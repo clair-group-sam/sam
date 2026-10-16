@@ -1,0 +1,16 @@
+project_id = "sam"
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+[db]
+port = 54322
+major_version = 15
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://sam.clair-group.com", "https://*.vercel.app"]
+[auth.external.azure]
+enabled = true
+client_id = "env(AZURE_CLIENT_ID)"
+secret = "env(AZURE_CLIENT_SECRET)"
+url = "env(AZURE_TENANT_URL)"
