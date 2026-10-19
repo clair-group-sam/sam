@@ -50,5 +50,5 @@ npm run dev                  # http://localhost:3000
 - `app/` — Next.js app router (login, auth callback, home/Inbox, API routes, cron)
 - `lib/` — Supabase clients, scope from Entra groups (UX-03)
 - `supabase/migrations/` — versioned SQL schema with RLS (apply with `supabase db push`)
-- `vercel.json` — region cdg1, hourly cron
+- `vercel.json` — region cdg1, daily cron (Hobby plan; hourly in production)
 - Never commit `.env*`; secrets live in Vercel and Supabase only.
