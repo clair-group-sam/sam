@@ -105,7 +105,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
               </button>
               {(open.has(part.key) || !!ql) && items.map((t) => (
                 <div key={t.id}>
-                  <Link href={href(t.ref)} className={"ch" + (active?.ref === t.ref ? " on" : "")}>
+                  <Link href={href(t.ref)} className={"tocch" + (active?.ref === t.ref ? " on" : "")}>
                     <span className="badge" style={{ background: part.color }}>{t.ref}</span><span>{t.title}</span>
                   </Link>
                   {(active?.ref === t.ref || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
