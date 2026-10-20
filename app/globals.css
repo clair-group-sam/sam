@@ -160,3 +160,7 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .log{background:var(--blue05);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;white-space:pre-wrap;min-height:120px;font-family:"IBM Plex Mono",monospace}
 .reader figure{margin:14px 0;text-align:center}
 .reader img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+
+.reader .revbar{border-left:3px solid var(--terra);margin-left:-16px;padding-left:13px;position:relative}
+.reader .revbar:before{content:"revised";position:absolute;left:-3px;top:-14px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--terra);font-weight:700}
+.reader svg{max-width:38px;max-height:38px}
