@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ENTS4, homeFor, type RoleKey } from "@/lib/nav";
@@ -25,7 +26,8 @@ export function initialsOf(name: string): string {
   return name.split(/[\s.@_-]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
-export async function getSession(): Promise<Session | null> {
+/** One auth round-trip per request (layout + page share it). */
+export const getSession = cache(async (): Promise<Session | null> => {
   const sb = await supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
@@ -41,4 +43,4 @@ export async function getSession(): Promise<Session | null> {
   let entity = group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL");
   if (wanted && (wanted === "ALL" ? group : entities.includes(wanted))) entity = wanted;
   return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, home: homeFor(role) };
-}
+});
