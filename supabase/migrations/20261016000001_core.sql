@@ -1,8 +1,8 @@
 -- S.A.M. core schema · step 2 of the beta plan (INF-01) · UX-03 scope by entity
-create extension if not exists pgcrypto;
-create extension if not exists vector;
-create extension if not exists pg_trgm;
-create extension if not exists citext;
+create extension if not exists pgcrypto with schema extensions;
+create extension if not exists vector with schema extensions;
+create extension if not exists pg_trgm with schema extensions;
+create extension if not exists citext with schema extensions;
 
 create type entity_code as enum ('ASF','ASJ','AJD','TEC');
 
