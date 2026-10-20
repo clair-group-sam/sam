@@ -57,11 +57,18 @@ export function partsOf(refs: string[]): Part[] {
   return keys.map((key, i) => ({ key, label: /^\d+$/.test(key) ? (key === "0" ? "Preliminary pages" : `Chapter ${key}`) : `Part ${key}`, color: PART_COLORS[i % PART_COLORS.length] }));
 }
 /** Adds ids to h2/h3 headings and returns them for the sub-table of contents. */
+const ENT_MAP: Record<string, string> = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", laquo: "«", raquo: "»", ndash: "–", mdash: "—", hellip: "…", deg: "°", eacute: "é", egrave: "è", ecirc: "ê", euml: "ë", agrave: "à", acirc: "â", ocirc: "ô", ucirc: "û", ugrave: "ù", icirc: "î", iuml: "ï", ccedil: "ç", Eacute: "É", Egrave: "È", Agrave: "À", Ccedil: "Ç", oelig: "œ", sup2: "²", sup3: "³", middot: "·", bull: "•", times: "×", euro: "€", copy: "©", reg: "®" };
+export function decodeEntities(s: string): string {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-zA-Z]+);/g, (m, e: string) => {
+    if (e[0] === "#") { const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10); return Number.isFinite(code) ? String.fromCodePoint(code) : m; }
+    return ENT_MAP[e] ?? m;
+  });
+}
 export function structureHtml(html: string, prefix: string, chapterRef?: string): { html: string; headings: Heading[] } {
   const headings: Heading[] = [];
   let i = 0; let first = true;
   const out = html.replace(/<h([23])([^>]*)>([\s\S]*?)<\/h\1>/gi, (_m, lvl: string, attrs: string, inner: string) => {
-    const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const text = decodeEntities(inner.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
     if (!text) return _m;
     // the chapter title itself is shown in the chapter header: do not repeat it
     if (first && chapterRef && text.replace(/\s+/g, "").toLowerCase().startsWith(chapterRef.replace(/\s+/g, "").toLowerCase())) { first = false; return ""; }
