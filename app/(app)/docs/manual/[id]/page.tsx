@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
 import { acknowledge } from "./actions";
+import { startRevision } from "@/app/(app)/docs/editor/[rev]/actions";
+import { isCmm, ownsManual } from "@/lib/revisions";
 
 type Reading = { person_id: string; acknowledged_at: string | null; via: string | null; people: { display_name: string; job_title: string | null } | null };
 
@@ -60,6 +62,10 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${manual.owner_role}` : "No revision yet"}
         right={<>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
+          {(isCmm(s) || ownsManual(s, manual.owner_role)) && working && <Link href={`/docs/editor/${working.id}`} className="btn">Open the draft (Rev {working.rev})</Link>}
+          {(isCmm(s) || ownsManual(s, manual.owner_role)) && !working && published[0] && (
+            <form action={startRevision}><input type="hidden" name="from_revision" value={published[0].id} /><button className="btn" type="submit">Start a new revision</button></form>
+          )}
           {current && !mine?.acknowledged_at && (
             <form action={acknowledge}><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
               <button className="btn primary" type="submit">I have read this revision</button></form>

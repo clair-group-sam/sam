@@ -164,3 +164,20 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .reader .revbar{border-left:3px solid var(--terra);margin-left:-16px;padding-left:13px;position:relative}
 .reader .revbar:before{content:"revised";position:absolute;left:-3px;top:-14px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--terra);font-weight:700}
 .reader svg{max-width:38px;max-height:38px}
+
+/* revision editor */
+.edwrap{display:flex;flex-direction:column;min-height:0}
+.edhead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.edtitle{flex:1;font-size:18px;font-weight:800;border:1px solid transparent;border-radius:6px;padding:4px 8px;background:transparent}
+.edtitle:hover,.edtitle:focus{border-color:var(--line);background:#fff;outline:none}
+.toolbar{display:flex;align-items:center;gap:4px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--blue05);flex-wrap:wrap}
+.tb{border:1px solid transparent;background:transparent;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;color:var(--navy);cursor:pointer}
+.tb:hover{background:#fff;border-color:var(--line)}.tb.on{background:var(--navy);color:#fff}
+.toolbar .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.edbody{padding:10px 24px 30px;overflow-y:auto;max-height:calc(100vh - 330px)}
+.edbody .ProseMirror{outline:none;min-height:300px}
+.edbody .ProseMirror table{width:100%}
+.edbody .ProseMirror .selectedCell:after{content:"";position:absolute;inset:0;background:rgba(18,165,229,.12);pointer-events:none}
+.edbody .ProseMirror td,.edbody .ProseMirror th{position:relative}
+.edtoc .tocch.changed span:last-child:after{content:" ●";color:var(--amber);font-size:10px}
+.pubcard .step{margin-bottom:6px}
