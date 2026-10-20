@@ -90,9 +90,10 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
           {mode === "full" && hits && (
             <div className="hits">
               {hits.map((h, i) => (
-                <Link key={i} href={href(h.ref, "")} onClick={(e) => { e.preventDefault(); router.push(href(h.ref)); }} className={"hit" + (active?.ref === h.ref ? " on" : "")}>
+                <Link key={i} href={href(h.ref)} onClick={(e) => { e.preventDefault(); router.push(href(h.ref)); }} className={"hit" + (active?.ref === h.ref ? " on" : "")}>
                   <span className="badge" style={{ background: colorOf[partOfRef(h.ref)] }}>{h.ref}</span>
                   <span className="t">{h.title}</span>
+                  <span className="n">{h.n}</span>
                   <span className="s">…{h.snippet}…</span>
                 </Link>
               ))}
