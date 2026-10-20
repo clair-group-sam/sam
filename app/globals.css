@@ -153,3 +153,7 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .toc .tocch .fold{margin-left:auto;color:var(--slate45);font-weight:400;font-size:11px;padding-left:6px}
 .reader a.ref{color:var(--cyan6);text-decoration:none;border-bottom:1px dotted var(--blue2)}
 .reader a.ref:hover{text-decoration:underline}
+.inp{display:block;width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px;background:#fff}
+.log{background:var(--blue05);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;white-space:pre-wrap;min-height:120px;font-family:"IBM Plex Mono",monospace}
+.reader figure{margin:14px 0;text-align:center}
+.reader img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
