@@ -77,3 +77,23 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .tbl th{text-align:left;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate45);padding:12px 16px;border-bottom:1px solid var(--line)}
 .tbl td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
 .tbl tr:last-child td{border-bottom:0}
+
+/* pills, steps, tabs, reader */
+.pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.04em;background:var(--blue1);color:var(--navy)}
+.pill.green{background:var(--green-s);color:#1d7a3a}.pill.amber{background:var(--amber-s);color:#8a5a00}.pill.red{background:var(--terra-s);color:var(--terra)}
+.steps{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;overflow-x:auto}
+.step{flex:1;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--slate5);position:relative;white-space:nowrap}
+.step i{width:12px;height:12px;border-radius:50%;border:2px solid var(--blue2);background:#fff;flex:0 0 auto}
+.step.done i{background:var(--green);border-color:var(--green)}.step.done{color:var(--navy)}
+.step.now i{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 0 4px var(--blue175)}.step.now{color:var(--navy);font-weight:700}
+.step+.step:before{content:"";height:1px;background:var(--line);width:18px;margin-right:4px}
+.tabs{display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--line)}
+.tab{padding:10px 14px;font-size:13px;font-weight:600;color:var(--slate6);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--navy);border-bottom-color:var(--cyan)}
+.toc{width:320px;flex:0 0 auto;max-height:calc(100vh - 260px);overflow-y:auto}
+.toc .sl{font-size:12.5px;padding:6px 10px}
+.reader{font-size:14px;line-height:1.6;max-width:none}
+.reader h1,.reader h2,.reader h3{font-weight:700;margin:18px 0 8px}.reader h1{font-size:20px}.reader h2{font-size:17px}.reader h3{font-size:15px}
+.reader p{margin:8px 0}.reader table{border-collapse:collapse;margin:10px 0;font-size:13px}.reader td,.reader th{border:1px solid var(--line);padding:5px 8px;vertical-align:top}
+.reader ul,.reader ol{padding-left:22px;margin:8px 0}.reader li{margin:3px 0}
+.reader .fig{display:inline-block;background:var(--blue1);color:var(--slate6);border-radius:4px;padding:1px 6px;font-size:11px;font-style:normal}
