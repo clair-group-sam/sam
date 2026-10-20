@@ -38,11 +38,10 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
     return () => clearTimeout(t);
   }, [q, mode, revId]);
 
-  // highlight the words in the chapter being read
+  // chapter content is injected by hand (not by React) so that highlights survive re-renders
   useEffect(() => {
     const el = art.current; if (!el) return;
-    el.querySelectorAll("mark.hl").forEach((m) => m.replaceWith(document.createTextNode(m.textContent ?? "")));
-    el.normalize();
+    el.innerHTML = active?.html ?? "";
     const words = q.trim().toLowerCase().split(/[\s-]+/).filter((w) => w.length > 2);
     if (mode !== "full" || !words.length) return;
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -130,7 +129,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
             </div>
             <div className="readscroll">
-              <article ref={art} className="reader" onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: active.html }} />
+              <article ref={art} className="reader" onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
               <div className="pager">
                 {prev ? <Link href={href(prev.ref)}>‹ {prev.ref} {prev.title}</Link> : <span />}
                 {next ? <Link href={href(next.ref)}>{next.ref} {next.title} ›</Link> : <span />}
