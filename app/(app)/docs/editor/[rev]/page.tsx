@@ -6,10 +6,12 @@ import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
 import { allowedTransitions, isCmm, ownsManual } from "@/lib/revisions";
-import { moveStep, saveSummary } from "./actions";
+import { moveStep, saveSummary, resolveConflict } from "./actions";
+import { frozenRefs } from "@/lib/revisions-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type Round = { id: string; at: string; direction: string; who: string; note: string };
-type Meta = { id: string; ord: number; ref: string; title: string | null; changed: boolean };
+type Meta = { id: string; ord: number; ref: string; title: string | null; changed: boolean; conflict: { base_html: string; base_rev: string } | null };
 
 export default async function Editor({ params, searchParams }: { params: Promise<{ rev: string }>; searchParams: Promise<{ tab?: string; sec?: string }> }) {
   const { rev: revId } = await params;
@@ -19,18 +21,23 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const sb = await supabaseServer();
   const { data: r } = await sb.from("revisions").select("*").eq("id", revId).maybeSingle();
   if (!r) notFound();
-  const rev = r as Revision & { submitted_at?: string | null; step_changed_at?: string | null };
+  const rev = r as Revision & { submitted_at?: string | null; step_changed_at?: string | null; based_on?: string | null };
   const { data: m } = await sb.from("manuals").select("*").eq("id", rev.manual_id).maybeSingle();
   if (!m) notFound();
   const manual = m as Manual;
   const cmm = isCmm(s), owner = ownsManual(s, manual.owner_role);
   if (!cmm && !owner) notFound();
   const editable = rev.step === "draft";
-  const { data: metaData } = await sb.from("revision_sections").select("id,ord,ref,title,changed").eq("revision_id", rev.id).order("ord");
+  const { data: metaData } = await sb.from("revision_sections").select("id,ord,ref,title,changed,conflict").eq("revision_id", rev.id).order("ord");
+  const frozen = await frozenRefs(supabaseAdmin(), rev);
+  const { data: baseRow } = rev.based_on ? await sb.from("revisions").select("rev,step").eq("id", rev.based_on).maybeSingle() : { data: null };
+  const baseLabel = baseRow ? `Rev ${(baseRow as { rev: string }).rev}` : "the published revision";
   const metas = (metaData ?? []) as Meta[];
   const activeMeta = metas.find((x) => x.ref === sec) ?? metas.find((x) => x.ord === 1) ?? metas[0] ?? null;
   let active: Section | null = null;
-  if (activeMeta) { const { data: one } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed").eq("id", activeMeta.id).maybeSingle(); active = (one as Section | null) ?? null; }
+  if (activeMeta) { const { data: one } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed,conflict").eq("id", activeMeta.id).maybeSingle(); active = (one as Section | null) ?? null; }
+  const activeConflict = (active as (Section & { conflict?: { base_html: string; base_rev: string } | null }) | null)?.conflict ?? null;
+  const conflicts = metas.filter((x) => x.conflict).length;
   const parts = partsOf(metas.map((x) => x.ref));
   const colorOf = Object.fromEntries(parts.map((p) => [p.key, p.color]));
   const changedCount = metas.filter((x) => x.changed).length;
@@ -43,7 +50,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
   return (
     <>
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code} · revision editor`} title={`${manual.title} — Issue ${rev.issue} Rev ${rev.rev}`}
-        sub={`${STEP_LABEL[rev.step]} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed · owner ${manual.owner_role}${editable ? "" : " · read-only at this step"}`}
+        sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_role}${editable ? "" : " · read-only at this step"}`}
         right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
 
       <div className="steps mb-4">
@@ -65,14 +72,28 @@ export default async function Editor({ params, searchParams }: { params: Promise
                 {metas.filter((x) => partOf(x.ref) === p.key).map((x) => (
                   <Link key={x.id} href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`} className={"tocch" + (active?.id === x.id ? " on" : "") + (x.changed ? " changed" : "")}>
                     <span className="badge" style={{ background: p.color }}>{x.ref}</span><span>{x.title}</span>
+                    {x.conflict ? <b className="fold" style={{ color: "var(--terra)" }} title="conflict">!</b> : frozen.refs.has(x.ref) ? <b className="fold" title={`frozen · Rev ${frozen.baseRev}`}>🔒</b> : null}
                   </Link>
                 ))}
               </div>
             ))}
           </aside>
           <section className="card flex-1 min-w-0" style={{ borderTop: `4px solid ${active ? colorOf[partOf(active.ref)] : "var(--line)"}` }}>
+            {active && activeConflict && (
+              <div className="conflict">
+                <div className="ch"><span className="eyebrow" style={{ color: "var(--terra)" }}>Conflict · this chapter was also changed in Rev {activeConflict.base_rev}, now published</span></div>
+                <div className="cb">
+                  <p className="mini mb-2">Below, the approved text of Rev {activeConflict.base_rev}. Your own text stays in the editor underneath. Choose which one Rev {rev.rev} continues from.</p>
+                  <div className="reader basepreview" dangerouslySetInnerHTML={{ __html: activeConflict.base_html }} />
+                  <div className="flex gap-2 mt-3">
+                    <form action={resolveConflict}><input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="section_id" value={active.id} /><input type="hidden" name="choice" value="base" /><button className="btn primary" type="submit">Take the approved text</button></form>
+                    <form action={resolveConflict}><input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="section_id" value={active.id} /><input type="hidden" name="choice" value="mine" /><button className="btn" type="submit">Keep my text (I will merge by hand)</button></form>
+                  </div>
+                </div>
+              </div>
+            )}
             {active ? (
-              <ChapterEditor key={active.id} revisionId={rev.id} sectionId={active.id} refCode={active.ref} title={active.title ?? ""} html={active.body.html ?? ""} changed={active.changed} editable={editable && (cmm || owner)} />
+              <ChapterEditor key={active.id} revisionId={rev.id} sectionId={active.id} refCode={active.ref} title={active.title ?? ""} html={active.body.html ?? ""} changed={active.changed} editable={editable && (cmm || owner)} frozenBy={frozen.refs.has(active.ref) ? frozen.baseRev : null} baseRevLabel={baseLabel} />
             ) : <div className="cb text-slate6">No chapter.</div>}
           </section>
         </div>

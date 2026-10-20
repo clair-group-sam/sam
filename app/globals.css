@@ -181,3 +181,7 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .edbody .ProseMirror td,.edbody .ProseMirror th{position:relative}
 .edtoc .tocch.changed span:last-child:after{content:" ●";color:var(--amber);font-size:10px}
 .pubcard .step{margin-bottom:6px}
+
+.lockbar{margin:0 18px 10px;padding:10px 14px;border-radius:8px;background:var(--terra-s);color:#8a1a12;font-size:13px}
+.conflict{border-bottom:3px solid var(--terra)}
+.basepreview{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--blue05)}

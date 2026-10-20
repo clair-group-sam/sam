@@ -16,6 +16,8 @@ export const TRANSITIONS: Transition[] = [
   { from: "with_civil_aviation", to: "draft", label: "Authority remarks → back to draft", by: "cmm" },
   { from: "published", to: "repository", label: "Deposited on the TM-CAD repository", by: "cmm" },
 ];
+export const EDITING = ["draft", "approved_np"];
+export const UNDER_REVIEW = ["approved_compliance", "signed", "with_civil_aviation"];
 export function isCmm(s: Session): boolean { return s.roles.includes("CMM") || s.roles.includes("SUPERADMIN"); }
 export function ownsManual(s: Session, ownerRole: string): boolean { return s.roles.map((r) => r.toUpperCase()).includes(ownerRole.toUpperCase()); }
 export function allowedTransitions(s: Session, step: string, ownerRole: string, needsSignature: boolean, toRepo: boolean): Transition[] {

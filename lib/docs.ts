@@ -17,7 +17,7 @@ export function entityFilter<T extends { eq: (c: string, v: string) => T }>(q: T
 }
 
 /** Manuals in scope with their current (latest published) and working (unpublished) revisions. */
-export async function listManuals(s: Session): Promise<{ manual: Manual; current: Revision | null; working: Revision | null }[]> {
+export async function listManuals(s: Session): Promise<{ manual: Manual; current: Revision | null; working: Revision | null; workings: Revision[] }[]> {
   const sb = await supabaseServer();
   let mq = sb.from("manuals").select("*").order("path").order("code");
   if (s.entity !== "ALL") mq = mq.eq("entity", s.entity);
@@ -30,8 +30,9 @@ export async function listManuals(s: Session): Promise<{ manual: Manual; current
   return (manuals as Manual[]).map((manual) => {
     const rs = byManual.get(manual.id) ?? [];
     const current = rs.filter((r) => r.step === "published" || r.step === "repository").sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""))[0] ?? null;
-    const working = rs.find((r) => r.step !== "published" && r.step !== "repository") ?? null;
-    return { manual, current, working };
+    const workings = rs.filter((r) => r.step !== "published" && r.step !== "repository").sort((a, b) => STEPS.indexOf(b.step) - STEPS.indexOf(a.step));
+    const working = workings[0] ?? null;
+    return { manual, current, working, workings };
   });
 }
 

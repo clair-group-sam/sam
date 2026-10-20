@@ -23,7 +23,9 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const { data: revsData } = await sb.from("revisions").select("*").eq("manual_id", id).order("published_at", { ascending: false, nullsFirst: true }).order("created_at", { ascending: false });
   const revs = (revsData ?? []) as Revision[];
   const published = revs.filter((r) => r.step === "published" || r.step === "repository").sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
-  const working = revs.find((r) => r.step !== "published" && r.step !== "repository") ?? null;
+  const workings = revs.filter((r) => r.step !== "published" && r.step !== "repository").sort((a, b) => STEPS.indexOf(b.step) - STEPS.indexOf(a.step));
+  const working = workings[0] ?? null;
+  const editing = workings.find((r) => r.step === "draft" || r.step === "approved_np") ?? null;
   const current = (rev ? revs.find((r) => r.id === rev) : null) ?? published[0] ?? working ?? null;
 
   let sections: Section[] = [];
@@ -62,9 +64,9 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${manual.owner_role}` : "No revision yet"}
         right={<>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
-          {(isCmm(s) || ownsManual(s, manual.owner_role)) && working && <Link href={`/docs/editor/${working.id}`} className="btn">Open the draft (Rev {working.rev})</Link>}
-          {(isCmm(s) || ownsManual(s, manual.owner_role)) && !working && published[0] && (
-            <form action={startRevision}><input type="hidden" name="from_revision" value={published[0].id} /><button className="btn" type="submit">Start a new revision</button></form>
+          {(isCmm(s) || ownsManual(s, manual.owner_role)) && editing && <Link href={`/docs/editor/${editing.id}`} className="btn">Open the draft (Rev {editing.rev})</Link>}
+          {(isCmm(s) || ownsManual(s, manual.owner_role)) && !editing && (published[0] || working) && (
+            <form action={startRevision}><input type="hidden" name="from_revision" value={(published[0] ?? working)!.id} /><button className="btn" type="submit">{working ? `Start Rev ${String(parseInt(working.rev, 10) + 1).padStart(working.rev.length, "0")} (parallel)` : "Start a new revision"}</button></form>
           )}
           {current && !mine?.acknowledged_at && (
             <form action={acknowledge}><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
@@ -78,8 +80,8 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
           <span className="pill green">Published · Iss {current.issue} Rev {current.rev}{current.published_at ? ` · ${current.published_at}` : ""}</span>
           {current.authority_route === "approval" && <span className="mini">approved by the civil aviation authority before publication</span>}
           {current.authority_route === "notification" && <span className="mini">notified to the civil aviation authority</span>}
-          {working && <Link href={`/docs/manual/${manual.id}?rev=${working.id}`} className="pill amber">Next revision in progress · Rev {working.rev} — {STEP_LABEL[working.step]}</Link>}
-          {!working && s.role !== "user" && <span className="mini">no revision in progress</span>}
+          {workings.map((w) => <Link key={w.id} href={`/docs/manual/${manual.id}?rev=${w.id}`} className="pill amber">Rev {w.rev} — {STEP_LABEL[w.step]}</Link>)}
+          {!workings.length && s.role !== "user" && <span className="mini">no revision in progress</span>}
         </div>
       )}
       {current && !(current.step === "published" || current.step === "repository") && (

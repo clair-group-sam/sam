@@ -8,11 +8,12 @@ import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
-import { saveSection } from "@/app/(app)/docs/editor/[rev]/actions";
+import { saveSection, revertSection } from "@/app/(app)/docs/editor/[rev]/actions";
 
-type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean };
+type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string };
 
-export default function ChapterEditor({ revisionId, sectionId, refCode, title: title0, html, changed: changed0, editable }: Props) {
+export default function ChapterEditor({ revisionId, sectionId, refCode, title: title0, html, changed: changed0, editable: editable0, frozenBy = null, baseRevLabel = "the published revision" }: Props) {
+  const editable = editable0 && !frozenBy;
   const router = useRouter();
   const [title, setTitle] = useState(title0);
   const [dirty, setDirty] = useState(false);
@@ -42,6 +43,15 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   });
+  function discard() { if (!editor) return; editor.commands.setContent(html); setTitle(title0); setDirty(false); setMsg("Back to the last saved state"); }
+  async function revert() {
+    if (!editor || saving) return;
+    if (!window.confirm(`Revert chapter ${refCode} to the text of ${baseRevLabel}? Your changes in this revision will be lost.`)) return;
+    setSaving(true);
+    const r = await revertSection({ revisionId, sectionId });
+    setSaving(false);
+    if (r.ok) { editor.commands.setContent(r.html ?? ""); baseNorm.current = editor.getHTML(); setDirty(false); setChanged(false); setMsg("Chapter reverted"); router.refresh(); } else setMsg(r.error ?? "Error");
+  }
   if (!editor) return <div className="cb text-slate6">Loading editor…</div>;
   const B = ({ on, act, label, title }: { on?: boolean; act: () => void; label: string; title?: string }) => (
     <button type="button" className={"tb" + (on ? " on" : "")} onMouseDown={(e) => { e.preventDefault(); act(); }} title={title ?? label} disabled={!editable}>{label}</button>
@@ -52,7 +62,9 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
         <span className="badge big">{refCode}</span>
         <input className="edtitle" value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} disabled={!editable} />
         {changed && <span className="pill amber">changed in this revision</span>}
+        {frozenBy && <span className="pill red">frozen · changed in Rev {frozenBy}, under review</span>}
       </div>
+      {frozenBy && <div className="lockbar">This chapter was modified in Rev {frozenBy}, which is still with Compliance or the authority. It is read-only here and will receive the approved text automatically when Rev {frozenBy} is published.</div>}
       {editable && (
         <div className="toolbar">
           <B label="B" title="Bold" on={editor.isActive("bold")} act={() => editor.chain().focus().toggleBold().run()} />
@@ -77,6 +89,8 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <B label="↷" title="Redo" act={() => editor.chain().focus().redo().run()} />
           <span className="flex-1" />
           <span className="mini">{msg || (dirty ? "Unsaved changes" : "")}</span>
+          {dirty && <button type="button" className="btn" onClick={discard} disabled={saving} title="Back to the last saved state of this chapter">Cancel changes</button>}
+          {changed && !dirty && <button type="button" className="btn" onClick={revert} disabled={saving} title="Back to the text of the base revision">Revert chapter</button>}
           <button type="button" className="btn primary" onClick={save} disabled={saving || !dirty}>{saving ? "Saving…" : "Save (⌘S)"}</button>
         </div>
       )}
