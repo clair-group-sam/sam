@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
-import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
+import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
 import { acknowledge } from "./actions";
 
@@ -28,22 +28,28 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   let readings: Reading[] = [];
   let mine: Reading | null = null;
   if (current) {
-    const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed").eq("revision_id", current.id).order("ord");
-    sections = (sd ?? []) as Section[];
+    const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,changed,headings:body->headings,structured:body->structured,pages:body->pages").eq("revision_id", current.id).order("ord");
+    sections = ((sd ?? []) as unknown as (Omit<Section, "body"> & { headings: Heading[] | null; structured: boolean | null; pages: string[] | null })[]).map((x) => ({ id: x.id, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { headings: x.headings ?? undefined, structured: !!x.structured, pages: x.pages ?? undefined } }));
     const { data: rd } = await sb.from("readings").select("person_id,acknowledged_at,via,people(display_name,job_title)").eq("revision_id", current.id);
     readings = (rd ?? []) as unknown as Reading[];
     mine = readings.find((r) => r.person_id === s.person?.id) ?? null;
   }
-  const active = sections.find((x) => x.ref === sec) ?? sections.find((x) => x.ord === 1) ?? sections[0] ?? null;
-  const structured = new Map(sections.map((x) => [x.id, structureHtml(x.body.html ?? `<p>${x.body.text ?? ""}</p>`, `s${x.ord}`, x.ref)]));
+  const activeMeta = sections.find((x) => x.ref === sec) ?? sections.find((x) => x.ord === 1) ?? sections[0] ?? null;
+  let active: Section | null = null;
+  if (activeMeta) {
+    const { data: one } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed").eq("id", activeMeta.id).maybeSingle();
+    active = (one as Section | null) ?? null;
+  }
+  // headings: stored at import; otherwise (legacy rows) computed for the active chapter only
+  const activeStructured = active ? (active.body.structured ? { html: active.body.html ?? "", headings: active.body.headings ?? [] } : structureHtml(active.body.html ?? `<p>${active.body.text ?? ""}</p>`, `s${active.ord}`, active.ref)) : null;
   const parts = partsOf(sections.map((x) => x.ref));
-  const toc: TocItem[] = sections.map((x) => ({ id: x.id, ref: x.ref, title: x.title, part: partOf(x.ref), headings: structured.get(x.id)?.headings ?? [] }));
+  const toc: TocItem[] = sections.map((x) => ({ id: x.id, ref: x.ref, title: x.title, part: partOf(x.ref), headings: (x.id === active?.id ? activeStructured?.headings : x.body.headings) ?? [] }));
   // references inside the manual's own table of contents → links
   const chapterRefs = new Map(sections.map((x) => [x.ref, x.id]));
   const subRefs = new Map<string, { ref: string; id: string }>();
-  for (const x of sections) for (const h of structured.get(x.id)?.headings ?? []) { const mm = /^([A-Z]{0,2}\d*(?:\.\d+){1,3})\b/.exec(h.text); if (mm && !chapterRefs.has(mm[1])) subRefs.set(mm[1], { ref: x.ref, id: h.id }); }
+  for (const x of toc) for (const h of x.headings) { const mm = /^([A-Z]{0,2}\d*(?:\.\d+){1,3})\b/.exec(h.text); if (mm && !chapterRefs.has(mm[1])) subRefs.set(mm[1], { ref: x.ref, id: h.id }); }
   const base = current ? `/docs/manual/${manual.id}?rev=${current.id}` : `/docs/manual/${manual.id}?x=1`;
-  const activeHtml = active ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(structured.get(active.id)?.html ?? "", chapterRefs, subRefs, base) : structured.get(active.id)?.html ?? "") : "";
+  const activeHtml = active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(activeStructured.html, chapterRefs, subRefs, base) : activeStructured.html) : "";
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
   const office = s.role !== "user";
   const tabs = [["read", "Read"], ["changed", "What changed"], ...(office ? [["history", "History"], ["readers", "Readers"]] : [])] as [string, string][];

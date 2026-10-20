@@ -3,7 +3,7 @@ import type { Session } from "@/lib/session";
 
 export type Manual = { id: string; entity: string; code: string; title: string; owner_role: string; needs_signature: boolean; to_tmcad_repository: boolean; path: string | null };
 export type Revision = { id: string; manual_id: string; issue: number; rev: string; step: string; authority_route: string | null; authority_ref: string | null; summary: string | null; published_at: string | null; created_at: string };
-export type Section = { id: string; ord: number; ref: string; title: string | null; body: { html?: string; text?: string; pages?: string[] }; changed: boolean };
+export type Section = { id: string; ord: number; ref: string; title: string | null; body: { html?: string; text?: string; pages?: string[]; headings?: Heading[]; structured?: boolean }; changed: boolean };
 export type Certificate = { id: string; entity: string; scope: string; registration: string | null; kind: string; title: string; issuer: string | null; valid_until: string | null; file_path: string | null };
 
 export const STEP_LABEL: Record<string, string> = {

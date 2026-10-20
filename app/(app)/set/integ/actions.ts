@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { buildSections, type WmBundle } from "@/lib/wm-import";
+import { structureHtml } from "@/lib/docs";
 
 export type ImportInput = { entity: string; code: string; title: string; path?: string; ownerRole?: string; bundle: WmBundle; imageExt: Record<string, string> };
 export type ImportResult = { ok: true; manualId: string; revisionId: string; sections: number; changed: number } | { ok: false; error: string };
@@ -41,7 +42,7 @@ export async function importWmBundle(input: ImportInput): Promise<ImportResult> 
   const base = `/api/files/manuals/${input.entity}/${input.code}/${rev}`;
   const sections = buildSections(b, (id) => `${base}/${id}.${input.imageExt[id] ?? "png"}`);
   await db.from("revision_sections").delete().eq("revision_id", revisionId);
-  const rows = sections.map((x) => ({ revision_id: revisionId, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { html: x.html, text: x.text, pages: x.pages, page_revs: x.pageRevs } }));
+  const rows = sections.map((x) => { const st = structureHtml(x.html, `s${x.ord}`, x.ref); return { revision_id: revisionId, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { html: st.html, text: x.text, pages: x.pages, page_revs: x.pageRevs, headings: st.headings, structured: true } }; });
   for (let i = 0; i < rows.length; i += 20) { const { error } = await db.from("revision_sections").insert(rows.slice(i, i + 20)); if (error) return { ok: false, error: error.message }; }
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: input.entity, object_type: "revision", object_id: revisionId, action: "import_webmanuals", after: { code: input.code, rev, sections: rows.length, images: Object.keys(b.images ?? {}).length } });
   revalidatePath("/docs/lib");
