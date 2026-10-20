@@ -2,6 +2,7 @@
 create extension if not exists pgcrypto;
 create extension if not exists vector;
 create extension if not exists pg_trgm;
+create extension if not exists citext;
 
 create type entity_code as enum ('ASF','ASJ','AJD','TEC');
 
@@ -21,7 +22,7 @@ insert into entities values
 create table people (
   id uuid primary key default gen_random_uuid(),
   entra_oid uuid unique,
-  email citext unique,
+  email extensions.citext unique,
   display_name text not null,
   home_entity entity_code,
   entities entity_code[] not null default '{}',
@@ -29,7 +30,6 @@ create table people (
   is_group_function boolean not null default false,
   created_at timestamptz not null default now()
 );
-create extension if not exists citext;
 
 -- helper: current user's row
 create or replace function me() returns people language sql stable security definer set search_path = public as $$
@@ -76,7 +76,7 @@ declare prev text;
 begin
   select hash into prev from audit_log order by id desc limit 1;
   new.prev_hash := prev;
-  new.hash := encode(digest(coalesce(prev,'') || new.at::text || new.object_type || new.object_id || new.action || coalesce(new.after::text,''), 'sha256'), 'hex');
+  new.hash := encode(extensions.digest(coalesce(prev,'') || new.at::text || new.object_type || new.object_id || new.action || coalesce(new.after::text,''), 'sha256'), 'hex');
   return new;
 end $$;
 create trigger audit_chain_trg before insert on audit_log for each row execute function audit_chain();
