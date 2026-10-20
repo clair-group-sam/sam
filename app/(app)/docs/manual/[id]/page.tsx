@@ -3,14 +3,15 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
-import { STEPS, STEP_LABEL, type Manual, type Revision, type Section } from "@/lib/docs";
+import { STEPS, STEP_LABEL, partOf, partsOf, structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
+import Reader, { type TocItem } from "@/components/Reader";
 import { acknowledge } from "./actions";
 
 type Reading = { person_id: string; acknowledged_at: string | null; via: string | null; people: { display_name: string; job_title: string | null } | null };
 
-export default async function ManualPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; sec?: string; rev?: string }> }) {
+export default async function ManualPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; sec?: string; rev?: string; q?: string }> }) {
   const { id } = await params;
-  const { tab = "read", sec, rev } = await searchParams;
+  const { tab = "read", sec, rev, q = "" } = await searchParams;
   const s = await getSession();
   if (!s) redirect("/login");
   const sb = await supabaseServer();
@@ -34,6 +35,9 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
     mine = readings.find((r) => r.person_id === s.person?.id) ?? null;
   }
   const active = sections.find((x) => x.ref === sec) ?? sections.find((x) => x.ord === 1) ?? sections[0] ?? null;
+  const structured = new Map(sections.map((x) => [x.id, structureHtml(x.body.html ?? `<p>${x.body.text ?? ""}</p>`, `s${x.ord}`, x.ref)]));
+  const parts = partsOf(sections.map((x) => x.ref));
+  const toc: TocItem[] = sections.map((x) => ({ id: x.id, ref: x.ref, title: x.title, part: partOf(x.ref), headings: structured.get(x.id)?.headings ?? [] }));
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
   const office = s.role !== "user";
   const tabs = [["read", "Read"], ["changed", "What changed"], ...(office ? [["history", "History"], ["readers", "Readers"]] : [])] as [string, string][];
@@ -64,27 +68,11 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         {published.length > 1 && <span className="mini ml-auto">Other published revisions: {published.slice(1).map((r) => <Link key={r.id} className="underline mr-2" href={`/docs/manual/${manual.id}?rev=${r.id}`}>Rev {r.rev}</Link>)}</span>}
       </div>
 
-      {tab === "read" && (
-        <div className="flex gap-4 items-start">
-          <aside className="card toc">
-            <div className="ch"><span className="eyebrow">Contents</span><span className="mini">{sections.length} sections</span></div>
-            <div className="p-2">
-              {sections.map((x) => (
-                <Link key={x.id} href={`/docs/manual/${manual.id}?sec=${encodeURIComponent(x.ref)}${current ? `&rev=${current.id}` : ""}`} className={"sl" + (active?.id === x.id ? " on" : "")}>
-                  <span className="mono mr-2">{x.ref}</span>{x.title}
-                </Link>
-              ))}
-              {!sections.length && <div className="p-4 text-slate6 text-sm">No content imported for this revision yet (Web Manuals page document or PDF).</div>}
-            </div>
-          </aside>
-          <section className="card flex-1 min-w-0">
-            {active ? (<>
-              <div className="ch"><span><span className="mono mr-2">{active.ref}</span><b>{active.title}</b></span><span className="mini">{active.body.pages?.length ?? 0} page{(active.body.pages?.length ?? 0) > 1 ? "s" : ""}</span></div>
-              <article className="cb reader" dangerouslySetInnerHTML={{ __html: active.body.html ?? `<p>${active.body.text ?? ""}</p>` }} />
-            </>) : <div className="cb text-slate6">Nothing to read.</div>}
-          </section>
-        </div>
+      {tab === "read" && current && (
+        <Reader manualId={manual.id} revId={current.id} parts={parts} toc={toc} initialQuery={q}
+          active={active ? { ref: active.ref, title: active.title, html: structured.get(active.id)?.html ?? "", part: partOf(active.ref), pages: active.body.pages?.length ?? 0 } : null} />
       )}
+      {tab === "read" && !current && <section className="card"><div className="cb text-slate6">No revision to read yet.</div></section>}
 
       {tab === "changed" && (
         <section className="card"><div className="ch"><span className="eyebrow">What changed in Rev {current?.rev ?? "—"}</span></div>

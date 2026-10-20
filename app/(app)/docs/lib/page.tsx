@@ -45,7 +45,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
           <table className="tbl"><tbody>
             {hits.map((h, i) => (
               <tr key={i}><td className="mono" style={{ width: 140 }}>{h.code} · {h.ref}</td>
-                <td><Link href={`/docs/manual/${h.manual_id}?sec=${encodeURIComponent(h.ref)}`}><b>{h.stitle ?? h.ref}</b></Link><div className="mini">…{h.snippet}…</div></td></tr>
+                <td><Link href={`/docs/manual/${h.manual_id}?sec=${encodeURIComponent(h.ref)}&q=${encodeURIComponent(q)}`}><b>{h.stitle ?? h.ref}</b></Link><div className="mini">…{h.snippet}…</div></td></tr>
             ))}
             {!hits.length && <tr><td className="p-5 text-slate6">No passage found. Full-text search covers the published content imported so far (Astontec CAE Rev 05).</td></tr>}
           </tbody></table>

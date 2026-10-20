@@ -42,3 +42,36 @@ export function daysUntil(d: string | null): number | null {
   if (!d) return null;
   return Math.round((new Date(d).getTime() - Date.now()) / 86400000);
 }
+
+/* ---------- reading structure ---------- */
+export type Heading = { level: number; text: string; id: string };
+export type Part = { key: string; label: string; color: string };
+const PART_COLORS = ["#7d166d", "#0e8cc4", "#248a3d", "#b86e00", "#b43a0f", "#0d2a3f", "#6b5bd2", "#006c9c"];
+export function partOf(ref: string): string {
+  const m = /^([A-Za-z]+|\d+)/.exec(ref);
+  return m ? m[1].toUpperCase() : "?";
+}
+export function partsOf(refs: string[]): Part[] {
+  const keys: string[] = [];
+  for (const r of refs) { const k = partOf(r); if (!keys.includes(k)) keys.push(k); }
+  return keys.map((key, i) => ({ key, label: /^\d+$/.test(key) ? (key === "0" ? "Preliminary pages" : `Chapter ${key}`) : `Part ${key}`, color: PART_COLORS[i % PART_COLORS.length] }));
+}
+/** Adds ids to h2/h3 headings and returns them for the sub-table of contents. */
+export function structureHtml(html: string, prefix: string, chapterRef?: string): { html: string; headings: Heading[] } {
+  const headings: Heading[] = [];
+  let i = 0; let first = true;
+  const out = html.replace(/<h([23])([^>]*)>([\s\S]*?)<\/h\1>/gi, (_m, lvl: string, attrs: string, inner: string) => {
+    const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) return _m;
+    // the chapter title itself is shown in the chapter header: do not repeat it
+    if (first && chapterRef && text.replace(/\s+/g, "").toLowerCase().startsWith(chapterRef.replace(/\s+/g, "").toLowerCase())) { first = false; return ""; }
+    first = false;
+    const id = `${prefix}-${++i}`;
+    headings.push({ level: Number(lvl), text, id });
+    return `<h${lvl}${attrs} id="${id}">${inner}</h${lvl}>`;
+  });
+  return { html: out, headings };
+}
+export function stripHtml(h: string): string {
+  return h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
