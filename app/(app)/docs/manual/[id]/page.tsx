@@ -64,6 +64,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${manual.owner_role}` : "No revision yet"}
         right={<>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
+          {current?.pdf_path && <a href={`/api/files/${current.pdf_path}`} target="_blank" className="btn" rel="noreferrer">Official PDF</a>}
           {(isCmm(s) || ownsManual(s, manual.owner_role)) && editing && <Link href={`/docs/editor/${editing.id}`} className="btn">Open the draft (Rev {editing.rev})</Link>}
           {(isCmm(s) || ownsManual(s, manual.owner_role)) && !editing && (published[0] || working) && (
             <form action={startRevision}><input type="hidden" name="from_revision" value={(published[0] ?? working)!.id} /><button className="btn" type="submit">{working ? `Start Rev ${String(parseInt(working.rev, 10) + 1).padStart(working.rev.length, "0")} (parallel)` : "Start a new revision"}</button></form>

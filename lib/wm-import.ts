@@ -2,8 +2,10 @@
 export type WmPage = { id: number; number: string; name: string; isChapter?: boolean; html: string };
 export type WmToc = { chapter: string; pageId: number; pageNumber: string; title: string; parentChapter: string | null };
 export type WmBundle = {
-  format: string; manual: { wmId: number; name: string; revisionId: number; issue?: string; rev?: string; revisionDate?: string; publishedDate?: string; pdfURL?: string };
+  format: string; kind?: "pages" | "pdf" | "file";
+  manual: { wmId: number; name: string; type?: string; revisionId: number; issue?: string; rev?: string; revisionDate?: string; publishedDate?: string; pdfURL?: string };
   toc: WmToc[]; pages: WmPage[]; images?: Record<string, { name: string; type: string; size: number; b64?: string }>;
+  file?: { name: string; type: string; size: number; b64?: string };
 };
 export type BuiltSection = { ord: number; ref: string; title: string; html: string; text: string; pages: string[]; pageRevs: string[]; changed: boolean };
 

@@ -26,7 +26,7 @@ export default async function Certificates() {
         <table className="tbl"><thead><tr><th>Entity</th><th>Scope</th><th>Kind</th><th>Title</th><th>Issuer</th><th>Valid until</th></tr></thead>
           <tbody>
             {rows.map((c) => { const d = daysUntil(c.valid_until); return (
-              <tr key={c.id}><td><span className={"ent " + c.entity}>{c.entity}</span></td><td className="mini">{c.scope}{c.registration ? ` · ${c.registration}` : ""}</td><td className="mini">{c.kind}</td><td><b>{c.title}</b>{c.file_path && <div className="mini">{c.file_path.startsWith("wm:") ? "file in Web Manuals (to migrate)" : c.file_path}</div>}</td><td className="mini">{c.issuer}</td>
+              <tr key={c.id}><td><span className={"ent " + c.entity}>{c.entity}</span></td><td className="mini">{c.scope}{c.registration ? ` · ${c.registration}` : ""}</td><td className="mini">{c.kind}</td><td><b>{c.title}</b>{c.file_path && <div className="mini">{c.file_path.startsWith("wm:") ? "file in Web Manuals (to migrate)" : <a className="underline" href={`/api/files/${c.file_path}`} target="_blank" rel="noreferrer">Open file (PDF)</a>}</div>}</td><td className="mini">{c.issuer}</td>
                 <td className="mono">{c.valid_until ?? "no expiry"}{d !== null && <div className={"mini" + (d < 0 ? " red" : "")}>{d < 0 ? `expired ${-d} d ago` : `${d} d left`}</div>}</td></tr>); })}
             {!rows.length && <tr><td colSpan={6} className="p-6 text-slate6">No certificate in this scope yet.</td></tr>}
           </tbody></table>

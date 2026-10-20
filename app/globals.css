@@ -185,3 +185,14 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .lockbar{margin:0 18px 10px;padding:10px 14px;border-radius:8px;background:var(--terra-s);color:#8a1a12;font-size:13px}
 .conflict{border-bottom:3px solid var(--terra)}
 .basepreview{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--blue05)}
+
+/* library folders */
+.folders{width:320px;flex:0 0 auto}
+.fnode{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:13px;color:var(--navy);border-left:3px solid transparent;margin:1px 0}
+.fnode.d0{font-weight:800;letter-spacing:.04em;text-transform:uppercase;font-size:11.5px;margin-top:8px;background:var(--blue05)}
+.fnode.d0.all{text-transform:none;letter-spacing:0;font-size:13px;margin-top:0;background:transparent}
+.fnode.d1{padding-left:26px}.fnode.d2{padding-left:44px;font-size:12.5px;color:var(--slate6)}.fnode.d3{padding-left:60px;font-size:12px;color:var(--slate6)}
+.fnode:hover{background:var(--blue1)}.fnode.on{background:var(--blue175);color:var(--navy)}
+.fdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fcount{font-size:11px;color:var(--slate5);font-weight:600}
