@@ -75,3 +75,15 @@ export function structureHtml(html: string, prefix: string, chapterRef?: string)
 export function stripHtml(h: string): string {
   return h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
+
+/** Turns chapter / sub-chapter references inside the manual's own table of contents into links. */
+export function linkRefs(html: string, chapters: Map<string, string>, subs: Map<string, { ref: string; id: string }>, base: string): string {
+  return html.replace(/<td>\s*([A-Z]{0,2}\d*(?:\.\d+){0,3})\s*<\/td>\s*<td>([\s\S]*?)<\/td>/g, (m, ref: string, title: string) => {
+    const key = ref.trim();
+    let href: string | null = null;
+    if (chapters.has(key)) href = `${base}&sec=${encodeURIComponent(key)}`;
+    else if (subs.has(key)) { const s = subs.get(key)!; href = `${base}&sec=${encodeURIComponent(s.ref)}#${s.id}`; }
+    if (!href) return m;
+    return `<td><a class="ref" data-nav href="${href}">${key}</a></td><td><a class="ref" data-nav href="${href}">${title}</a></td>`;
+  });
+}

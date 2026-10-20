@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
-import { STEPS, STEP_LABEL, partOf, partsOf, structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
+import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
 import { acknowledge } from "./actions";
 
@@ -38,6 +38,12 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const structured = new Map(sections.map((x) => [x.id, structureHtml(x.body.html ?? `<p>${x.body.text ?? ""}</p>`, `s${x.ord}`, x.ref)]));
   const parts = partsOf(sections.map((x) => x.ref));
   const toc: TocItem[] = sections.map((x) => ({ id: x.id, ref: x.ref, title: x.title, part: partOf(x.ref), headings: structured.get(x.id)?.headings ?? [] }));
+  // references inside the manual's own table of contents → links
+  const chapterRefs = new Map(sections.map((x) => [x.ref, x.id]));
+  const subRefs = new Map<string, { ref: string; id: string }>();
+  for (const x of sections) for (const h of structured.get(x.id)?.headings ?? []) { const mm = /^([A-Z]{0,2}\d*(?:\.\d+){1,3})\b/.exec(h.text); if (mm && !chapterRefs.has(mm[1])) subRefs.set(mm[1], { ref: x.ref, id: h.id }); }
+  const base = current ? `/docs/manual/${manual.id}?rev=${current.id}` : `/docs/manual/${manual.id}?x=1`;
+  const activeHtml = active ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(structured.get(active.id)?.html ?? "", chapterRefs, subRefs, base) : structured.get(active.id)?.html ?? "") : "";
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
   const office = s.role !== "user";
   const tabs = [["read", "Read"], ["changed", "What changed"], ...(office ? [["history", "History"], ["readers", "Readers"]] : [])] as [string, string][];
@@ -55,7 +61,16 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
           {mine?.acknowledged_at && <span className="pill green">Read · {mine.acknowledged_at.slice(0, 10)}</span>}
         </>} />
 
-      {current && (
+      {current && (current.step === "published" || current.step === "repository") && tab !== "history" && (
+        <div className="statusline mb-4">
+          <span className="pill green">Published · Iss {current.issue} Rev {current.rev}{current.published_at ? ` · ${current.published_at}` : ""}</span>
+          {current.authority_route === "approval" && <span className="mini">approved by the civil aviation authority before publication</span>}
+          {current.authority_route === "notification" && <span className="mini">notified to the civil aviation authority</span>}
+          {working && <Link href={`/docs/manual/${manual.id}?rev=${working.id}`} className="pill amber">Next revision in progress · Rev {working.rev} — {STEP_LABEL[working.step]}</Link>}
+          {!working && s.role !== "user" && <span className="mini">no revision in progress</span>}
+        </div>
+      )}
+      {current && !(current.step === "published" || current.step === "repository") && (
         <div className="steps mb-5">
           {STEPS.filter((st) => st !== "repository" || manual.to_tmcad_repository).map((st, i) => (
             <div key={st} className={"step" + (i < stepIdx ? " done" : i === stepIdx ? " now" : "")}><i /><span>{STEP_LABEL[st]}</span></div>
@@ -70,7 +85,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
 
       {tab === "read" && current && (
         <Reader manualId={manual.id} revId={current.id} parts={parts} toc={toc} initialQuery={q}
-          active={active ? { ref: active.ref, title: active.title, html: structured.get(active.id)?.html ?? "", part: partOf(active.ref), pages: active.body.pages?.length ?? 0 } : null} />
+          active={active ? { ref: active.ref, title: active.title, html: activeHtml, part: partOf(active.ref), pages: active.body.pages?.length ?? 0 } : null} />
       )}
       {tab === "read" && !current && <section className="card"><div className="cb text-slate6">No revision to read yet.</div></section>}
 

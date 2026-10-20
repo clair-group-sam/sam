@@ -148,3 +148,8 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .reader mark.hl{background:#fff1a8;color:inherit;border-radius:3px;padding:0 2px}
 .pager{display:flex;justify-content:space-between;gap:16px;margin-top:28px;padding-top:14px;border-top:1px solid var(--line);font-size:13px;font-weight:600}
 .pager a{color:var(--cyan6)}.pager a:hover{text-decoration:underline}
+.statusline{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.statusline a.pill:hover{text-decoration:underline}
+.toc .tocch .fold{margin-left:auto;color:var(--slate45);font-weight:400;font-size:11px;padding-left:6px}
+.reader a.ref{color:var(--cyan6);text-decoration:none;border-bottom:1px dotted var(--blue2)}
+.reader a.ref:hover{text-decoration:underline}

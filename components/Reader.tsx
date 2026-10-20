@@ -20,6 +20,8 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Set<string>>(() => new Set(parts.map((p) => p.key)));
   const [progress, setProgress] = useState(0);
+  const [folded, setFolded] = useState(false);
+  useEffect(() => { setFolded(false); }, [active?.ref]);
   const art = useRef<HTMLDivElement>(null);
   const colorOf = useMemo(() => Object.fromEntries(parts.map((p) => [p.key, p.color])), [parts]);
   const idx = toc.findIndex((t) => t.ref === active?.ref);
@@ -41,7 +43,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
     const el = art.current; if (!el) return;
     el.querySelectorAll("mark.hl").forEach((m) => m.replaceWith(document.createTextNode(m.textContent ?? "")));
     el.normalize();
-    const words = q.trim().toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+    const words = q.trim().toLowerCase().split(/[\s-]+/).filter((w) => w.length > 2);
     if (mode !== "full" || !words.length) return;
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     const nodes: Text[] = []; let n: Node | null;
@@ -105,10 +107,12 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
               </button>
               {(open.has(part.key) || !!ql) && items.map((t) => (
                 <div key={t.id}>
-                  <Link href={href(t.ref)} className={"tocch" + (active?.ref === t.ref ? " on" : "")}>
+                  <Link href={href(t.ref)} className={"tocch" + (active?.ref === t.ref ? " on" : "")}
+                    onClick={(e) => { if (active?.ref === t.ref && t.headings.length) { e.preventDefault(); setFolded((f) => !f); } }}>
                     <span className="badge" style={{ background: part.color }}>{t.ref}</span><span>{t.title}</span>
+                    {t.headings.length > 0 && <b className="fold">{active?.ref === t.ref && !folded ? "▾" : "▸"}</b>}
                   </Link>
-                  {(active?.ref === t.ref || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
+                  {((active?.ref === t.ref && !folded) || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
                     <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" }); } }}>{h.text}</a>
                   ))}
                 </div>
@@ -126,7 +130,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
             </div>
             <div className="readscroll">
-              <article ref={art} className="reader" style={{ "--pc": colorOf[active.part] } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: active.html }} />
+              <article ref={art} className="reader" onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: active.html }} />
               <div className="pager">
                 {prev ? <Link href={href(prev.ref)}>‹ {prev.ref} {prev.title}</Link> : <span />}
                 {next ? <Link href={href(next.ref)}>{next.ref} {next.title} ›</Link> : <span />}
