@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { canDownloadPdf, getSession } from "@/lib/session";
+import DownloadMenu from "@/components/DownloadMenu";
 import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
@@ -64,7 +65,12 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${manual.owner_role}` : "No revision yet"}
         right={<>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
-          {current && ["np", "am", "cmm"].includes(s.role) && <a href={`/print/manual/${manual.id}?rev=${current.id}&auto=1`} target="_blank" className="btn" rel="noreferrer" title="The manual as held in S.A.M., A4 layout (NP, AM and Compliance only)">Download PDF</a>}
+          {canDownloadPdf(s.roles) && revs.length > 0 && (
+            <DownloadMenu manualId={manual.id}
+              published={published[0] ? { id: published[0].id, label: `Iss ${published[0].issue} Rev ${published[0].rev}`, sub: published[0].published_at ? `effective ${published[0].published_at}` : "published" } : null}
+              drafts={workings.map((w) => ({ id: w.id, label: `Rev ${w.rev}`, sub: STEP_LABEL[w.step] }))}
+              archive={published.slice(1).map((r) => ({ id: r.id, label: `Iss ${r.issue} Rev ${r.rev}`, sub: r.published_at ?? "published" }))} />
+          )}
           {(isCmm(s) || ownsManual(s, manual.owner_role)) && editing && <Link href={`/docs/editor/${editing.id}`} className="btn">Open the draft (Rev {editing.rev})</Link>}
           {(isCmm(s) || ownsManual(s, manual.owner_role)) && !editing && (published[0] || working) && (
             <form action={startRevision}><input type="hidden" name="from_revision" value={(published[0] ?? working)!.id} /><button className="btn" type="submit">{working ? `Start Rev ${String(parseInt(working.rev, 10) + 1).padStart(working.rev.length, "0")} (parallel)` : "Start a new revision"}</button></form>

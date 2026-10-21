@@ -15,8 +15,22 @@ export type Session = {
 };
 
 const NP_ROLES = ["NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "NP", "SMD", "QM"];
+/**
+ * Deputies hold the same rights as the post they deputise. Accepted spellings: DEPUTY_X, DEPUTY-X, DEP_X, X_DEPUTY, X_DEP, X-D,
+ * and the short forms DAM (deputy AM), DCMM (deputy CMM), DSM (deputy SM). Returns the base post, e.g. "NPFO_DEP" → "NPFO".
+ */
+export function basePost(role: string): string {
+  const r = role.trim().toUpperCase();
+  if (["DAM", "DCMM", "DSM"].includes(r)) return r.slice(1);
+  return r.replace(/^(DEPUTY|DEP)[_\s-]+/, "").replace(/[_\s-]+(DEPUTY|DEP|D)$/, "");
+}
+export function isDeputy(role: string): boolean { return basePost(role) !== role.trim().toUpperCase(); }
+/** Manual PDF download (DOC-13): AM, nominated persons, CMM / SM — and the deputy of each. */
+export function canDownloadPdf(roles: string[]): boolean {
+  return roles.map(basePost).some((x) => ["AM", "CMM", "SM", "SUPERADMIN"].includes(x) || NP_ROLES.includes(x) || x.startsWith("NP"));
+}
 export function roleKeyFrom(roles: string[]): RoleKey {
-  const r = roles.map((x) => x.toUpperCase());
+  const r = roles.map(basePost);
   if (r.some((x) => ["SUPERADMIN", "CMM", "SM", "COMPLIANCE"].includes(x))) return "cmm";
   if (r.includes("AM")) return "am";
   if (r.some((x) => NP_ROLES.includes(x) || x.startsWith("NP"))) return "np";

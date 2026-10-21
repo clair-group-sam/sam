@@ -245,6 +245,7 @@ body:has(.pm){background:#e9eef2}
 .pm{font:10pt/1.5 Inter,Arial,sans-serif;color:#1d2a36;max-width:190mm;margin:0 auto;padding:70px 0 40px}
 .pm-bar{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;gap:14px;align-items:center;padding:10px 20px;background:#fff;border-bottom:1px solid var(--line);font-size:13px}
 .pm-bar span{flex:1;color:var(--slate5)}
+.pm-wm.arch{font-size:80pt;color:rgba(68,84,106,.08)}
 .pm-wm{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font:800 120pt Inter,Arial,sans-serif;color:rgba(179,38,30,.07);pointer-events:none;z-index:0;letter-spacing:.1em}
 .pm-cover,.pm-front,.pm-ch{background:#fff;padding:18mm 16mm;margin-bottom:10px;box-shadow:0 1px 3px rgba(13,42,63,.12);position:relative}
 .pm-cover{min-height:250mm;display:flex;flex-direction:column}
@@ -294,3 +295,12 @@ body:has(.pm){background:#e9eef2}
   .pm-ch.newpart{margin-top:0}
   .pm-wm{position:fixed}
 }
+.dlmenu{position:relative}
+.dlpanel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:360px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(13,42,63,.16);padding:6px}
+.dlrow{display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-radius:8px}
+.dlrow+.dlrow{border-top:1px solid var(--line)}
+.dlrow .k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--slate5)}
+.dlrow .v{font-size:13px;min-width:0}.dlrow .v small{display:block;color:var(--slate5);font-size:11.5px}
+.dlrow select{width:100%;font-size:13px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;background:#fff}
+.dlrow.off .v{color:var(--slate45);font-style:italic}
+.dlrow .btn{height:30px;padding:0 10px;font-size:12px}
