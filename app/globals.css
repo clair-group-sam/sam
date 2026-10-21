@@ -208,3 +208,24 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .aidiff del{background:#fde3e1;color:#8a1a12;border-radius:3px}
 .aipreview{max-height:360px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .ainotes{font-size:12.5px;padding-left:18px}.ainotes li{margin:4px 0}
+
+/* compact menus */
+.compact{position:relative}
+.rail{transition:width .15s ease}
+.rail.mini{width:62px;position:relative;z-index:30}
+.rail.mini .brand b,.rail.mini .brand span,.rail.mini .rl span,.rail.mini .morebox .rl span{display:none}
+.rail.mini .brand{padding:4px 0 14px 13px}.rail.mini .brand img{width:36px;height:auto}
+.rail.mini .rl{justify-content:center;padding:0;margin:0 8px;width:calc(100% - 16px)}
+.rail.mini .morebox.open{margin:6px 6px}
+.rail.mini.hover{width:230px;box-shadow:8px 0 24px rgba(13,42,63,.12)}
+.rail.mini.hover .brand b,.rail.mini.hover .brand span,.rail.mini.hover .rl span{display:inline}
+.rail.mini.hover .brand{padding:4px 20px 18px}.rail.mini.hover .brand img{width:56px}
+.rail.mini.hover .rl{justify-content:flex-start;padding:0 10px 0 14px;margin:0 10px;width:calc(100% - 20px)}
+.compact .rail.mini.hover{margin-right:-168px}
+.rl.collapse{color:var(--slate5);font-weight:600;letter-spacing:.04em;text-transform:none;font-size:12px;height:36px}
+.rl.collapse .chev.rot180{transform:rotate(180deg)}
+.substrip{width:26px;flex:0 0 auto;background:#fbfdfe;border-right:1px solid var(--line);cursor:pointer;display:flex;align-items:flex-start;justify-content:center;padding-top:18px;z-index:20}
+.substrip .vtext{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--slate45)}
+.substrip:hover{background:var(--blue05)}
+.sub.overlay{position:absolute;left:88px;top:0;bottom:0;z-index:25;box-shadow:8px 0 24px rgba(13,42,63,.12);transform:translateX(-110%);transition:transform .15s ease;pointer-events:none}
+.sub.overlay.show{transform:none;pointer-events:auto}

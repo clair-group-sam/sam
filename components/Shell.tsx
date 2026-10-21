@@ -20,13 +20,23 @@ export default function Shell({ session, children }: Props) {
   const inRare = rare.some((m) => m.id === mod);
   const [more, setMore] = useState(inRare);
   useEffect(() => { if (inRare) setMore(true); }, [inRare]);
+  // compact mode: rail = icons only, sub-menu hidden; both expand on hover as overlays. Remembered per browser.
+  const [compact, setCompact] = useState(false);
+  const [railHover, setRailHover] = useState(false);
+  const [subHover, setSubHover] = useState(false);
+  useEffect(() => { try { setCompact(localStorage.getItem("sam_compact") === "1"); } catch {} }, []);
+  const toggleCompact = () => setCompact((v) => { const n = !v; try { localStorage.setItem("sam_compact", n ? "1" : "0"); } catch {} return n; });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { const t = e.target as HTMLElement; if (e.key === "[" && !["INPUT", "TEXTAREA"].includes(t?.tagName) && !t?.isContentEditable) toggleCompact(); };
+    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const subs = subsFor(role, mod).filter((s) => !s.hidden || s.id === sub);
   const curMod = mods.find((m) => m.id === mod);
   const curSub = subs.find((s) => s.id === sub);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <nav className="rail">
+    <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")}>
+      <nav className={"rail" + (compact ? (railHover ? " mini hover" : " mini") : "")} onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)}>
         <Link href={session.home} className="brand">
           <img src="/logos/sam.svg" alt="" width={56} height={52} />
           <b>S.A.M.</b><span>Safety · Assurance · Management</span>
@@ -45,11 +55,19 @@ export default function Shell({ session, children }: Props) {
         </div>
         <div className="railbottom">
           {bottom.map((m) => <RailLink key={m.id} m={m} role={role} on={mod === m.id} />)}
+          <button type="button" className="rl collapse" onClick={toggleCompact} title={compact ? "Expand the menus  [" : "Collapse the menus  ["}>
+            <Icon name="more" size={14} className={"chev" + (compact ? " rot0" : " rot180")} /><span>{compact ? "Expand" : "Collapse"}</span>
+          </button>
         </div>
       </nav>
 
+      {subs.length > 0 && compact && (
+        <div className="substrip" onMouseEnter={() => setSubHover(true)} onMouseLeave={() => setSubHover(false)} onClick={() => setSubHover((v) => !v)} title={curMod ? modLabel(role, curMod) : mod}>
+          <span className="vtext">{curMod ? modLabel(role, curMod) : mod}</span>
+        </div>
+      )}
       {subs.length > 0 && (
-        <aside className="sub">
+        <aside className={"sub" + (compact ? (subHover ? " overlay show" : " overlay") : "")} onMouseEnter={() => compact && setSubHover(true)} onMouseLeave={() => setSubHover(false)}>
           <div className="h">{curMod ? modLabel(role, curMod) : mod}</div>
           {subs.map((s) => (
             <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "")}>
@@ -69,7 +87,7 @@ export default function Shell({ session, children }: Props) {
 
 function RailLink({ m, role, on, small }: { m: Module; role: RoleKey; on: boolean; small?: boolean }) {
   return (
-    <Link href={`/${m.id}`} className={"rl" + (on ? " on" : "") + (m.erp ? " erp" : "") + (small ? " sm" : "")}>
+    <Link href={`/${m.id}`} className={"rl" + (on ? " on" : "") + (m.erp ? " erp" : "") + (small ? " sm" : "")} title={modLabel(role, m)}>
       <Icon name={m.icon} size={small ? 16 : 18} /><span>{modLabel(role, m)}</span>
     </Link>
   );
