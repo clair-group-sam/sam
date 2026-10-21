@@ -1,0 +1,130 @@
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { supabaseServer } from "@/lib/supabase-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
+import { ENT } from "@/lib/nav";
+import PrintAuto from "@/components/PrintAuto";
+
+/**
+ * DOC-13 · Download PDF — the manual as S.A.M. holds it, laid out for A4 (cover, record of revisions,
+ * list of effective chapters, chapters with revision bars, running header/footer with page x / y).
+ * The browser's own PDF engine produces the file (Save as PDF). Restricted to NP, AM and Compliance (CMM).
+ */
+export const dynamic = "force-dynamic";
+const PDF_ROLES = ["np", "am", "cmm"];
+
+const css = (v: string) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")}"`;
+
+export default async function PrintManual({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ rev?: string; auto?: string }> }) {
+  const { id } = await params;
+  const { rev, auto } = await searchParams;
+  const s = await getSession();
+  if (!s) redirect("/login");
+  if (!PDF_ROLES.includes(s.role)) return <Denied />;
+  const sb = await supabaseServer();
+  const { data: m } = await sb.from("manuals").select("*").eq("id", id).maybeSingle();
+  if (!m) notFound();
+  const manual = m as Manual;
+  if (!s.group && !s.entities.includes(manual.entity)) return <Denied />;
+
+  const { data: revsData } = await sb.from("revisions").select("*").eq("manual_id", id).order("created_at", { ascending: false });
+  const revs = (revsData ?? []) as Revision[];
+  const published = revs.filter((r) => r.step === "published" || r.step === "repository").sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
+  const current = (rev ? revs.find((r) => r.id === rev) : null) ?? published[0] ?? revs[0] ?? null;
+  if (!current) notFound();
+  const isPublished = current.step === "published" || current.step === "repository";
+
+  const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed").eq("revision_id", current.id).order("ord");
+  const sections = (sd ?? []) as Section[];
+
+  // figures: private bucket → one batch of signed URLs (10 min) instead of one redirect per image; no lazy loading in print
+  const keys = new Set<string>();
+  for (const x of sections) for (const mm of (x.body.html ?? "").matchAll(/src="\/api\/files\/manuals\/([^"?#]+)"/g)) keys.add(decodeURIComponent(mm[1]));
+  const signed = new Map<string, string>();
+  if (keys.size) {
+    const { data } = await supabaseAdmin().storage.from("manuals").createSignedUrls([...keys], 600);
+    for (const d of data ?? []) if (d.path && d.signedUrl) signed.set(d.path, d.signedUrl);
+  }
+  const fix = (h: string) => h
+    .replace(/src="\/api\/files\/manuals\/([^"?#]+)"/g, (all, k: string) => { const u = signed.get(decodeURIComponent(k)); return u ? `src="${u}"` : all; })
+    .replace(/\sloading="lazy"/g, "");
+
+  const parts = partsOf(sections.map((x) => x.ref));
+  const partLabel = new Map(parts.map((p) => [p.key, p.label]));
+  const ent = ENT[manual.entity];
+  const today = new Date().toISOString().slice(0, 10);
+  const revLabel = `Issue ${current.issue} · Rev ${current.rev}`;
+  const fileName = `${manual.entity}-${manual.code}-Iss${current.issue}-Rev${current.rev}${isPublished ? "" : "-DRAFT"}`;
+  const head = `${ent?.name ?? manual.entity} · ${manual.code} — ${manual.title}`;
+  const right = `${revLabel}${current.published_at ? " · " + current.published_at : ""}${isPublished ? "" : " · DRAFT"}`;
+  const foot = isPublished ? "Uncontrolled copy once downloaded — the current revision is in S.A.M." : `Not approved — ${STEP_LABEL[current.step]} — do not use for operations`;
+
+  await supabaseAdmin().from("audit_log").insert({ actor: s.person?.id ?? null, entity: manual.entity, object_type: "revision", object_id: current.id, action: "download_pdf", after: { code: manual.code, rev: current.rev, step: current.step } });
+
+  const pageCss = `
+@page { size: A4; margin: 20mm 15mm 18mm 20mm;
+  @top-left { content: ${css(head)}; font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; vertical-align: bottom; padding-bottom: 3mm; border-bottom: .4pt solid #c9d3dc; }
+  @top-right { content: ${css(right)}; font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; vertical-align: bottom; padding-bottom: 3mm; border-bottom: .4pt solid #c9d3dc; }
+  @bottom-left { content: ${css(foot)}; font: 7pt Inter, Arial, sans-serif; color: ${isPublished ? "#7a8794" : "#b3261e"}; }
+  @bottom-right { content: "Page " counter(page) " / " counter(pages); font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; }
+}
+@page :first { @top-left { content: none; border: 0 } @top-right { content: none; border: 0 } @bottom-left { content: none } @bottom-right { content: none } }`;
+
+  let lastPart = "";
+  return (
+    <div className="pm">
+      <style dangerouslySetInnerHTML={{ __html: pageCss }} />
+      <PrintAuto fileName={fileName} auto={auto === "1"} />
+      {!isPublished && <div className="pm-wm">DRAFT</div>}
+
+      <section className="pm-cover">
+        <div className="pm-ent">{ent?.name ?? manual.entity}<small>{ent?.qual}</small></div>
+        <div className="pm-mid">
+          <div className="pm-code">{manual.code}</div>
+          <h1>{manual.title}</h1>
+          <div className="pm-rev">{revLabel}</div>
+          <div className={"pm-state" + (isPublished ? "" : " draft")}>{isPublished ? `Published${current.published_at ? " · effective " + current.published_at : ""}` : `${STEP_LABEL[current.step]} — not approved`}</div>
+        </div>
+        <table className="pm-meta"><tbody>
+          <tr><th>Entity</th><td>{ent?.name ?? manual.entity} ({manual.entity})</td></tr>
+          <tr><th>Owner</th><td>{manual.owner_role}</td></tr>
+          <tr><th>Authority</th><td>{ent?.auth ?? "—"}{current.authority_ref ? ` · ref. ${current.authority_ref}` : ""}{current.authority_route === "approval" ? " · approved before publication" : current.authority_route === "notification" ? " · notified" : ""}</td></tr>
+          <tr><th>Downloaded</th><td>{today} by {s.name}</td></tr>
+        </tbody></table>
+        <p className="pm-note">{isPublished ? "This copy was generated from S.A.M. and is uncontrolled once downloaded or printed. Always check the current revision in S.A.M. before use." : "Working copy of a revision in progress. It has not been approved and must not be used for operations."}</p>
+      </section>
+
+      <section className="pm-front">
+        <h2>Record of revisions</h2>
+        <table className="pm-tab"><thead><tr><th>Issue / Rev</th><th>Effective</th><th>Summary</th></tr></thead><tbody>
+          {!isPublished && <tr className="cur"><td>Iss {current.issue} Rev {current.rev}</td><td>{STEP_LABEL[current.step]}</td><td>{current.summary ?? "—"}</td></tr>}
+          {published.map((r) => <tr key={r.id} className={r.id === current.id ? "cur" : ""}><td>Iss {r.issue} Rev {r.rev}</td><td>{r.published_at ?? "—"}</td><td>{r.summary ?? "—"}</td></tr>)}
+        </tbody></table>
+
+        <h2>List of effective chapters</h2>
+        <table className="pm-tab pm-lec"><thead><tr><th>Chapter</th><th>Title</th><th>Revision</th></tr></thead><tbody>
+          {sections.map((x) => (
+            <tr key={x.id}><td>{x.ref}</td><td>{x.title}</td><td>{x.changed ? <b>Rev {current.rev} ▌</b> : <span>—</span>}</td></tr>
+          ))}
+        </tbody></table>
+        <p className="pm-small">▌ chapter revised in this revision; changes are marked by a bar in the left margin.</p>
+      </section>
+
+      {sections.map((x) => {
+        const p = partOf(x.ref); const newPart = p !== lastPart; lastPart = p;
+        return (
+          <article key={x.id} className={"pm-ch" + (newPart ? " newpart" : "")}>
+            {newPart && parts.length > 1 && <div className="pm-part">{partLabel.get(p) ?? p}</div>}
+            <h1 className="pm-cht"><span>{x.ref}</span> {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h1>
+            <div className="pm-body" dangerouslySetInnerHTML={{ __html: fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`) }} />
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function Denied() {
+  return <div style={{ padding: 40, fontFamily: "Inter, Arial, sans-serif" }}><h1 style={{ fontSize: 20, fontWeight: 700 }}>Download restricted</h1><p>The PDF download of a manual is reserved for nominated persons, the accountable manager and compliance.</p></div>;
+}
