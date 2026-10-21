@@ -38,14 +38,14 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
   function insert() { if (!prop) return; editor.commands.setContent(prop.html); onInserted(); setProp(null); }
   const diff = prop ? diffWords(textOf(editor.getHTML()), textOf(prop.html)) : [];
   const added = diff.filter((d) => d.k === "+").length, removed = diff.filter((d) => d.k === "-").length;
-  const AGENTS: [AiAgent, string, string][] = [["draft", "Draft", "Integrate what you describe"], ["rewrite", "Rewrite", "Manual style, same meaning"], ["translate", "Translate", "French passages → English"], ["check", "Check", "Consistency review, no change"]];
+  const AGENTS: [AiAgent, string, string][] = [["draft", "Draft", "Integrate what you describe"], ["rewrite", "Rewrite", "Manual style, same meaning"], ["translate", "Translate", "Passages in another language → manual language"], ["check", "Check", "Consistency review, no change"]];
 
   return (
     <aside className="aipanel">
       <div className="ch"><span className="eyebrow">Draft with AI</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
       <div className="p-3">
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
-        <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (French or English — the manual stays in English)" : agent === "check" ? "Optional: what to pay attention to" : "Optional: which passages"} />
+        <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
         <div className="flex items-center gap-2 mt-2">
           <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? "Thinking…" : "Propose"}</button>
           <span className="mini">Nothing enters the manual until you insert it.</span>

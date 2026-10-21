@@ -26,7 +26,7 @@ const IN_RATE = Number(process.env.AI_RATE_IN_EUR ?? "2.8"), OUT_RATE = Number(p
 
 const SYSTEM = `You are the technical writer of an aviation organisation's regulatory manuals (EASA Part-CAO / Part-CAMO / AOC / ATO). You help a nominated person revise ONE chapter of a manual.
 Rules:
-- Write in English, in the style of the manual (same tone, same way of naming the organisation and posts, same formatting habits). Keep the existing structure and numbering of sub-chapters.
+- Write in the language of the current chapter (some manuals are in French, most group manuals are in English; never mix), in the style of the manual (same tone, same way of naming the organisation and posts, same formatting habits). Keep the existing structure and numbering of sub-chapters.
 - Change only what the request requires; keep everything else word for word. Never invent regulatory references: use only those present in the chapter or given in the request.
 - Output HTML limited to: p, h2, h3, h4, ul, ol, li, table, thead, tbody, tr, th, td, strong, em, figure, img (keep existing img tags unchanged).
 - Answer ONLY with a JSON object: {"html": "<full revised chapter html>", "notes": [{"where": "sub-chapter or sentence", "change": "what changed", "why": "reason / reference"}]} .`;
@@ -59,9 +59,9 @@ export function parseJsonBlock(text: string): { html: string; notes: { where: st
 export function userPromptFor(agent: AiAgent, ctx: { manual: string; entity: string; chapterRef: string; chapterTitle: string; chapterHtml: string; neighbours: string[]; request: string }): string {
   const head = `Manual: ${ctx.manual} (${ctx.entity}). Chapter ${ctx.chapterRef} — ${ctx.chapterTitle}. Other chapters of this manual (for consistency): ${ctx.neighbours.join(" · ")}.\n\nCURRENT CHAPTER HTML:\n${ctx.chapterHtml}\n\n`;
   switch (agent) {
-    case "draft": return head + `REQUEST FROM THE NOMINATED PERSON (may be in French; the manual stays in English):\n${ctx.request}\n\nIntegrate this request into the chapter and return the full revised chapter.`;
+    case "draft": return head + `REQUEST FROM THE NOMINATED PERSON (may be in another language than the manual; the chapter keeps its own language):\n${ctx.request}\n\nIntegrate this request into the chapter and return the full revised chapter.`;
     case "rewrite": return head + `Rewrite the passages the nominated person typed quickly so they read like the rest of the manual (style, terminology, formatting), without changing their meaning. ${ctx.request ? "Focus: " + ctx.request : ""} Return the full chapter.`;
-    case "translate": return head + `Translate into English every passage still written in French, in the manual's style; keep the English passages unchanged. Return the full chapter.`;
+    case "translate": return head + `Translate into the manual's language (${ctx.request.trim() || "the language of the rest of the chapter"}) every passage written in another language, in the manual's style; keep the other passages unchanged. Return the full chapter.`;
     case "check": return head + `Do not rewrite. Review this chapter for internal consistency (posts, references to other chapters, delays, contradictions, missing cross-references, terminology) ${ctx.request ? "with attention to: " + ctx.request : ""}. Return the chapter html UNCHANGED and put every finding in "notes" (where / change = the issue / why = suggestion).`;
   }
 }
