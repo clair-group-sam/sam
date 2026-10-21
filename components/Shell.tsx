@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ENT, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
@@ -22,9 +22,11 @@ export default function Shell({ session, children }: Props) {
   useEffect(() => { if (inRare) setMore(true); }, [inRare]);
   // compact mode: rail = icons only, sub-menu hidden; both expand on hover as overlays. Remembered per browser.
   const [compact, setCompact] = useState(false);
-  const [railHover, setRailHover] = useState(false);
-  const [subHover, setSubHover] = useState(false);
+  // hover with a short opening delay (no accidental flashes) and a longer closing delay (smooth exit)
+  const rail = useDelayedHover(120, 450);
+  const subH = useDelayedHover(80, 450);
   useEffect(() => { try { setCompact(localStorage.getItem("sam_compact") === "1"); } catch {} }, []);
+  const setMode = (n: boolean) => { setCompact(n); try { localStorage.setItem("sam_compact", n ? "1" : "0"); } catch {} };
   const toggleCompact = () => setCompact((v) => { const n = !v; try { localStorage.setItem("sam_compact", n ? "1" : "0"); } catch {} return n; });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { const t = e.target as HTMLElement; if (e.key === "[" && !["INPUT", "TEXTAREA"].includes(t?.tagName) && !t?.isContentEditable) toggleCompact(); };
@@ -36,7 +38,7 @@ export default function Shell({ session, children }: Props) {
 
   return (
     <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")}>
-      <nav className={"rail" + (compact ? (railHover ? " mini hover" : " mini") : "")} onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)}>
+      <nav className={"rail" + (compact ? (rail.on ? " mini hover" : " mini") : "")} onMouseEnter={() => compact && rail.enter()} onMouseLeave={rail.leave}>
         <Link href={session.home} className="brand">
           <img src="/logos/sam.svg" alt="" width={56} height={52} />
           <b>S.A.M.</b><span>Safety · Assurance · Management</span>
@@ -55,19 +57,16 @@ export default function Shell({ session, children }: Props) {
         </div>
         <div className="railbottom">
           {bottom.map((m) => <RailLink key={m.id} m={m} role={role} on={mod === m.id} />)}
-          <button type="button" className="rl collapse" onClick={toggleCompact} title={compact ? "Expand the menus  [" : "Collapse the menus  ["}>
-            <Icon name="more" size={14} className={"chev" + (compact ? " rot0" : " rot180")} /><span>{compact ? "Expand" : "Collapse"}</span>
-          </button>
         </div>
       </nav>
 
       {subs.length > 0 && compact && (
-        <div className="substrip" onMouseEnter={() => setSubHover(true)} onMouseLeave={() => setSubHover(false)} onClick={() => setSubHover((v) => !v)} title={curMod ? modLabel(role, curMod) : mod}>
+        <div className="substrip" onMouseEnter={subH.enter} onMouseLeave={subH.leave} onClick={subH.toggle} title={curMod ? modLabel(role, curMod) : mod}>
           <span className="vtext">{curMod ? modLabel(role, curMod) : mod}</span>
         </div>
       )}
       {subs.length > 0 && (
-        <aside className={"sub" + (compact ? (subHover ? " overlay show" : " overlay") : "")} onMouseEnter={() => compact && setSubHover(true)} onMouseLeave={() => setSubHover(false)}>
+        <aside className={"sub" + (compact ? (subH.on ? " overlay show" : " overlay") : "")} onMouseEnter={() => compact && subH.enter()} onMouseLeave={subH.leave}>
           <div className="h">{curMod ? modLabel(role, curMod) : mod}</div>
           {subs.map((s) => (
             <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "")}>
@@ -78,7 +77,7 @@ export default function Shell({ session, children }: Props) {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <TopBar session={session} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
+        <TopBar session={session} compact={compact} setCompact={setMode} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
         <main className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
@@ -93,7 +92,7 @@ function RailLink({ m, role, on, small }: { m: Module; role: RoleKey; on: boolea
   );
 }
 
-function TopBar({ session, crumb }: { session: Session; crumb: [string, string] }) {
+function TopBar({ session, crumb, compact, setCompact }: { session: Session; crumb: [string, string]; compact: boolean; setCompact: (v: boolean) => void }) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   const chips = session.group ? ["ALL", ...session.entities] : session.entities;
@@ -103,6 +102,13 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   }
   return (
     <header className="topbar">
+      <button type="button" className={"menutoggle" + (compact ? " on" : "")} onClick={() => setCompact(!compact)}
+        title={compact ? "Menus: auto-collapse — click to keep them fixed  [" : "Menus: fixed — click to auto-collapse them  ["} aria-pressed={compact}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M9 4v16" />
+          {compact ? <path d="M13 10l2 2-2 2" /> : <path d="M15 10l-2 2 2 2" />}
+        </svg>
+      </button>
       <div className="crumb"><b>{crumb[0]}</b>{crumb[1] && <> · <span>{crumb[1]}</span></>}</div>
       {chips.length > 1 && (
         <div className="chips">
@@ -129,6 +135,11 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
           <div className="menu" onMouseLeave={() => setMenu(false)}>
             <div className="mi muted">{session.email}</div>
             <div className="mi muted">Scope: {session.group ? "Group function" : session.entities.join(", ") || "none"} · roles: {session.roles.join(", ") || "none"}</div>
+            <div className="mi muted">Side menus</div>
+            <div className="miseg">
+              <button type="button" className={!compact ? "on" : ""} onClick={() => setCompact(false)}>Fixed</button>
+              <button type="button" className={compact ? "on" : ""} onClick={() => setCompact(true)}>Auto-collapse</button>
+            </div>
             <Link href="/api/me" className="mi" target="_blank">My access (JSON)</Link>
             <form action="/auth/signout" method="post"><button type="submit" className="mi">Sign out</button></form>
           </div>
@@ -139,4 +150,17 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
 }
 function roleTitle(s: Session): string {
   return s.role === "cmm" ? "CMM / SM" : s.role === "am" ? "Accountable Manager" : s.role === "np" ? "Nominated person" : (s.entities[0] ? ENT[s.entities[0]]?.name ?? "" : "");
+}
+
+function useDelayedHover(openMs: number, closeMs: number) {
+  const [on, setOn] = useState(false);
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => { if (t.current) { clearTimeout(t.current); t.current = null; } };
+  useEffect(() => clear, []);
+  return {
+    on,
+    enter: () => { clear(); if (!on) t.current = setTimeout(() => setOn(true), openMs); },
+    leave: () => { clear(); t.current = setTimeout(() => setOn(false), closeMs); },
+    toggle: () => { clear(); setOn((v) => !v); },
+  };
 }
