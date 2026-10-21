@@ -7,6 +7,8 @@ import { htmlToText } from "@/lib/wm-import";
 import { structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
 import { TRANSITIONS, isCmm, nextRev, ownsManual, UNDER_REVIEW, EDITING } from "@/lib/revisions";
 import { frozenRefs } from "@/lib/revisions-server";
+import { callClaude, parseJsonBlock, userPromptFor, type AiAgent } from "@/lib/ai";
+import { stripHtml } from "@/lib/docs";
 
 async function guard(revisionId: string) {
   const s = await getSession();
@@ -152,5 +154,22 @@ export async function revertSection(input: { revisionId: string; sectionId: stri
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/docs/editor/${rev.id}`); revalidatePath(`/docs/manual/${manual.id}`);
     return { ok: true, html: st.html };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+
+/** Draft with AI: a proposal for ONE chapter, never written to the document by itself (the author inserts, edits or discards). */
+export async function aiPropose(input: { revisionId: string; sectionId: string; agent: AiAgent; request: string; currentHtml: string }): Promise<{ ok: true; html: string; notes: { where: string; change: string; why: string }[]; model: string } | { ok: false; error: string }> {
+  try {
+    const { s, db, rev, manual, may } = await guard(input.revisionId);
+    if (!may || rev.step !== "draft") return { ok: false, error: "Draft only." };
+    const { data: cur } = await db.from("revision_sections").select("id,ref,title").eq("id", input.sectionId).eq("revision_id", rev.id).maybeSingle();
+    if (!cur) return { ok: false, error: "Chapter not found" };
+    const { data: others } = await db.from("revision_sections").select("ref,title").eq("revision_id", rev.id).order("ord");
+    const html = input.currentHtml.slice(0, 120_000);
+    if (stripHtml(html).length > 60_000) return { ok: false, error: "This chapter is too long for a single proposal — split it or ask for a specific sub-chapter." };
+    const user = userPromptFor(input.agent, { manual: manual.title, entity: manual.entity, chapterRef: cur.ref as string, chapterTitle: (cur.title as string) ?? "", chapterHtml: html, neighbours: ((others ?? []) as { ref: string; title: string | null }[]).map((o) => `${o.ref} ${o.title ?? ""}`).slice(0, 80), request: input.request });
+    const { text, model } = await callClaude({ agent: input.agent, personId: s.person?.id ?? null, entity: manual.entity, user, maxTokens: 12000 });
+    const parsed = parseJsonBlock(text);
+    return { ok: true, html: parsed.html, notes: parsed.notes, model };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 }

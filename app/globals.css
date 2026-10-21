@@ -196,3 +196,15 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .fdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
 .fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fcount{font-size:11px;color:var(--slate5);font-weight:600}
+
+/* AI panel */
+.tb.ai{color:#6b5bd2;border-color:#e4e0fb;background:#f3f1fd}.tb.ai.on{background:#6b5bd2;color:#fff}
+.edsplit{display:flex;min-width:0}
+.edsplit .edbody{flex:1;min-width:0}
+.aipanel{width:420px;flex:0 0 auto;border-left:1px solid var(--line);background:#faf9ff;max-height:calc(100vh - 330px);overflow-y:auto}
+.aipanel .ch{padding:10px 14px}
+.aidiff{font-size:13px;line-height:1.6;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;max-height:360px;overflow:auto}
+.aidiff ins{background:#dcf5e3;color:#145c2a;text-decoration:none;border-radius:3px}
+.aidiff del{background:#fde3e1;color:#8a1a12;border-radius:3px}
+.aipreview{max-height:360px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.ainotes{font-size:12.5px;padding-left:18px}.ainotes li{margin:4px 0}

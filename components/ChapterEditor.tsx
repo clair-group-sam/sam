@@ -9,6 +9,7 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import { saveSection, revertSection } from "@/app/(app)/docs/editor/[rev]/actions";
+import AiPanel from "@/components/AiPanel";
 
 type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string };
 
@@ -20,6 +21,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const [saving, setSaving] = useState(false);
   const [changed, setChanged] = useState(changed0);
   const [msg, setMsg] = useState("");
+  const [ai, setAi] = useState(false);
   const baseNorm = useRef<string | null>(null);
   const editor = useEditor({
     extensions: [StarterKit, Image.configure({ inline: false }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
@@ -87,6 +89,8 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <span className="sep" />
           <B label="↶" title="Undo" act={() => editor.chain().focus().undo().run()} />
           <B label="↷" title="Redo" act={() => editor.chain().focus().redo().run()} />
+          <span className="sep" />
+          <button type="button" className={"tb ai" + (ai ? " on" : "")} onClick={() => setAi((v) => !v)} title="Draft with AI">✦ AI</button>
           <span className="flex-1" />
           <span className="mini">{msg || (dirty ? "Unsaved changes" : "")}</span>
           {dirty && <button type="button" className="btn" onClick={discard} disabled={saving} title="Back to the last saved state of this chapter">Cancel changes</button>}
@@ -94,8 +98,11 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <button type="button" className="btn primary" onClick={save} disabled={saving || !dirty}>{saving ? "Saving…" : "Save (⌘S)"}</button>
         </div>
       )}
-      <div className="edbody">
-        <EditorContent editor={editor} className="reader" />
+      <div className={"edsplit" + (ai ? " withai" : "")}>
+        <div className="edbody">
+          <EditorContent editor={editor} className="reader" />
+        </div>
+        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} onInserted={() => { setDirty(true); setMsg("Proposal inserted — review, then save"); }} onClose={() => setAi(false)} />}
       </div>
     </div>
   );
