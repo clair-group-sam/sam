@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { importWmBundle, type ImportResult } from "@/app/(app)/set/integ/actions";
 import { imageExt, type WmBundle } from "@/lib/wm-import";
@@ -22,12 +22,26 @@ export default function WmImport({ manuals, entities }: Props) {
   const [validUntil, setValidUntil] = useState("");
   const say = (m: string) => setLog((l) => [...l, m]);
 
-  async function onFile(f: File | undefined) {
-    setResult(null); setLog([]); setBundle(null);
-    if (!f) return;
-    setFileName(f.name);
+  const partsRef = useRef<{ of: number; texts: Map<number, string>; name: string }>({ of: 0, texts: new Map(), name: "" });
+  async function onFile(list: FileList | null) {
+    setResult(null); setBundle(null);
+    const files = list ? [...list] : [];
+    if (!files.length) return;
     try {
-      const b = JSON.parse(await f.text()) as WmBundle;
+      let text: string; let f = files[0];
+      const split = files.map((x) => ({ x, m: /\.part(\d+)of(\d+)\.json$/.exec(x.name) })).filter((p) => p.m);
+      if (split.length) {
+        // split export: wm-export_….partNofM.json — parts can be added in several selections; assembled when complete
+        const of = Number(split[0].m![2]);
+        if (partsRef.current.of !== of) partsRef.current = { of, texts: new Map(), name: split[0].x.name.replace(/\.part\d+of\d+\.json$/, ".json") };
+        for (const p of split) partsRef.current.texts.set(Number(p.m![1]), await p.x.text());
+        const have = partsRef.current.texts.size;
+        if (have < of) { setLog([`Split export ${partsRef.current.name}: ${have} / ${of} parts received — add the remaining parts.`]); return; }
+        text = [...partsRef.current.texts.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]).join("");
+        setFileName(`${partsRef.current.name} (${of} parts)`); setLog([]);
+        partsRef.current = { of: 0, texts: new Map(), name: "" };
+      } else { text = await f.text(); setFileName(f.name); setLog([]); }
+      const b = JSON.parse(text) as WmBundle;
       if (b.format !== "sam-wm-export/1") { say("This file is not a S.A.M. Web Manuals export."); return; }
       setBundle(b);
       const guess = /_([A-Z]{3})_([A-Z0-9-]+)_/.exec(f.name);
@@ -83,7 +97,8 @@ export default function WmImport({ manuals, entities }: Props) {
     <div className="grid grid-cols-2 gap-5">
       <div>
         <label className="block mb-3"><span className="eyebrow">1 · Export file</span>
-          <input type="file" accept=".json,application/json" className="block mt-1 text-sm" onChange={(e) => onFile(e.target.files?.[0])} /></label>
+          <input type="file" accept=".json,application/json" multiple className="block mt-1 text-sm" onChange={(e) => onFile(e.target.files)} /></label>
+        <p className="mini mb-3">One export file, or all the parts of a split export selected together (…part1of3.json, part2of3.json…).</p>
         {bundle && (
           <div className="mini mb-3">{fileName} — <b>{bundle.manual.name}</b> · Issue {bundle.manual.issue} Rev {bundle.manual.rev} · published {bundle.manual.publishedDate?.slice(0, 10)} · {bundle.kind === "pages" || !bundle.kind ? `${bundle.pages.length} pages · ${Object.keys(bundle.images ?? {}).length} images` : bundle.kind === "pdf" ? `official PDF ${bundle.file?.name}` : `file ${bundle.file?.name} → Certificates & Validities`}</div>
         )}
