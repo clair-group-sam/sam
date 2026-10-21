@@ -2,7 +2,25 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export type AiAgent = "draft" | "rewrite" | "translate" | "check";
-const MODEL = process.env.AI_MODEL_WRITE ?? "claude-sonnet-4-5";
+const HEADERS = (key: string) => ({ "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" });
+let modelCache: { id: string; at: number } | null = null;
+/** Lists the models available to the group's key (ids + display names). */
+export async function listModels(): Promise<{ id: string; display_name?: string; created_at?: string }[]> {
+  const key = process.env.ANTHROPIC_API_KEY; if (!key) return [];
+  const r = await fetch("https://api.anthropic.com/v1/models?limit=100", { headers: HEADERS(key) });
+  const j = (await r.json()) as { data?: { id: string; display_name?: string; created_at?: string }[] };
+  return j.data ?? [];
+}
+/** Writing model: AI_MODEL_WRITE if set, else the newest Sonnet available to the key (refreshed hourly). */
+export async function writeModel(): Promise<string> {
+  if (process.env.AI_MODEL_WRITE) return process.env.AI_MODEL_WRITE;
+  if (modelCache && Date.now() - modelCache.at < 3_600_000) return modelCache.id;
+  const models = await listModels();
+  const pick = (re: RegExp) => models.filter((m) => re.test(m.id)).sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0]?.id;
+  const id = pick(/sonnet/i) ?? pick(/opus/i) ?? pick(/claude/i) ?? "claude-sonnet-4-5";
+  modelCache = { id, at: Date.now() };
+  return id;
+}
 // €/M tokens, overridable from Vercel if pricing changes
 const IN_RATE = Number(process.env.AI_RATE_IN_EUR ?? "2.8"), OUT_RATE = Number(process.env.AI_RATE_OUT_EUR ?? "14");
 
@@ -17,8 +35,9 @@ export async function callClaude(opts: { agent: AiAgent; personId: string | null
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set in Vercel.");
   const db = supabaseAdmin();
+  const MODEL = await writeModel();
   const body = { model: MODEL, max_tokens: opts.maxTokens ?? 8000, system: opts.system ?? SYSTEM, messages: [{ role: "user", content: opts.user }] };
-  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(body) });
+  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: HEADERS(key), body: JSON.stringify(body) });
   const j = (await r.json()) as { content?: { type: string; text?: string }[]; usage?: { input_tokens: number; output_tokens: number }; error?: { message: string } };
   const inT = j.usage?.input_tokens ?? 0, outT = j.usage?.output_tokens ?? 0;
   const cost = (inT * IN_RATE + outT * OUT_RATE) / 1_000_000;
