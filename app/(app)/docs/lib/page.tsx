@@ -33,6 +33,10 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   const { q = "", folder = "" } = await searchParams;
   const rows = await listManuals(s);
   const tree = buildTree(rows);
+  const sbc = await supabaseServer();
+  let cq = sbc.from("certificates").select("id", { count: "exact", head: true });
+  if (s.entity !== "ALL") cq = cq.eq("entity", s.entity);
+  const { count: certCount } = await cq;
   const inFolder = folder ? rows.filter((r) => (r.manual.path ?? "Unfiled") === folder || (r.manual.path ?? "").startsWith(folder + " › ")) : rows;
   const published = rows.filter((r) => r.current).length, drafts = rows.filter((r) => r.workings.length).length, never = rows.filter((r) => !r.current).length;
 
@@ -91,6 +95,10 @@ export default async function Library({ searchParams }: { searchParams: Promise<
           <div className="ch"><span className="eyebrow">Folders</span><span className="mini">colour = worst status inside</span></div>
           <div className="p-2">
             <Link href="/docs/lib" className={"fnode d0 all" + (!folder ? " on" : "")}><span className="fname">All documents</span><span className="fcount">{rows.length}</span></Link>
+            <Link href="/docs/files" className="fnode d0" style={{ borderLeftColor: FAMILY_COLORS["1"] }} title="Certificates & Validities">
+              <i className="fdot" style={{ background: "var(--green)" }} /><span className="fname" style={{ color: FAMILY_COLORS["1"] }}>1. Certificates</span><span className="fcount">{certCount ?? 0}</span>
+            </Link>
+            <Link href="/docs/files" className="fnode d1"><i className="fdot" style={{ background: "var(--green)" }} /><span className="fname">Approvals & validities ›</span><span className="fcount">{certCount ?? 0}</span></Link>
             {renderNodes(tree)}
           </div>
         </aside>
