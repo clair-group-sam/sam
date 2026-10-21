@@ -218,7 +218,7 @@ button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:
 .rail.mini .rl{justify-content:center;padding:0;margin:0 8px;width:calc(100% - 16px)}
 .rail.mini .morebox.open{margin:6px 6px}
 .rail.mini.hover{width:230px;box-shadow:8px 0 24px rgba(13,42,63,.12)}
-.rail.mini.hover .brand b,.rail.mini.hover .brand span,.rail.mini.hover .rl span{display:inline}
+.rail.mini.hover .brand b,.rail.mini.hover .rl span{display:inline}.rail.mini.hover .brand span{display:block}
 .rail.mini.hover .brand{padding:4px 20px 18px}.rail.mini.hover .brand img{width:56px}
 .rail.mini.hover .rl{justify-content:flex-start;padding:0 10px 0 14px;margin:0 10px;width:calc(100% - 20px)}
 .compact .rail.mini.hover{margin-right:-168px}
