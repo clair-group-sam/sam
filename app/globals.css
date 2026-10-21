@@ -296,7 +296,7 @@ body:has(.pm){background:#e9eef2}
   .pm-wm{position:fixed}
 }
 .dlmenu{position:relative}
-.dlpanel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:360px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(13,42,63,.16);padding:6px}
+.dlpanel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:420px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(13,42,63,.16);padding:6px}
 .dlrow{display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-radius:8px}
 .dlrow+.dlrow{border-top:1px solid var(--line)}
 .dlrow .k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--slate5)}
