@@ -54,7 +54,8 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
   if (ret.length) { const { data } = await supabaseAdmin().storage.from("manuals").createSignedUrls(ret.map((x) => x.path), 600); for (const d of data ?? []) if (d.path && d.signedUrl) retSigned.set(d.path, d.signedUrl); }
   const approvalPages = ret.filter((x) => x.role === "approval" || x.role === "signature");
   const lepPages = ret.filter((x) => x.role === "lep");
-  const fix = (h: string) => h
+  const shift = (h: string) => h.replace(/<(\/?)h([1-6])(\s|>)/gi, (_m, sl: string, n: string, tail: string) => `<${sl}h${Math.min(6, Number(n) + 2)}${tail}`);
+  const fix = (h: string) => shift(h)
     .replace(/src="\/api\/files\/manuals\/([^"?#]+)"/g, (all, k: string) => { const u = signed.get(decodeURIComponent(k)); return u ? `src="${u}"` : all; })
     .replace(/\sloading="lazy"/g, "");
 
@@ -92,7 +93,7 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
         <div className="pm-ent">{ent?.name ?? manual.entity}<small>{ent?.qual}</small></div>
         <div className="pm-mid">
           <div className="pm-code">{manual.code}</div>
-          <h1>{manual.title}</h1>
+          <div className="pm-title">{manual.title}</div>
           <div className="pm-rev">{revLabel}</div>
           <div className={"pm-state" + (state === "published" ? "" : " draft")}>{state === "published" ? `Published${current.published_at ? " · effective " + current.published_at : ""}` : state === "archive" ? `Superseded by Rev ${supersededBy!.rev} — archive copy` : `${STEP_LABEL[current.step]} — not approved`}</div>
         </div>
@@ -106,20 +107,20 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
       </section>
 
       {approvalPages.map((x) => (
-        <section key={x.path} className="pm-scan"><div className="pm-scanlab">0.0 · Authority {x.role === "signature" ? "signature page" : "approval"} — {ent?.auth ?? ""}</div>{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>
+        <section key={x.path} className="pm-scan"><h1 className="pm-scanlab">0.0 · Authority {x.role === "signature" ? "signature page" : "approval"} — {ent?.auth ?? ""}</h1>{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>
       ))}
       <section className="pm-front">
-        <h2>Record of revisions</h2>
+        <h1>Record of revisions</h1>
         <table className="pm-tab"><thead><tr><th>Issue / Rev</th><th>Effective</th><th>Summary</th></tr></thead><tbody>
           {!isPublished && <tr className="cur"><td>Iss {current.issue} Rev {current.rev}</td><td>{STEP_LABEL[current.step]}</td><td>{current.summary ?? "—"}</td></tr>}
           {published.map((r) => <tr key={r.id} className={r.id === current.id ? "cur" : ""}><td>Iss {r.issue} Rev {r.rev}</td><td>{r.published_at ?? "—"}</td><td>{r.summary ?? "—"}</td></tr>)}
         </tbody></table>
 
         {lepPages.length > 0 ? (<>
-          <h2>List of effective pages</h2>
+          <h1>List of effective pages</h1>
           <p className="pm-small">As stamped by {ent?.auth ?? "the authority"} — {lepPages.length} page{lepPages.length === 1 ? "" : "s"} follow.</p>
         </>) : (<>
-        <h2>List of effective chapters</h2>
+        <h1>List of effective chapters</h1>
         <table className="pm-tab pm-lec"><thead><tr><th>Chapter</th><th>Title</th><th>Revision</th></tr></thead><tbody>
           {sections.map((x) => (
             <tr key={x.id}><td>{x.ref}</td><td>{x.title}</td><td>{x.changed ? <b>Rev {current.rev} ▌</b> : <span>—</span>}</td></tr>
@@ -134,8 +135,8 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
         const p = partOf(x.ref); const newPart = p !== lastPart; lastPart = p;
         return (
           <article key={x.id} className={"pm-ch" + (newPart ? " newpart" : "")}>
-            {newPart && parts.length > 1 && <div className="pm-part">{partLabel.get(p) ?? p}</div>}
-            <h1 className="pm-cht"><span>{x.ref}</span> {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h1>
+            {newPart && parts.length > 1 && <h1 className="pm-part">{partLabel.get(p) ?? p}</h1>}
+            <h2 className="pm-cht"><span>{x.ref}</span> {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h2>
             <div className="pm-body" dangerouslySetInnerHTML={{ __html: fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`) }} />
           </article>
         );

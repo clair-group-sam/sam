@@ -16,7 +16,18 @@ export default function DownloadMenu({ manualId, published, drafts, archive }: {
     document.addEventListener("mousedown", close); document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
   }, [open]);
-  const go = (rev: string) => { window.open(`/print/manual/${manualId}?rev=${rev}&auto=1`, "_blank", "noopener"); setOpen(false); };
+  const [busy, setBusy] = useState("");
+  // real PDF (with bookmarks) generated on the server; if that fails, the browser's Save as PDF on the print page
+  const go = async (rev: string) => {
+    if (busy) return; setBusy(rev);
+    try {
+      const r = await fetch(`/api/docs/pdf/${manualId}?rev=${rev}`);
+      const j = (await r.json()) as { url?: string; fallback?: string };
+      if (j.url) { const a = document.createElement("a"); a.href = j.url; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+      else window.open(j.fallback ?? `/print/manual/${manualId}?rev=${rev}&auto=1`, "_blank", "noopener");
+    } catch { window.open(`/print/manual/${manualId}?rev=${rev}&auto=1`, "_blank", "noopener"); }
+    setBusy(""); setOpen(false);
+  };
   return (
     <div className="dlmenu" ref={box}>
       <button type="button" className="btn" onClick={() => setOpen((v) => !v)} aria-expanded={open}>Download PDF ▾</button>
@@ -25,22 +36,23 @@ export default function DownloadMenu({ manualId, published, drafts, archive }: {
           <div className={"dlrow" + (published ? "" : " off")}>
             <span className="k">Published</span>
             <span className="v">{published ? <>{published.label}<small>{published.sub}</small></> : "no published revision"}</span>
-            <button type="button" className="btn primary" disabled={!published} onClick={() => published && go(published.id)}>Download</button>
+            <button type="button" className="btn primary" disabled={!published || !!busy} onClick={() => published && go(published.id)}>{busy && busy === published?.id ? "Preparing…" : "Download"}</button>
           </div>
           <div className={"dlrow" + (drafts.length ? "" : " off")}>
             <span className="k">Draft</span>
             <span className="v">{drafts.length ? (
               <select value={draft} onChange={(e) => setDraft(e.target.value)}>{drafts.map((d) => <option key={d.id} value={d.id}>{d.label} — {d.sub}</option>)}</select>
             ) : "no revision in progress"}</span>
-            <button type="button" className="btn" disabled={!draft} onClick={() => draft && go(draft)}>Download</button>
+            <button type="button" className="btn" disabled={!draft || !!busy} onClick={() => draft && go(draft)}>{busy && busy === draft ? "Preparing…" : "Download"}</button>
           </div>
           <div className={"dlrow" + (archive.length ? "" : " off")}>
             <span className="k">Archive</span>
             <span className="v">{archive.length ? (
               <select value={arch} onChange={(e) => setArch(e.target.value)}>{archive.map((d) => <option key={d.id} value={d.id}>{d.label} — {d.sub}</option>)}</select>
             ) : "no superseded revision"}</span>
-            <button type="button" className="btn" disabled={!arch} onClick={() => arch && go(arch)}>Download</button>
+            <button type="button" className="btn" disabled={!arch || !!busy} onClick={() => arch && go(arch)}>{busy && busy === arch ? "Preparing…" : "Download"}</button>
           </div>
+          {busy && <p className="mini px-3 pb-2">Preparing the PDF with its bookmarks — a few seconds for a large manual.</p>}
         </div>
       )}
     </div>

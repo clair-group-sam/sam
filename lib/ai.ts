@@ -63,5 +63,6 @@ export function userPromptFor(agent: AiAgent, ctx: { manual: string; entity: str
     case "rewrite": return head + `Rewrite the passages the nominated person typed quickly so they read like the rest of the manual (style, terminology, formatting), without changing their meaning. ${ctx.request ? "Focus: " + ctx.request : ""} Return the full chapter.`;
     case "translate": return head + `Translate into the manual's language (${ctx.request.trim() || "the language of the rest of the chapter"}) every passage written in another language, in the manual's style; keep the other passages unchanged. Return the full chapter.`;
     case "check": return head + `Do not rewrite. Review this chapter for internal consistency (posts, references to other chapters, delays, contradictions, missing cross-references, terminology) ${ctx.request ? "with attention to: " + ctx.request : ""}. Return the chapter html UNCHANGED and put every finding in "notes" (where / change = the issue / why = suggestion).`;
+    default: return head + ctx.request;
   }
 }
