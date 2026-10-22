@@ -54,6 +54,32 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
   if (ret.length) { const { data } = await supabaseAdmin().storage.from("manuals").createSignedUrls(ret.map((x) => x.path), 600); for (const d of data ?? []) if (d.path && d.signedUrl) retSigned.set(d.path, d.signedUrl); }
   const approvalPages = ret.filter((x) => x.role === "approval" || x.role === "signature");
   const lepPages = ret.filter((x) => x.role === "lep");
+  // internal links (PDF): every chapter and numbered sub-chapter gets an anchor; links inside the manual point there, never to the web
+  const chapId = (ref: string) => `ch-${ref.replace(/[^A-Za-z0-9]+/g, "-")}`;
+  const chapters = new Map(sections.map((x) => [x.ref, chapId(x.ref)]));
+  const subs = new Map<string, string>();
+  for (const x of sections) for (const h of x.body.headings ?? []) { const mm = /^\s*([A-Z]{0,2}\d*(?:\.\d+){1,4})\b/.exec(h.text); if (mm && !chapters.has(mm[1]) && !subs.has(mm[1])) subs.set(mm[1], h.id); }
+  const target = (txt: string): string | null => {
+    const mm = /^\s*([A-Z]{0,2}\d*(?:\.\d+){0,4})\b/.exec(txt.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " "));
+    if (!mm || !mm[1]) return null;
+    let k = mm[1];
+    while (k) { if (chapters.has(k)) return chapters.get(k)!; if (subs.has(k)) return subs.get(k)!; k = k.includes(".") ? k.slice(0, k.lastIndexOf(".")) : ""; }
+    return null;
+  };
+  const linkify = (h: string, isToc: boolean) => {
+    let out = h.replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (all, attrs: string, inner: string) => {
+      const href = /href="([^"]*)"/i.exec(attrs)?.[1] ?? "";
+      if (/^https?:\/\//i.test(href) && !/webmanuals|vercel\.app|clair-group\.com\/sam/i.test(href)) return all; // genuine external reference
+      const t = target(inner);
+      return t ? `<a href="#${t}">${inner}</a>` : inner;
+    });
+    if (isToc) out = out.replace(/<td([^>]*)>((?:(?!<\/td>)[\s\S])*?)<\/td>/gi, (all, attrs: string, inner: string) => {
+      if (/<a\b/i.test(inner)) return all;
+      const t = target(inner);
+      return t && /^\s*(<[^>]+>\s*)*[A-Z]{0,2}\d*(?:\.\d+)*\b/.test(inner) ? `<td${attrs}><a href="#${t}">${inner}</a></td>` : all;
+    });
+    return out;
+  };
   const shift = (h: string) => h.replace(/<(\/?)h([1-6])(\s|>)/gi, (_m, sl: string, n: string, tail: string) => `<${sl}h${Math.min(6, Number(n) + 2)}${tail}`);
   const fix = (h: string) => shift(h)
     .replace(/src="\/api\/files\/manuals\/([^"?#]+)"/g, (all, k: string) => { const u = signed.get(decodeURIComponent(k)); return u ? `src="${u}"` : all; })
@@ -82,6 +108,14 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
 }
 @page :first { @top-left { content: none; border: 0 } @top-right { content: none; border: 0 } @bottom-left { content: none } @bottom-right { content: none } }`;
 
+  // the manual's own preliminary pages (cover, contents, revisions, LEP) come first; S.A.M. adds a cover + lists only when the manual has none
+  const hasOwnFront = sections.some((x) => partOf(x.ref) === "0" || /cover|couverture|page de garde/i.test(x.title ?? ""));
+  const coverIdx = sections.findIndex((x) => /cover|couverture|page de garde/i.test(x.title ?? ""));
+  const afterCover = hasOwnFront ? Math.max(coverIdx, 0) : -1; // authority pages (0.0) go right after the manual's cover
+  const isLep = (t: string | null) => /pages? effectives|effective pages|\bLEP\b/i.test(t ?? "");
+  const AuthorityPages = () => <>{approvalPages.map((x) => (
+    <section key={x.path} className="pm-scan"><h1 className="pm-scanlab">0.0 · Authority {x.role === "signature" ? "signature page" : "approval"} — {ent?.auth ?? ""}</h1>{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>
+  ))}</>;
   let lastPart = "";
   return (
     <div className="pm">
@@ -89,6 +123,7 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
       <PrintAuto fileName={fileName} auto={auto === "1"} />
       {state !== "published" && <div className={"pm-wm" + (state === "archive" ? " arch" : "")}>{state === "draft" ? "DRAFT" : "SUPERSEDED"}</div>}
 
+      {!hasOwnFront && (<>
       <section className="pm-cover">
         <div className="pm-ent">{ent?.name ?? manual.entity}<small>{ent?.qual}</small></div>
         <div className="pm-mid">
@@ -106,9 +141,8 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
         <p className="pm-note">{state === "archive" ? "Archive copy of a superseded revision, generated from S.A.M. for reference only. It must not be used for operations." : isPublished ? "This copy was generated from S.A.M. and is uncontrolled once downloaded or printed. Always check the current revision in S.A.M. before use." : "Working copy of a revision in progress. It has not been approved and must not be used for operations."}</p>
       </section>
 
-      {approvalPages.map((x) => (
-        <section key={x.path} className="pm-scan"><h1 className="pm-scanlab">0.0 · Authority {x.role === "signature" ? "signature page" : "approval"} — {ent?.auth ?? ""}</h1>{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>
-      ))}
+      {approvalPages.length > 0 && <AuthorityPages />}
+
       <section className="pm-front">
         <h1>Record of revisions</h1>
         <table className="pm-tab"><thead><tr><th>Issue / Rev</th><th>Effective</th><th>Summary</th></tr></thead><tbody>
@@ -131,14 +165,24 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
       </section>
       {lepPages.map((x) => <section key={x.path} className="pm-scan">{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>)}
 
-      {sections.map((x) => {
+      </>)}
+      {sections.map((x, i) => {
         const p = partOf(x.ref); const newPart = p !== lastPart; lastPart = p;
+        const cover = i === coverIdx;
+        const stampedHere = hasOwnFront && lepPages.length > 0 && isLep(x.title);
+        const toc = /table des mati|contents|sommaire/i.test(x.title ?? "");
         return (
-          <article key={x.id} className={"pm-ch" + (newPart ? " newpart" : "")}>
-            {newPart && parts.length > 1 && <h1 className="pm-part">{partLabel.get(p) ?? p}</h1>}
-            <h2 className="pm-cht"><span>{x.ref}</span> {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h2>
-            <div className="pm-body" dangerouslySetInnerHTML={{ __html: fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`) }} />
-          </article>
+          <div key={x.id}>
+            <article id={chapId(x.ref)} className={"pm-ch" + (newPart ? " newpart" : "") + (cover ? " cover" : "")}>
+              {newPart && parts.length > 1 && <h1 className="pm-part">{partLabel.get(p) ?? p}</h1>}
+              <h2 className={"pm-cht" + (cover ? " vh" : "")}><span>{x.ref}</span> {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h2>
+              {stampedHere
+                ? <p className="pm-small">Replaced by the list of effective pages stamped by {ent?.auth ?? "the authority"} ({lepPages.length} page{lepPages.length === 1 ? "" : "s"}).</p>
+                : <div className="pm-body" dangerouslySetInnerHTML={{ __html: linkify(fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`), toc) }} />}
+            </article>
+            {stampedHere && lepPages.map((l) => <section key={l.path} className="pm-scan">{retSigned.get(l.path) && <img src={retSigned.get(l.path)} alt="" />}</section>)}
+            {i === afterCover && approvalPages.length > 0 && <AuthorityPages />}
+          </div>
         );
       })}
     </div>
