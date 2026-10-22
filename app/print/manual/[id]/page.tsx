@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
 import { ENT } from "@/lib/nav";
 import PrintAuto from "@/components/PrintAuto";
+import { headers } from "next/headers";
+import { linkIndex, rewriteLinks } from "@/lib/links";
 
 /**
  * DOC-13 · Download PDF — the manual as S.A.M. holds it, laid out for A4 (cover, record of revisions,
@@ -66,12 +68,15 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
     while (k) { if (chapters.has(k)) return chapters.get(k)!; if (subs.has(k)) return subs.get(k)!; k = k.includes(".") ? k.slice(0, k.lastIndexOf(".")) : ""; }
     return null;
   };
+  // links: inside this manual → anchors of this PDF; other manuals → S.A.M. (which checks access); web addresses kept
+  const hd = await headers();
+  const origin = `${hd.get("x-forwarded-proto") ?? "https"}://${hd.get("x-forwarded-host") ?? hd.get("host")}`;
+  const idx = sections.some((x) => /\/reader\/#\//.test(x.body.html ?? "")) ? await linkIndex(supabaseAdmin()) : null;
   const linkify = (h: string, isToc: boolean) => {
-    let out = h.replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (all, attrs: string, inner: string) => {
-      const href = /href="([^"]*)"/i.exec(attrs)?.[1] ?? "";
-      if (/^https?:\/\//i.test(href) && !/webmanuals|vercel\.app|clair-group\.com\/sam/i.test(href)) return all; // genuine external reference
-      const t = target(inner);
-      return t ? `<a href="#${t}">${inner}</a>` : inner;
+    let out = rewriteLinks(h, {
+      idx, selfManualId: manual.id, base: origin,
+      self: (ref) => (ref && chapters.has(ref) ? `#${chapters.get(ref)}` : null),
+      textTarget: (inner) => { const t = target(inner); return t ? `#${t}` : null; },
     });
     if (isToc) out = out.replace(/<td([^>]*)>((?:(?!<\/td>)[\s\S])*?)<\/td>/gi, (all, attrs: string, inner: string) => {
       if (/<a\b/i.test(inner)) return all;

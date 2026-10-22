@@ -12,6 +12,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from "@/lib/audience";
 import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
 import { ENT } from "@/lib/nav";
+import { linkIndex, rewriteLinks } from "@/lib/links";
 import { startRevision } from "@/app/(app)/docs/editor/[rev]/actions";
 import { isCmm, ownsManual } from "@/lib/revisions";
 
@@ -59,7 +60,20 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const subRefs = new Map<string, { ref: string; id: string }>();
   for (const x of toc) for (const h of x.headings) { const mm = /^([A-Z]{0,2}\d*(?:\.\d+){1,3})\b/.exec(h.text); if (mm && !chapterRefs.has(mm[1])) subRefs.set(mm[1], { ref: x.ref, id: h.id }); }
   const base = current ? `/docs/manual/${manual.id}?rev=${current.id}` : `/docs/manual/${manual.id}?x=1`;
-  const activeHtml = active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(activeStructured.html, chapterRefs, subRefs, base) : activeStructured.html) : "";
+  const rawHtml = active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(activeStructured.html, chapterRefs, subRefs, base) : activeStructured.html) : "";
+  // links copied from the source system: same manual → its chapter, other manuals → S.A.M., web addresses in a new tab
+  const refHref = (inner: string): string | null => {
+    const mm = /^\s*([A-Z]{0,2}\d*(?:\.\d+){0,4})\b/.exec(inner.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " "));
+    let k = mm?.[1] ?? "";
+    while (k) { if (chapterRefs.has(k)) return `${base}&sec=${encodeURIComponent(k)}`; const sr = subRefs.get(k); if (sr) return `${base}&sec=${encodeURIComponent(sr.ref)}#${sr.id}`; k = k.includes(".") ? k.slice(0, k.lastIndexOf(".")) : ""; }
+    return null;
+  };
+  const activeHtml = /<a\b/i.test(rawHtml)
+    ? rewriteLinks(rawHtml, {
+        idx: /\/reader\/#\//.test(rawHtml) ? await linkIndex(supabaseAdmin()) : null, selfManualId: manual.id, base: "", newTab: true,
+        self: (ref) => (ref ? `${base}&sec=${encodeURIComponent(ref)}` : null), textTarget: refHref,
+      })
+    : rawHtml;
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
   const canAudience = isCmm(s) || ownsManual(s, manual.owner_role);
 

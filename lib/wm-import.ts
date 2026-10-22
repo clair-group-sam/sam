@@ -7,7 +7,7 @@ export type WmBundle = {
   toc: WmToc[]; pages: WmPage[]; images?: Record<string, { name: string; type: string; size: number; b64?: string }>;
   file?: { name: string; type: string; size: number; b64?: string };
 };
-export type BuiltSection = { ord: number; ref: string; title: string; html: string; text: string; pages: string[]; pageRevs: string[]; changed: boolean };
+export type BuiltSection = { ord: number; ref: string; title: string; html: string; text: string; pages: string[]; pageRevs: string[]; pageIds: string[]; changed: boolean };
 
 const decode = (s: string) => s.replace(/&nbsp;/g, " ").replace(/&eacute;/g, "é").replace(/&egrave;/g, "è").replace(/&agrave;/g, "à").replace(/&ecirc;/g, "ê").replace(/&acirc;/g, "â").replace(/&ocirc;/g, "ô").replace(/&icirc;/g, "î").replace(/&ucirc;/g, "û").replace(/&ccedil;/g, "ç").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, "’").replace(/&laquo;/g, "«").replace(/&raquo;/g, "»").replace(/&deg;/g, "°").replace(/&ndash;/g, "–").replace(/&mdash;/g, "—");
 
@@ -50,7 +50,7 @@ export function buildSections(bundle: WmBundle, imgSrc: (id: string) => string):
   const chapters: { ref: string; title: string }[] = [];
   for (const t of bundle.toc) { if (/^[A-Za-z0-9]+\.\d+$/.test(t.chapter) && !chapters.some((c) => c.ref === t.chapter)) chapters.push({ ref: t.chapter, title: decode(t.title) }); }
   // one stream with page markers
-  const stream = bundle.pages.map((p) => `<!--pg:${p.number || "cover"}:${pageRevision(p.html) ?? ""}-->` + pageContent(p.html)).join("\n");
+  const stream = bundle.pages.map((p) => `<!--pg:${p.number || "cover"}:${pageRevision(p.html) ?? ""}:${p.id ?? ""}-->` + pageContent(p.html)).join("\n");
   // split points: headings whose section number equals a chapter ref
   const cuts: { ref: string; title: string; idx: number }[] = [];
   if (chapters.length) {
@@ -76,13 +76,14 @@ export function buildSections(bundle: WmBundle, imgSrc: (id: string) => string):
   for (const c of chapters) if (!pieces.some((p) => p.ref === c.ref)) pieces.push({ ref: c.ref, title: c.title, html: "" });
   const allRevs = new Set(bundle.pages.map((p) => pageRevision(p.html) ?? ""));
   const usePageRevs = allRevs.size > 1;
-  let lastRev = ""; let lastPage = "";
+  let lastRev = ""; let lastPage = ""; let lastId = "";
   return pieces.map((p, ord) => {
-    const pages: string[] = []; const pageRevs: string[] = [];
-    const body = p.html.replace(/<!--pg:([^:]*):([^>]*)-->/g, (_m, num: string, r: string) => { lastPage = num; lastRev = r; pages.push(num); pageRevs.push(r); return ""; });
-    if (!pages.length && lastPage) { pages.push(lastPage); pageRevs.push(lastRev); }
+    const pages: string[] = []; const pageRevs: string[] = []; const pageIds: string[] = [];
+    // marker: number : page revision : Web Manuals page id (the id is what cross-references point to)
+    const body = p.html.replace(/<!--pg:([^:]*):([^:>]*)(?::(\d*))?-->/g, (_m, num: string, r: string, id?: string) => { lastPage = num; lastRev = r; lastId = id ?? ""; pages.push(num); pageRevs.push(r); pageIds.push(id ?? ""); return ""; });
+    if (!pages.length && lastPage) { pages.push(lastPage); pageRevs.push(lastRev); pageIds.push(lastId); }
     const html = cleanHtml(body, imgSrc);
-    return { ord, ref: p.ref, title: p.title, html, text: htmlToText(html), pages, pageRevs, changed: html.includes('class="revbar"') || (usePageRevs && !!rev && pageRevs.includes(rev)) };
+    return { ord, ref: p.ref, title: p.title, html, text: htmlToText(html), pages, pageRevs, pageIds, changed: html.includes('class="revbar"') || (usePageRevs && !!rev && pageRevs.includes(rev)) };
   });
 }
 export function imageExt(name: string, type: string): string {
