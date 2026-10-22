@@ -20,9 +20,16 @@ export const EDITING = ["draft", "approved_np"];
 export const UNDER_REVIEW = ["approved_compliance", "signed", "with_civil_aviation"];
 export function isCmm(s: Session): boolean { return s.roles.includes("CMM") || s.roles.includes("SUPERADMIN"); }
 export function ownsManual(s: Session, ownerRole: string): boolean { return s.roles.map((r) => r.toUpperCase()).includes(ownerRole.toUpperCase()); }
-export function allowedTransitions(s: Session, step: string, ownerRole: string, needsSignature: boolean, toRepo: boolean): Transition[] {
+/**
+ * DOC-06: once Compliance has approved, the way forward depends on the authority route it decided:
+ * notification / approval → only "Send to the authority"; none → only "Publish"; not decided yet → nothing forward.
+ */
+export function allowedTransitions(s: Session, step: string, ownerRole: string, needsSignature: boolean, toRepo: boolean, route?: string | null): Transition[] {
   const cmm = isCmm(s), owner = ownsManual(s, ownerRole);
+  const viaAuthority = route === "notification" || route === "approval";
   return TRANSITIONS.filter((t) => t.from === step)
+    .filter((t) => !(t.to === "with_civil_aviation" && !viaAuthority))
+    .filter((t) => !((t.from === "approved_compliance" || t.from === "signed") && t.to === "published" && route !== "none"))
     .filter((t) => (t.by === "cmm" ? cmm : t.by === "owner" ? owner : owner || cmm))
     .filter((t) => !(t.to === "signed" && !needsSignature))
     .filter((t) => !(t.to === "repository" && !toRepo))
@@ -34,3 +41,17 @@ export function nextRev(current: string | null | undefined): string {
   return String(next).padStart((current ?? "00").length || 2, "0");
 }
 export function stepIndex(step: string): number { return STEPS.indexOf(step); }
+
+/** DOC-03 · what the authority sends back after an approval, by entity / authority and kind of manual. */
+export type ReturnKind = "none" | "approval_page" | "approval_lep" | "consolidated";
+export const RETURN_LABEL: Record<ReturnKind, string> = {
+  none: "Nothing expected back",
+  approval_page: "Approval page",
+  approval_lep: "Approval page + stamped list of effective pages",
+  consolidated: "Consolidated manual with the signature page",
+};
+export function expectedReturn(entity: string, code: string, route: string | null | undefined): ReturnKind {
+  if (route !== "approval") return "none";
+  if (entity === "AJD") return /CAME|AMP|MOE|CAMO/i.test(code) ? "approval_lep" : "consolidated"; // TM-CAD Airworthiness vs Flight Ops
+  return "none"; // DSAC (ASF, ASJ) and OSAC (TEC) send nothing to integrate — an approval letter can still be added
+}

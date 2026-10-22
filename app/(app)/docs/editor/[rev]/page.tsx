@@ -5,8 +5,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
-import { allowedTransitions, isCmm, ownsManual } from "@/lib/revisions";
-import { moveStep, saveSummary, resolveConflict } from "./actions";
+import { allowedTransitions, expectedReturn, isCmm, ownsManual, RETURN_LABEL, type ReturnKind } from "@/lib/revisions";
+import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal } from "./actions";
+import AuthorityReturn from "@/components/AuthorityReturn";
+import RouteProposal from "@/components/RouteProposal";
+import { ENT } from "@/lib/nav";
 import { frozenRefs } from "@/lib/revisions-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -21,7 +24,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const sb = await supabaseServer();
   const { data: r } = await sb.from("revisions").select("*").eq("id", revId).maybeSingle();
   if (!r) notFound();
-  const rev = r as Revision & { submitted_at?: string | null; step_changed_at?: string | null; based_on?: string | null };
+  const rev = r as Revision & { submitted_at?: string | null; step_changed_at?: string | null; based_on?: string | null; return_kind?: string | null; return_pdf_path?: string | null; return_pages?: { path: string; role: string; page: number }[] | null; return_received_at?: string | null; route_proposal?: Proposal | null };
   const { data: m } = await sb.from("manuals").select("*").eq("id", rev.manual_id).maybeSingle();
   if (!m) notFound();
   const manual = m as Manual;
@@ -43,7 +46,18 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const changedCount = metas.filter((x) => x.changed).length;
   const { data: roundsData } = cmm ? await sb.from("authority_rounds").select("*").eq("revision_id", rev.id).order("at") : { data: [] };
   const rounds = (roundsData ?? []) as Round[];
-  const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository);
+  const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository, rev.authority_route);
+  // DOC-03: what the authority sends back, and whether it is in
+  const returnKind = (rev.return_kind ?? expectedReturn(manual.entity, manual.code, rev.authority_route)) as ReturnKind;
+  const returnMissing = returnKind !== "none" && !rev.return_pdf_path;
+  const admin = supabaseAdmin();
+  const retPages = rev.return_pages ?? [];
+  const retUrls = new Map<string, string>();
+  if (cmm && retPages.length) { const { data: su } = await admin.storage.from("manuals").createSignedUrls(retPages.map((x) => x.path), 600); for (const x of su ?? []) if (x.path && x.signedUrl) retUrls.set(x.path, x.signedUrl); }
+  const { data: noticeData } = cmm ? await admin.from("manual_notices").select("sent_at,recipients,emailed,email_status").eq("revision_id", rev.id).order("sent_at") : { data: [] };
+  const notices = (noticeData ?? []) as { sent_at: string; recipients: number; emailed: number; email_status: string | null }[];
+  const routeOpen = ["draft", "approved_np", "approved_compliance", "signed"].includes(rev.step);
+  const auth = ENT[manual.entity]?.auth ?? "authority";
   const stepIdx = STEPS.indexOf(rev.step);
   const tabs: [string, string][] = cmm ? [["write", "Write"], ["publish", "Publish · Compliance"]] : [["write", "Write"]];
 
@@ -102,16 +116,12 @@ export default async function Editor({ params, searchParams }: { params: Promise
       {tab === "publish" && cmm && (
         <div className="grid grid-cols-2 gap-4">
           <section className="card">
-            <div className="ch"><span className="eyebrow">Revision summary & authority route</span></div>
+            <div className="ch"><span className="eyebrow">Revision summary</span></div>
             <form action={saveSummary} className="cb">
               <input type="hidden" name="revision_id" value={rev.id} />
               <label className="block mb-3"><span className="eyebrow">What changes in Rev {rev.rev} (shown to readers in “What changed”)</span>
                 <textarea name="summary" defaultValue={rev.summary ?? ""} rows={5} className="inp" placeholder="Short summary of the revision, in English…" /></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label><span className="eyebrow">Authority route</span>
-                  <select name="authority_route" defaultValue={rev.authority_route ?? ""} className="inp"><option value="">none</option><option value="notification">notification</option><option value="approval">approval</option></select></label>
-                <label><span className="eyebrow">Application / dossier reference</span><input name="authority_ref" defaultValue={rev.authority_ref ?? ""} className="inp" placeholder="TM-CAD OPS-…, METEOR …" /></label>
-              </div>
+              <label className="block"><span className="eyebrow">Application / dossier reference at the authority</span><input name="authority_ref" defaultValue={rev.authority_ref ?? ""} className="inp" placeholder="TM-CAD OPS-…, METEOR …, OSAC …" /></label>
               <button className="btn primary mt-3" type="submit">Save</button>
             </form>
           </section>
@@ -119,17 +129,52 @@ export default async function Editor({ params, searchParams }: { params: Promise
             <div className="ch"><span className="eyebrow">Workflow · DOC-09</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
             <div className="cb">
               {transitions.length === 0 && <p className="mini">No action for you at this step.</p>}
-              {transitions.map((t) => (
+              {(rev.step === "approved_compliance" || rev.step === "signed") && !rev.authority_route && <p className="mini mb-3">Decide the authority route (card below) to continue.</p>}
+              {transitions.map((t) => { const blocked = t.from === "with_civil_aviation" && t.to === "published" && returnMissing; return (
                 <form key={t.to} action={moveStep} className="mb-3 p-3 border border-line rounded-lg">
                   <input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="to" value={t.to} />
-                  <div className="flex items-center gap-3"><button className={"btn " + (t.to === "draft" ? "" : "primary")} type="submit">{t.label}</button><span className="mini">{t.note}</span></div>
+                  <div className="flex items-center gap-3"><button className={"btn " + (t.to === "draft" ? "" : "primary")} type="submit" disabled={blocked}>{t.label}</button><span className="mini">{blocked ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}) — integrate it below first.` : t.to === "published" ? `${t.note ?? ""} The update notice goes to every reader of the manual.` : t.note}</span></div>
                   {(t.to === "with_civil_aviation" || t.from === "with_civil_aviation") && <input name="note" className="inp mt-2" placeholder="Note for the authority exchange (what was sent / received)…" />}
                 </form>
-              ))}
+              ); })}
+              {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
               {rounds.length > 0 && (<>
                 <div className="eyebrow mt-4 mb-2">Exchanges with the authority</div>
                 <table className="tbl"><tbody>{rounds.map((x) => <tr key={x.id}><td className="mono" style={{ width: 100 }}>{x.at}</td><td style={{ width: 80 }}><span className={"pill " + (x.direction === "sent" ? "" : "green")}>{x.direction}</span></td><td><b>{x.who}</b><div className="mini">{x.note}</div></td></tr>)}</tbody></table>
               </>)}
+            </div>
+          </section>
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Authority route · DOC-06</span>{rev.authority_route && <span className="pill">{rev.authority_route}</span>}</div>
+            <div className="cb">
+              {routeOpen
+                ? <RouteProposal revisionId={rev.id} initial={rev.route_proposal ?? null} route={rev.authority_route} authority={auth} />
+                : <p className="mini">Route: <b>{rev.authority_route ?? "none"}</b>{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""} — fixed once the revision is with the authority.</p>}
+            </div>
+          </section>
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Authority return · DOC-03</span><span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
+            <div className="cb">
+              <form action={setReturnKind} className="flex items-center gap-2 mb-3">
+                <input type="hidden" name="revision_id" value={rev.id} />
+                <span className="mini">Expected from {auth}:</span>
+                <select name="kind" defaultValue={returnKind} className="inp" style={{ width: "auto" }} disabled={!!rev.return_pdf_path}>
+                  {(Object.keys(RETURN_LABEL) as ReturnKind[]).map((k) => <option key={k} value={k}>{RETURN_LABEL[k]}</option>)}
+                </select>
+                {!rev.return_pdf_path && <button className="btn" type="submit">Set</button>}
+              </form>
+              {rev.return_pdf_path ? (<>
+                <p className="mini mb-2">Received {rev.return_received_at ?? ""} · {retPages.length} page(s) kept in the manual (added to the PDF: approval / signature page as page 0.0{retPages.some((x) => x.role === "lep") ? ", stamped LEP in place of S.A.M.'s list" : ""}).</p>
+                <div className="athumbs">{retPages.map((x) => <div key={x.path} className="athumb on">{retUrls.get(x.path) && <img src={retUrls.get(x.path)} alt={`page ${x.page}`} />}<span className="mini">p. {x.page} · {x.role}</span></div>)}</div>
+                <div className="flex gap-2 mt-3">
+                  <a className="btn" href={`/api/files/manuals/${rev.return_pdf_path}`} target="_blank" rel="noreferrer">Open the authority's PDF</a>
+                  {rev.step === "with_civil_aviation" && <form action={clearReturn}><input type="hidden" name="revision_id" value={rev.id} /><button className="btn" type="submit">Remove and upload again</button></form>}
+                </div>
+              </>) : rev.step === "with_civil_aviation" ? (
+                returnKind === "none"
+                  ? <p className="mini">{auth} sends nothing to integrate for this manual: publication is not blocked. If an approval letter or page should go into the manual, choose “Approval page” above.</p>
+                  : <AuthorityReturn revisionId={rev.id} entity={manual.entity} code={manual.code} rev={rev.rev} kind={returnKind} />
+              ) : <p className="mini">{returnKind === "none" ? "Nothing to integrate." : "Available once the revision has been sent to the authority."}</p>}
             </div>
           </section>
           <section className="card col-span-2">

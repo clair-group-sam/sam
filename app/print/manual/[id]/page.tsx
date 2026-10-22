@@ -48,6 +48,12 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
     const { data } = await supabaseAdmin().storage.from("manuals").createSignedUrls([...keys], 600);
     for (const d of data ?? []) if (d.path && d.signedUrl) signed.set(d.path, d.signedUrl);
   }
+  // DOC-03: pages kept from the authority's return (approval / signature page as 0.0, stamped LEP in place of ours)
+  const ret = ((current as Revision & { return_pages?: { path: string; role: string; page: number }[] | null }).return_pages ?? []);
+  const retSigned = new Map<string, string>();
+  if (ret.length) { const { data } = await supabaseAdmin().storage.from("manuals").createSignedUrls(ret.map((x) => x.path), 600); for (const d of data ?? []) if (d.path && d.signedUrl) retSigned.set(d.path, d.signedUrl); }
+  const approvalPages = ret.filter((x) => x.role === "approval" || x.role === "signature");
+  const lepPages = ret.filter((x) => x.role === "lep");
   const fix = (h: string) => h
     .replace(/src="\/api\/files\/manuals\/([^"?#]+)"/g, (all, k: string) => { const u = signed.get(decodeURIComponent(k)); return u ? `src="${u}"` : all; })
     .replace(/\sloading="lazy"/g, "");
@@ -99,6 +105,9 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
         <p className="pm-note">{state === "archive" ? "Archive copy of a superseded revision, generated from S.A.M. for reference only. It must not be used for operations." : isPublished ? "This copy was generated from S.A.M. and is uncontrolled once downloaded or printed. Always check the current revision in S.A.M. before use." : "Working copy of a revision in progress. It has not been approved and must not be used for operations."}</p>
       </section>
 
+      {approvalPages.map((x) => (
+        <section key={x.path} className="pm-scan"><div className="pm-scanlab">0.0 · Authority {x.role === "signature" ? "signature page" : "approval"} — {ent?.auth ?? ""}</div>{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>
+      ))}
       <section className="pm-front">
         <h2>Record of revisions</h2>
         <table className="pm-tab"><thead><tr><th>Issue / Rev</th><th>Effective</th><th>Summary</th></tr></thead><tbody>
@@ -106,6 +115,10 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
           {published.map((r) => <tr key={r.id} className={r.id === current.id ? "cur" : ""}><td>Iss {r.issue} Rev {r.rev}</td><td>{r.published_at ?? "—"}</td><td>{r.summary ?? "—"}</td></tr>)}
         </tbody></table>
 
+        {lepPages.length > 0 ? (<>
+          <h2>List of effective pages</h2>
+          <p className="pm-small">As stamped by {ent?.auth ?? "the authority"} — {lepPages.length} page{lepPages.length === 1 ? "" : "s"} follow.</p>
+        </>) : (<>
         <h2>List of effective chapters</h2>
         <table className="pm-tab pm-lec"><thead><tr><th>Chapter</th><th>Title</th><th>Revision</th></tr></thead><tbody>
           {sections.map((x) => (
@@ -113,7 +126,9 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
           ))}
         </tbody></table>
         <p className="pm-small">▌ chapter revised in this revision; changes are marked by a bar in the left margin.</p>
+        </>)}
       </section>
+      {lepPages.map((x) => <section key={x.path} className="pm-scan">{retSigned.get(x.path) && <img src={retSigned.get(x.path)} alt="" />}</section>)}
 
       {sections.map((x) => {
         const p = partOf(x.ref); const newPart = p !== lastPart; lastPart = p;

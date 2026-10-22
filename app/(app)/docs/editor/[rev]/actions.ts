@@ -1,6 +1,10 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { sendUpdateNotice } from "@/lib/notice";
+import { expectedReturn, type ReturnKind } from "@/lib/revisions";
+import { ENT } from "@/lib/nav";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { htmlToText } from "@/lib/wm-import";
@@ -92,7 +96,9 @@ export async function saveSummary(formData: FormData) {
   const revisionId = String(formData.get("revision_id") ?? "");
   const { db, rev, may } = await guard(revisionId);
   if (!may) return;
-  await db.from("revisions").update({ summary: String(formData.get("summary") ?? ""), authority_route: String(formData.get("authority_route") ?? "") || null, authority_ref: String(formData.get("authority_ref") ?? "") || null }).eq("id", rev.id);
+  const patch: Record<string, unknown> = { summary: String(formData.get("summary") ?? "") };
+  if (formData.has("authority_ref")) patch.authority_ref = String(formData.get("authority_ref") ?? "") || null;
+  await db.from("revisions").update(patch).eq("id", rev.id);
   revalidatePath(`/docs/editor/${rev.id}`);
 }
 
@@ -110,6 +116,11 @@ export async function moveStep(formData: FormData) {
     const { count } = await db.from("revision_sections").select("id", { count: "exact", head: true }).eq("revision_id", rev.id).not("conflict", "is", null);
     if (count) throw new Error(`${count} chapter(s) in conflict must be resolved before submitting.`);
   }
+  const r2 = rev as Revision & { return_kind?: string | null; return_pdf_path?: string | null };
+  if (to === "published" && rev.step === "with_civil_aviation") {
+    const kind = (r2.return_kind ?? expectedReturn(manual.entity, manual.code, rev.authority_route)) as ReturnKind;
+    if (kind !== "none" && !r2.return_pdf_path) throw new Error("The authority's return must be integrated before publication (DOC-03).");
+  }
   const patch: Record<string, unknown> = { step: to, step_changed_at: new Date().toISOString(), step_changed_by: s.person?.id ?? null };
   if (to === "approved_np") patch.submitted_at = new Date().toISOString();
   if (to === "published") patch.published_at = new Date().toISOString().slice(0, 10);
@@ -117,7 +128,16 @@ export async function moveStep(formData: FormData) {
   if (to === "with_civil_aviation" || rev.step === "with_civil_aviation") {
     await db.from("authority_rounds").insert({ revision_id: rev.id, at: new Date().toISOString().slice(0, 10), direction: to === "with_civil_aviation" ? "sent" : "received", who: s.name, note: note || (to === "with_civil_aviation" ? "Application / notification sent" : `Return integrated → ${to}`) });
   }
-  if (to === "published") await rebaseDependants(db, rev.id, rev.rev);
+  if (to === "published") {
+    await rebaseDependants(db, rev.id, rev.rev);
+    // DOC-04: the update notice is created only after publication
+    const h = await headers();
+    const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+    const { data: ch } = await db.from("revision_sections").select("ref,title").eq("revision_id", rev.id).eq("changed", true).order("ord");
+    const { data: fresh } = await db.from("revisions").select("*").eq("id", rev.id).maybeSingle();
+    const n = await sendUpdateNotice(db, { manual, rev: (fresh ?? rev) as Revision, origin, senderId: s.person?.id ?? null, changed: (ch ?? []) as { ref: string; title: string | null }[] });
+    await audit(db, s.person?.id ?? null, manual.entity, rev.id, "update_notice", { recipients: n.recipients, emailed: n.emailed, email: n.emailStatus });
+  }
   await audit(db, s.person?.id ?? null, manual.entity, rev.id, `step_${to}`, { code: manual.code, rev: rev.rev, from: rev.step, note });
   revalidatePath(`/docs/editor/${rev.id}`); revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/drafts"); revalidatePath("/docs/lib");
   if (to === "published" || to === "repository") redirect(`/docs/manual/${manual.id}?rev=${rev.id}`);
@@ -172,4 +192,75 @@ export async function aiPropose(input: { revisionId: string; sectionId: string; 
     const parsed = parseJsonBlock(text);
     return { ok: true, html: parsed.html, notes: parsed.notes, model };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+
+/** DOC-03 · the authority's return: original PDF + the pages kept in the manual (approval / signature page, stamped LEP). */
+export async function recordReturn(input: { revisionId: string; kind: ReturnKind; pdfPath: string; pages: { path: string; role: "approval" | "lep" | "signature"; page: number }[]; receivedAt: string }): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { s, db, rev, manual } = await guard(input.revisionId);
+    if (!isCmm(s)) return { ok: false, error: "Compliance only (DOC-06)." };
+    if (rev.step !== "with_civil_aviation") return { ok: false, error: "The revision is not with the authority." };
+    const prefix = `${manual.entity}/`;
+    if (!input.pdfPath.startsWith(prefix) || input.pages.some((p) => !p.path.startsWith(prefix))) return { ok: false, error: "Unexpected file location." };
+    await db.from("revisions").update({ return_kind: input.kind, return_pdf_path: input.pdfPath, return_pages: input.pages, return_received_at: input.receivedAt || new Date().toISOString().slice(0, 10), return_by: s.person?.id ?? null }).eq("id", rev.id);
+    await db.from("authority_rounds").insert({ revision_id: rev.id, at: input.receivedAt || new Date().toISOString().slice(0, 10), direction: "received", who: s.name, note: `Authority return integrated: ${input.pages.length} page(s) kept in the manual` });
+    await audit(db, s.person?.id ?? null, manual.entity, rev.id, "authority_return", { kind: input.kind, pages: input.pages.length, received: input.receivedAt });
+    revalidatePath(`/docs/editor/${rev.id}`);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+export async function clearReturn(formData: FormData) {
+  const { s, db, rev, manual } = await guard(String(formData.get("revision_id") ?? ""));
+  if (!isCmm(s) || rev.step !== "with_civil_aviation") return;
+  await db.from("revisions").update({ return_pdf_path: null, return_pages: null, return_received_at: null }).eq("id", rev.id);
+  await audit(db, s.person?.id ?? null, manual.entity, rev.id, "authority_return_removed", {});
+  revalidatePath(`/docs/editor/${rev.id}`);
+}
+export async function setReturnKind(formData: FormData) {
+  const { s, db, rev } = await guard(String(formData.get("revision_id") ?? ""));
+  if (!isCmm(s)) return;
+  await db.from("revisions").update({ return_kind: String(formData.get("kind") ?? "none") }).eq("id", rev.id);
+  revalidatePath(`/docs/editor/${rev.id}`);
+}
+
+/** DOC-06 · proposal for the authority route, from the changed chapters and the manual's own amendment procedure. Compliance decides. */
+export type RouteProposal = { route: "notification" | "approval" | "none"; confidence: "high" | "medium" | "low"; reasons: { chapter: string; change: string; rule: string }[]; summary: string; at?: string; model?: string };
+export async function proposeRoute(input: { revisionId: string }): Promise<{ ok: true; proposal: RouteProposal } | { ok: false; error: string }> {
+  try {
+    const { s, db, rev, manual } = await guard(input.revisionId);
+    if (!isCmm(s)) return { ok: false, error: "Compliance only (DOC-06)." };
+    const { data: ch } = await db.from("revision_sections").select("ref,title,body").eq("revision_id", rev.id).eq("changed", true).order("ord");
+    const changed = (ch ?? []) as Section[];
+    if (!changed.length) return { ok: false, error: "No chapter has been changed in this revision." };
+    const baseId = (rev as Revision & { based_on?: string | null }).based_on;
+    const baseMap = new Map<string, string>();
+    if (baseId) {
+      const { data: b } = await db.from("revision_sections").select("ref,body").eq("revision_id", baseId).in("ref", changed.map((c) => c.ref));
+      for (const x of (b ?? []) as Section[]) baseMap.set(x.ref, stripHtml(x.body.html ?? x.body.text ?? ""));
+    }
+    const { data: all } = await db.from("revision_sections").select("ref,title,body").eq("revision_id", rev.id).order("ord");
+    const procedure = ((all ?? []) as Section[]).filter((x) => /amend|modif|change|approbation|approval|notif/i.test(x.title ?? "")).map((x) => `### ${x.ref} ${x.title}\n${stripHtml(x.body.html ?? "").slice(0, 6000)}`).join("\n\n").slice(0, 14000);
+    const blocks = changed.slice(0, 25).map((c) => `### ${c.ref} ${c.title ?? ""}\nBEFORE:\n${(baseMap.get(c.ref) ?? "(not available)").slice(0, 3500)}\nAFTER:\n${stripHtml(c.body.html ?? "").slice(0, 3500)}`).join("\n\n");
+    const ent = ENT[manual.entity];
+    const system = `You assist the Compliance Monitoring Manager of an aviation organisation. For a revision of a regulatory manual you propose whether the authority must APPROVE it before publication, only be NOTIFIED, or neither. Base yourself on (1) the manual's own amendment procedure quoted below, which prevails, then (2) the applicable EASA rules for this organisation (Part-CAO: CAO.A.015 / CAO.A.025 changes; Part-CAMO: CAMO.A.130 and the CAME indirect approval procedure; AOC: ORO.GEN.130 and ORO.GEN.200; ATO: ORA.GEN.130). Typical approval items: name, location, accountable manager and nominated persons, scope / ratings, facilities, the change procedure itself. Editorial, typographical or purely internal procedural changes are usually notification or none according to the procedure. Never invent references; when unsure, say so and lower the confidence. Answer ONLY with JSON: {"route":"approval|notification|none","confidence":"high|medium|low","summary":"one or two sentences","reasons":[{"chapter":"ref","change":"what changed","rule":"procedure paragraph or rule that applies"}]}`;
+    const user = `Organisation: ${ent?.name ?? manual.entity} (${ent?.qual ?? ""}), authority ${ent?.auth ?? ""}. Manual: ${manual.code} — ${manual.title}, Issue ${rev.issue} Rev ${rev.rev}.\nRevision summary by the author: ${rev.summary ?? "(none)"}\n\nAMENDMENT PROCEDURE OF THE MANUAL:\n${procedure || "(no amendment chapter found)"}\n\nCHANGED CHAPTERS:\n${blocks}`;
+    const { text, model } = await callClaude({ agent: "route", personId: s.person?.id ?? null, entity: manual.entity, system, user, maxTokens: 2500 });
+    const m = /\{[\s\S]*\}/.exec(text);
+    if (!m) return { ok: false, error: "No proposal returned." };
+    const proposal = { ...(JSON.parse(m[0]) as RouteProposal), at: new Date().toISOString(), model };
+    if (!["approval", "notification", "none"].includes(proposal.route)) return { ok: false, error: "Unexpected proposal." };
+    await db.from("revisions").update({ route_proposal: proposal }).eq("id", rev.id);
+    revalidatePath(`/docs/editor/${rev.id}`);
+    return { ok: true, proposal };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+/** Compliance's decision on the route (DOC-06). The journal records the person who decided. */
+export async function decideRoute(formData: FormData) {
+  const { s, db, rev, manual } = await guard(String(formData.get("revision_id") ?? ""));
+  if (!isCmm(s)) return;
+  const route = String(formData.get("route") ?? "");
+  if (!["approval", "notification", "none"].includes(route)) return;
+  await db.from("revisions").update({ authority_route: route, return_kind: expectedReturn(manual.entity, manual.code, route) }).eq("id", rev.id);
+  await audit(db, s.person?.id ?? null, manual.entity, rev.id, "authority_route", { route });
+  revalidatePath(`/docs/editor/${rev.id}`);
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { canDownloadPdf, getSession } from "@/lib/session";
 import DownloadMenu from "@/components/DownloadMenu";
@@ -6,7 +7,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
-import { acknowledge } from "./actions";
+import { acknowledge, saveAudience } from "./actions";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from "@/lib/audience";
+import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
+import { ENT } from "@/lib/nav";
 import { startRevision } from "@/app/(app)/docs/editor/[rev]/actions";
 import { isCmm, ownsManual } from "@/lib/revisions";
 
@@ -56,6 +61,32 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const base = current ? `/docs/manual/${manual.id}?rev=${current.id}` : `/docs/manual/${manual.id}?x=1`;
   const activeHtml = active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(activeStructured.html, chapterRefs, subRefs, base) : activeStructured.html) : "";
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
+  const canAudience = isCmm(s) || ownsManual(s, manual.owner_role);
+
+  // What changed: each changed chapter against the revision it was based on (else the previous published one)
+  type Change = { id: string; ref: string; title: string | null; rows: Row[] | null; passages: string[] };
+  let changes: Change[] = []; let baseRevLabel = "";
+  if (tab === "changed" && current) {
+    const basedOn = (current as Revision & { based_on?: string | null }).based_on ?? null;
+    const older = published.filter((r) => r.id !== current.id && (!current.published_at || (r.published_at ?? "") <= current.published_at));
+    const base = (basedOn ? revs.find((r) => r.id === basedOn) : null) ?? (current.step === "published" || current.step === "repository" ? older[0] : published[0]) ?? null;
+    baseRevLabel = base ? `Rev ${base.rev}` : "";
+    const { data: cd } = await sb.from("revision_sections").select("id,ref,title,body").eq("revision_id", current.id).eq("changed", true).order("ord");
+    const cur = (cd ?? []) as Section[];
+    const baseMap = new Map<string, string>();
+    if (base && cur.length) { const { data: bd } = await sb.from("revision_sections").select("ref,body").eq("revision_id", base.id).in("ref", cur.map((c) => c.ref)); for (const b of (bd ?? []) as Section[]) baseMap.set(b.ref, b.body.html ?? ""); }
+    changes = cur.map((c) => { const after = c.body.html ?? ""; const before = baseMap.get(c.ref); return { id: c.id, ref: c.ref, title: c.title, rows: before !== undefined ? diffBlocks(before, after) : null, passages: before === undefined ? revbarPassages(after) : [] }; });
+  }
+
+  // Readers: who must read (audience) and who has acknowledged
+  let audience: string[] = []; let expected: { id: string; display_name: string; job_title: string | null; roles: string[] }[] = []; let entityPeople: { id: string; display_name: string; job_title: string | null; roles: string[] }[] = []; let audienceText = "";
+  if (tab === "readers" && s.role !== "user") {
+    const admin = supabaseAdmin();
+    const [tok, ppl, rd] = await Promise.all([audienceTokens(admin, manual.id), peopleFor(admin, manual.entity), current ? admin.from("readings").select("person_id,acknowledged_at,via,people(display_name,job_title)").eq("revision_id", current.id) : Promise.resolve({ data: [] })]);
+    audience = tok; entityPeople = ppl; expected = resolveReaders(ppl, manual.entity, tok);
+    readings = ((rd as { data: unknown }).data ?? []) as Reading[];
+    audienceText = describeTokens(tok, ENT[manual.entity]?.name ?? manual.entity, new Map(ppl.map((p) => [p.id, p.display_name])));
+  }
   const office = s.role !== "user";
   const tabs = [["read", "Read"], ["changed", "What changed"], ...(office ? [["history", "History"], ["readers", "Readers"]] : [])] as [string, string][];
 
@@ -111,12 +142,22 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       {tab === "read" && !current && <section className="card"><div className="cb text-slate6">No revision to read yet.</div></section>}
 
       {tab === "changed" && (
-        <section className="card"><div className="ch"><span className="eyebrow">What changed in Rev {current?.rev ?? "—"}</span></div>
+        <section className="card"><div className="ch"><span className="eyebrow">What changed in Rev {current?.rev ?? "—"}{baseRevLabel ? ` · compared with ${baseRevLabel}` : ""}</span><span className="mini">{changes.length} chapter{changes.length === 1 ? "" : "s"}</span></div>
           <div className="cb">
-            <p>{current?.summary ?? "No revision summary recorded."}</p>
-            {sections.some((x) => x.changed)
-              ? <ul className="mt-3 list-disc pl-5">{sections.filter((x) => x.changed).map((x) => <li key={x.id}><Link className="underline" href={`/docs/manual/${manual.id}?sec=${encodeURIComponent(x.ref)}`}>{x.ref} {x.title}</Link></li>)}</ul>
-              : <p className="mini mt-2">Changed passages are marked from the first revision written in S.A.M.; imported revisions carry the publisher’s summary only.</p>}
+            <p className="mb-4">{current?.summary ?? "No revision summary recorded."}</p>
+            {!changes.length && <p className="mini">No chapter is marked as changed in this revision.</p>}
+            {changes.map((c) => (
+              <div key={c.id} className="wchg">
+                <div className="wchg-h"><span className="mono">{c.ref}</span> <b>{c.title}</b><Link className="mini underline ml-auto" href={`/docs/manual/${manual.id}?rev=${current?.id}&sec=${encodeURIComponent(c.ref)}`}>Open the chapter ›</Link></div>
+                {c.rows ? <DiffTable rows={c.rows} left={baseRevLabel} right={`Rev ${current?.rev}`} />
+                  : c.passages.length ? <div className="wchg-pass"><div className="mini mb-1">Passages marked as revised by the publisher (no previous text in S.A.M.):</div>{c.passages.map((t, i) => <p key={i} className="ins">{t}</p>)}</div>
+                  : <p className="mini">New chapter, or no previous text available in S.A.M.</p>}
+              </div>
+            ))}
+            {current && !mine?.acknowledged_at && changes.length > 0 && (
+              <form action={acknowledge} className="mt-5"><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
+                <button className="btn primary" type="submit">I have read the changes of Rev {current.rev}</button></form>
+            )}
           </div>
         </section>
       )}
@@ -130,13 +171,53 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         </table></section>
       )}
 
-      {tab === "readers" && office && (
-        <section className="card"><div className="ch"><span className="eyebrow">Readers · Rev {current?.rev}</span><span className="mini">{readings.filter((r) => r.acknowledged_at).length} acknowledged</span></div>
-          <table className="tbl"><thead><tr><th>Person</th><th>Acknowledged</th><th>Via</th></tr></thead>
-            <tbody>{readings.map((r) => <tr key={r.person_id}><td><b>{r.people?.display_name}</b><div className="mini">{r.people?.job_title}</div></td><td className="mono">{r.acknowledged_at?.slice(0, 16).replace("T", " ") ?? "—"}</td><td className="mini">{r.via ?? ""}</td></tr>)}
-              {!readings.length && <tr><td colSpan={3} className="p-5 text-slate6">Nobody has acknowledged this revision yet. Audiences and reading deadlines come with the publication flow.</td></tr>}</tbody></table>
+      {tab === "readers" && office && (<>
+        <section className="card mb-4"><div className="ch"><span className="eyebrow">Readers · Rev {current?.rev}</span>
+          <span className="mini">{expected.filter((p) => readings.some((r) => r.person_id === p.id && r.acknowledged_at)).length} / {expected.length} acknowledged</span></div>
+          <table className="tbl"><thead><tr><th>Person</th><th>Post</th><th>Acknowledged</th><th>Via</th></tr></thead>
+            <tbody>
+              {expected.map((p) => { const r = readings.find((x) => x.person_id === p.id); return (
+                <tr key={p.id}><td><b>{p.display_name}</b><div className="mini">{p.job_title}</div></td><td className="mini">{p.roles.join(", ")}</td>
+                  <td className="mono">{r?.acknowledged_at ? r.acknowledged_at.slice(0, 16).replace("T", " ") : <span className="pill amber">to read</span>}</td><td className="mini">{r?.via ?? ""}</td></tr>); })}
+              {readings.filter((r) => r.acknowledged_at && !expected.some((p) => p.id === r.person_id)).map((r) => (
+                <tr key={r.person_id}><td><b>{r.people?.display_name}</b><div className="mini">{r.people?.job_title} · not in the readers list</div></td><td /><td className="mono">{r.acknowledged_at?.slice(0, 16).replace("T", " ")}</td><td className="mini">{r.via ?? ""}</td></tr>))}
+              {!expected.length && <tr><td colSpan={4} className="p-5 text-slate6">Nobody must read this manual with the current list (below).</td></tr>}
+            </tbody></table>
         </section>
-      )}
+        <section className="card"><div className="ch"><span className="eyebrow">Who must read this manual</span><span className="mini">{audienceText}</span></div>
+          {canAudience ? (
+            <form action={saveAudience} className="cb">
+              <input type="hidden" name="manual_id" value={manual.id} />
+              <label className="flex items-center gap-2 mb-3"><input type="checkbox" name="all" defaultChecked={audience.includes("ALL")} /> <b>All staff of {ENT[manual.entity]?.name ?? manual.entity}</b><span className="mini">(everyone attached to the entity; group functions only when named below)</span></label>
+              <div className="eyebrow mb-1">Posts — holders and their deputies</div>
+              <div className="audgrid mb-3">{POSTS.map((p) => <label key={p} className="audchk"><input type="checkbox" name="post" value={p} defaultChecked={audience.includes(`ROLE:${p}`)} /> {p}</label>)}</div>
+              <div className="eyebrow mb-1">People by name</div>
+              <div className="audgrid people mb-3">{entityPeople.map((p) => <label key={p.id} className="audchk"><input type="checkbox" name="person" value={p.id} defaultChecked={audience.includes(`PERSON:${p.id}`)} /> {p.display_name}<span className="mini"> {p.roles.join(", ")}</span></label>)}
+                {!entityPeople.length && <span className="mini">Nobody of this entity has signed in to S.A.M. yet.</span>}</div>
+              <button className="btn primary" type="submit">Save the readers list</button>
+              <p className="mini mt-2">Used for the update notice at each publication and for the reading status above. Aircraft-type filtering for crews comes with “My manuals”.</p>
+            </form>
+          ) : <div className="cb mini">Set by Compliance or the manual's owner ({manual.owner_role}).</div>}
+        </section>
+      </>)}
     </>
   );
+}
+
+function Words({ w }: { w: Word[] }) {
+  return <>{w.map((x, i) => x.k === "=" ? <span key={i}>{x.t} </span> : x.k === "+" ? <ins key={i}>{x.t} </ins> : <del key={i}>{x.t} </del>)}</>;
+}
+/** Side by side; unchanged paragraphs are folded, one kept on each side of a change for context. */
+function DiffTable({ rows, left, right }: { rows: Row[]; left: string; right: string }) {
+  const changedAt = (i: number) => !!rows[i] && rows[i].kind !== "same";
+  const keep = rows.map((_, i) => changedAt(i) || changedAt(i - 1) || changedAt(i + 1));
+  const out: ReactNode[] = []; let folded = 0;
+  rows.forEach((r, i) => {
+    if (!keep[i]) { folded++; return; }
+    if (folded) { out.push(<tr key={`f${i}`} className="fold"><td colSpan={2}>⋯ {folded} unchanged paragraph{folded === 1 ? "" : "s"}</td></tr>); folded = 0; }
+    out.push(<tr key={i} className={r.kind}><td><Words w={r.left} /></td><td><Words w={r.right} /></td></tr>);
+  });
+  if (folded) out.push(<tr key="fend" className="fold"><td colSpan={2}>⋯ {folded} unchanged paragraph{folded === 1 ? "" : "s"}</td></tr>);
+  if (!rows.some((r) => r.kind !== "same")) return <p className="mini">Marked as changed, but the text is identical to {left} (formatting only).</p>;
+  return <table className="wdiff"><thead><tr><th>{left}</th><th>{right}</th></tr></thead><tbody>{out}</tbody></table>;
 }

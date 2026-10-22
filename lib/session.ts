@@ -14,7 +14,7 @@ export type Session = {
   entity: string; home: string;
 };
 
-const NP_ROLES = ["NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "NP", "SMD", "QM"];
+export const NP_ROLES = ["NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "NP", "SMD", "QM"];
 /**
  * Deputies hold the same rights as the post they deputise. Accepted spellings: DEPUTY_X, DEPUTY-X, DEP_X, X_DEPUTY, X_DEP, X-D,
  * and the short forms DAM (deputy AM), DCMM (deputy CMM), DSM (deputy SM). Returns the base post, e.g. "NPFO_DEP" → "NPFO".
