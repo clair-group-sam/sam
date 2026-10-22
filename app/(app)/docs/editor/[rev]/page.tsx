@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
 import { allowedTransitions, expectedReturn, isCmm, ownsManual, RETURN_LABEL, type ReturnKind } from "@/lib/revisions";
-import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal } from "./actions";
+import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review } from "./actions";
+import ReviewPanel from "@/components/ReviewPanel";
 import AuthorityReturn from "@/components/AuthorityReturn";
 import RouteProposal from "@/components/RouteProposal";
 import { ENT } from "@/lib/nav";
@@ -24,10 +25,11 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const sb = await supabaseServer();
   const { data: r } = await sb.from("revisions").select("*").eq("id", revId).maybeSingle();
   if (!r) notFound();
-  const rev = r as Revision & { submitted_at?: string | null; step_changed_at?: string | null; based_on?: string | null; return_kind?: string | null; return_pdf_path?: string | null; return_pages?: { path: string; role: string; page: number }[] | null; return_received_at?: string | null; route_proposal?: Proposal | null };
+  const rev = r as Revision & { submitted_at?: string | null; step_changed_at?: string | null; based_on?: string | null; return_kind?: string | null; return_pdf_path?: string | null; return_pages?: { path: string; role: string; page: number }[] | null; return_received_at?: string | null; route_proposal?: Proposal | null; review?: Review | null };
   const { data: m } = await sb.from("manuals").select("*").eq("id", rev.manual_id).maybeSingle();
   if (!m) notFound();
-  const manual = m as Manual;
+  const manual = m as Manual & { internal?: boolean; owner_name?: string | null };
+  const internal = !!manual.internal;
   const cmm = isCmm(s), owner = ownsManual(s, manual.owner_role);
   if (!cmm && !owner) notFound();
   const editable = rev.step === "draft";
@@ -46,7 +48,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const changedCount = metas.filter((x) => x.changed).length;
   const { data: roundsData } = cmm ? await sb.from("authority_rounds").select("*").eq("revision_id", rev.id).order("at") : { data: [] };
   const rounds = (roundsData ?? []) as Round[];
-  const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository, rev.authority_route);
+  const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository, rev.authority_route, internal);
   // DOC-03: what the authority sends back, and whether it is in
   const returnKind = (rev.return_kind ?? expectedReturn(manual.entity, manual.code, rev.authority_route)) as ReturnKind;
   const returnMissing = returnKind !== "none" && !rev.return_pdf_path;
@@ -54,17 +56,17 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const retPages = rev.return_pages ?? [];
   const retUrls = new Map<string, string>();
   if (cmm && retPages.length) { const { data: su } = await admin.storage.from("manuals").createSignedUrls(retPages.map((x) => x.path), 600); for (const x of su ?? []) if (x.path && x.signedUrl) retUrls.set(x.path, x.signedUrl); }
-  const { data: noticeData } = cmm ? await admin.from("manual_notices").select("sent_at,recipients,emailed,email_status").eq("revision_id", rev.id).order("sent_at") : { data: [] };
+  const { data: noticeData } = cmm || (internal && owner) ? await admin.from("manual_notices").select("sent_at,recipients,emailed,email_status").eq("revision_id", rev.id).order("sent_at") : { data: [] };
   const notices = (noticeData ?? []) as { sent_at: string; recipients: number; emailed: number; email_status: string | null }[];
   const routeOpen = ["draft", "approved_np", "approved_compliance", "signed"].includes(rev.step);
   const auth = ENT[manual.entity]?.auth ?? "authority";
   const stepIdx = STEPS.indexOf(rev.step);
-  const tabs: [string, string][] = cmm ? [["write", "Write"], ["publish", "Publish · Compliance"]] : [["write", "Write"]];
+  const tabs: [string, string][] = internal && (owner || cmm) ? [["write", "Write"], ["publish", "Review & publish"]] : cmm ? [["write", "Write"], ["publish", "Publish · Compliance"]] : [["write", "Write"]];
 
   return (
     <>
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code} · revision editor`} title={`${manual.title} — Issue ${rev.issue} Rev ${rev.rev}`}
-        sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_role}${editable ? "" : " · read-only at this step"}`}
+        sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_name ?? manual.owner_role}${internal ? " · internal document" : ""}${editable ? "" : " · read-only at this step"}`}
         right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
 
       <div className="steps mb-4">
@@ -74,7 +76,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
       </div>
       <div className="tabs mb-4">
         {tabs.map(([k, l]) => <Link key={k} href={`/docs/editor/${rev.id}?tab=${k}${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`} className={"tab" + (tab === k ? " on" : "")}>{l}</Link>)}
-        {!cmm && <span className="mini ml-auto">Authority route, publication and notice are handled by the Compliance department (DOC-06).</span>}
+        {!cmm && !internal && <span className="mini ml-auto">Authority route, publication and notice are handled by the Compliance department (DOC-06).</span>}
       </div>
 
       {tab === "write" && (
@@ -113,7 +115,38 @@ export default async function Editor({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {tab === "publish" && cmm && (
+      {tab === "publish" && internal && (owner || cmm) && (
+        <div className="grid grid-cols-2 gap-4">
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Revision summary</span></div>
+            <form action={saveSummary} className="cb">
+              <input type="hidden" name="revision_id" value={rev.id} />
+              <label className="block mb-3"><span className="eyebrow">What changes in Rev {rev.rev} (shown to readers in “What changed”)</span>
+                <textarea name="summary" defaultValue={rev.summary ?? ""} rows={4} className="inp" placeholder="Short summary of the revision…" /></label>
+              <button className="btn primary" type="submit">Save</button>
+            </form>
+          </section>
+          <section className="card pubcard">
+            <div className="ch"><span className="eyebrow">Publication · internal document</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
+            <div className="cb">
+              {rev.step === "draft" && !rev.review && <p className="mini mb-3">Run the review (below) first. Its comments are yours to use or to ignore.</p>}
+              {transitions.map((t) => (
+                <form key={t.to} action={moveStep} className="mb-3 p-3 border border-line rounded-lg">
+                  <input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="to" value={t.to} />
+                  <div className="flex items-center gap-3"><button className="btn primary" type="submit" disabled={t.to === "published" && !rev.review}>{t.label}</button><span className="mini">No authority approval or notification. The update notice goes to every reader of the document.</span></div>
+                </form>
+              ))}
+              {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
+            </div>
+          </section>
+          <section className="card col-span-2">
+            <div className="ch"><span className="eyebrow">Review before publication</span></div>
+            <div className="cb"><ReviewPanel revisionId={rev.id} initial={rev.review ?? null} editable={rev.step === "draft"} /></div>
+          </section>
+        </div>
+      )}
+
+      {tab === "publish" && cmm && !internal && (
         <div className="grid grid-cols-2 gap-4">
           <section className="card">
             <div className="ch"><span className="eyebrow">Revision summary</span></div>

@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { ENT } from "@/lib/nav";
 import { PageHeader, Metric } from "@/components/Page";
 import { STEP_LABEL, listManuals } from "@/lib/docs";
+import { mayCreateManual } from "@/lib/create";
 
 const FAMILY_COLORS: Record<string, string> = { "1": "#7d166d", "2": "#0e8cc4", "3": "#248a3d", "4": "#b86e00", "5": "#b43a0f", "6": "#6b5bd2" };
 type Row = Awaited<ReturnType<typeof listManuals>>[number];
@@ -32,6 +33,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   if (!s) redirect("/login");
   const { q = "", folder = "" } = await searchParams;
   const rows = await listManuals(s);
+  const canCreate = await mayCreateManual(s);
   const tree = buildTree(rows);
   const sbc = await supabaseServer();
   let cq = sbc.from("certificates").select("id", { count: "exact", head: true });
@@ -67,7 +69,8 @@ export default async function Library({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <PageHeader eyebrow="Documents · Library" title="Document library" sub={`Manuals as the unit of revision and approval (DOC-01) · ${scope}`} />
+      <PageHeader eyebrow="Documents · Library" title="Document library" sub={`Manuals as the unit of revision and approval (DOC-01) · ${scope}`}
+        right={canCreate ? <Link href={`/docs/new${s.entity !== "ALL" ? `?entity=${s.entity}` : ""}`} className="btn primary">+ New manual</Link> : undefined} />
       <form className="card mb-5" action="/docs/lib" method="get">
         <div className="p-3 flex gap-2">
           <input name="q" defaultValue={q} placeholder="Search the manuals — title, chapter or text (e.g. sous-traitance, MEL, dégivrage)…" className="flex-1 border border-line rounded-lg px-4 py-2.5 text-sm" />

@@ -110,6 +110,11 @@ export async function moveStep(formData: FormData) {
   const { s, db, rev, manual } = await guard(revisionId);
   const t = TRANSITIONS.find((x) => x.from === rev.step && x.to === to);
   if (!t) throw new Error("Transition not allowed");
+  const internal = !!(manual as Manual & { internal?: boolean }).internal;
+  if (t.from === "draft" && t.to === "published") {
+    if (!internal) throw new Error("A regulated manual goes through NP and Compliance approval.");
+    if (!(rev as Revision & { review?: unknown }).review) throw new Error("Run the review before publishing.");
+  }
   const cmm = isCmm(s), owner = ownsManual(s, manual.owner_role);
   if (!(t.by === "cmm" ? cmm : t.by === "owner" ? owner : owner || cmm)) throw new Error("Not allowed for your role");
   if (to === "approved_np") {
@@ -263,4 +268,30 @@ export async function decideRoute(formData: FormData) {
   await db.from("revisions").update({ authority_route: route, return_kind: expectedReturn(manual.entity, manual.code, route) }).eq("id", rev.id);
   await audit(db, s.person?.id ?? null, manual.entity, rev.id, "authority_route", { route });
   revalidatePath(`/docs/editor/${rev.id}`);
+}
+
+/** Internal documents: review of the whole revision before its author publishes it. Comments may be used or ignored; not part of the document journal. */
+export type ReviewComment = { chapter: string; severity: "major" | "minor" | "suggestion"; comment: string; proposal?: string };
+export type Review = { at: string; model: string; summary: string; comments: ReviewComment[] };
+export async function reviewRevision(input: { revisionId: string }): Promise<{ ok: true; review: Review } | { ok: false; error: string }> {
+  try {
+    const { s, db, rev, manual, may } = await guard(input.revisionId);
+    if (!may) return { ok: false, error: "Owner or Compliance only." };
+    const { data: secs } = await db.from("revision_sections").select("ref,title,body,changed").eq("revision_id", rev.id).order("ord");
+    const all = (secs ?? []) as Section[];
+    const focus = all.some((x) => x.changed) && (rev as Revision & { based_on?: string | null }).based_on ? all.filter((x) => x.changed) : all;
+    let budget = 90_000;
+    const blocks: string[] = [];
+    for (const x of focus) { const t = stripHtml(x.body.html ?? x.body.text ?? "").slice(0, 12_000); if (budget - t.length < 0) break; budget -= t.length; blocks.push(`### ${x.ref} ${x.title ?? ""}\n${t || "(empty)"}`); }
+    const system = `You review an internal document of an aviation group (policies, procedures, guides) before its author publishes it. Check: clarity and completeness, internal consistency (posts, delays, amounts, cross-references), contradictions, missing responsibilities or steps, wording that could be misread, spelling. Be concrete and brief; no praise. Write the comments in the document's language. Answer ONLY with JSON: {"summary":"two sentences","comments":[{"chapter":"ref","severity":"major|minor|suggestion","comment":"the issue","proposal":"suggested wording or fix"}]} — at most 25 comments, most important first.`;
+    const user = `Document: ${manual.code} — ${manual.title} (${manual.entity}), Issue ${rev.issue} Rev ${rev.rev}.\nAuthor's summary: ${rev.summary || "(none)"}\nChapters in the document: ${all.map((x) => `${x.ref} ${x.title ?? ""}`).join(" · ").slice(0, 3000)}\n\nTEXT TO REVIEW:\n${blocks.join("\n\n")}`;
+    const { text, model } = await callClaude({ agent: "check", personId: s.person?.id ?? null, entity: manual.entity, system, user, maxTokens: 4000 });
+    const m = /\{[\s\S]*\}/.exec(text);
+    if (!m) return { ok: false, error: "No review returned." };
+    const j = JSON.parse(m[0]) as { summary?: string; comments?: ReviewComment[] };
+    const review: Review = { at: new Date().toISOString(), model, summary: j.summary ?? "", comments: (j.comments ?? []).slice(0, 25) };
+    await db.from("revisions").update({ review }).eq("id", rev.id);
+    revalidatePath(`/docs/editor/${rev.id}`);
+    return { ok: true, review };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 }

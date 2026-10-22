@@ -1,4 +1,4 @@
-import type { Session } from "@/lib/session";
+import { basePost, NP_ROLES, type Session } from "@/lib/session";
 import { STEPS } from "@/lib/docs";
 
 /** Who may move a revision from one step to the next (DOC-09, DOC-06). */
@@ -15,19 +15,30 @@ export const TRANSITIONS: Transition[] = [
   { from: "with_civil_aviation", to: "published", label: "Publish", by: "cmm", note: "After the authority's return has been integrated." },
   { from: "with_civil_aviation", to: "draft", label: "Authority remarks → back to draft", by: "cmm" },
   { from: "published", to: "repository", label: "Deposited on the TM-CAD repository", by: "cmm" },
+  { from: "draft", to: "published", label: "Publish (internal document)", by: "owner_or_cmm", note: "Internal document: no authority route; published by its author after the review." },
 ];
 export const EDITING = ["draft", "approved_np"];
 export const UNDER_REVIEW = ["approved_compliance", "signed", "with_civil_aviation"];
 export function isCmm(s: Session): boolean { return s.roles.includes("CMM") || s.roles.includes("SUPERADMIN"); }
-export function ownsManual(s: Session, ownerRole: string): boolean { return s.roles.map((r) => r.toUpperCase()).includes(ownerRole.toUpperCase()); }
+/** Owner = holder (or deputy) of the owner post, or the named person when the owner is a person (owner_role 'PERSON:<id>'). */
+export function ownsManual(s: Session, ownerRole: string): boolean {
+  if (ownerRole.startsWith("PERSON:")) return s.person?.id === ownerRole.slice(7);
+  return s.roles.map(basePost).includes(basePost(ownerRole));
+}
+/** Posts that may create a manual (the "selected few" are flagged on their person: people.can_create_manuals). */
+export function postMayCreate(s: Session): boolean {
+  return s.roles.map(basePost).some((x) => ["AM", "CMM", "SM", "SUPERADMIN"].includes(x) || NP_ROLES.includes(x) || x.startsWith("NP"));
+}
 /**
  * DOC-06: once Compliance has approved, the way forward depends on the authority route it decided:
  * notification / approval → only "Send to the authority"; none → only "Publish"; not decided yet → nothing forward.
  */
-export function allowedTransitions(s: Session, step: string, ownerRole: string, needsSignature: boolean, toRepo: boolean, route?: string | null): Transition[] {
+export function allowedTransitions(s: Session, step: string, ownerRole: string, needsSignature: boolean, toRepo: boolean, route?: string | null, internal?: boolean): Transition[] {
   const cmm = isCmm(s), owner = ownsManual(s, ownerRole);
   const viaAuthority = route === "notification" || route === "approval";
   return TRANSITIONS.filter((t) => t.from === step)
+    // internal documents: draft → published by the author; regulated manuals: never straight from draft
+    .filter((t) => (internal ? step !== "draft" || t.to === "published" : !(t.from === "draft" && t.to === "published")))
     .filter((t) => !(t.to === "with_civil_aviation" && !viaAuthority))
     .filter((t) => !((t.from === "approved_compliance" || t.from === "signed") && t.to === "published" && route !== "none"))
     .filter((t) => (t.by === "cmm" ? cmm : t.by === "owner" ? owner : owner || cmm))

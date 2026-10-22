@@ -109,7 +109,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   return (
     <>
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
-        sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${manual.owner_role}` : "No revision yet"}
+        sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${(manual as Manual & { internal?: boolean }).internal ? " · internal document" : ""}` : "No revision yet"}
         right={<>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
           {canDownloadPdf(s.roles) && revs.length > 0 && (
