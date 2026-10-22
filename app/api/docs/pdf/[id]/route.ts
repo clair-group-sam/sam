@@ -10,7 +10,7 @@ import type { Manual, Revision } from "@/lib/docs";
  * DOC-13 · real PDF file, rendered on the server by headless Chromium from the print page (same layout),
  * with BOOKMARKS (document outline: parts › chapters › sub-chapters) and tagged structure.
  * The file is kept in storage and handed back as a short signed link (Vercel responses are limited to 4.5 MB).
- * On any failure the client falls back to the browser's Save as PDF.
+ * On failure the user gets an error and is asked to try again later (no lesser fallback).
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +52,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     if (!signed) throw new Error("signed link");
     return NextResponse.json({ url: signed.signedUrl, fileName: `${fileName}.pdf` });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message, fallback: `/print/manual/${id}?rev=${encodeURIComponent(revId)}&auto=1` }, { status: 503 });
+    console.error("pdf export failed", manual.code, rev.rev, (e as Error).message);
+    return NextResponse.json({ error: "The PDF could not be generated right now. Please try again later." }, { status: 503 });
   } finally {
     await browser?.close().catch(() => undefined);
   }

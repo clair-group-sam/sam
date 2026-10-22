@@ -18,15 +18,18 @@ export default function DownloadMenu({ manualId, published, drafts, archive }: {
   }, [open]);
   const [busy, setBusy] = useState("");
   // real PDF (with bookmarks) generated on the server; if that fails, the browser's Save as PDF on the print page
+  const [err, setErr] = useState("");
+  // real PDF (with bookmarks) generated on the server; no lesser fallback — if it fails, say so and let the user retry later
   const go = async (rev: string) => {
-    if (busy) return; setBusy(rev);
+    if (busy) return; setBusy(rev); setErr("");
     try {
       const r = await fetch(`/api/docs/pdf/${manualId}?rev=${rev}`);
-      const j = (await r.json()) as { url?: string; fallback?: string };
-      if (j.url) { const a = document.createElement("a"); a.href = j.url; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
-      else window.open(j.fallback ?? `/print/manual/${manualId}?rev=${rev}&auto=1`, "_blank", "noopener");
-    } catch { window.open(`/print/manual/${manualId}?rev=${rev}&auto=1`, "_blank", "noopener"); }
-    setBusy(""); setOpen(false);
+      const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!j.url) throw new Error(j.error ?? `HTTP ${r.status}`);
+      const a = document.createElement("a"); a.href = j.url; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove();
+      setOpen(false);
+    } catch { setErr("The PDF could not be generated right now. Please try again later."); }
+    setBusy("");
   };
   return (
     <div className="dlmenu" ref={box}>
@@ -53,6 +56,7 @@ export default function DownloadMenu({ manualId, published, drafts, archive }: {
             <button type="button" className="btn" disabled={!arch || !!busy} onClick={() => arch && go(arch)}>{busy && busy === arch ? "Preparing…" : "Download"}</button>
           </div>
           {busy && <p className="mini px-3 pb-2">Preparing the PDF with its bookmarks — a few seconds for a large manual.</p>}
+          {err && <p className="mini red px-3 pb-2">{err}</p>}
         </div>
       )}
     </div>
