@@ -42,7 +42,8 @@ export function rewriteLinks(html: string, o: {
   newTab?: boolean; // in the app: web addresses in a new tab, links inside the manual handled by the reader (data-nav)
 }): string {
   const nav = o.newTab ? " data-nav" : "";
-  return html.replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (all, attrs: string, inner: string) => {
+  // innermost anchors only (a link nested in another one is handled on its own)
+  return html.replace(/<a\b([^>]*)>((?:(?!<a\b)[\s\S])*?)<\/a>/gi, (all, attrs: string, inner: string) => {
     const href = /href="([^"]*)"/i.exec(attrs)?.[1] ?? "";
     if (/^(mailto|tel):/i.test(href)) return `<a href="${href}">${inner}</a>`;
     if (/^\/docs\/|^#(ch-|s\d)/.test(href)) return all; // already a S.A.M. link
