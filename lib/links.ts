@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type LinkIndex = {
   byWm: Map<string, { manualId: string; entity: string; code: string; title: string }>;
   pageRef: Map<string, { manualId: string; ref: string }>; // "<wmManualId>:<wmPageId>"
+  refs: Map<string, Set<string>>; // manualId → chapter refs (to find the chapter from the link text)
 };
 
 export async function linkIndex(db: SupabaseClient): Promise<LinkIndex> {
@@ -18,16 +19,18 @@ export async function linkIndex(db: SupabaseClient): Promise<LinkIndex> {
   const byWm: LinkIndex["byWm"] = new Map();
   for (const r of latest.values()) byWm.set(String(r.wm), { manualId: r.manual_id, entity: r.manuals?.entity ?? "", code: r.manuals?.code ?? "", title: r.manuals?.title ?? "" });
   const pageRef: LinkIndex["pageRef"] = new Map();
+  const refs: LinkIndex["refs"] = new Map();
   const ids = [...latest.values()].map((r) => r.id);
   if (ids.length) {
     const { data: secs } = await db.from("revision_sections").select("revision_id,ref,page_ids:body->page_ids").in("revision_id", ids);
     const wmOf = new Map([...latest.values()].map((r) => [r.id, { wm: String(r.wm), manualId: r.manual_id }]));
     for (const x of (secs ?? []) as { revision_id: string; ref: string; page_ids: string[] | null }[]) {
       const w = wmOf.get(x.revision_id); if (!w) continue;
+      if (!refs.has(w.manualId)) refs.set(w.manualId, new Set()); refs.get(w.manualId)!.add(x.ref);
       for (const pid of x.page_ids ?? []) if (pid && !pageRef.has(`${w.wm}:${pid}`)) pageRef.set(`${w.wm}:${pid}`, { manualId: w.manualId, ref: x.ref });
     }
   }
-  return { byWm, pageRef };
+  return { byWm, pageRef, refs };
 }
 
 const WM = /(?:https?:\/\/[a-z0-9.-]*webmanuals\.aero)?\/reader\/#\/(\d+)\/p\/(\d+)/i;
@@ -52,7 +55,12 @@ export function rewriteLinks(html: string, o: {
         const h = o.textTarget?.(inner) ?? o.self(page?.ref ?? null, inner);
         return h ? `<a href="${h}"${nav}>${inner}</a>` : inner;
       }
-      if (man) return `<a href="${o.base}/docs/manual/${man.manualId}${page ? `?sec=${encodeURIComponent(page.ref)}` : ""}">${inner}</a>`;
+      if (man) {
+        // the chapter: from the page when known, else from a chapter number in the link text (e.g. "MOE 2.3")
+        let ref = page?.ref ?? null;
+        if (!ref) { const set = o.idx?.refs.get(man.manualId); const txt = inner.replace(/<[^>]+>/g, " "); for (const m of txt.matchAll(/\b([A-Z]{0,2}\d*(?:\.\d+){1,4})\b/g)) { let k = m[1]; while (k && !set?.has(k)) k = k.includes(".") ? k.slice(0, k.lastIndexOf(".")) : ""; if (k) { ref = k; break; } } }
+        return `<a href="${o.base}/docs/manual/${man.manualId}${ref ? `?sec=${encodeURIComponent(ref)}` : ""}">${inner}</a>`;
+      }
       return `<a href="${o.base}/docs/link/wm/${wmId}/${pageId}">${inner}</a>`;
     }
     if (/^https?:\/\/[a-z0-9.-]*webmanuals\.aero/i.test(href)) return `<a href="${o.base}/docs/lib">${inner}</a>`;
