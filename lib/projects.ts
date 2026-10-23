@@ -11,6 +11,7 @@ export type TaskStatus = "todo" | "in_progress" | "waiting" | "blocked" | "done"
 export type LinkKind = "manual" | "authority_file" | "certificate" | "moc";
 export type Task = { id: string; project_id: string; phase_id: string | null; ord: number; key: string | null; title: string; detail: string | null; source: string | null; owner_role: string | null; owner_person: string | null; status: TaskStatus; not_needed_reason: string | null; days: number | null; due: string | null; started_at: string | null; done_at: string | null; done_by: string | null; link_kind: LinkKind | null; link_ref: string | null; link_id: string | null; note: string | null; created_at: string; updated_at: string };
 export type Dep = { task_id: string; depends_on: string };
+export type TaskFile = { id: string; task_id: string; project_id: string; name: string; path: string | null; size: number | null; uploaded_by: string | null; at: string };
 
 export const STATUS_LABEL: Record<TaskStatus, string> = { todo: "To do", in_progress: "In progress", waiting: "Waiting", blocked: "Blocked", done: "Done", not_needed: "Not needed" };
 export const STATUS_TONE: Record<TaskStatus, string> = { todo: "", in_progress: "amber", waiting: "", blocked: "red", done: "green", not_needed: "" };
@@ -23,7 +24,7 @@ export async function loadTemplates(db: SupabaseClient): Promise<ProjectTemplate
   const { data } = await db.from("project_templates").select("*").eq("active", true).order("ord");
   return (data ?? []) as ProjectTemplate[];
 }
-export async function loadProject(db: SupabaseClient, id: string): Promise<{ project: Project; phases: Phase[]; tasks: Task[]; deps: Dep[] } | null> {
+export async function loadProject(db: SupabaseClient, id: string): Promise<{ project: Project; phases: Phase[]; tasks: Task[]; deps: Dep[]; files: TaskFile[] } | null> {
   const { data: p } = await db.from("projects").select("*").eq("id", id).maybeSingle();
   if (!p) return null;
   const [{ data: phases }, { data: tasks }] = await Promise.all([
@@ -31,8 +32,11 @@ export async function loadProject(db: SupabaseClient, id: string): Promise<{ pro
     db.from("project_tasks").select("*").eq("project_id", id).order("ord"),
   ]);
   const ids = ((tasks ?? []) as Task[]).map((t) => t.id);
-  const { data: deps } = ids.length ? await db.from("project_task_deps").select("*").in("task_id", ids) : { data: [] };
-  return { project: p as Project, phases: (phases ?? []) as Phase[], tasks: (tasks ?? []) as Task[], deps: (deps ?? []) as Dep[] };
+  const [{ data: deps }, { data: files }] = await Promise.all([
+    ids.length ? db.from("project_task_deps").select("*").in("task_id", ids) : Promise.resolve({ data: [] }),
+    db.from("project_task_files").select("*").eq("project_id", id).order("at"),
+  ]);
+  return { project: p as Project, phases: (phases ?? []) as Phase[], tasks: (tasks ?? []) as Task[], deps: (deps ?? []) as Dep[], files: (files ?? []) as TaskFile[] };
 }
 
 /**

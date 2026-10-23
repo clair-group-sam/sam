@@ -7,10 +7,10 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STAGE_LABEL, fr, today, type AuthorityFile } from "@/lib/authority";
 import { LINK_LABEL, OPEN, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, type Task, type TaskStatus } from "@/lib/projects";
-import { addPhase, addTask, bindFileToTask, deleteTask, openFileForTask, pushToTemplate, saveProject, updateTask } from "../actions";
+import { addPhase, addTask, bindFileToTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
 
-const STATUSES: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked", "done", "not_needed"];
+const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "not_needed", "blocked"];
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string; view?: string }> }) {
   const s = await getSession();
@@ -20,7 +20,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const db = supabaseAdmin();
   const loaded = await loadProject(db, id);
   if (!loaded) notFound();
-  const { project: p, phases, deps } = loaded;
+  const { project: p, phases, deps, files: taskFiles } = loaded;
   if (!s.group && !s.entities.includes(p.entity)) notFound();
   const links = await resolveLinks(db, p, loaded.tasks);
   // statuses may have moved while resolving the links: reload the tasks once
@@ -77,12 +77,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     {shown.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const work = mayWork(t) && p.status !== "closed"; return (
                       <tr key={t.id} id={`t-${t.id}`} className={t.status === "done" || t.status === "not_needed" ? "muted" : ""}>
                         <td style={{ width: 150 }}>
-                          {work ? (
-                            <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
-                              <select name="status" className={"inp pillsel " + STATUS_TONE[t.status]} defaultValue={t.status} style={{ height: 26, fontSize: 12 }}>{STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}</select>
-                              <button className="btn" type="submit" style={{ height: 26, padding: "0 7px", fontSize: 11 }} title="Apply">✓</button>
-                              <input name="not_needed_reason" className="inp" placeholder="why not needed?" defaultValue={t.not_needed_reason ?? ""} style={{ height: 26, fontSize: 11, width: 0, flex: 1, minWidth: 0 }} /></form>
-                          ) : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
+                          <div className="flex items-center gap-2">
+                            <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
+                              <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!work || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? "✓" : ""}</button></form>
+                            {t.status === "todo" && work ? (
+                              <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start (it also starts by itself when you touch the linked manual, open the file or attach a document)">To do ▸</button></form>
+                            ) : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
+                          </div>
                         </td>
                         <td>
                           <div className="flex items-baseline gap-2 flex-wrap">{pj.critical && t.status !== "done" && <span title="critical path">⚡</span>}<b>{t.title}</b>{t.link_kind && <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span>}</div>
@@ -98,6 +99,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                           {ds.length > 0 && <div className="mini">after: {ds.map((d) => <span key={d.id} className={openDs.some((o) => o.id === d.id) ? "amber" : ""}>{d.title}{d.status === "done" ? " ✓" : ""}</span>).reduce<React.ReactNode[]>((acc, x, i) => (i ? [...acc, " · ", x] : [x]), [])}</div>}
                           {t.source && <div className="mini">{/^https?:/.test(t.source) ? <a className="underline" href={t.source} target="_blank" rel="noreferrer">source</a> : t.source}</div>}
                           {t.note && <div className="mini">✎ {t.note}</div>}
+                          {taskFiles.filter((f) => f.task_id === t.id).map((f) => <div key={f.id} className="mini flex items-center gap-2">📎 {f.path ? <a className="underline" href={`/api/files/${f.path}`} target="_blank" rel="noreferrer">{f.name}</a> : <>{f.name} <span>(on the server)</span></>}{f.size ? <span>{Math.round(f.size / 1024)} KB</span> : null}<span>{fr(f.at)}</span>{mayEdit && <form action={removeTaskFile}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="file_id" value={f.id} /><button className="mini underline" type="submit" style={{ background: "none", border: 0, cursor: "pointer", color: "var(--slate6)" }}>remove</button></form>}</div>)}
+                          {work && t.status !== "done" && t.status !== "not_needed" && (
+                            <form action={uploadTaskFile} className="flex items-center gap-2 mt-1 flex-wrap" encType="multipart/form-data"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
+                              <input type="file" name="file" className="inp" style={{ height: 26, fontSize: 11, maxWidth: 260 }} /><input name="name" className="inp" style={{ height: 26, fontSize: 11, maxWidth: 220 }} placeholder="or name of a file kept on the server" /><button className="btn" type="submit" style={{ height: 26, fontSize: 11 }}>Attach</button></form>
+                          )}
                           {mayEdit && p.status !== "closed" && (
                             <details className="mt-1"><summary className="mini underline cursor-pointer">Edit</summary>
                               <form action={updateTask} className="grid grid-cols-6 gap-2 mt-2 p-2" style={{ background: "#f7f9fb", borderRadius: 8 }}>
@@ -112,6 +118,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                                 <label><span className="mini">Code / type / kind</span><input name="link_ref" className="inp mono" defaultValue={t.link_ref ?? ""} placeholder="OM-A · AC-NEW · insurance" /></label>
                                 <label className="col-span-4"><span className="mini">Depends on</span><select name="depends_on" multiple className="inp" size={4} defaultValue={ds.map((d) => d.id)}>{tasks.filter((x) => x.id !== t.id).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
                                 <label className="col-span-2"><span className="mini">Note</span><input name="note" className="inp" defaultValue={t.note ?? ""} /></label>
+                                <label><span className="mini">Status</span><select name="status" className="inp" defaultValue={t.status}>{STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}</select></label>
+                                <label className="col-span-3"><span className="mini">If not needed — why (kept for the authority)</span><input name="not_needed_reason" className="inp" defaultValue={t.not_needed_reason ?? ""} /></label>
                                 <div className="col-span-6 flex gap-2"><button className="btn primary" type="submit">Save</button><button className="btn" type="submit" formAction={deleteTask} title="Delete this task">✕ Delete</button></div>
                               </form>
                             </details>

@@ -222,3 +222,54 @@ export async function pushToTemplate(formData: FormData) {
   revalidatePath("/ref/ptpl"); revalidatePath("/proj/boards/new"); paths(p.id);
   redirect(`/ref/ptpl?edit=${code}#${code}`);
 }
+
+async function taskOf(db: Db, p: Project, taskId: string): Promise<Task | null> {
+  const { data } = await db.from("project_tasks").select("*").eq("id", taskId).eq("project_id", p.id).maybeSingle();
+  return (data as Task | null) ?? null;
+}
+/** The tick: done ↔ back to in progress. */
+export async function tickTask(formData: FormData) {
+  const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
+  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) return;
+  const done = task.status !== "done";
+  await db.from("project_tasks").update(done ? { status: "done", done_at: today(), done_by: s.person?.id ?? null, started_at: task.started_at ?? today(), updated_at: new Date().toISOString() } : { status: "in_progress", done_at: null, done_by: null, updated_at: new Date().toISOString() }).eq("id", task.id);
+  await audit(db, s, p, done ? "task_done" : "task_reopened", { task: task.title });
+  paths(p.id); revalidatePath("/home/tasks");
+}
+/** Start by hand (it also starts by itself when a linked object is touched or a document is attached). */
+export async function startTask(formData: FormData) {
+  const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
+  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task) || task.status !== "todo") return;
+  await db.from("project_tasks").update({ status: "in_progress", started_at: task.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", task.id);
+  paths(p.id); revalidatePath("/home/tasks");
+}
+/** A document produced outside S.A.M. (contract, PPI report, form, evidence) attached to the task; the task starts if it had not. */
+export async function uploadTaskFile(formData: FormData) {
+  const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
+  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) throw new Error("Not allowed");
+  const file = formData.get("file"); const name = str(formData, "name");
+  if (file instanceof File && file.size > 0) {
+    if (file.size > 25 * 1024 * 1024) throw new Error("File larger than 25 MB: keep it on the server and record its name here.");
+    const safe = file.name.replace(/[^\w.\-() ]+/g, "_");
+    const key = `${p.entity}/projects/${p.id}/${task.id}/${safe}`;
+    const { error } = await db.storage.from("evidence").upload(key, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream", upsert: true });
+    if (error) throw new Error(error.message);
+    await db.from("project_task_files").insert({ task_id: task.id, project_id: p.id, name: safe, path: `evidence/${key}`, size: file.size, uploaded_by: s.person?.id ?? null });
+  } else if (name) {
+    await db.from("project_task_files").insert({ task_id: task.id, project_id: p.id, name, path: null, size: null, uploaded_by: s.person?.id ?? null });
+  } else return;
+  if (task.status === "todo") await db.from("project_tasks").update({ status: "in_progress", started_at: task.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", task.id);
+  await audit(db, s, p, "task_file_added", { task: task.title, name: name || (file as File).name });
+  paths(p.id);
+}
+export async function removeTaskFile(formData: FormData) {
+  const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
+  if (!cmm && !owner) throw new Error("Not allowed");
+  const { data } = await db.from("project_task_files").select("*").eq("id", str(formData, "file_id")).eq("project_id", p.id).maybeSingle();
+  if (!data) return;
+  const f = data as { id: string; name: string; path: string | null };
+  if (f.path?.startsWith("evidence/")) await db.storage.from("evidence").remove([f.path.slice(9)]);
+  await db.from("project_task_files").delete().eq("id", f.id);
+  await audit(db, s, p, "task_file_removed", { name: f.name });
+  paths(p.id);
+}
