@@ -378,3 +378,15 @@ body:has(.pm){background:#e9eef2}
 .nprow.add{background:#fbfdfe;border-top:1px solid var(--line)}
 .pm-body .orgchart svg{max-height:200mm}
 .reader .orgchart svg,.pm .orgchart svg{max-width:100%;max-height:none;width:auto;height:auto}
+
+/* Projects · authority files (PRJ-01) */
+.chk{width:22px;height:22px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:#fff;line-height:1}
+.chk.on{background:var(--green);border-color:var(--green)}
+.chk:disabled{cursor:default;opacity:.6}
+.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px}
+.kcol{background:var(--blue05);border:1px solid var(--line);border-radius:12px;padding:8px;min-height:160px}
+.kcol .kh{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--slate45);padding:6px 8px 10px}
+.kcol .kh b{background:#fff;border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:11px;color:var(--navy)}
+.kcard{display:block;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:var(--navy);box-shadow:var(--sh)}
+.kcard:hover{border-color:var(--cyan)}
+.kcard.late{border-left:3px solid var(--terra)}
