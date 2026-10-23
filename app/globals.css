@@ -377,3 +377,4 @@ body:has(.pm){background:#e9eef2}
 .nprow .inp{padding:5px 7px;font-size:12.5px;min-width:0;flex:1}
 .nprow.add{background:#fbfdfe;border-top:1px solid var(--line)}
 .pm-body .orgchart svg{max-height:200mm}
+.reader .orgchart svg,.pm .orgchart svg{max-width:100%;max-height:none;width:auto;height:auto}
