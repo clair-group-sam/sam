@@ -336,3 +336,11 @@ body:has(.pm){background:#e9eef2}
 .pm-cht.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .pm-body a[href^="#"]{color:inherit;text-decoration:none}
 @media print{.pm-ch{break-before:page;margin-top:0}}
+
+/* editor save state: something to save vs up to date */
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.save.dirty{background:#c2410c;border-color:#c2410c;color:#fff;box-shadow:0 0 0 3px rgba(194,65,12,.18)}
+.btn.save.dirty:hover{background:#9a3412}
+.btn.save.clean{background:#eaf6ee;border-color:#bfe3cb;color:#1e7a3c;opacity:1;cursor:default}
+.btn.save.busy{background:var(--navy);border-color:var(--navy);color:#fff;opacity:.8}
+.savestate.dirty{color:#c2410c;font-weight:700}

@@ -21,6 +21,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const [saving, setSaving] = useState(false);
   const [changed, setChanged] = useState(changed0);
   const [msg, setMsg] = useState("");
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [ai, setAi] = useState(false);
   const baseNorm = useRef<string | null>(null);
   const editor = useEditor({
@@ -29,30 +30,36 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     editable,
     immediatelyRender: false,
     onCreate: ({ editor }) => { baseNorm.current = editor.getHTML(); },
-    onUpdate: () => setDirty(true),
+    onUpdate: () => { setDirty(true); setMsg(""); },
   });
-  useEffect(() => { setTitle(title0); setDirty(false); setChanged(changed0); setMsg(""); }, [sectionId, title0, changed0]);
+  useEffect(() => { setTitle(title0); setDirty(false); setChanged(changed0); setMsg(""); setSavedAt(null); }, [sectionId, title0, changed0]);
+  // leaving the page with unsaved changes asks first
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   async function save() {
     if (!editor || saving) return;
     setSaving(true); setMsg("");
     const r = await saveSection({ revisionId, sectionId, html: editor.getHTML(), title, baseNorm: baseNorm.current ?? undefined });
     setSaving(false);
-    if (r.ok) { setDirty(false); setChanged(!!r.changed); setMsg(r.changed ? "Saved · marked as changed" : "Saved · identical to the published text"); router.refresh(); }
+    if (r.ok) { setDirty(false); setChanged(!!r.changed); setSavedAt(new Date().toTimeString().slice(0, 5)); setMsg(r.changed ? "marked as changed" : "identical to the published text"); router.refresh(); }
     else setMsg(r.error ?? "Error");
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   });
-  function discard() { if (!editor) return; editor.commands.setContent(html); setTitle(title0); setDirty(false); setMsg("Back to the last saved state"); }
+  function discard() { if (!editor) return; editor.commands.setContent(html, false); setTitle(title0); setDirty(false); setMsg("back to the last saved state"); }
   async function revert() {
     if (!editor || saving) return;
     if (!window.confirm(`Revert chapter ${refCode} to the text of ${baseRevLabel}? Your changes in this revision will be lost.`)) return;
     setSaving(true);
     const r = await revertSection({ revisionId, sectionId });
     setSaving(false);
-    if (r.ok) { editor.commands.setContent(r.html ?? ""); baseNorm.current = editor.getHTML(); setDirty(false); setChanged(false); setMsg("Chapter reverted"); router.refresh(); } else setMsg(r.error ?? "Error");
+    if (r.ok) { editor.commands.setContent(r.html ?? "", false); baseNorm.current = editor.getHTML(); setDirty(false); setChanged(false); setMsg("Chapter reverted"); router.refresh(); } else setMsg(r.error ?? "Error");
   }
   if (!editor) return <div className="cb text-slate6">Loading editor…</div>;
   const B = ({ on, act, label, title }: { on?: boolean; act: () => void; label: string; title?: string }) => (
@@ -92,10 +99,13 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <span className="sep" />
           <button type="button" className={"tb ai" + (ai ? " on" : "")} onClick={() => setAi((v) => !v)} title="Draft with AI">✦ AI</button>
           <span className="flex-1" />
-          <span className="mini">{msg || (dirty ? "Unsaved changes" : "")}</span>
+          <span className={"mini" + (dirty ? " savestate dirty" : "")}>{dirty ? "● Unsaved changes" : msg}</span>
           {dirty && <button type="button" className="btn" onClick={discard} disabled={saving} title="Back to the last saved state of this chapter">Cancel changes</button>}
           {changed && !dirty && <button type="button" className="btn" onClick={revert} disabled={saving} title="Back to the text of the base revision">Revert chapter</button>}
-          <button type="button" className="btn primary" onClick={save} disabled={saving || !dirty}>{saving ? "Saving…" : "Save (⌘S)"}</button>
+          <button type="button" className={"btn save " + (saving ? "busy" : dirty ? "dirty" : "clean")} onClick={save} disabled={saving || !dirty}
+            title={dirty ? "Save this chapter (⌘S)" : "Everything is saved"}>
+            {saving ? "Saving…" : dirty ? "Save changes (⌘S)" : savedAt ? `✓ Saved ${savedAt}` : "✓ Up to date"}
+          </button>
         </div>
       )}
       <div className={"edsplit" + (ai ? " withai" : "")}>
