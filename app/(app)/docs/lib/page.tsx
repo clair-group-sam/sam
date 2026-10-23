@@ -8,6 +8,7 @@ import { STEP_LABEL, listManuals } from "@/lib/docs";
 import { mayCreateManual } from "@/lib/create";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENTS4 } from "@/lib/nav";
+import FolderTree, { type TNode } from "@/components/FolderTree";
 
 const FAMILY_COLORS: Record<string, string> = { "1": "#7d166d", "2": "#0e8cc4", "3": "#248a3d", "4": "#b86e00", "5": "#b43a0f", "6": "#6b5bd2" };
 type Row = Awaited<ReturnType<typeof listManuals>>[number];
@@ -82,18 +83,43 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   }
   const scope = s.entity === "ALL" ? "all entities" : `${ENT[s.entity]?.name} (${s.entity})`;
   const famColor = (name: string) => FAMILY_COLORS[name.trim()[0]] ?? "#5b7183";
-  const dot = (w: 0 | 1 | 2) => (w === 2 ? "var(--terra)" : w === 1 ? "var(--amber)" : "var(--green)");
+  const ENT_COLOR: Record<string, string> = { AJD: "#006c9c", ASJ: "#3a7a1b", ASF: "#b08300", TEC: "#b43a0f" };
 
-  const renderNodes = (nodes: Map<string, Node>, color?: string): React.ReactNode => [...nodes.values()].map((n) => (
-    <div key={n.full}>
-      <Link href={`/docs/lib?folder=${encodeURIComponent(n.full)}`} className={"fnode d" + n.depth + (folder === n.full ? " on" : "")} style={n.depth === 0 ? { borderLeftColor: famColor(n.name) } : undefined}>
-        <i className="fdot" style={{ background: dot(n.worst) }} />
-        <span className="fname" style={n.depth === 0 ? { color: color ?? famColor(n.name) } : undefined}>{n.name}</span>
-        <span className="fcount">{n.count}</span>
-      </Link>
-      {n.children.size > 0 && renderNodes(n.children, color ?? famColor(n.name))}
-    </div>
-  ));
+  // certificates of each entity, as "1. Certificates" with their folders, inside the entity (or at the top for one entity)
+  let cq2 = supabaseAdmin().from("certificates").select("entity,folder,valid_until").is("archived_at", null);
+  if (s.entity !== "ALL") cq2 = cq2.eq("entity", s.entity); else if (!s.group) cq2 = cq2.in("entity", s.entities);
+  const { data: certRows } = await cq2;
+  const today = new Date().toISOString().slice(0, 10), in90 = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+  const certWorst = (v: string | null): 0 | 1 | 2 => (!v ? 0 : v < today ? 2 : v <= in90 ? 1 : 0);
+  const certNode = (entity: string, prefix: string, depth: number): TNode | null => {
+    const list = ((certRows ?? []) as { entity: string; folder: string | null; valid_until: string | null }[]).filter((c) => c.entity === entity);
+    const folders = new Map<string, { n: number; w: 0 | 1 | 2 }>();
+    for (const c of list) { const f = c.folder ?? "Unfiled"; const x = folders.get(f) ?? { n: 0, w: 0 as 0 | 1 | 2 }; x.n++; x.w = Math.max(x.w, certWorst(c.valid_until)) as 0 | 1 | 2; folders.set(f, x); }
+    const full = prefix ? `${prefix} › 1. Certificates` : "1. Certificates";
+    return { name: "1. Certificates", full, depth, count: list.length, worst: Math.max(0, ...[...folders.values()].map((x) => x.w)) as 0 | 1 | 2, href: `/docs/files?entity=${entity}`, color: FAMILY_COLORS["1"],
+      children: [...folders.entries()].sort().map(([f, x]) => ({ name: f, full: `${full} › ${f}`, depth: depth + 1, count: x.n, worst: x.w, href: `/docs/files?entity=${entity}&folder=${encodeURIComponent(f)}`, children: [] })) };
+  };
+  const toT = (nodes: Map<string, Node>, color?: string): TNode[] => [...nodes.values()].map((n) => {
+    const isEnt = several && n.depth === 0;
+    const c = isEnt ? ENT_COLOR[/\(([A-Z]{3})\)$/.exec(n.name)?.[1] ?? ""] : color ?? famColor(n.name);
+    const kids = toT(n.children, isEnt ? undefined : c);
+    return { name: n.name, full: n.full, depth: n.depth, count: n.count, worst: n.worst, href: `/docs/lib?folder=${encodeURIComponent(n.full)}`, color: c, entity: isEnt, children: kids };
+  });
+  let tnodes = toT(tree);
+  if (several) {
+    // every entity in scope gets its node (with its certificates) even without a manual yet
+    const shown = (s.group ? ENTS4 : s.entities).filter((e) => tnodes.some((t) => t.name.endsWith(`(${e})`)) || ((certRows ?? []) as { entity: string }[]).some((c) => c.entity === e));
+    tnodes = shown.map((e) => {
+      const label = `${ENT[e]?.name ?? e} (${e})`;
+      const t = tnodes.find((x) => x.name === label) ?? { name: label, full: label, depth: 0, count: 0, worst: 0 as 0 | 1 | 2, href: `/docs/lib?folder=${encodeURIComponent(label)}`, color: ENT_COLOR[e], entity: true, children: [] };
+      const cn = certNode(e, label, 1);
+      return { ...t, count: t.count + (cn?.count ?? 0), children: cn && cn.count ? [cn, ...t.children] : t.children };
+    });
+  } else if (s.entity !== "ALL" || ents.length === 1) {
+    const e = s.entity !== "ALL" ? s.entity : ents[0];
+    const cn = e ? certNode(e, "", 0) : null;
+    if (cn) tnodes = [cn, ...tnodes];
+  }
 
   return (
     <>
@@ -166,14 +192,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       <div className="flex gap-4 items-start">
         <aside className="card folders">
           <div className="ch"><span className="eyebrow">Folders</span><span className="mini">colour = worst status inside</span></div>
-          <div className="p-2">
-            <Link href="/docs/lib" className={"fnode d0 all" + (!folder ? " on" : "")}><span className="fname">All documents</span><span className="fcount">{rows.length}</span></Link>
-            <Link href="/docs/files" className="fnode d0" style={{ borderLeftColor: FAMILY_COLORS["1"] }} title="Certificates & Validities">
-              <i className="fdot" style={{ background: "var(--green)" }} /><span className="fname" style={{ color: FAMILY_COLORS["1"] }}>1. Certificates</span><span className="fcount">{certCount ?? 0}</span>
-            </Link>
-            <Link href="/docs/files" className="fnode d1"><i className="fdot" style={{ background: "var(--green)" }} /><span className="fname">Approvals & validities ›</span><span className="fcount">{certCount ?? 0}</span></Link>
-            {renderNodes(tree)}
-          </div>
+          <FolderTree nodes={tnodes} selected={folder} total={rows.length} several={several} />
         </aside>
         <section className="card flex-1 min-w-0">
           <div className="ch"><span className="eyebrow">{folder || "All documents"}</span><span className="mini">{inFolder.length} document{inFolder.length > 1 ? "s" : ""}</span></div>

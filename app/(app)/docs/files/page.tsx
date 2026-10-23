@@ -8,14 +8,15 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader, Metric } from "@/components/Page";
 import { daysUntil, type Certificate } from "@/lib/docs";
 
-export default async function Certificates({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
+export default async function Certificates({ searchParams }: { searchParams: Promise<{ all?: string; entity?: string; folder?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
-  const { all } = await searchParams;
+  const { all, entity: qe, folder: qf } = await searchParams;
   const canDrop = await mayCreateManual(s);
   const sb = await supabaseServer();
   let q = sb.from("certificates").select("*").order("valid_until", { ascending: true, nullsFirst: false });
-  if (s.entity !== "ALL") q = q.eq("entity", s.entity);
+  if (s.entity !== "ALL") q = q.eq("entity", s.entity); else if (qe) q = q.eq("entity", qe);
+  if (qf) q = qf === "Unfiled" ? q.is("folder", null) : q.eq("folder", qf);
   const { data } = await q;
   const everything = (data ?? []) as (Certificate & { archived_at?: string | null; reference?: string | null; summary?: string | null; folder?: string | null })[];
   const rows = all ? everything : everything.filter((c) => !c.archived_at);
@@ -30,7 +31,7 @@ export default async function Certificates({ searchParams }: { searchParams: Pro
   const expired = rows.filter((c) => { const d = daysUntil(c.valid_until); return d !== null && d < 0; });
   return (
     <>
-      <PageHeader eyebrow="Documents · Certificates & Validities" title="Certificates & Validities" sub="Organisation approvals and aircraft documents, with their validity. Alerts at 90 / 30 / 7 days (DOC-10)."
+      <PageHeader eyebrow="Documents · Certificates & Validities" title="Certificates & Validities" sub={`Organisation approvals and aircraft documents, with their validity. Alerts at 90 / 30 / 7 days (DOC-10).${qe ? ` · ${qe}` : ""}${qf ? ` › ${qf}` : ""}`}
         right={<>{superseded > 0 && <Link className="btn" href={all ? "/docs/files" : "/docs/files?all=1"}>{all ? "Hide superseded" : `Show superseded (${superseded})`}</Link>}{canDrop && <Link className="btn primary" href="/docs/drop">+ Drop a document</Link>}</>} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Certificates" value={rows.length} />

@@ -425,3 +425,10 @@ body:has(.pm){background:#e9eef2}
 .mgrid .none{color:#b8c4ce;font-size:12px}
 .star{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:#c9a227;padding:0 4px}
 .star.off{color:#b8c4ce}
+.fchev{width:16px;height:16px;flex:0 0 16px;border:0;background:none;color:var(--slate5);font-size:14px;line-height:16px;cursor:pointer;transition:transform .15s;padding:0}
+.fchev.open{transform:rotate(90deg)}
+.fchev.empty{cursor:default}
+.fnode .fname{color:inherit}
+.fnode.ent-node{font-size:12.5px;background:#f3f6f9;border-left-width:5px}
+.ftools{display:flex;gap:10px;padding:0 10px 6px;font-size:11.5px}
+.ftools button{background:none;border:0;color:var(--slate5);text-decoration:underline;cursor:pointer;padding:0}
