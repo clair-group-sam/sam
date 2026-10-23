@@ -31,10 +31,10 @@ function buildTree(rows: Row[], byEntity = false): Map<string, Node> {
   return root;
 }
 
-export default async function Library({ searchParams }: { searchParams: Promise<{ q?: string; folder?: string; view?: string }> }) {
+export default async function Library({ searchParams }: { searchParams: Promise<{ q?: string; folder?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
-  const { q = "", folder = "", view = "" } = await searchParams;
+  const { q = "", folder = "" } = await searchParams;
   const rows = await listManuals(s);
   const canCreate = await mayCreateManual(s);
   const ents = [...new Set(rows.map((r) => r.manual.entity))];
@@ -63,12 +63,6 @@ export default async function Library({ searchParams }: { searchParams: Promise<
     recent = ((v.data ?? []) as { manual_id: string }[]).map((x) => byId.get(x.manual_id)).filter(Boolean).slice(0, 8) as Row[];
     toRead = ((t.data ?? []) as { title: string; link: string; entity: string }[]).filter((x) => s.entity === "ALL" || x.entity === s.entity);
   }
-  // comparison grid: one row per manual code, one column per entity
-  const gridEnts = (s.entity === "ALL" ? (s.group ? ENTS4 : s.entities) : [s.entity]).filter((e) => e !== "ALL");
-  const codes = [...new Set(rows.map((r) => r.manual.code))].sort((a, b) => {
-    const fa = rows.find((r) => r.manual.code === a)?.manual.path ?? "~", fb = rows.find((r) => r.manual.code === b)?.manual.path ?? "~";
-    return fa.split(" › ")[0].localeCompare(fb.split(" › ")[0]) || a.localeCompare(b);
-  });
   const published = rows.filter((r) => r.current).length, drafts = rows.filter((r) => r.workings.length).length, never = rows.filter((r) => !r.current).length;
 
   let hits: { manual_id: string; entity: string; code: string; title: string; ref: string; stitle: string | null; snippet: string }[] = [];
@@ -154,41 +148,12 @@ export default async function Library({ searchParams }: { searchParams: Promise<
             {!recent.length && <div className="row mini">—</div>}</section>
         </div>
       )}
-      <div className="flex items-center gap-3 mb-3">
-        <div className="viewseg">
-          <Link href={`/docs/lib${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`} className={view !== "grid" ? "on" : ""}>{several ? "By entity" : "Folders"}</Link>
-          <Link href="/docs/lib?view=grid" className={view === "grid" ? "on" : ""}>Compare entities</Link>
-        </div>
-        <span className="mini">{view === "grid" ? "one row per manual, one column per entity — published revision, date and revision in progress" : several ? "each entity keeps its own folders" : ""}</span>
-      </div>
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Manuals" value={rows.length} hint="structured, revisable" />
         <Metric label="Published" value={published} hint="current revision available" />
         <Metric label="Revisions in progress" value={drafts} tone={drafts ? "amber" : undefined} hint="draft, review or authority" />
         <Metric label="Never published" value={never} tone={never ? "red" : undefined} hint="to clean or publish" />
       </div>
-      {view === "grid" ? (
-        <section className="card">
-          <table className="tbl mgrid">
-            <thead><tr><th style={{ width: 180 }}>Manual</th>{gridEnts.map((e) => <th key={e}><span className={"ent " + e}>{e}</span> <span className="mini">{ENT[e]?.name}</span></th>)}</tr></thead>
-            <tbody>
-              {codes.map((code) => { const any = rows.find((r) => r.manual.code === code)!; return (
-                <tr key={code}>
-                  <td><b className="mono">{code}</b><div className="mini">{(any.manual.path ?? "").split(" › ")[0]}</div></td>
-                  {gridEnts.map((e) => { const r = rows.find((x) => x.manual.code === code && x.manual.entity === e); return (
-                    <td key={e}>{r ? (
-                      <Link href={`/docs/manual/${r.manual.id}`} className="cell">
-                        <span className="t">{r.current ? `Iss ${r.current.issue} Rev ${r.current.rev}` : "never published"}</span>
-                        {r.current?.published_at && <span className="mini"> · {r.current.published_at}</span>}
-                        <div className="mini">{r.manual.title}</div>
-                        {r.workings.map((w) => <span key={w.id} className="pill amber mt-1">Rev {w.rev} · {STEP_LABEL[w.step]}</span>)}
-                      </Link>) : <span className="none">—</span>}</td>); })}
-                </tr>); })}
-              {!codes.length && <tr><td colSpan={gridEnts.length + 1} className="p-6 text-slate6">No manual.</td></tr>}
-            </tbody>
-          </table>
-        </section>
-      ) : (
       <div className="flex gap-4 items-start">
         <aside className="card folders">
           <div className="ch"><span className="eyebrow">Folders</span><span className="mini">colour = worst status inside</span></div>
@@ -214,7 +179,6 @@ export default async function Library({ searchParams }: { searchParams: Promise<
           </table>
         </section>
       </div>
-      )}
     </>
   );
 }
