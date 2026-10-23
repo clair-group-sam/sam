@@ -495,3 +495,4 @@ details.more>summary::-webkit-details-marker{display:none}details.more[open]>sum
 .morepanel{position:absolute;right:0;top:28px;z-index:30;width:720px;max-width:80vw;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:12px;display:grid;gap:8px;font-size:13px}
 .linkbtn{background:none;border:0;cursor:pointer;color:var(--slate6);text-decoration:underline;font-size:11.5px;padding:0}
 details.addtask>summary{list-style:none;cursor:pointer;padding:8px 14px;color:var(--slate6)}details.addtask>summary::-webkit-details-marker{display:none}details.addtask>summary:hover{color:var(--navy)}
+.pill.later{color:var(--slate45, #9aa8b5);border-color:var(--line);background:#fff}

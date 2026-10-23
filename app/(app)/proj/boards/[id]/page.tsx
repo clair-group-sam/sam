@@ -84,7 +84,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                             <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!work || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? "✓" : ""}</button></form>
                         </td>
                         <td style={{ width: 96 }}>
-                          {t.status === "todo" && work ? (
+                          {t.status === "todo" && pj.openDeps.length > 0 ? (
+                            <span className="pill later" title={`After: ${openDs.map((d) => d.title).join(" · ")}`}>Later</span>
+                          ) : t.status === "todo" && work ? (
                             <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start now — it also starts by itself when the linked manual, file or a document is touched">To do ▸</button></form>
                           ) : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
                         </td>
@@ -94,7 +96,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                             <b>{t.title}</b>
                             {lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label} · <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span> : null}
                             {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}>📎 {tf.length}</span>}
-                            {openDs.length > 0 && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(" · ")}`}>waits for {openDs.length}</span>}
+                            {openDs.length > 0 && t.status !== "todo" && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(" · ")}`}>waits for {openDs.length}</span>}
                           </div>
                           {t.detail && open && <div className="mini">{t.detail}</div>}
                           {t.status === "not_needed" && t.not_needed_reason && <div className="mini">Not needed: {t.not_needed_reason}</div>}
