@@ -10,10 +10,11 @@ import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
 import { allowedTransitions, expectedReturn, isCmm, ownsManual, RETURN_LABEL, type ReturnKind } from "@/lib/revisions";
-import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review } from "./actions";
+import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review, setManualClass } from "./actions";
 import ReviewPanel from "@/components/ReviewPanel";
 import ChapterTools from "@/components/ChapterTools";
 import EntityBand from "@/components/EntityBand";
+import ManualClass from "@/components/ManualClass";
 import { checkLinks } from "@/lib/links";
 import AuthorityReturn from "@/components/AuthorityReturn";
 import RouteProposal from "@/components/RouteProposal";
@@ -109,7 +110,10 @@ export default async function Editor({ params, searchParams }: { params: Promise
     <>
       <EntityBand entity={manual.entity} current={s.entity} multi={s.group || s.entities.length > 1} />
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code} · revision editor`} title={`${manual.title} — Issue ${rev.issue} Rev ${rev.rev}`}
-        sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_name ?? manual.owner_role}${internal ? " · internal document" : ""}${editable ? "" : " · read-only at this step"}`}
+        tag={<ManualClass internal={internal} entity={manual.entity} action={cmm && rev.step === "draft" ? (
+          <form action={setManualClass} className="inline"><input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="internal" value={internal ? "0" : "1"} />
+            <button className="btn" type="submit" style={{ padding: "3px 10px", fontSize: 12 }}>{internal ? "Make it a regulated manual" : "Make it an internal document"}</button></form>) : null} />}
+        sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_name ?? manual.owner_role}${editable ? "" : " · read-only at this step"}`}
         right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
 
       <div className="steps mb-4">

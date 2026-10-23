@@ -434,3 +434,15 @@ export async function orgSnapshot(input: { revisionId: string }): Promise<{ ok: 
     return { ok: true, entity: manual.entity, snapshot: JSON.stringify(snap) };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 }
+
+/** Regulated manual ↔ internal document: Compliance only, and only while the revision is a draft. */
+export async function setManualClass(formData: FormData) {
+  const { s, db, rev, manual } = await guard(String(formData.get("revision_id") ?? ""));
+  if (!isCmm(s)) throw new Error("Only Compliance can change whether a manual is regulated or internal.");
+  if (rev.step !== "draft") throw new Error("This can only be changed while the revision is a draft.");
+  const internal = String(formData.get("internal") ?? "") === "1";
+  await db.from("manuals").update({ internal }).eq("id", manual.id);
+  await db.from("revisions").update({ authority_route: internal ? "none" : null, return_kind: null }).eq("id", rev.id);
+  await audit(db, s.person?.id ?? null, manual.entity, rev.id, "manual_class", { code: manual.code, internal });
+  revalidatePath(`/docs/editor/${rev.id}`); revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/lib");
+}

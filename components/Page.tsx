@@ -1,9 +1,10 @@
-export function PageHeader({ eyebrow, title, sub, right }: { eyebrow?: string; title: string; sub?: string; right?: React.ReactNode }) {
+export function PageHeader({ eyebrow, title, sub, right, tag }: { eyebrow?: string; title: string; sub?: string; right?: React.ReactNode; tag?: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 mb-5">
       <div className="flex-1 min-w-0">
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h1 className="text-[28px] leading-tight font-bold tracking-tight mt-1">{title}</h1>
+        {tag && <div className="mt-1.5">{tag}</div>}
         {sub && <p className="text-slate6 mt-1">{sub}</p>}
       </div>
       {right && <div className="flex gap-2 shrink-0">{right}</div>}

@@ -9,6 +9,7 @@ import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Headi
 import Reader, { type TocItem } from "@/components/Reader";
 import { acknowledge, saveAudience, setNature, toggleFavourite } from "./actions";
 import EntityBand from "@/components/EntityBand";
+import ManualClass from "@/components/ManualClass";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from "@/lib/audience";
 import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
@@ -144,6 +145,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
     <>
       <EntityBand entity={manual.entity} current={s.entity} multi={multi} />
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
+        tag={<ManualClass internal={!!(manual as Manual & { internal?: boolean }).internal} entity={manual.entity} />}
         sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}` : "No revision yet"}
         right={<>
           {isCmm(s) ? (

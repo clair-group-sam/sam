@@ -464,3 +464,5 @@ body:has(.pm){background:#e9eef2}
 .card.locked .cb{opacity:.72;pointer-events:none;user-select:text}
 .card.locked .ch{background:transparent}
 .wfrow.locked .wfbody{background:repeating-linear-gradient(135deg,transparent 0 12px,#f6f8fa 12px 24px);border-radius:8px;padding:2px 8px;margin:-2px -8px}
+.mclass{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill.blue{background:#e5f1fb;color:#0d4f86}
