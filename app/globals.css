@@ -432,3 +432,27 @@ body:has(.pm){background:#e9eef2}
 .fnode.ent-node{font-size:12.5px;background:#f3f6f9;border-left-width:5px}
 .ftools{display:flex;gap:10px;padding:0 10px 6px;font-size:11.5px}
 .ftools button{background:none;border:0;color:var(--slate5);text-decoration:underline;cursor:pointer;padding:0}
+
+/* DOC-09 workflow card: steps in order, the one to do now with its action, the next ones greyed */
+.wf{display:grid;gap:0}
+.wfrow{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.wfrow:first-child{border-top:0}
+.wfdot{display:flex;align-items:flex-start;justify-content:center;position:relative;font-size:11px;color:#fff;padding-top:2px}
+.wfdot i{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;border:2px solid var(--blue2);background:#fff}
+.wfrow.done .wfdot i{background:var(--green);border-color:var(--green)}
+.wfrow.done .wfdot{color:#fff;z-index:1;font-weight:700}
+.wfrow.now .wfdot i{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 0 4px var(--blue175)}
+.wfrow.next,.wfrow.skip{color:var(--slate5)}
+.wfrow.next .wfdot i,.wfrow.skip .wfdot i{border-color:var(--line);background:#f4f6f8}
+.wfrow.skip b{text-decoration:line-through;font-weight:500}
+.wfhead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.wfrow.now .wfhead b{color:var(--navy)}
+.wfact{margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.wfback{margin-top:8px;padding-top:10px;border-top:1px dashed var(--line);display:grid;gap:6px}
+
+/* working on a draft: neutral reminder band (the amber one is the reader preview) */
+.draftbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;border-radius:10px;border:1px solid var(--line);color:var(--slate6);font-size:13px;
+  background:repeating-linear-gradient(135deg,#f6f8fa 0 14px,#eef2f5 14px 28px)}
+.draftbar b{color:var(--navy)}
+.draftbar > div{flex:1;min-width:260px}
+.nature{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--slate5);border:1px solid var(--line);border-radius:999px;padding:1px 8px;background:#fff}

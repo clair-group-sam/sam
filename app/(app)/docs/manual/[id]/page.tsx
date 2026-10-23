@@ -7,7 +7,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
-import { acknowledge, saveAudience, toggleFavourite } from "./actions";
+import { acknowledge, saveAudience, setNature, toggleFavourite } from "./actions";
 import EntityBand from "@/components/EntityBand";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from "@/lib/audience";
@@ -144,8 +144,17 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
     <>
       <EntityBand entity={manual.entity} current={s.entity} multi={multi} />
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
-        sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${(manual as Manual & { internal?: boolean }).internal ? " · internal document" : ""}` : "No revision yet"}
+        sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}` : "No revision yet"}
         right={<>
+          {isCmm(s) ? (
+            <form action={setNature} className="flex items-center" title="Nature of the document (Compliance): a regulated manual follows the DOC-09 cycle with an authority route; an internal document is reviewed and published by its author">
+              <input type="hidden" name="manual_id" value={manual.id} />
+              <select name="nature" className="nature" defaultValue={(manual as Manual & { internal?: boolean }).internal ? "internal" : "regulated"} style={{ cursor: "pointer" }}>
+                <option value="regulated">regulated manual</option><option value="internal">internal document</option>
+              </select>
+              <button type="submit" className="btn" style={{ height: 24, padding: "0 8px", fontSize: 11, marginLeft: 4 }}>Set</button>
+            </form>
+          ) : <span className="nature" style={{ alignSelf: "center" }}>{(manual as Manual & { internal?: boolean }).internal ? "internal document" : "regulated manual"}</span>}
           <form action={toggleFavourite}><input type="hidden" name="manual_id" value={manual.id} /><button type="submit" className={"star" + (fav ? "" : " off")} title={fav ? "Remove from my favourites" : "Add to my favourites (Library shortcuts)"}>{fav ? "★" : "☆"}</button></form>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
           {canDownloadPdf(s.roles) && revs.length > 0 && (

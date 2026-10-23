@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { STAGE_LABEL, type Stage } from "@/lib/authority";
+import Workflow, { type StepRow } from "@/components/Workflow";
+import { postsOf } from "@/lib/np";
+import { basePost } from "@/lib/session";
 import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
@@ -76,7 +79,30 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const routeOpen = ["draft", "approved_np", "approved_compliance", "signed"].includes(rev.step);
   const auth = ENT[manual.entity]?.auth ?? "authority";
   const stepIdx = STEPS.indexOf(rev.step);
-  const tabs: [string, string][] = internal && (owner || cmm) ? [["write", "Write"], ["publish", "Review & publish"]] : cmm ? [["write", "Write"], ["publish", "Publish · Compliance"]] : [["write", "Write"]];
+  const tabs: [string, string][] = internal ? [["write", "Write"], ["publish", "Review & publish"]] : [["write", "Write"], ["publish", "Approve & publish"]];
+
+  // DOC-09 workflow rows: who does each step (names from NP management), what was done when (document journal)
+  const posts = internal ? [] : await postsOf(admin, manual.entity);
+  const holder = (code: string) => posts.find((p) => p.code === basePost(code))?.holder_name ?? null;
+  const ownerWho = manual.owner_role.startsWith("PERSON:") ? (manual.owner_name ?? "the author") : [holder(manual.owner_role), `(${basePost(manual.owner_role)})`].filter(Boolean).join(" ");
+  const cmmWho = `Compliance department${holder("CMM") ? ` · ${holder("CMM")}` : ""}`;
+  const signWho = /MSM/i.test(manual.code) ? `Accountable Manager${holder("AM") ? ` ${holder("AM")}` : ""} + CMM` : `${ownerWho} + CMM`;
+  const { data: histData } = internal ? { data: [] } : await admin.from("audit_log").select("action,at,actor").eq("object_type", "revision").eq("object_id", rev.id).like("action", "step_%").order("at");
+  const hist = (histData ?? []) as { action: string; at: string; actor: string | null }[];
+  const actorIds = [...new Set(hist.map((h) => h.actor).filter((x): x is string => !!x))];
+  const { data: actorRows } = actorIds.length ? await admin.from("people").select("id,display_name").in("id", actorIds) : { data: [] };
+  const actorName = new Map(((actorRows ?? []) as { id: string; display_name: string }[]).map((p) => [p.id, p.display_name]));
+  const doneAt = (step: string) => { const h = [...hist].reverse().find((x) => x.action === `step_${step}`); return h ? { at: h.at, by: h.actor ? actorName.get(h.actor) ?? null : null } : null; };
+  const route = rev.authority_route;
+  const wfRows: StepRow[] = [
+    { step: "approved_np", label: "Approve (NP)", who: ownerWho, detail: "The nominated person validates the content and hands over to Compliance.", done: doneAt("approved_np") },
+    { step: "approved_compliance", label: "Approve (Compliance)", who: cmmWho, detail: "Checked against the requirements; the authority route is decided here.", done: doneAt("approved_compliance") },
+    ...(manual.needs_signature ? [{ step: "signed", label: "Sign", who: signWho, done: doneAt("signed") }] : []),
+    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance.", skipped: route === "none" ? "not required — no authority route for this revision" : undefined, done: doneAt("with_civil_aviation") },
+    { step: "published", label: "Publish", who: "Compliance", detail: "Readers are notified; reading is tracked per reader.", done: doneAt("published") },
+    ...(manual.to_tmcad_repository ? [{ step: "repository", label: "TM-CAD repository", who: "Compliance", done: doneAt("repository") }] : []),
+  ];
+  const routeHint = (rev.step === "approved_compliance" || rev.step === "signed") && !route ? (cmm ? "Decide the authority route (card on the right) to continue." : "Waiting for Compliance to decide the authority route.") : null;
 
   return (
     <>
@@ -92,8 +118,14 @@ export default async function Editor({ params, searchParams }: { params: Promise
       </div>
       <div className="tabs mb-4">
         {tabs.map(([k, l]) => <Link key={k} href={`/docs/editor/${rev.id}?tab=${k}${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`} className={"tab" + (tab === k ? " on" : "")}>{l}</Link>)}
-        {!cmm && !internal && <span className="mini ml-auto">Authority route, publication and notice are handled by the Compliance department (DOC-06).</span>}
+        <span className="nature ml-auto" title={internal ? "Internal document: no authority route, published by its author after the review" : "Regulated manual: DOC-09 cycle, authority route decided by Compliance"}>{internal ? "internal document" : "regulated manual"}</span>
+        {!cmm && !internal && <span className="mini">Authority route, publication and notice are handled by the Compliance department (DOC-06).</span>}
       </div>
+      {editable ? (
+        <div className="draftbar mb-4"><div><b>Draft — Rev {rev.rev}</b> is the working copy, based on {baseLabel}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
+      ) : (
+        <div className="draftbar mb-4"><div><b>Rev {rev.rev} — {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
+      )}
 
       {tab === "write" && (
         <div className="flex gap-4 items-start">
@@ -166,7 +198,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {tab === "publish" && cmm && !internal && (
+      {tab === "publish" && !internal && (
         <div className="grid grid-cols-2 gap-4">
           <section className="card">
             <div className="ch"><span className="eyebrow">Revision summary</span></div>
@@ -174,22 +206,15 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <input type="hidden" name="revision_id" value={rev.id} />
               <label className="block mb-3"><span className="eyebrow">What changes in Rev {rev.rev} (shown to readers in “What changed”)</span>
                 <textarea name="summary" defaultValue={rev.summary ?? ""} rows={5} className="inp" placeholder="Short summary of the revision, in English…" /></label>
-              <label className="block"><span className="eyebrow">Application / dossier reference at the authority</span><input name="authority_ref" defaultValue={rev.authority_ref ?? ""} className="inp" placeholder="TM-CAD OPS-…, METEOR …, OSAC …" /></label>
+              {cmm && <label className="block"><span className="eyebrow">Application / dossier reference at the authority</span><input name="authority_ref" defaultValue={rev.authority_ref ?? ""} className="inp" placeholder="TM-CAD OPS-…, METEOR …, OSAC …" /></label>}
               <button className="btn primary mt-3" type="submit">Save</button>
             </form>
           </section>
           <section className="card pubcard">
-            <div className="ch"><span className="eyebrow">Workflow · DOC-09</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
+            <div className="ch"><span className="eyebrow">Approval and publication · DOC-09</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
             <div className="cb">
-              {transitions.length === 0 && <p className="mini">No action for you at this step.</p>}
-              {(rev.step === "approved_compliance" || rev.step === "signed") && !rev.authority_route && <p className="mini mb-3">Decide the authority route (card below) to continue.</p>}
-              {transitions.map((t) => { const blocked = t.from === "with_civil_aviation" && t.to === "published" && returnMissing; return (
-                <form key={t.to} action={moveStep} className="mb-3 p-3 border border-line rounded-lg">
-                  <input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="to" value={t.to} />
-                  <div className="flex items-center gap-3"><button className={"btn " + (t.to === "draft" ? "" : "primary")} type="submit" disabled={blocked}>{t.label}</button><span className="mini">{blocked ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}) — integrate it below first.` : t.to === "published" ? `${t.note ?? ""} The update notice goes to every reader of the manual.` : t.note}</span></div>
-                  {(t.to === "with_civil_aviation" || t.from === "with_civil_aviation") && <input name="note" className="inp mt-2" placeholder="Note for the authority exchange (what was sent / received)…" />}
-                </form>
-              ); })}
+              <Workflow revisionId={rev.id} current={rev.step} rows={wfRows} transitions={transitions} routeHint={routeHint}
+                blockedNote={rev.step === "with_civil_aviation" && returnMissing ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}) — integrate it in the card below first.` : null} />
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
               {cmm && (rev.authority_route === "approval" || rev.authority_route === "notification") && (
                 <p className="mini mt-3">Authority file: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
@@ -200,15 +225,16 @@ export default async function Editor({ params, searchParams }: { params: Promise
               </>)}
             </div>
           </section>
-          <section className="card">
+          {!cmm && route && <section className="card"><div className="ch"><span className="eyebrow">Authority route · DOC-06</span><span className="pill">{route}</span></div><div className="cb mini">Decided by the Compliance department{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""}.</div></section>}
+          {cmm && <section className="card">
             <div className="ch"><span className="eyebrow">Authority route · DOC-06</span>{rev.authority_route && <span className="pill">{rev.authority_route}</span>}</div>
             <div className="cb">
               {routeOpen
                 ? <RouteProposal revisionId={rev.id} initial={rev.route_proposal ?? null} route={rev.authority_route} authority={auth} />
                 : <p className="mini">Route: <b>{rev.authority_route ?? "none"}</b>{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""} — fixed once the revision is with the authority.</p>}
             </div>
-          </section>
-          <section className="card">
+          </section>}
+          {cmm && <section className="card">
             <div className="ch"><span className="eyebrow">Authority return · DOC-03</span><span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
             <div className="cb">
               <form action={setReturnKind} className="flex items-center gap-2 mb-3">
@@ -232,7 +258,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
                   : <AuthorityReturn revisionId={rev.id} entity={manual.entity} code={manual.code} rev={rev.rev} kind={returnKind} />
               ) : <p className="mini">{returnKind === "none" ? "Nothing to integrate." : "Available once the revision has been sent to the authority."}</p>}
             </div>
-          </section>
+          </section>}
           {linkCard}
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Changed chapters in this revision</span><span className="mini">{changedCount}</span></div>

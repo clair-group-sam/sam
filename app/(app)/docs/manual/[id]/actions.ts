@@ -51,3 +51,22 @@ export async function toggleFavourite(formData: FormData) {
   else await db.from("manual_favourites").insert({ person_id: s.person.id, manual_id: manualId });
   revalidatePath(`/docs/manual/${manualId}`); revalidatePath("/docs/lib");
 }
+
+/** Nature of the document (Compliance only): regulated manual (DOC-09 cycle, authority route) or internal document (reviewed, published by its author). */
+export async function setNature(formData: FormData) {
+  const manualId = String(formData.get("manual_id") ?? "");
+  const internal = String(formData.get("nature") ?? "") === "internal";
+  const s = await getSession();
+  if (!s || !isCmm(s)) return;
+  const db = supabaseAdmin();
+  const { data: m } = await db.from("manuals").select("id,entity,code,internal").eq("id", manualId).maybeSingle();
+  if (!m) return;
+  const manual = m as { id: string; entity: string; code: string; internal: boolean };
+  if (!s.group && !s.entities.includes(manual.entity)) return;
+  if (manual.internal === internal) return;
+  await db.from("manuals").update({ internal }).eq("id", manual.id);
+  await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: manual.entity, object_type: "manual", object_id: manual.id, action: "nature", before: { internal: manual.internal }, after: { internal, code: manual.code } });
+  revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/lib"); revalidatePath("/docs/drafts");
+  const { data: revs } = await db.from("revisions").select("id").eq("manual_id", manual.id);
+  for (const r of (revs ?? []) as { id: string }[]) revalidatePath(`/docs/editor/${r.id}`);
+}
