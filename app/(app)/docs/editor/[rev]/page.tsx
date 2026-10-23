@@ -53,10 +53,10 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const parts = partsOf(metas.map((x) => x.ref));
   const colorOf = Object.fromEntries(parts.map((p) => [p.key, p.color]));
   const changedCount = metas.filter((x) => x.changed).length;
-  const { data: roundsData } = cmm ? await sb.from("authority_rounds").select("*").eq("revision_id", rev.id).order("at") : { data: [] };
+  const { data: roundsData } = await supabaseAdmin().from("authority_rounds").select("*").eq("revision_id", rev.id).order("at");
   const rounds = (roundsData ?? []) as Round[];
   // PRJ-01: the authority file that carries this revision's application (opened automatically when the revision leaves for the authority)
-  const { data: afData } = cmm ? await supabaseAdmin().from("authority_files").select("id,stage,portal_ref,type_code").eq("revision_id", rev.id).not("stage", "in", "(closed,standby)").order("created_at", { ascending: false }).limit(1).maybeSingle() : { data: null };
+  const { data: afData } = await supabaseAdmin().from("authority_files").select("id,stage,portal_ref,type_code").eq("revision_id", rev.id).not("stage", "in", "(closed,standby)").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const authFile = afData as { id: string; stage: Stage; portal_ref: string | null; type_code: string } | null;
   const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository, rev.authority_route, internal);
   // DOC-03: what the authority sends back, and whether it is in
@@ -97,11 +97,11 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const route = rev.authority_route;
   const wfRows: StepRow[] = [
     { step: "approved_np", label: `Approve (${ownerPost ?? "author"})`, who: ownerWho, detail: `The owner of the manual${ownerPost && !["CMM", "SM"].includes(ownerPost) ? " (nominated person)" : ""} validates the content and hands over to Compliance.`, done: doneAt("approved_np") },
-    { step: "approved_compliance", label: "Approve (Compliance)", who: cmmWho, detail: "Checked against the requirements; the authority route is decided here.", done: doneAt("approved_compliance") },
-    ...(manual.needs_signature ? [{ step: "signed", label: "Sign", who: signWho, done: doneAt("signed") }] : []),
-    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance.", skipped: route === "none" ? "not required — no authority route for this revision" : undefined, done: doneAt("with_civil_aviation") },
-    { step: "published", label: "Publish", who: "Compliance", detail: "Readers are notified; reading is tracked per reader.", done: doneAt("published") },
-    ...(manual.to_tmcad_repository ? [{ step: "repository", label: "TM-CAD repository", who: "Compliance", done: doneAt("repository") }] : []),
+    { step: "approved_compliance", label: "Approve (Compliance)", who: cmmWho, locked: !cmm, detail: "Checked against the requirements; the authority route is decided here.", done: doneAt("approved_compliance") },
+    ...(manual.needs_signature ? [{ step: "signed", label: "Sign", who: signWho, locked: !cmm, done: doneAt("signed") }] : []),
+    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, locked: !cmm, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance.", skipped: route === "none" ? "not required — no authority route for this revision" : undefined, done: doneAt("with_civil_aviation") },
+    { step: "published", label: "Publish", who: "Compliance", locked: !cmm, detail: "Readers are notified; reading is tracked per reader.", done: doneAt("published") },
+    ...(manual.to_tmcad_repository ? [{ step: "repository", label: "TM-CAD repository", who: "Compliance", locked: !cmm, done: doneAt("repository") }] : []),
   ];
   const routeHint = (rev.step === "approved_compliance" || rev.step === "signed") && !route ? (cmm ? "Decide the authority route (card on the right) to continue." : "Waiting for Compliance to decide the authority route.") : null;
 
@@ -120,7 +120,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
       <div className="tabs mb-4">
         {tabs.map(([k, l]) => <Link key={k} href={`/docs/editor/${rev.id}?tab=${k}${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`} className={"tab" + (tab === k ? " on" : "")}>{l}</Link>)}
         <span className="nature ml-auto" title={internal ? "Internal document: no authority route, published by its author after the review" : "Regulated manual: DOC-09 cycle, authority route decided by Compliance"}>{internal ? "internal document" : "regulated manual"}</span>
-        {!cmm && !internal && <span className="mini">Authority route, publication and notice are handled by the Compliance department (DOC-06).</span>}
+        {!cmm && !internal && <span className="mini"><span className="lockpill">Compliance</span> marks what the Compliance department decides and validates (DOC-06) — shown to you, not editable.</span>}
       </div>
       {editable ? (
         <div className="draftbar mb-4"><div><b>Draft — Rev {rev.rev}</b> is the working copy, based on {baseLabel}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
@@ -216,7 +216,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <Workflow revisionId={rev.id} current={rev.step} rows={wfRows} transitions={transitions} routeHint={routeHint}
                 blockedNote={rev.step === "with_civil_aviation" && returnMissing ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}) — integrate it in the card below first.` : null} />
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
-              {cmm && (rev.authority_route === "approval" || rev.authority_route === "notification") && (
+              {(rev.authority_route === "approval" || rev.authority_route === "notification") && (
                 <p className="mini mt-3">Authority file: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
               )}
               {rounds.length > 0 && (<>
@@ -225,17 +225,16 @@ export default async function Editor({ params, searchParams }: { params: Promise
               </>)}
             </div>
           </section>
-          {!cmm && route && <section className="card"><div className="ch"><span className="eyebrow">Authority route · DOC-06</span><span className="pill">{route}</span></div><div className="cb mini">Decided by the Compliance department{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""}.</div></section>}
-          {cmm && <section className="card">
-            <div className="ch"><span className="eyebrow">Authority route · DOC-06</span>{rev.authority_route && <span className="pill">{rev.authority_route}</span>}</div>
+          <section className={"card" + (cmm ? "" : " locked")}>
+            <div className="ch"><span className="eyebrow">Authority route · DOC-06</span>{!cmm && <span className="lockpill">Compliance</span>}{rev.authority_route && <span className="pill">{rev.authority_route}</span>}</div>
             <div className="cb">
               {routeOpen
                 ? <RouteProposal revisionId={rev.id} initial={rev.route_proposal ?? null} route={rev.authority_route} authority={auth} />
                 : <p className="mini">Route: <b>{rev.authority_route ?? "none"}</b>{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""} — fixed once the revision is with the authority.</p>}
             </div>
-          </section>}
-          {cmm && <section className="card">
-            <div className="ch"><span className="eyebrow">Authority return · DOC-03</span><span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
+          </section>
+          <section className={"card" + (cmm ? "" : " locked")}>
+            <div className="ch"><span className="eyebrow">Authority return · DOC-03</span>{!cmm && <span className="lockpill">Compliance</span>}<span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
             <div className="cb">
               <p className="mini mb-3">Application / dossier reference: {rev.authority_ref || authFile?.portal_ref ? <b className="mono">{rev.authority_ref ?? authFile?.portal_ref}</b> : <i>none yet</i>} — {authFile ? <>from the <Link className="underline" href={`/proj/auth/${authFile.id}`}>authority file</Link>, filled when the submission is recorded there</> : "filled automatically from the authority file when the submission is recorded"}.</p>
               <form action={setReturnKind} className="flex items-center gap-2 mb-3">
@@ -259,7 +258,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
                   : <AuthorityReturn revisionId={rev.id} entity={manual.entity} code={manual.code} rev={rev.rev} kind={returnKind} />
               ) : <p className="mini">{returnKind === "none" ? "Nothing to integrate." : "Available once the revision has been sent to the authority."}</p>}
             </div>
-          </section>}
+          </section>
           {linkCard}
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Changed chapters in this revision</span><span className="mini">{changedCount}</span></div>

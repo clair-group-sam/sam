@@ -456,3 +456,11 @@ body:has(.pm){background:#e9eef2}
 .draftbar b{color:var(--navy)}
 .draftbar > div{flex:1;min-width:260px}
 .nature{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--slate5);border:1px solid var(--line);border-radius:999px;padding:1px 8px;background:#fff}
+
+/* Compliance-only cards and steps, shown to NPs but not editable: light hatching + lock pill (DOC-06) */
+.lockpill{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate6);border:1px solid var(--line);border-radius:999px;padding:1px 7px;background:#fff;vertical-align:middle}
+.lockpill:before{content:"🔒";font-size:9px}
+.card.locked{border-style:dashed;background:repeating-linear-gradient(135deg,#fff 0 12px,#f6f8fa 12px 24px)}
+.card.locked .cb{opacity:.72;pointer-events:none;user-select:text}
+.card.locked .ch{background:transparent}
+.wfrow.locked .wfbody{background:repeating-linear-gradient(135deg,transparent 0 12px,#f6f8fa 12px 24px);border-radius:8px;padding:2px 8px;margin:-2px -8px}

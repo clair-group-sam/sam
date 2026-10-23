@@ -4,7 +4,7 @@ import type { Transition } from "@/lib/revisions";
 import { moveStep } from "@/app/(app)/docs/editor/[rev]/actions";
 
 /** What the workflow card needs to know about one step: who does it, when it was done, and whether it applies. */
-export type StepRow = { step: string; label: string; who: string; detail?: string; skipped?: string; done?: { at: string; by: string | null } | null };
+export type StepRow = { step: string; label: string; who: string; detail?: string; skipped?: string; done?: { at: string; by: string | null } | null; /** validated by Compliance: shown with a lock to the others */ locked?: boolean };
 export type WorkflowProps = {
   revisionId: string; current: string; rows: StepRow[]; transitions: Transition[];
   /** Transition to "published" blocked while the authority's return is missing (DOC-03). */
@@ -29,10 +29,10 @@ export default function Workflow({ revisionId, current, rows, transitions, block
         const state = r.skipped ? "skip" : i <= idx ? "done" : r.step === nowRow?.step ? "now" : "next";
         const forward = state === "now" ? transitions.filter((t) => t.to === r.step) : [];
         return (
-          <div key={r.step} className={"wfrow " + state}>
+          <div key={r.step} className={"wfrow " + state + (r.locked && state !== "done" ? " locked" : "")}>
             <div className="wfdot"><i />{state === "done" ? "✓" : ""}</div>
             <div className="wfbody">
-              <div className="wfhead"><b>{r.label}</b><span className="mini">{r.skipped ?? r.who}</span></div>
+              <div className="wfhead"><b>{r.label}</b>{r.locked && state !== "done" && <span className="lockpill">Compliance</span>}<span className="mini">{r.skipped ?? r.who}</span></div>
               {r.detail && state !== "skip" && <div className="mini">{r.detail}</div>}
               {state === "done" && r.done && <div className="mini">done {r.done.at.slice(0, 10)}{r.done.by ? ` · ${r.done.by}` : ""}</div>}
               {state === "now" && !forward.length && <div className="mini">{routeHint ?? `Waiting for ${r.who}.`}</div>}
