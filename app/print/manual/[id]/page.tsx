@@ -39,8 +39,10 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
   const supersededBy = isPublished && published[0] && published[0].id !== current.id ? published[0] : null;
   const state: "published" | "archive" | "draft" = !isPublished ? "draft" : supersededBy ? "archive" : "published";
 
-  const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed").eq("revision_id", current.id).order("ord");
-  const sections = (sd ?? []) as Section[];
+  const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed,deleted_at").eq("revision_id", current.id).order("ord");
+  const sections = ((sd ?? []) as (Section & { deleted_at?: string | null })[]).filter((x) => !x.deleted_at);
+  const selfUids = new Map<string, string>();
+  for (const x of sections) { const u = (x.body as { uid?: string }).uid; if (u) selfUids.set(u, x.ref); }
 
   // figures: private bucket → one batch of signed URLs (10 min) instead of one redirect per image; no lazy loading in print
   const keys = new Set<string>();
@@ -71,10 +73,10 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
   // links: inside this manual → anchors of this PDF; other manuals → S.A.M. (which checks access); web addresses kept
   const hd = await headers();
   const origin = `${hd.get("x-forwarded-proto") ?? "https"}://${hd.get("x-forwarded-host") ?? hd.get("host")}`;
-  const idx = sections.some((x) => /\/reader\/#\//.test(x.body.html ?? "")) ? await linkIndex(supabaseAdmin()) : null;
+  const idx = sections.some((x) => /\/reader\/#\/|\/docs\/link\/ch\//.test(x.body.html ?? "")) ? await linkIndex(supabaseAdmin()) : null;
   const linkify = (h: string, isToc: boolean) => {
     let out = rewriteLinks(h, {
-      idx, selfManualId: manual.id, base: origin,
+      idx, selfManualId: manual.id, base: origin, selfUids,
       self: (ref) => (ref && chapters.has(ref) ? `#${chapters.get(ref)}` : null),
       textTarget: (inner) => { const t = target(inner); return t ? `#${t}` : null; },
     });

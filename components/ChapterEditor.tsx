@@ -8,12 +8,14 @@ import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
-import { saveSection, revertSection } from "@/app/(app)/docs/editor/[rev]/actions";
+import LinkExt from "@tiptap/extension-link";
+import LinkPicker, { type Chap } from "@/components/LinkPicker";
+import { saveSection, revertSection, uploadImage } from "@/app/(app)/docs/editor/[rev]/actions";
 import AiPanel from "@/components/AiPanel";
 
-type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string };
+type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string; manualId?: string; chapters?: Chap[] };
 
-export default function ChapterEditor({ revisionId, sectionId, refCode, title: title0, html, changed: changed0, editable: editable0, frozenBy = null, baseRevLabel = "the published revision" }: Props) {
+export default function ChapterEditor({ revisionId, sectionId, refCode, title: title0, html, changed: changed0, editable: editable0, frozenBy = null, baseRevLabel = "the published revision", manualId = "", chapters = [] }: Props) {
   const editable = editable0 && !frozenBy;
   const router = useRouter();
   const [title, setTitle] = useState(title0);
@@ -23,9 +25,12 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const [msg, setMsg] = useState("");
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [ai, setAi] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const baseNorm = useRef<string | null>(null);
   const editor = useEditor({
-    extensions: [StarterKit, Image.configure({ inline: false }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
+    extensions: [StarterKit, Image.configure({ inline: false }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
+      LinkExt.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } })],
     content: html,
     editable,
     immediatelyRender: false,
@@ -62,6 +67,21 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     if (r.ok) { editor.commands.setContent(r.html ?? "", false); baseNorm.current = editor.getHTML(); setDirty(false); setChanged(false); setMsg("Chapter reverted"); router.refresh(); } else setMsg(r.error ?? "Error");
   }
   if (!editor) return <div className="cb text-slate6">Loading editor…</div>;
+  function pickLink(href: string, label: string) {
+    if (!editor) return;
+    const { empty } = editor.state.selection;
+    if (empty && !editor.isActive("link")) editor.chain().focus().insertContent({ type: "text", text: label, marks: [{ type: "link", attrs: { href } }] }).insertContent(" ").run();
+    else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+    setLinking(false);
+  }
+  async function addImage(f: File | null) {
+    if (!f || !editor) return;
+    setMsg("Uploading the image…");
+    const b64 = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] ?? ""); r.readAsDataURL(f); });
+    const r = await uploadImage({ revisionId, name: f.name, type: f.type, b64 });
+    if (r.ok && r.src) { editor.chain().focus().setImage({ src: r.src, alt: f.name }).run(); setMsg("Image inserted — save the chapter"); } else setMsg(r.error ?? "Upload failed");
+    if (fileRef.current) fileRef.current.value = "";
+  }
   const B = ({ on, act, label, title }: { on?: boolean; act: () => void; label: string; title?: string }) => (
     <button type="button" className={"tb" + (on ? " on" : "")} onMouseDown={(e) => { e.preventDefault(); act(); }} title={title ?? label} disabled={!editable}>{label}</button>
   );
@@ -94,6 +114,10 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <B label="− Col" act={() => editor.chain().focus().deleteColumn().run()} />
           <B label="✕ Table" act={() => editor.chain().focus().deleteTable().run()} />
           <span className="sep" />
+          <B label="🔗 Link" title="Link to a chapter, another manual or a web address" on={editor.isActive("link") || linking} act={() => setLinking((v) => !v)} />
+          <B label="🖼 Image" title="Insert an image (PNG, JPG…)" act={() => fileRef.current?.click()} />
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void addImage(e.target.files?.[0] ?? null)} />
+          <span className="sep" />
           <B label="↶" title="Undo" act={() => editor.chain().focus().undo().run()} />
           <B label="↷" title="Redo" act={() => editor.chain().focus().redo().run()} />
           <span className="sep" />
@@ -108,6 +132,8 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           </button>
         </div>
       )}
+      {linking && editable && <LinkPicker manualId={manualId} chapters={chapters} initialUrl={editor.getAttributes("link").href as string | undefined}
+        onPick={pickLink} onRemove={() => { editor.chain().focus().extendMarkRange("link").unsetLink().run(); setLinking(false); }} onClose={() => setLinking(false)} />}
       <div className={"edsplit" + (ai ? " withai" : "")}>
         <div className="edbody">
           <EditorContent editor={editor} className="reader" />

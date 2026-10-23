@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!rev || q.length < 2) return Response.json({ hits: [] });
   const sb = await supabaseServer();
-  const { data } = await sb.from("revision_sections").select("ref,title,body_text,ord").eq("revision_id", rev).textSearch("body_text", q, { type: "websearch", config: "simple" }).order("ord").limit(40);
+  const { data } = await sb.from("revision_sections").select("ref,title,body_text,ord").eq("revision_id", rev).is("deleted_at", null).textSearch("body_text", q, { type: "websearch", config: "simple" }).order("ord").limit(40);
   const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !/^[-"]/.test(w)).map((w) => w.replace(/"/g, ""));
   // one line per chapter: number of occurrences and the first short excerpt
   const hits = ((data ?? []) as { ref: string; title: string | null; body_text: string; ord: number }[]).map((s) => {

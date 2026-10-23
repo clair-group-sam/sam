@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
@@ -34,7 +35,7 @@ export async function createManual(formData: FormData) {
     const mm = /^([A-Z]{0,2}\d+(?:\.\d+)*)\s*[-–.:]?\s+(.+)$/.exec(l);
     const ref = mm ? mm[1] : String(++n);
     const t = mm ? mm[2] : l;
-    return { revision_id: r.id, ord: ord + 1, ref, title: t, changed: true, body: { html: "<p></p>", text: "", headings: [], structured: true, base_html: "", base_norm: null } };
+    return { revision_id: r.id, ord: ord + 1, ref, title: t, changed: true, body: { html: "<p></p>", text: "", headings: [], structured: true, base_html: "", base_norm: null, uid: randomUUID() } };
   });
   await db.from("revision_sections").insert(rows);
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "manual", object_id: m.id, action: "manual_created", after: { code, title, owner, internal, chapters: rows.length } });

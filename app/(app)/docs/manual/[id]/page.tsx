@@ -36,11 +36,14 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const current = (rev ? revs.find((r) => r.id === rev) : null) ?? published[0] ?? working ?? null;
 
   let sections: Section[] = [];
+  const selfUids = new Map<string, string>();
   let readings: Reading[] = [];
   let mine: Reading | null = null;
   if (current) {
-    const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,changed,headings:body->headings,structured:body->structured,pages:body->pages").eq("revision_id", current.id).order("ord");
-    sections = ((sd ?? []) as unknown as (Omit<Section, "body"> & { headings: Heading[] | null; structured: boolean | null; pages: string[] | null })[]).map((x) => ({ id: x.id, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { headings: x.headings ?? undefined, structured: !!x.structured, pages: x.pages ?? undefined } }));
+    const { data: sd } = await sb.from("revision_sections").select("id,ord,ref,title,changed,deleted_at,uid:body->>uid,headings:body->headings,structured:body->structured,pages:body->pages").eq("revision_id", current.id).order("ord");
+    const live = ((sd ?? []) as unknown as (Omit<Section, "body"> & { deleted_at: string | null; uid: string | null; headings: Heading[] | null; structured: boolean | null; pages: string[] | null })[]).filter((x) => !x.deleted_at);
+    for (const x of live) if (x.uid) selfUids.set(x.uid, x.ref);
+    sections = live.map((x) => ({ id: x.id, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { headings: x.headings ?? undefined, structured: !!x.structured, pages: x.pages ?? undefined } }));
     const { data: rd } = await sb.from("readings").select("person_id,acknowledged_at,via,people(display_name,job_title)").eq("revision_id", current.id);
     readings = (rd ?? []) as unknown as Reading[];
     mine = readings.find((r) => r.person_id === s.person?.id) ?? null;
@@ -71,7 +74,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const srcHtml = activeStructured?.html ?? "";
   const linked = /<a\b/i.test(srcHtml)
     ? rewriteLinks(srcHtml, {
-        idx: /\/reader\/#\//.test(srcHtml) ? await linkIndex(supabaseAdmin()) : null, selfManualId: manual.id, base: "", newTab: true,
+        idx: /\/reader\/#\/|\/docs\/link\/ch\//.test(srcHtml) ? await linkIndex(supabaseAdmin()) : null, selfManualId: manual.id, base: "", newTab: true, selfUids,
         self: (ref) => (ref ? `${base}&sec=${encodeURIComponent(ref)}` : null), textTarget: refHref,
       })
     : srcHtml;
@@ -80,18 +83,27 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const canAudience = isCmm(s) || ownsManual(s, manual.owner_role);
 
   // What changed: each changed chapter against the revision it was based on (else the previous published one)
-  type Change = { id: string; ref: string; title: string | null; rows: Row[] | null; passages: string[] };
+  type Change = { id: string; ref: string; title: string | null; note: string; rows: Row[] | null; passages: string[] };
   let changes: Change[] = []; let baseRevLabel = "";
   if (tab === "changed" && current) {
     const basedOn = (current as Revision & { based_on?: string | null }).based_on ?? null;
     const older = published.filter((r) => r.id !== current.id && (!current.published_at || (r.published_at ?? "") <= current.published_at));
     const base = (basedOn ? revs.find((r) => r.id === basedOn) : null) ?? (current.step === "published" || current.step === "repository" ? older[0] : published[0]) ?? null;
     baseRevLabel = base ? `Rev ${base.rev}` : "";
-    const { data: cd } = await sb.from("revision_sections").select("id,ref,title,body").eq("revision_id", current.id).eq("changed", true).order("ord");
-    const cur = (cd ?? []) as Section[];
-    const baseMap = new Map<string, string>();
-    if (base && cur.length) { const { data: bd } = await sb.from("revision_sections").select("ref,body").eq("revision_id", base.id).in("ref", cur.map((c) => c.ref)); for (const b of (bd ?? []) as Section[]) baseMap.set(b.ref, b.body.html ?? ""); }
-    changes = cur.map((c) => { const after = c.body.html ?? ""; const before = baseMap.get(c.ref); return { id: c.id, ref: c.ref, title: c.title, rows: before !== undefined ? diffBlocks(before, after) : null, passages: before === undefined ? revbarPassages(after) : [] }; });
+    const { data: cd } = await sb.from("revision_sections").select("id,ref,title,body,base_ref,deleted_at").eq("revision_id", current.id).eq("changed", true).order("ord");
+    const cur = (cd ?? []) as (Section & { base_ref?: string | null; deleted_at?: string | null })[];
+    const baseByUid = new Map<string, string>(), baseByRef = new Map<string, string>();
+    if (base && cur.length) {
+      const { data: bd } = await sb.from("revision_sections").select("ref,body").eq("revision_id", base.id);
+      for (const b of (bd ?? []) as Section[]) { const u = (b.body as { uid?: string }).uid; if (u) baseByUid.set(u, b.body.html ?? ""); baseByRef.set(b.ref, b.body.html ?? ""); }
+    }
+    changes = cur.map((c) => {
+      const after = c.deleted_at ? "" : c.body.html ?? "";
+      const u = (c.body as { uid?: string }).uid;
+      const before = (u ? baseByUid.get(u) : undefined) ?? baseByRef.get(c.base_ref ?? c.ref);
+      const note = c.deleted_at ? `Deleted in Rev ${current.rev}` : !c.base_ref && basedOn ? "New chapter" : c.base_ref && c.base_ref !== c.ref ? `Renumbered — was ${c.base_ref}` : "";
+      return { id: c.id, ref: c.ref, title: c.title, note, rows: before !== undefined ? diffBlocks(before, after) : null, passages: before === undefined ? revbarPassages(after) : [] };
+    });
   }
 
   // Readers: who must read (audience) and who has acknowledged
@@ -129,6 +141,13 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
           {mine?.acknowledged_at && <span className="pill green">Read · {mine.acknowledged_at.slice(0, 10)}</span>}
         </>} />
 
+      {current && !(current.step === "published" || current.step === "repository") && (
+        <div className="previewbar mb-4">
+          <div><b>Preview — Rev {current.rev} is not published</b> ({STEP_LABEL[current.step]}). This is how readers will see it once published{published[0] ? `; today they read Rev ${published[0].rev}` : ""}.</div>
+          {(isCmm(s) || ownsManual(s, manual.owner_role)) && <Link className="btn primary" href={`/docs/editor/${current.id}?tab=write${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`}>‹ Back to the draft</Link>}
+          {published[0] && <Link className="btn" href={`/docs/manual/${manual.id}`}>Published version</Link>}
+        </div>
+      )}
       {current && (current.step === "published" || current.step === "repository") && tab !== "history" && (
         <div className="statusline mb-4">
           <span className="pill green">Published · Iss {current.issue} Rev {current.rev}{current.published_at ? ` · ${current.published_at}` : ""}</span>
@@ -164,7 +183,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             {!changes.length && <p className="mini">No chapter is marked as changed in this revision.</p>}
             {changes.map((c) => (
               <div key={c.id} className="wchg">
-                <div className="wchg-h"><span className="mono">{c.ref}</span> <b>{c.title}</b><Link className="mini underline ml-auto" href={`/docs/manual/${manual.id}?rev=${current?.id}&sec=${encodeURIComponent(c.ref)}`}>Open the chapter ›</Link></div>
+                <div className="wchg-h"><span className="mono">{c.ref}</span> <b>{c.title}</b>{c.note && <span className="pill amber">{c.note}</span>}<Link className="mini underline ml-auto" href={`/docs/manual/${manual.id}?rev=${current?.id}&sec=${encodeURIComponent(c.ref)}`}>Open the chapter ›</Link></div>
                 {c.rows ? <DiffTable rows={c.rows} left={baseRevLabel} right={`Rev ${current?.rev}`} />
                   : c.passages.length ? <div className="wchg-pass"><div className="mini mb-1">Passages marked as revised by the publisher (no previous text in S.A.M.):</div>{c.passages.map((t, i) => <p key={i} className="ins">{t}</p>)}</div>
                   : <p className="mini">New chapter, or no previous text available in S.A.M.</p>}

@@ -344,3 +344,18 @@ body:has(.pm){background:#e9eef2}
 .btn.save.clean{background:#eaf6ee;border-color:#bfe3cb;color:#1e7a3c;opacity:1;cursor:default}
 .btn.save.busy{background:var(--navy);border-color:var(--navy);color:#fff;opacity:.8}
 .savestate.dirty{color:#c2410c;font-weight:700}
+
+/* chapter tools, link picker, preview banner */
+.chtools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--line);background:#fbfdfe}
+.chtools .btn{padding:5px 10px;font-size:12px}
+.chadd{display:flex;gap:6px;width:100%;margin-top:4px}.chadd .inp{flex:1}
+.tocch.deleted{text-decoration:line-through;opacity:.55}
+.lpick{border:1px solid var(--line);border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(13,42,63,.12);padding:10px;margin:8px 14px}
+.lpick .tab{padding:5px 10px;font-size:12.5px}
+.lplist{max-height:260px;overflow:auto;display:flex;flex-direction:column}
+.lplist button{text-align:left;padding:6px 8px;border-radius:6px;font-size:13px}
+.lplist button:hover{background:var(--blue05)}
+.reader a[href]{color:#0e6fa8;text-decoration:underline;text-underline-offset:2px}
+.previewbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:10px;border:1px solid #f1c27d;color:#7a4a00;
+  background:repeating-linear-gradient(135deg,#fff6e6 0 14px,#fdefd6 14px 28px)}
+.previewbar > div{flex:1;min-width:260px;font-size:13.5px}

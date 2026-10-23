@@ -13,6 +13,8 @@ import { TRANSITIONS, isCmm, nextRev, ownsManual, UNDER_REVIEW, EDITING } from "
 import { frozenRefs } from "@/lib/revisions-server";
 import { callClaude, parseJsonBlock, userPromptFor, type AiAgent } from "@/lib/ai";
 import { stripHtml } from "@/lib/docs";
+import { blockOf, parentOf, renumber, type Ch } from "@/lib/chapters";
+import { randomUUID } from "crypto";
 
 async function guard(revisionId: string) {
   const s = await getSession();
@@ -45,8 +47,8 @@ export async function startRevision(formData: FormData) {
   const newRev = nextRev(base.rev);
   const { data: created, error } = await db.from("revisions").insert({ manual_id: manual.id, issue: base.issue, rev: newRev, step: "draft", authority_route: base.authority_route, summary: "", created_by: s.person?.id ?? null, step_changed_by: s.person?.id ?? null, based_on: base.id }).select("id").single();
   if (error || !created) throw new Error(error?.message ?? "not created");
-  const { data: secs } = await db.from("revision_sections").select("ord,ref,title,body").eq("revision_id", base.id).order("ord");
-  const rows = ((secs ?? []) as Section[]).map((x) => ({ revision_id: created.id, ord: x.ord, ref: x.ref, title: x.title, changed: false, body: { ...x.body, base_norm: null, base_html: x.body.html ?? "" } }));
+  const { data: secs } = await db.from("revision_sections").select("ord,ref,title,body,deleted_at").eq("revision_id", base.id).order("ord");
+  const rows = ((secs ?? []) as (Section & { deleted_at?: string | null })[]).filter((x) => !x.deleted_at).map((x, n) => ({ revision_id: created.id, ord: n + 1, ref: x.ref, base_ref: x.ref, title: x.title, changed: false, body: { ...x.body, uid: (x.body as { uid?: string }).uid ?? randomUUID(), base_norm: null, base_html: x.body.html ?? "" } }));
   for (let i = 0; i < rows.length; i += 20) await db.from("revision_sections").insert(rows.slice(i, i + 20));
   await audit(db, s.person?.id ?? null, manual.entity, created.id, "revision_started", { code: manual.code, rev: newRev, based_on: base.rev, parallel: !!underReview, sections: rows.length });
   revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/drafts");
@@ -294,4 +296,126 @@ export async function reviewRevision(input: { revisionId: string }): Promise<{ o
     revalidatePath(`/docs/editor/${rev.id}`);
     return { ok: true, review };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+
+// ── Chapter tools (draft only): add after / add sub-chapter / move / delete / restore, then automatic renumbering ──
+type Row = Ch & { title: string | null; changed: boolean; base_ref: string | null; deleted_at: string | null; revision_id: string };
+async function structure(revisionId: string, op: (list: Row[], db: ReturnType<typeof supabaseAdmin>) => Promise<string | void>): Promise<{ ok: boolean; error?: string; focus?: string }> {
+  try {
+    const { s, db, rev, manual, may } = await guard(revisionId);
+    if (!may) return { ok: false, error: "Owner or Compliance only." };
+    if (rev.step !== "draft") return { ok: false, error: "Chapters can only be changed in a draft." };
+    const { data } = await db.from("revision_sections").select("id,ord,ref,title,changed,base_ref,deleted_at,revision_id").eq("revision_id", rev.id).order("ord");
+    const list = ((data ?? []) as Row[]).map((x) => ({ ...x, deleted: !!x.deleted_at }));
+    const focus = (await op(list, db)) ?? undefined;
+    const { data: again } = await db.from("revision_sections").select("id,ord,ref,title,changed,base_ref,deleted_at,revision_id").eq("revision_id", rev.id).order("ord");
+    const now = ((again ?? []) as Row[]).map((x) => ({ ...x, deleted: !!x.deleted_at }));
+    const refs = renumber(now);
+    const upd = now.map((x, i) => {
+      const ref = refs.get(x.id) ?? x.ref;
+      const changed = x.changed || !x.base_ref || (!x.deleted && ref !== x.base_ref);
+      return { id: x.id, revision_id: x.revision_id, ord: i + 1, ref, changed };
+    }).filter((u, i) => u.ord !== now[i].ord || u.ref !== now[i].ref || u.changed !== now[i].changed);
+    if (upd.length) { const { error } = await db.from("revision_sections").upsert(upd, { onConflict: "id" }); if (error) return { ok: false, error: error.message }; }
+    await audit(db, s.person?.id ?? null, manual.entity, rev.id, "chapters_restructured", { code: manual.code, rev: rev.rev, renumbered: upd.filter((u) => now.find((x) => x.id === u.id)?.ref !== u.ref).length });
+    revalidatePath(`/docs/editor/${rev.id}`);
+    const f = focus ? now.find((x) => x.id === focus) : null;
+    return { ok: true, focus: f ? refs.get(f.id) ?? f.ref : undefined };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+async function shiftOrds(db: ReturnType<typeof supabaseAdmin>, list: Row[], fromIndex: number, by: number) {
+  // contiguous order with a gap of `by` places at fromIndex
+  const rows = list.map((x, k) => ({ id: x.id, revision_id: x.revision_id, ord: k < fromIndex ? k + 1 : k + 1 + by, ref: x.ref }));
+  if (rows.length) await db.from("revision_sections").upsert(rows, { onConflict: "id" });
+}
+export async function addChapter(input: { revisionId: string; sectionId: string; mode: "after" | "child"; title: string }) {
+  return structure(input.revisionId, async (list, db) => {
+    const i = list.findIndex((x) => x.id === input.sectionId);
+    if (i < 0) throw new Error("Chapter not found");
+    const [, end] = blockOf(list, i);
+    const ref = input.mode === "child" ? `${list[i].ref}.9999` : (parentOf(list[i].ref) ? `${parentOf(list[i].ref)}.9999` : "9999");
+    await shiftOrds(db, list, end, 1);
+    const id = randomUUID();
+    const { error } = await db.from("revision_sections").insert({ id, revision_id: input.revisionId, ord: end + 1, ref, title: input.title.trim() || "New chapter", changed: true, base_ref: null, body: { html: "<p></p>", text: "", headings: [], structured: true, base_html: "", base_norm: null, uid: randomUUID() } });
+    if (error) throw new Error(error.message);
+    return id;
+  });
+}
+export async function moveChapter(input: { revisionId: string; sectionId: string; dir: "up" | "down" }) {
+  return structure(input.revisionId, async (list, db) => {
+    const i = list.findIndex((x) => x.id === input.sectionId);
+    if (i < 0) throw new Error("Chapter not found");
+    const [a, b] = blockOf(list, i);
+    const p = parentOf(list[i].ref);
+    const sib = (k: number) => !list[k].deleted && parentOf(list[k].ref) === p && list[k].ref.split(".").length === list[i].ref.split(".").length;
+    let order: Row[];
+    if (input.dir === "up") {
+      let k = a - 1; while (k >= 0 && !sib(k)) k--;
+      if (k < 0) throw new Error("Already the first chapter at this level.");
+      order = [...list.slice(0, k), ...list.slice(a, b), ...list.slice(k, a), ...list.slice(b)];
+    } else {
+      let k = b; while (k < list.length && !sib(k)) k++;
+      if (k >= list.length) throw new Error("Already the last chapter at this level.");
+      const [, kb] = blockOf(list, k);
+      order = [...list.slice(0, a), ...list.slice(b, kb), ...list.slice(a, b), ...list.slice(kb)];
+    }
+    await db.from("revision_sections").upsert(order.map((x, n) => ({ id: x.id, revision_id: x.revision_id, ord: n + 1, ref: x.ref })), { onConflict: "id" });
+    return input.sectionId;
+  });
+}
+/** A chapter of the base revision is kept as "deleted in this revision"; a chapter created in this draft is removed. Sub-chapters follow. */
+export async function deleteChapter(input: { revisionId: string; sectionId: string }) {
+  return structure(input.revisionId, async (list, db) => {
+    const i = list.findIndex((x) => x.id === input.sectionId);
+    if (i < 0) throw new Error("Chapter not found");
+    if (list.filter((x) => !x.deleted).length <= 1) throw new Error("A manual keeps at least one chapter.");
+    const [a, b] = blockOf(list, i);
+    for (const x of list.slice(a, b)) {
+      if (x.base_ref) await db.from("revision_sections").update({ deleted_at: new Date().toISOString(), changed: true }).eq("id", x.id);
+      else await db.from("revision_sections").delete().eq("id", x.id);
+    }
+    const next = list.slice(b).find((x) => !x.deleted) ?? list.slice(0, a).reverse().find((x) => !x.deleted);
+    return next?.id;
+  });
+}
+export async function restoreChapter(input: { revisionId: string; sectionId: string }) {
+  return structure(input.revisionId, async (list, db) => {
+    const x = list.find((y) => y.id === input.sectionId);
+    if (!x) throw new Error("Chapter not found");
+    await db.from("revision_sections").update({ deleted_at: null }).eq("id", x.id);
+    return x.id;
+  });
+}
+
+/** Images inserted by the author: stored with the manual, served through S.A.M. (scope check). */
+export async function uploadImage(input: { revisionId: string; name: string; type: string; b64: string }): Promise<{ ok: boolean; src?: string; error?: string }> {
+  try {
+    const { db, rev, manual, may } = await guard(input.revisionId);
+    if (!may || rev.step !== "draft") return { ok: false, error: "Draft only." };
+    if (!/^image\/(png|jpe?g|gif|webp|svg\+xml)$/.test(input.type)) return { ok: false, error: "PNG, JPG, GIF, WebP or SVG only." };
+    const bin = Buffer.from(input.b64, "base64");
+    if (bin.length > 8 * 1024 * 1024) return { ok: false, error: "Image larger than 8 MB." };
+    const ext = input.type.includes("png") ? "png" : input.type.includes("gif") ? "gif" : input.type.includes("webp") ? "webp" : input.type.includes("svg") ? "svg" : "jpg";
+    const path = `${manual.entity}/${manual.code}/${rev.rev}/img-${Date.now()}.${ext}`;
+    const { error } = await db.storage.from("manuals").upload(path, bin, { contentType: input.type, upsert: false });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, src: `/api/files/manuals/${path}` };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+}
+
+/** Link picker: manuals in the user's scope and the chapters of their current revision (stable chapter ids). */
+export async function linkTargets(input: { manualId?: string }): Promise<{ manuals: { id: string; entity: string; code: string; title: string }[]; chapters: { ref: string; title: string | null; uid: string }[] }> {
+  const s = await getSession();
+  if (!s) return { manuals: [], chapters: [] };
+  const db = supabaseAdmin();
+  let q = db.from("manuals").select("id,entity,code,title").order("entity").order("code");
+  if (!s.group) q = q.in("entity", s.entities);
+  const { data: ms } = await q;
+  const manuals = (ms ?? []) as { id: string; entity: string; code: string; title: string }[];
+  let chapters: { ref: string; title: string | null; uid: string }[] = [];
+  if (input.manualId && manuals.some((m) => m.id === input.manualId)) {
+    const { data: r } = await db.from("revisions").select("id").eq("manual_id", input.manualId).in("step", ["published", "repository"]).order("published_at", { ascending: false }).limit(1).maybeSingle();
+    if (r) { const { data: cs } = await db.from("revision_sections").select("ref,title,uid:body->>uid,deleted_at").eq("revision_id", r.id).order("ord"); chapters = ((cs ?? []) as { ref: string; title: string | null; uid: string; deleted_at: string | null }[]).filter((c) => !c.deleted_at && c.uid).map(({ ref, title, uid }) => ({ ref, title, uid })); }
+  }
+  return { manuals, chapters };
 }

@@ -8,6 +8,8 @@ import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Se
 import { allowedTransitions, expectedReturn, isCmm, ownsManual, RETURN_LABEL, type ReturnKind } from "@/lib/revisions";
 import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review } from "./actions";
 import ReviewPanel from "@/components/ReviewPanel";
+import ChapterTools from "@/components/ChapterTools";
+import { checkLinks } from "@/lib/links";
 import AuthorityReturn from "@/components/AuthorityReturn";
 import RouteProposal from "@/components/RouteProposal";
 import { ENT } from "@/lib/nav";
@@ -15,7 +17,7 @@ import { frozenRefs } from "@/lib/revisions-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type Round = { id: string; at: string; direction: string; who: string; note: string };
-type Meta = { id: string; ord: number; ref: string; title: string | null; changed: boolean; conflict: { base_html: string; base_rev: string } | null };
+type Meta = { id: string; ord: number; ref: string; title: string | null; changed: boolean; conflict: { base_html: string; base_rev: string } | null; deleted_at: string | null; base_ref: string | null; uid: string | null };
 
 export default async function Editor({ params, searchParams }: { params: Promise<{ rev: string }>; searchParams: Promise<{ tab?: string; sec?: string }> }) {
   const { rev: revId } = await params;
@@ -33,12 +35,12 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const cmm = isCmm(s), owner = ownsManual(s, manual.owner_role);
   if (!cmm && !owner) notFound();
   const editable = rev.step === "draft";
-  const { data: metaData } = await sb.from("revision_sections").select("id,ord,ref,title,changed,conflict").eq("revision_id", rev.id).order("ord");
+  const { data: metaData } = await sb.from("revision_sections").select("id,ord,ref,title,changed,conflict,deleted_at,base_ref,uid:body->>uid").eq("revision_id", rev.id).order("ord");
   const frozen = await frozenRefs(supabaseAdmin(), rev);
   const { data: baseRow } = rev.based_on ? await sb.from("revisions").select("rev,step").eq("id", rev.based_on).maybeSingle() : { data: null };
   const baseLabel = baseRow ? `Rev ${(baseRow as { rev: string }).rev}` : "the published revision";
   const metas = (metaData ?? []) as Meta[];
-  const activeMeta = metas.find((x) => x.ref === sec) ?? metas.find((x) => x.ord === 1) ?? metas[0] ?? null;
+  const activeMeta = metas.find((x) => x.ref === sec && !x.deleted_at) ?? metas.find((x) => x.ref === sec) ?? metas.find((x) => !x.deleted_at) ?? metas[0] ?? null;
   let active: Section | null = null;
   if (activeMeta) { const { data: one } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed,conflict").eq("id", activeMeta.id).maybeSingle(); active = (one as Section | null) ?? null; }
   const activeConflict = (active as (Section & { conflict?: { base_html: string; base_rev: string } | null }) | null)?.conflict ?? null;
@@ -58,6 +60,14 @@ export default async function Editor({ params, searchParams }: { params: Promise
   if (cmm && retPages.length) { const { data: su } = await admin.storage.from("manuals").createSignedUrls(retPages.map((x) => x.path), 600); for (const x of su ?? []) if (x.path && x.signedUrl) retUrls.set(x.path, x.signedUrl); }
   const { data: noticeData } = cmm || (internal && owner) ? await admin.from("manual_notices").select("sent_at,recipients,emailed,email_status").eq("revision_id", rev.id).order("sent_at") : { data: [] };
   const notices = (noticeData ?? []) as { sent_at: string; recipients: number; emailed: number; email_status: string | null }[];
+  const broken = tab === "publish" ? await checkLinks(admin, rev.id, manual.id) : [];
+  const linkCard = (
+    <section className="card col-span-2">
+      <div className="ch"><span className="eyebrow">Links check</span><span className={"pill " + (broken.length ? "amber" : "green")}>{broken.length ? `${broken.length} to fix` : "all links resolve"}</span></div>
+      <div className="cb">{broken.length ? <table className="tbl"><tbody>{broken.map((b, i) => <tr key={i}><td className="mono" style={{ width: 80 }}><Link className="underline" href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(b.chapter)}`}>{b.chapter}</Link></td><td>“{b.text}”<div className="mini">{b.why}</div></td></tr>)}</tbody></table>
+        : <p className="mini">Every link to a chapter of this or another manual points to a chapter that exists.</p>}</div>
+    </section>
+  );
   const routeOpen = ["draft", "approved_np", "approved_compliance", "signed"].includes(rev.step);
   const auth = ENT[manual.entity]?.auth ?? "authority";
   const stepIdx = STEPS.indexOf(rev.step);
@@ -67,7 +77,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
     <>
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code} · revision editor`} title={`${manual.title} — Issue ${rev.issue} Rev ${rev.rev}`}
         sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_name ?? manual.owner_role}${internal ? " · internal document" : ""}${editable ? "" : " · read-only at this step"}`}
-        right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
+        right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
 
       <div className="steps mb-4">
         {STEPS.filter((st) => st !== "repository" || manual.to_tmcad_repository).map((st, i) => (
@@ -86,7 +96,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <div key={p.key} className="tocpart">
                 <div className="ph" style={{ color: p.color }}><i style={{ background: p.color }} />{p.label}</div>
                 {metas.filter((x) => partOf(x.ref) === p.key).map((x) => (
-                  <Link key={x.id} href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`} className={"tocch" + (active?.id === x.id ? " on" : "") + (x.changed ? " changed" : "")}>
+                  <Link key={x.id} href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`} className={"tocch" + (active?.id === x.id ? " on" : "") + (x.changed ? " changed" : "") + (x.deleted_at ? " deleted" : "")} title={x.deleted_at ? "deleted in this revision" : x.base_ref && x.base_ref !== x.ref ? `was ${x.base_ref}` : !x.base_ref && rev.based_on ? "new chapter" : undefined}>
                     <span className="badge" style={{ background: p.color }}>{x.ref}</span><span>{x.title}</span>
                     {x.conflict ? <b className="fold" style={{ color: "var(--terra)" }} title="conflict">!</b> : frozen.refs.has(x.ref) ? <b className="fold" title={`frozen · Rev ${frozen.baseRev}`}>🔒</b> : null}
                   </Link>
@@ -109,7 +119,10 @@ export default async function Editor({ params, searchParams }: { params: Promise
               </div>
             )}
             {active ? (
-              <ChapterEditor key={active.id} revisionId={rev.id} sectionId={active.id} refCode={active.ref} title={active.title ?? ""} html={active.body.html ?? ""} changed={active.changed} editable={editable && (cmm || owner)} frozenBy={frozen.refs.has(active.ref) ? frozen.baseRev : null} baseRevLabel={baseLabel} />
+              <>
+              {editable && (cmm || owner) && <ChapterTools revisionId={rev.id} sectionId={active.id} refCode={active.ref} deleted={!!activeMeta?.deleted_at} isNew={!activeMeta?.base_ref} />}
+              <ChapterEditor key={active.id} manualId={manual.id} chapters={metas.filter((x) => !x.deleted_at && x.uid).map((x) => ({ ref: x.ref, title: x.title, uid: x.uid! }))} revisionId={rev.id} sectionId={active.id} refCode={active.ref} title={active.title ?? ""} html={active.body.html ?? ""} changed={active.changed} editable={editable && (cmm || owner) && !activeMeta?.deleted_at} frozenBy={frozen.refs.has(active.ref) ? frozen.baseRev : null} baseRevLabel={baseLabel} />
+              </>
             ) : <div className="cb text-slate6">No chapter.</div>}
           </section>
         </div>
@@ -139,6 +152,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
             </div>
           </section>
+          {linkCard}
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Review before publication</span></div>
             <div className="cb"><ReviewPanel revisionId={rev.id} initial={rev.review ?? null} editable={rev.step === "draft"} /></div>
@@ -210,10 +224,11 @@ export default async function Editor({ params, searchParams }: { params: Promise
               ) : <p className="mini">{returnKind === "none" ? "Nothing to integrate." : "Available once the revision has been sent to the authority."}</p>}
             </div>
           </section>
+          {linkCard}
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Changed chapters in this revision</span><span className="mini">{changedCount}</span></div>
             <div className="cb">
-              {changedCount ? <ul className="list-disc pl-5">{metas.filter((x) => x.changed).map((x) => <li key={x.id}><Link className="underline" href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`}>{x.ref} {x.title}</Link></li>)}</ul> : <p className="mini">No chapter has been modified yet.</p>}
+              {changedCount ? <ul className="list-disc pl-5">{metas.filter((x) => x.changed).map((x) => <li key={x.id}><Link className="underline" href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`}>{x.ref} {x.title}</Link>{x.deleted_at ? <span className="mini"> — deleted</span> : !x.base_ref ? <span className="mini"> — new</span> : x.base_ref !== x.ref ? <span className="mini"> — was {x.base_ref}</span> : null}</li>)}</ul> : <p className="mini">No chapter has been modified yet.</p>}
             </div>
           </section>
         </div>
