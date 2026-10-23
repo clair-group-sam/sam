@@ -15,7 +15,7 @@ export type AuthorityFile = {
   trigger_kind: string | null; trigger_note: string | null; revision_id: string | null; finding_ref: string | null; aircraft_reg: string | null;
   np_post_code: string | null; moc_ref: string | null; outcome: string | null; rounds: number; fee: number | null; fee_currency: string | null;
   triggered_at: string; target_date: string | null; submitted_at: string | null; decision_at: string | null; closed_at: string | null;
-  lessons: string | null; created_by: string | null; created_at: string; updated_at: string;
+  lessons: string | null; created_by: string | null; created_at: string; updated_at: string; project_id?: string | null;
 };
 export type FileItem = { id: string; file_id: string; ord: number; key: string; label: string; role: string | null; required: boolean; done: boolean; done_by: string | null; done_at: string | null; note: string | null };
 export type FileEvent = { id: number; file_id: string; at: string; kind: string; who: string | null; note: string | null; meta: Record<string, unknown> | null };

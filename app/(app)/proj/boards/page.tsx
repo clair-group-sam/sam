@@ -2,47 +2,73 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { PageHeader } from "@/components/Page";
+import { PageHeader, Metric } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
-import { OPEN_STAGES, STAGE_LABEL, daysAtAuthority, fr, today, type AuthorityFile, type Stage } from "@/lib/authority";
+import { fr, today } from "@/lib/authority";
+import { PROJECT_STATUS_LABEL, progress, project as projectDates, projectedEnd, type Dep, type Project, type Task } from "@/lib/projects";
 
-const COLS: Stage[] = ["draft", "compliance", "signing", "ready", "submitted", "remarks", "approved", "published"];
-
-/** Projects › Boards: the open authority files as a board, one column per stage. */
-export default async function Boards({ searchParams }: { searchParams: Promise<{ entity?: string }> }) {
+/** Projects › Projects: every project of the entity (aircraft addition, NP change, new SPA…), its progress and what it waits for. */
+export default async function Projects({ searchParams }: { searchParams: Promise<{ entity?: string; status?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
-  const { entity: q } = await searchParams;
+  const { entity: q, status = "open" } = await searchParams;
   const ents = s.group ? ENTS4 : s.entities;
   const entity = q && (q === "ALL" ? s.group : ents.includes(q)) ? q : s.entity;
   const db = supabaseAdmin();
-  let fq = db.from("authority_files").select("*").in("stage", OPEN_STAGES).order("target_date", { ascending: true, nullsFirst: false });
-  fq = entity === "ALL" ? fq.in("entity", ents) : fq.eq("entity", entity);
-  const { data } = await fq;
-  const files = (data ?? []) as AuthorityFile[];
+  let pq = db.from("projects").select("*").order("created_at", { ascending: false });
+  pq = entity === "ALL" ? pq.in("entity", ents) : pq.eq("entity", entity);
+  if (status !== "all") pq = status === "open" ? pq.in("status", ["open", "on_hold"]) : pq.eq("status", status);
+  const { data } = await pq;
+  const projects = (data ?? []) as Project[];
+  const ids = projects.map((p) => p.id);
+  const { data: ts } = ids.length ? await db.from("project_tasks").select("*").in("project_id", ids) : { data: [] };
+  const tasks = (ts ?? []) as Task[];
+  const { data: ds } = tasks.length ? await db.from("project_task_deps").select("*").in("task_id", tasks.map((t) => t.id)) : { data: [] };
+  const deps = (ds ?? []) as Dep[];
+  const { data: people } = await db.from("people").select("id,display_name").in("id", [...new Set(projects.map((p) => p.owner_person).filter((x): x is string => !!x))]);
+  const nameOf = new Map(((people ?? []) as { id: string; display_name: string }[]).map((p) => [p.id, p.display_name]));
   const t0 = today();
+  const rows = projects.map((p) => {
+    const pt = tasks.filter((t) => t.project_id === p.id);
+    const proj = projectDates(pt, deps, p.started_at);
+    const pr = progress(pt);
+    const late = pt.filter((t) => proj.get(t.id)?.late).length;
+    const blocked = pt.filter((t) => t.status === "blocked").length;
+    const end = projectedEnd(pt, proj);
+    const next = pt.filter((t) => t.status !== "done" && t.status !== "not_needed" && !(proj.get(t.id)?.openDeps.length)).sort((a, b) => (proj.get(a.id)!.end < proj.get(b.id)!.end ? -1 : 1)).slice(0, 2);
+    return { p, pr, late, blocked, end, next };
+  });
+  const open = rows.filter((r) => r.p.status === "open");
   return (
     <>
-      <PageHeader eyebrow="Projects · Boards" title="Authority files by stage" sub="Open files, oldest target date first in each column." right={<Link href="/proj/auth/new" className="btn primary">+ New file</Link>} />
-      {ents.length > 1 && <div className="chips mb-4" style={{ display: "inline-flex" }}>{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={`/proj/boards?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
-      <div className="kanban">
-        {COLS.map((st) => {
-          const col = files.filter((f) => f.stage === st);
-          if (st === "signing" && !col.length) return null;
-          return (
-            <div key={st} className="kcol">
-              <div className="kh"><span>{STAGE_LABEL[st]}</span><b>{col.length}</b></div>
-              {col.map((f) => { const d = daysAtAuthority(f); const late = (st === "submitted" || st === "remarks") && f.target_date && f.target_date < t0; return (
-                <Link key={f.id} href={`/proj/auth/${f.id}`} className={"kcard" + (late ? " late" : "")}>
-                  <div className="flex items-center gap-2 mb-1"><span className={"ent " + f.entity}>{f.entity}</span><span className="mono mini">{f.type_code}</span></div>
-                  <b>{f.title}</b>
-                  <div className="mini">{f.portal_ref ?? f.portal ?? ENT[f.entity]?.auth}{f.owner_role ? ` · ${f.owner_role}` : ""}</div>
-                  <div className={"mini" + (late ? " red" : "")}>{f.target_date ? `target ${fr(f.target_date)}` : ""}{d !== null && (st === "submitted" || st === "remarks") ? ` · ${d} d` : ""}{f.rounds ? ` · ${f.rounds} round(s)` : ""}</div>
-                </Link>); })}
-              {!col.length && <div className="mini p-2">—</div>}
-            </div>);
-        })}
+      <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks — aircraft addition or removal, nominated person change, new approval… The manuals, authority files and certificates it needs are the real objects of S.A.M., linked to their task."
+        right={<><Link href="/proj/auth" className="btn">Authority files</Link><Link href="/proj/boards/new" className="btn primary">+ New project</Link></>} />
+      {ents.length > 1 && <div className="chips mb-4" style={{ display: "inline-flex" }}>{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={`/proj/boards?entity=${e}&status=${status}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
+      <div className="grid grid-cols-4 gap-4 mb-5">
+        <Metric label="Open projects" value={open.length} />
+        <Metric label="Tasks late" value={open.reduce((n, r) => n + r.late, 0)} tone={open.some((r) => r.late) ? "red" : undefined} hint="projected end before today" />
+        <Metric label="Blocked" value={open.reduce((n, r) => n + r.blocked, 0)} tone={open.some((r) => r.blocked) ? "amber" : undefined} />
+        <Metric label="Done this scope" value={`${open.reduce((n, r) => n + r.pr.done, 0)} / ${open.reduce((n, r) => n + r.pr.total, 0)}`} hint="tasks, open projects" />
       </div>
+      <div className="tabs mb-4">{[["open", "Open & on hold"], ["closed", "Closed"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards?entity=${entity}&status=${k}`} className={"tab" + (status === k ? " on" : "")}>{l}</Link>)}</div>
+      <section className="card">
+        <table className="tbl">
+          <thead><tr><th style={{ width: 60 }}>Entity</th><th>Project</th><th style={{ width: 120 }}>Owner</th><th style={{ width: 170 }}>Progress</th><th>Next</th><th style={{ width: 120 }}>Projected end</th><th style={{ width: 110 }}>Status</th></tr></thead>
+          <tbody>
+            {rows.map(({ p, pr, late, blocked, end, next }) => (
+              <tr key={p.id}>
+                <td><span className={"ent " + p.entity}>{p.entity}</span></td>
+                <td><Link href={`/proj/boards/${p.id}`}><b>{p.title}</b></Link><div className="mini">{p.template_code ?? "blank project"} · started {fr(p.started_at)}{p.target_date ? ` · target ${fr(p.target_date)}` : ""}</div></td>
+                <td className="mini">{p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"}</td>
+                <td><div className="bar"><i style={{ width: `${pr.pct}%` }} /></div><div className="mini">{pr.done} / {pr.total} · {pr.pct} %{late ? <span className="red"> · {late} late</span> : ""}{blocked ? <span className="amber"> · {blocked} blocked</span> : ""}</div></td>
+                <td className="mini">{p.status === "closed" ? "—" : next.length ? next.map((t) => <div key={t.id}>{t.title}{t.owner_role ? ` · ${t.owner_role}` : ""}</div>) : "nothing ready to start"}</td>
+                <td className="mono">{p.status === "closed" ? fr(p.closed_at) : end ? <span className={end < t0 ? "red" : ""}>{fr(end)}</span> : "—"}</td>
+                <td><span className={"pill " + (p.status === "closed" ? "green" : p.status === "on_hold" ? "" : "amber")}>{PROJECT_STATUS_LABEL[p.status]}</span></td>
+              </tr>))}
+            {!rows.length && <tr><td colSpan={7} className="p-6 text-slate6">No project in this scope. <Link className="underline" href="/proj/boards/new">Open one</Link> — blank or from a template.</td></tr>}
+          </tbody>
+        </table>
+      </section>
     </>
   );
 }

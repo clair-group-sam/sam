@@ -466,3 +466,9 @@ body:has(.pm){background:#e9eef2}
 .wfrow.locked .wfbody{background:repeating-linear-gradient(135deg,transparent 0 12px,#f6f8fa 12px 24px);border-radius:8px;padding:2px 8px;margin:-2px -8px}
 .mclass{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pill.blue{background:#e5f1fb;color:#0d4f86}
+
+/* Projects */
+.bar{height:6px;background:var(--line);border-radius:999px;overflow:hidden;width:150px}.bar i{display:block;height:100%;background:var(--cyan)}
+.tplrow{display:grid;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;color:var(--navy)}.tplrow:hover{background:var(--blue05)}.tplrow.on{border-color:var(--cyan);background:var(--blue05)}
+.ptasks tr.muted td{color:var(--slate5)}.ptasks tr.muted b{font-weight:500}
+.pillsel{border-radius:999px;padding:0 8px}.pillsel.amber{border-color:#f1c27d;background:#fff6e6}.pillsel.green{border-color:#9ad9b5;background:#eefaf3}.pillsel.red{border-color:#f0a3a3;background:#fff0f0}

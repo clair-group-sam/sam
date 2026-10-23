@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
-import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today } from "@/lib/authority";
+import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
 import { addAttachment, addItem, addNote, addRound, moveStage, removeAttachment, saveFile, toggleItem } from "../actions";
 
 const KIND_ICON: Record<string, string> = { created: "＋", stage: "→", note: "✎", item: "☑", submitted: "⇧", remarks: "✉", reply: "↩", decision: "✔", attachment: "📎", link: "🔗", task: "⏰", mail: "✉" };
@@ -32,6 +32,8 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
   type RevRow = { id: string; rev: string; issue: number; step: string; manuals: { id: string; code: string; title: string } };
   const { data: rev } = f.revision_id ? await db.from("revisions").select("id,rev,issue,step,manuals!inner(id,code,title)").eq("id", f.revision_id).maybeSingle() : { data: null };
   const revision = rev as unknown as RevRow | null;
+  const { data: prj } = (f as AuthorityFile & { project_id?: string | null }).project_id ? await db.from("projects").select("id,title").eq("id", (f as AuthorityFile & { project_id?: string | null }).project_id!).maybeSingle() : { data: null };
+  const projectOf = prj as { id: string; title: string } | null;
   const days = daysAtAuthority(f);
   const t0 = today();
   const late = (f.stage === "submitted" || f.stage === "remarks") && f.target_date && f.target_date < t0;
@@ -186,6 +188,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
               <label><span className="mini">Owner post</span><input name="owner_role" className="inp mono" defaultValue={f.owner_role ?? ""} disabled={!cmm} /></label>
               <label><span className="mini">Trigger</span><select name="trigger_kind" className="inp" defaultValue={f.trigger_kind ?? "other"} disabled={!mayEdit}>{TRIGGERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
               <label><span className="mini">Trigger note</span><input name="trigger_note" className="inp" defaultValue={f.trigger_note ?? ""} disabled={!mayEdit} /></label>
+              <div className="mini">Project: {projectOf ? <Link className="underline" href={`/proj/boards/${projectOf.id}`}>{projectOf.title}</Link> : "— (standalone file)"}</div>
               <div className="mini">Manual revision: {revision ? <Link className="underline" href={`/docs/manual/${revision.manuals.id}?rev=${revision.id}`}>{revision.manuals.code} Iss {revision.issue} Rev {revision.rev} · {STEP_LABEL[revision.step] ?? revision.step}</Link> : "—"}</div>
               <label><span className="mini">Finding</span><input name="finding_ref" className="inp mono" defaultValue={f.finding_ref ?? ""} disabled={!mayEdit} /></label>
               <label><span className="mini">Aircraft</span><input name="aircraft_reg" className="inp mono" defaultValue={f.aircraft_reg ?? ""} disabled={!mayEdit} /></label>
