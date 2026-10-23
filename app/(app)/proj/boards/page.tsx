@@ -6,6 +6,7 @@ import { PageHeader, Metric } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { fr, today } from "@/lib/authority";
 import { PROJECT_STATUS_LABEL, progress, project as projectDates, projectedEnd, type Dep, type Project, type Task } from "@/lib/projects";
+import { cancelProject, deleteProject } from "./actions";
 
 /** Projects › Projects: every project of the entity (aircraft addition, NP change, new SPA…), its progress and what it waits for. */
 export default async function Projects({ searchParams }: { searchParams: Promise<{ entity?: string; status?: string }> }) {
@@ -17,7 +18,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
   const db = supabaseAdmin();
   let pq = db.from("projects").select("*").order("created_at", { ascending: false });
   pq = entity === "ALL" ? pq.in("entity", ents) : pq.eq("entity", entity);
-  if (status !== "all") pq = status === "open" ? pq.in("status", ["open", "on_hold"]) : pq.eq("status", status);
+  if (status !== "all") pq = status === "open" ? pq.in("status", ["open", "on_hold"]) : status === "closed" ? pq.in("status", ["closed", "cancelled"]) : pq.eq("status", status);
   const { data } = await pq;
   const projects = (data ?? []) as Project[];
   const ids = projects.map((p) => p.id);
@@ -39,6 +40,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
     return { p, pr, late, blocked, end, next };
   });
   const open = rows.filter((r) => r.p.status === "open");
+  const superadmin = s.roles.includes("SUPERADMIN");
   return (
     <>
       <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks — aircraft addition or removal, nominated person change, new approval… The manuals, authority files and certificates it needs are the real objects of S.A.M., linked to their task."
@@ -50,10 +52,10 @@ export default async function Projects({ searchParams }: { searchParams: Promise
         <Metric label="Blocked" value={open.reduce((n, r) => n + r.blocked, 0)} tone={open.some((r) => r.blocked) ? "amber" : undefined} />
         <Metric label="Done this scope" value={`${open.reduce((n, r) => n + r.pr.done, 0)} / ${open.reduce((n, r) => n + r.pr.total, 0)}`} hint="tasks, open projects" />
       </div>
-      <div className="tabs mb-4">{[["open", "Open & on hold"], ["closed", "Closed"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards?entity=${entity}&status=${k}`} className={"tab" + (status === k ? " on" : "")}>{l}</Link>)}</div>
+      <div className="tabs mb-4">{[["open", "Open & on hold"], ["closed", "Closed & cancelled"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards?entity=${entity}&status=${k}`} className={"tab" + (status === k ? " on" : "")}>{l}</Link>)}</div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th style={{ width: 60 }}>Entity</th><th>Project</th><th style={{ width: 120 }}>Owner</th><th style={{ width: 170 }}>Progress</th><th>Next</th><th style={{ width: 120 }}>Projected end</th><th style={{ width: 110 }}>Status</th></tr></thead>
+          <thead><tr><th style={{ width: 60 }}>Entity</th><th>Project</th><th style={{ width: 120 }}>Owner</th><th style={{ width: 170 }}>Progress</th><th>Next</th><th style={{ width: 120 }}>Projected end</th><th style={{ width: 110 }}>Status</th>{superadmin && <th style={{ width: 150 }} />}</tr></thead>
           <tbody>
             {rows.map(({ p, pr, late, blocked, end, next }) => (
               <tr key={p.id}>
@@ -63,9 +65,19 @@ export default async function Projects({ searchParams }: { searchParams: Promise
                 <td><div className="bar"><i style={{ width: `${pr.pct}%` }} /></div><div className="mini">{pr.done} / {pr.total} · {pr.pct} %{late ? <span className="red"> · {late} late</span> : ""}{blocked ? <span className="amber"> · {blocked} blocked</span> : ""}</div></td>
                 <td className="mini">{p.status === "closed" ? "—" : next.length ? next.map((t) => <div key={t.id}>{t.title}{t.owner_role ? ` · ${t.owner_role}` : ""}</div>) : "nothing ready to start"}</td>
                 <td className="mono">{p.status === "closed" ? fr(p.closed_at) : end ? <span className={end < t0 ? "red" : ""}>{fr(end)}</span> : "—"}</td>
-                <td><span className={"pill " + (p.status === "closed" ? "green" : p.status === "on_hold" ? "" : "amber")}>{PROJECT_STATUS_LABEL[p.status]}</span></td>
+                <td><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")}>{PROJECT_STATUS_LABEL[p.status]}</span></td>
+                {superadmin && (
+                  <td>
+                    <details className="more"><summary title="Cancel or delete (super admin)">⋯</summary>
+                      <div className="morepanel" style={{ width: 360 }}>
+                        {p.status !== "cancelled" && p.status !== "closed" && <form action={cancelProject} className="flex items-center gap-2"><input type="hidden" name="id" value={p.id} /><input name="reason" className="inp" placeholder="Why it is cancelled (optional)" /><button className="btn" type="submit">Cancel the project</button></form>}
+                        <form action={deleteProject} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><label className="mini flex items-center gap-1"><input type="checkbox" name="confirm" /> I confirm — tasks and attached documents are deleted for good</label><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></form>
+                      </div>
+                    </details>
+                  </td>
+                )}
               </tr>))}
-            {!rows.length && <tr><td colSpan={7} className="p-6 text-slate6">No project in this scope. <Link className="underline" href="/proj/boards/new">Open one</Link> — blank or from a template.</td></tr>}
+            {!rows.length && <tr><td colSpan={superadmin ? 8 : 7} className="p-6 text-slate6">No project in this scope. <Link className="underline" href="/proj/boards/new">Open one</Link> — blank or from a template.</td></tr>}
           </tbody>
         </table>
       </section>

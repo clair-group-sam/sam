@@ -5,7 +5,7 @@ import { openDraft } from "@/lib/revisions-server";
 /** PRJ-02 · Projects: any objective broken into phases and tasks, orchestrating the objects S.A.M. already tracks. */
 export type TemplateTask = { key: string; phase: string; title: string; owner_role?: string | null; days?: number | null; deps?: string[]; link_kind?: LinkKind; link_ref?: string; detail?: string; source?: string };
 export type ProjectTemplate = { code: string; name: string; description: string | null; entities: string[]; phases: { key: string; label: string }[]; tasks: TemplateTask[]; pivots: string[]; active: boolean; ord: number };
-export type ProjectStatus = "open" | "on_hold" | "closed";
+export type ProjectStatus = "open" | "on_hold" | "closed" | "cancelled";
 export type Project = { id: string; entity: string; template_code: string | null; title: string; description: string | null; owner_role: string | null; owner_person: string | null; status: ProjectStatus; pivot: Record<string, string>; started_at: string; target_date: string | null; closed_at: string | null; lessons: string | null; created_by: string | null; created_at: string; updated_at: string };
 export type Phase = { id: string; project_id: string; ord: number; key: string | null; label: string };
 export type TaskStatus = "todo" | "in_progress" | "waiting" | "blocked" | "done" | "not_needed";
@@ -16,7 +16,7 @@ export type TaskFile = { id: string; task_id: string; project_id: string; name: 
 
 export const STATUS_LABEL: Record<TaskStatus, string> = { todo: "To do", in_progress: "In progress", waiting: "Waiting", blocked: "Blocked", done: "Done", not_needed: "Not needed" };
 export const STATUS_TONE: Record<TaskStatus, string> = { todo: "", in_progress: "amber", waiting: "", blocked: "red", done: "green", not_needed: "" };
-export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = { open: "Open", on_hold: "On hold", closed: "Closed" };
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = { open: "Open", on_hold: "On hold", closed: "Closed", cancelled: "Cancelled" };
 export const LINK_LABEL: Record<LinkKind, string> = { manual: "Manual revision", authority_file: "Authority file", certificate: "Certificate", moc: "MOC / risk assessment" };
 export const PIVOT_LABEL: Record<string, string> = { aircraft_type: "Aircraft type", aircraft_reg: "Registration", np_post_code: "Nominated post" };
 export const OPEN: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked"];

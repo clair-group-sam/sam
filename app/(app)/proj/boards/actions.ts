@@ -269,3 +269,27 @@ export async function removeTaskFile(formData: FormData) {
   await audit(db, s, p, "task_file_removed", { name: f.name });
   paths(p.id);
 }
+
+/** Super admin only: cancel a project (kept, greyed, with its history) or delete it for good (tasks, dependencies, attached documents). */
+export async function cancelProject(formData: FormData) {
+  const { s, db, p } = await guard(str(formData, "id"));
+  if (!s.roles.includes("SUPERADMIN")) throw new Error("Super admin only");
+  const reason = opt(formData, "reason");
+  await db.from("projects").update({ status: "cancelled", closed_at: today(), lessons: reason ? `Cancelled: ${reason}${p.lessons ? `\n${p.lessons}` : ""}` : p.lessons, updated_at: new Date().toISOString() }).eq("id", p.id);
+  await db.from("tasks").update({ status: "superseded" }).eq("status", "open").in("ref_id", [p.id]);
+  await audit(db, s, p, "project_cancelled", { reason });
+  paths(p.id);
+}
+export async function deleteProject(formData: FormData) {
+  const { s, db, p } = await guard(str(formData, "id"));
+  if (!s.roles.includes("SUPERADMIN")) throw new Error("Super admin only");
+  if (formData.get("confirm") !== "on") throw new Error("Tick the confirmation to delete");
+  const { data: fs } = await db.from("project_task_files").select("path").eq("project_id", p.id);
+  const keys = ((fs ?? []) as { path: string | null }[]).map((f) => f.path).filter((x): x is string => !!x && x.startsWith("evidence/")).map((x) => x.slice(9));
+  if (keys.length) await db.storage.from("evidence").remove(keys);
+  await db.from("authority_files").update({ project_id: null }).eq("project_id", p.id);
+  await audit(db, s, p, "project_deleted", { title: p.title, template: p.template_code, files: keys.length });
+  await db.from("projects").delete().eq("id", p.id);   // phases, tasks, dependencies and attachments follow (on delete cascade)
+  paths();
+  redirect("/proj/boards");
+}

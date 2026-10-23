@@ -30,7 +30,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const tasks = (fresh ?? loaded.tasks) as Task[];
   const cmm = isCmm(s);
   const owner = p.owner_person ? s.person?.id === p.owner_person : !!p.owner_role && s.roles.map(basePost).includes(basePost(p.owner_role));
-  const mayEdit = cmm || owner;
+  const active = p.status === "open" || p.status === "on_hold";
+  const mayEdit = (cmm || owner) && p.status !== "cancelled";
   const mayWork = (t: Task) => mayEdit || (t.owner_person ? s.person?.id === t.owner_person : !!t.owner_role && s.roles.map(basePost).includes(basePost(t.owner_role)));
   const proj = projectDates(tasks, deps, p.started_at);
   const pr = progress(tasks);
@@ -55,7 +56,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     <>
       <PageHeader eyebrow={`Projects · ${p.entity} · ${p.template_code ?? "project"}`} title={p.title}
         sub={`${ENT[p.entity]?.name ?? p.entity}${pivotTxt ? ` · ${pivotTxt}` : ""} · owner ${p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"} · started ${fr(p.started_at)}${p.target_date ? ` · target ${fr(p.target_date)}` : ""}`}
-        right={<><span className={"pill " + (p.status === "closed" ? "green" : p.status === "on_hold" ? "" : "amber")} style={{ alignSelf: "center" }}>{PROJECT_STATUS_LABEL[p.status]}</span><Link href="/proj/boards" className="btn">‹ Projects</Link></>} />
+        right={<><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")} style={{ alignSelf: "center" }}>{PROJECT_STATUS_LABEL[p.status]}</span><Link href="/proj/boards" className="btn">‹ Projects</Link></>} />
       {p.description && <p className="mini mb-4" style={{ maxWidth: 1000 }}>{p.description}</p>}
 
       <div className="grid grid-cols-4 gap-4 mb-5">
@@ -75,7 +76,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <section key={g.dept} className="card">
                 <div className="ch"><span className="eyebrow">{g.dept}</span><span className="mini">{done} / {counted}</span></div>
                 <table className="tbl ptasks"><tbody>
-                  {g.tasks.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const canWork = mayWork(t) && p.status !== "closed"; const tf = taskFiles.filter((f) => f.task_id === t.id); const open = t.status !== "done" && t.status !== "not_needed"; return (
+                  {g.tasks.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const canWork = mayWork(t) && active; const tf = taskFiles.filter((f) => f.task_id === t.id); const open = t.status !== "done" && t.status !== "not_needed"; return (
                     <tr key={t.id} id={`t-${t.id}`} className={"prow" + (t.status === "done" ? " isdone" : t.status === "not_needed" ? " muted" : "")}>
                       <td style={{ width: 34 }}>
                         <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
@@ -114,7 +115,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                                 <form action={uploadTaskFile} className="flex items-center gap-2 flex-wrap" encType="multipart/form-data"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
                                   <input type="file" name="file" className="inp" style={{ maxWidth: 280 }} /><input name="name" className="inp" style={{ maxWidth: 240 }} placeholder="or the name of a file kept on the server" /><button className="btn" type="submit">Attach a document</button></form>
                               )}
-                              {mayEdit && p.status !== "closed" && (
+                              {mayEdit && active && (
                                 <form action={updateTask} className="grid grid-cols-6 gap-2 mt-1">
                                   <input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><input type="hidden" name="deps_edit" value="1" />
                                   <label className="col-span-3"><span className="mini">Title</span><input name="title" className="inp" defaultValue={t.title} /></label>
@@ -140,7 +141,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 </tbody></table>
               </section>);
           })}
-          {view === "tasks" && mayEdit && p.status !== "closed" && (
+          {view === "tasks" && mayEdit && active && (
             <details className="addtask"><summary className="mini">+ Add a task</summary>
               <form action={addTask} className="nprow add"><input type="hidden" name="id" value={p.id} />
                 <input name="title" className="inp" placeholder="What has to be done" required /><input name="owner_role" className="inp mono" style={{ maxWidth: 80 }} placeholder="Post" /><input name="days" type="number" className="inp" style={{ maxWidth: 70 }} placeholder="days" />
@@ -162,7 +163,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 const doneUp = up.filter((t) => t.status === "done").length;
                 const pct = f && ["approved", "published", "closed"].includes(f.stage) ? 100 : up.length ? Math.round((100 * doneUp) / up.length) : a.status === "done" ? 100 : 0;
                 const stageTone = f ? STAGE_TONE[f.stage] : "";
-                const canOpen = mayWork(a) && !a.link_id && a.status !== "done" && a.status !== "not_needed" && p.status !== "closed";
+                const canOpen = mayWork(a) && !a.link_id && a.status !== "done" && a.status !== "not_needed" && active;
                 return (
                   <div key={a.id} className="appcard">
                     <div className="flex items-baseline gap-2 flex-wrap">
@@ -174,13 +175,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     <div className="mini flex items-center gap-2 flex-wrap mt-1">
                       {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"} — {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
                       {canOpen && <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><button className="linkbtn" type="submit">open now</button></form>}
-                      {mayEdit && a.status !== "not_needed" && !a.link_id && p.status !== "closed" && <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="not_needed" /><input name="not_needed_reason" className="inp" style={{ height: 22, fontSize: 11, width: 150 }} placeholder="not needed because…" required /><button className="linkbtn" type="submit">not needed</button></form>}
+                      {mayEdit && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="not_needed" /><input name="not_needed_reason" className="inp" style={{ height: 22, fontSize: 11, width: 150 }} placeholder="not needed because…" required /><button className="linkbtn" type="submit">not needed</button></form>}
                     </div>
                     {up.length > 0 && !f && <div className="mini" style={{ color: "var(--slate5)" }} title={up.map((t) => `${t.status === "done" ? "✓" : "·"} ${t.title}`).join("\n")}>{up.filter((t) => t.status !== "done").slice(0, 3).map((t) => t.title).join(" · ")}{up.filter((t) => t.status !== "done").length > 3 ? " · …" : ""}</div>}
                   </div>);
               })}
               {!apps.length && <p className="mini text-slate6">No application in this project.</p>}
-              {mayEdit && p.status !== "closed" && (
+              {mayEdit && active && (
                 <details className="addtask" style={{ marginTop: 4 }}><summary className="mini">+ Add an application</summary>
                   <form action={addTask} className="grid grid-cols-3 gap-2 mt-2"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="link_kind" value="authority_file" /><input type="hidden" name="phase_id" value={phases[phases.length - 1]?.id ?? ""} />
                     <input name="title" className="inp col-span-2" placeholder="Application" required /><input name="link_ref" className="inp mono" placeholder="Type (OM-APP…)" required />
