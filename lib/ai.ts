@@ -1,7 +1,7 @@
 // Server-side Claude calls (AI-01). The key lives in Vercel only; every call is logged in ai_usage.
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "route";
+export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "route" | "file";
 const HEADERS = (key: string) => ({ "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" });
 let modelCache: { id: string; at: number } | null = null;
 /** Lists the models available to the group's key (ids + display names). */
@@ -31,12 +31,14 @@ Rules:
 - Output HTML limited to: p, h2, h3, h4, ul, ol, li, table, thead, tbody, tr, th, td, strong, em, figure, img (keep existing img tags unchanged).
 - Answer ONLY with a JSON object: {"html": "<full revised chapter html>", "notes": [{"where": "sub-chapter or sentence", "change": "what changed", "why": "reason / reference"}]} .`;
 
-export async function callClaude(opts: { agent: AiAgent; personId: string | null; entity: string | null; system?: string; user: string; maxTokens?: number }): Promise<{ text: string; model: string }> {
+export async function callClaude(opts: { agent: AiAgent; personId: string | null; entity: string | null; system?: string; user: string; maxTokens?: number; attachments?: { type: "document" | "image"; mediaType: string; b64: string }[] }): Promise<{ text: string; model: string }> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set in Vercel.");
   const db = supabaseAdmin();
   const MODEL = await writeModel();
-  const body = { model: MODEL, max_tokens: opts.maxTokens ?? 8000, system: opts.system ?? SYSTEM, messages: [{ role: "user", content: opts.user }] };
+  const body = { model: MODEL, max_tokens: opts.maxTokens ?? 8000, system: opts.system ?? SYSTEM, messages: [{ role: "user", content: opts.attachments?.length
+    ? [...opts.attachments.map((a) => ({ type: a.type, source: { type: "base64", media_type: a.mediaType, data: a.b64 } })), { type: "text", text: opts.user }]
+    : opts.user }] };
   const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: HEADERS(key), body: JSON.stringify(body) });
   const j = (await r.json()) as { content?: { type: string; text?: string }[]; usage?: { input_tokens: number; output_tokens: number }; error?: { message: string } };
   const inT = j.usage?.input_tokens ?? 0, outT = j.usage?.output_tokens ?? 0;

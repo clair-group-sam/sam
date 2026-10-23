@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addDays, today } from "@/lib/authority";
+import { alertRoles } from "@/lib/cert";
 // Daily (Hobby plan): authority files past their target date get a follow-up task for Compliance (PRJ-01 §6.2);
 // step 4 will add 90/30/7-day certificate alerts, MOR 72 h clock (SAF-01), reading reminders.
 export async function GET(req: NextRequest) {
@@ -20,5 +21,22 @@ export async function GET(req: NextRequest) {
     n++;
   }
   jobs.authority_followups = n;
+  // 2 · certificates & validities (DOC-10): one task per threshold 90 / 30 / 7 days and at expiry, for Compliance (+ CAMO for aircraft documents)
+  const { data: certs } = await db.from("certificates").select("id,entity,scope,registration,kind,title,valid_until,alerts").is("archived_at", null).not("valid_until", "is", null).lte("valid_until", addDays(t0, 90));
+  let c = 0;
+  for (const x of (certs ?? []) as { id: string; entity: string; scope: string; registration: string | null; kind: string; title: string; valid_until: string; alerts: Record<string, string> | null }[]) {
+    const left = Math.round((Date.parse(x.valid_until) - Date.parse(t0)) / 86_400_000);
+    const step = left < 0 ? "expired" : left <= 7 ? "7" : left <= 30 ? "30" : "90";
+    const alerts = x.alerts ?? {};
+    if (alerts[step]) continue;
+    await db.from("tasks").update({ status: "superseded" }).eq("ref_id", x.id).eq("kind", "certificate_validity").eq("status", "open");
+    const what = `${x.title}${x.registration ? ` · ${x.registration}` : ""}`;
+    for (const role of alertRoles(x.scope)) {
+      await db.from("tasks").insert({ entity: x.entity, kind: "certificate_validity", title: left < 0 ? `Expired: ${what}` : `${what} expires in ${left} day${left === 1 ? "" : "s"}`, detail: `Valid until ${x.valid_until}. Renew it, then drop the new document in S.A.M. (Certificates & Validities › Drop a document): it replaces this one.`, due: x.valid_until, owner_role: role, status: "open", link: "/docs/files", ref_id: x.id });
+    }
+    await db.from("certificates").update({ alerts: { ...alerts, [step]: t0 } }).eq("id", x.id);
+    c++;
+  }
+  jobs.certificate_alerts = c;
   return Response.json({ ran: new Date().toISOString(), jobs });
 }

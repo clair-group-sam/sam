@@ -70,7 +70,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   return (
     <>
       <PageHeader eyebrow="Documents · Library" title="Document library" sub={`Manuals as the unit of revision and approval (DOC-01) · ${scope}`}
-        right={canCreate ? <Link href={`/docs/new${s.entity !== "ALL" ? `?entity=${s.entity}` : ""}`} className="btn primary">+ New manual</Link> : undefined} />
+        right={canCreate ? <><Link href="/docs/drop" className="btn">+ Drop a document</Link><Link href={`/docs/new${s.entity !== "ALL" ? `?entity=${s.entity}` : ""}`} className="btn primary">+ New manual</Link></> : undefined} />
       <form className="card mb-5" action="/docs/lib" method="get">
         <div className="p-3 flex gap-2">
           <input name="q" defaultValue={q} placeholder="Search the manuals — title, chapter or text (e.g. sous-traitance, MEL, dégivrage)…" className="flex-1 border border-line rounded-lg px-4 py-2.5 text-sm" />
