@@ -365,3 +365,15 @@ body:has(.pm){background:#e9eef2}
 .recoverbar span{flex:1}
 .modalbg{position:fixed;inset:0;background:rgba(13,42,63,.35);z-index:80;display:grid;place-items:center}
 .modal{background:#fff;border-radius:12px;padding:18px 20px;max-width:460px;width:calc(100% - 32px);box-shadow:0 20px 50px rgba(13,42,63,.3)}
+
+/* organisation charts (NP management → manuals) */
+.orgchart{margin:14px 0;text-align:center;overflow-x:auto}
+.orgchart svg{display:inline-block}
+.orgchart.editing{border:1px dashed #b8c4ce;border-radius:8px;padding:10px;background:#fbfdfe}
+.orgchart.editing.ProseMirror-selectednode{outline:2px solid var(--navy)}
+.orgchart figcaption{font-size:11px;color:var(--slate5);margin-top:6px}
+.orgchart-empty{font-size:12px;color:var(--slate5);padding:10px;border:1px dashed var(--line);border-radius:8px}
+.nprow{display:flex;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid #eef2f5}
+.nprow .inp{padding:5px 7px;font-size:12.5px;min-width:0;flex:1}
+.nprow.add{background:#fbfdfe;border-top:1px solid var(--line)}
+.pm-body .orgchart svg{max-height:200mm}

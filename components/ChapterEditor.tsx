@@ -9,8 +9,9 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import LinkExt from "@tiptap/extension-link";
+import { OrgChartNode } from "@/components/OrgChartNode";
 import LinkPicker, { type Chap } from "@/components/LinkPicker";
-import { saveSection, revertSection, uploadImage } from "@/app/(app)/docs/editor/[rev]/actions";
+import { saveSection, revertSection, uploadImage, orgSnapshot } from "@/app/(app)/docs/editor/[rev]/actions";
 import AiPanel from "@/components/AiPanel";
 
 type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string; manualId?: string; chapters?: Chap[] };
@@ -36,7 +37,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const baseNorm = useRef<string | null>(null);
   const editor = useEditor({
     extensions: [StarterKit, Image.configure({ inline: false }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
-      LinkExt.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } })],
+      LinkExt.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } }), OrgChartNode],
     content: html,
     editable,
     immediatelyRender: false,
@@ -98,6 +99,14 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     if (empty && !editor.isActive("link")) editor.chain().focus().insertContent({ type: "text", text: label, marks: [{ type: "link", attrs: { href } }] }).insertContent(" ").run();
     else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
     setLinking(false);
+  }
+  async function addChart() {
+    if (!editor) return;
+    setMsg("Drawing the chart from NP management…");
+    const r = await orgSnapshot({ revisionId });
+    if (!r.ok) { setMsg(r.error); return; }
+    editor.chain().focus().insertContent({ type: "orgChart", attrs: { entity: r.entity, snapshot: r.snapshot } }).run();
+    setMsg("Organisation chart inserted — save the chapter");
   }
   async function addImage(f: File | null) {
     if (!f || !editor) return;
@@ -161,6 +170,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <span className="sep" />
           <B label="🔗 Link" title="Link to a chapter, another manual or a web address" on={editor.isActive("link") || linking} act={() => setLinking((v) => !v)} />
           <B label="🖼 Image" title="Insert an image (PNG, JPG…)" act={() => fileRef.current?.click()} />
+          <B label="🏢 Org chart" title="Insert the organisation chart from NP management (frozen with this revision)" act={() => void addChart()} />
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void addImage(e.target.files?.[0] ?? null)} />
           <span className="sep" />
           <B label="↶" title="Undo" act={() => editor.chain().focus().undo().run()} />

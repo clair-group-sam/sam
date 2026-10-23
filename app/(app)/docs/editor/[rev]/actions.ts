@@ -15,6 +15,7 @@ import { callClaude, parseJsonBlock, userPromptFor, type AiAgent } from "@/lib/a
 import { stripHtml } from "@/lib/docs";
 import { blockOf, parentOf, renumber, type Ch } from "@/lib/chapters";
 import { randomUUID } from "crypto";
+import { currentSnapshot } from "@/lib/np";
 
 async function guard(revisionId: string) {
   const s = await getSession();
@@ -418,4 +419,15 @@ export async function linkTargets(input: { manualId?: string }): Promise<{ manua
     if (r) { const { data: cs } = await db.from("revision_sections").select("ref,title,uid:body->>uid,deleted_at").eq("revision_id", r.id).order("ord"); chapters = ((cs ?? []) as { ref: string; title: string | null; uid: string; deleted_at: string | null }[]).filter((c) => !c.deleted_at && c.uid).map(({ ref, title, uid }) => ({ ref, title, uid })); }
   }
   return { manuals, chapters };
+}
+
+/** Organisation chart block: the chart of the manual's entity as it is now in NP management (snapshot stored in the chapter). */
+export async function orgSnapshot(input: { revisionId: string }): Promise<{ ok: true; entity: string; snapshot: string } | { ok: false; error: string }> {
+  try {
+    const { db, rev, manual, may } = await guard(input.revisionId);
+    if (!may || rev.step !== "draft") return { ok: false, error: "Draft only." };
+    const snap = await currentSnapshot(db, manual.entity);
+    if (!snap.posts.length) return { ok: false, error: `No post defined in NP management for ${manual.entity} yet.` };
+    return { ok: true, entity: manual.entity, snapshot: JSON.stringify(snap) };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 }

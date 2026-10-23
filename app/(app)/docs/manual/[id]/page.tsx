@@ -13,6 +13,7 @@ import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from
 import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
 import { ENT } from "@/lib/nav";
 import { linkIndex, rewriteLinks } from "@/lib/links";
+import { renderCharts } from "@/lib/orgchart";
 import { startRevision } from "@/app/(app)/docs/editor/[rev]/actions";
 import { isCmm, ownsManual } from "@/lib/revisions";
 
@@ -78,7 +79,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         self: (ref) => (ref ? `${base}&sec=${encodeURIComponent(ref)}` : null), textTarget: refHref,
       })
     : srcHtml;
-  const activeHtml = active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(linked, chapterRefs, subRefs, base) : linked) : "";
+  const activeHtml = renderCharts(active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(linked, chapterRefs, subRefs, base) : linked) : "");
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
   const canAudience = isCmm(s) || ownsManual(s, manual.owner_role);
 

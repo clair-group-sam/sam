@@ -26,7 +26,8 @@
     "@tiptap/extension-table-header": "^2.11.0",
     "@sparticuz/chromium": ">=131.0.0",
     "puppeteer-core": ">=23.10.0",
-    "@tiptap/extension-link": "^2.11.0"
+    "@tiptap/extension-link": "^2.11.0",
+    "@tiptap/core": "^2.11.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
