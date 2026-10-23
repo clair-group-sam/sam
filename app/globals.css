@@ -399,3 +399,29 @@ body:has(.pm){background:#e9eef2}
 .droppreview{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f5f7f9;min-height:360px}
 .droppreview iframe{width:100%;height:460px;border:0}
 .droppreview img{width:100%;height:auto;display:block}
+
+/* entity band (who owns this manual) */
+.entband{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:-4px 0 14px;padding:8px 14px;border-radius:8px;border-left:6px solid var(--navy);background:#f3f6f9;font-size:13px}
+.entband b{font-size:14px;letter-spacing:.02em}
+.entband span{color:var(--slate5);font-size:12px}
+.entband em{font-style:normal;font-weight:700;color:#9a3412;margin-left:auto}
+.entband em.mute{font-weight:500;color:var(--slate5)}
+.entband.AJD{border-left-color:#006c9c;background:#eef8fd}.entband.AJD b{color:#006c9c}
+.entband.ASJ{border-left-color:#3a7a1b;background:#f1f8ee}.entband.ASJ b{color:#3a7a1b}
+.entband.ASF{border-left-color:#b08300;background:#fffaea}.entband.ASF b{color:#7a5a00}
+.entband.TEC{border-left-color:#b43a0f;background:#fdf2ee}.entband.TEC b{color:#b43a0f}
+/* library shortcuts and comparison grid */
+.shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.shortcuts .card .row{display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid #eef2f5;font-size:13px}
+.shortcuts .card .row:first-of-type{border-top:0}
+.shortcuts .card .row a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.viewseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.viewseg a{padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--slate5)}
+.viewseg a.on{background:var(--navy);color:#fff}
+.mgrid td,.mgrid th{vertical-align:top}
+.mgrid .cell{display:block;padding:6px 8px;border-radius:6px;border:1px solid #eef2f5;background:#fff;font-size:12px;line-height:1.35}
+.mgrid .cell:hover{border-color:var(--navy)}
+.mgrid .cell .t{font-weight:700;font-size:12.5px}
+.mgrid .none{color:#b8c4ce;font-size:12px}
+.star{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:#c9a227;padding:0 4px}
+.star.off{color:#b8c4ce}

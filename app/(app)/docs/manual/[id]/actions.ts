@@ -39,3 +39,15 @@ export async function saveAudience(formData: FormData) {
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: manual.entity, object_type: "manual", object_id: manual.id, action: "audience", after: { tokens } });
   revalidatePath(`/docs/manual/${manual.id}`);
 }
+
+/** ★ favourite manuals, shown in the Library shortcuts across entities. */
+export async function toggleFavourite(formData: FormData) {
+  const manualId = String(formData.get("manual_id") ?? "");
+  const s = await getSession();
+  if (!s?.person || !manualId) return;
+  const db = supabaseAdmin();
+  const { data: f } = await db.from("manual_favourites").select("manual_id").eq("person_id", s.person.id).eq("manual_id", manualId).maybeSingle();
+  if (f) await db.from("manual_favourites").delete().eq("person_id", s.person.id).eq("manual_id", manualId);
+  else await db.from("manual_favourites").insert({ person_id: s.person.id, manual_id: manualId });
+  revalidatePath(`/docs/manual/${manualId}`); revalidatePath("/docs/lib");
+}

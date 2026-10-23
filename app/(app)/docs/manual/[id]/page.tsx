@@ -7,7 +7,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
-import { acknowledge, saveAudience } from "./actions";
+import { acknowledge, saveAudience, toggleFavourite } from "./actions";
+import EntityBand from "@/components/EntityBand";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from "@/lib/audience";
 import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
@@ -19,6 +20,14 @@ import { isCmm, ownsManual } from "@/lib/revisions";
 
 type Reading = { person_id: string; acknowledged_at: string | null; via: string | null; people: { display_name: string; job_title: string | null } | null };
 
+/** Browser tab: entity + code first, so two manuals with the same code (OM-A of two entities) are never confused. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { data } = await supabaseAdmin().from("manuals").select("entity,code,title").eq("id", id).maybeSingle();
+  const m = data as { entity: string; code: string; title: string } | null;
+  return { title: m ? `${ENT[m.entity]?.name ?? m.entity} · ${m.code} — ${m.title}` : "S.A.M." };
+}
+
 export default async function ManualPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; sec?: string; rev?: string; q?: string }> }) {
   const { id } = await params;
   const { tab = "read", sec, rev, q = "" } = await searchParams;
@@ -28,6 +37,15 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const { data: m } = await sb.from("manuals").select("*").eq("id", id).maybeSingle();
   if (!m) notFound();
   const manual = m as Manual;
+  // recently opened (Library shortcuts) and favourite state
+  let fav = false;
+  if (s.person) {
+    const adm = supabaseAdmin();
+    await adm.from("manual_views").upsert({ person_id: s.person.id, manual_id: manual.id, viewed_at: new Date().toISOString() }, { onConflict: "person_id,manual_id" });
+    const { data: f } = await adm.from("manual_favourites").select("manual_id").eq("person_id", s.person.id).eq("manual_id", manual.id).maybeSingle();
+    fav = !!f;
+  }
+  const multi = s.group || s.entities.length > 1;
   const { data: revsData } = await sb.from("revisions").select("*").eq("manual_id", id).order("published_at", { ascending: false, nullsFirst: true }).order("created_at", { ascending: false });
   const revs = (revsData ?? []) as Revision[];
   const published = revs.filter((r) => r.step === "published" || r.step === "repository").sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
@@ -124,9 +142,11 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
 
   return (
     <>
+      <EntityBand entity={manual.entity} current={s.entity} multi={multi} />
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
         sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${(manual as Manual & { internal?: boolean }).internal ? " · internal document" : ""}` : "No revision yet"}
         right={<>
+          <form action={toggleFavourite}><input type="hidden" name="manual_id" value={manual.id} /><button type="submit" className={"star" + (fav ? "" : " off")} title={fav ? "Remove from my favourites" : "Add to my favourites (Library shortcuts)"}>{fav ? "★" : "☆"}</button></form>
           <Link href="/docs/lib" className="btn">‹ Library</Link>
           {canDownloadPdf(s.roles) && revs.length > 0 && (
             <DownloadMenu manualId={manual.id}
