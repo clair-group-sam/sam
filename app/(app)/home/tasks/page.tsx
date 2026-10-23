@@ -35,7 +35,7 @@ export default async function Inbox() {
     const all = (allData ?? []) as PTask[];
     for (const p of projects) {
       const proj = projectDates(all.filter((t) => t.project_id === p.id), deps, p.started_at);
-      for (const t of ptasks.filter((t) => t.project_id === p.id)) {
+      for (const t of ptasks.filter((t) => t.project_id === p.id && t.link_kind !== "authority_file")) {
         const mine = t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : (p.owner_person ? p.owner_person === s.person?.id : !!p.owner_role && posts.has(basePost(p.owner_role)));
         if (!mine || proj.get(t.id)?.openDeps.length) continue;
         tasks.push({ id: t.id, title: t.title, detail: `${p.title}${t.status === "blocked" ? " · blocked" : t.status === "waiting" ? " · waiting" : ""}`, due: t.status === "waiting" ? null : proj.get(t.id)?.end ?? null, entity: p.entity, kind: "project", status: "open", link: `/proj/boards/${p.id}`, owner_person: t.owner_person, owner_role: t.owner_role });

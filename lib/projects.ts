@@ -193,3 +193,23 @@ export async function instantiate(db: SupabaseClient, projectId: string, tpl: Pr
   if (deps.length) await db.from("project_task_deps").insert(deps);
   return rows.length;
 }
+
+/** Department of a post — tasks are grouped by who does them, not by phase (phases drive the timeline). */
+export const DEPARTMENTS = ["Management", "Compliance & Safety", "Flight Operations", "Ground Operations", "Training", "Airworthiness / CAMO", "Other"];
+export function departmentOf(role: string | null | undefined): string {
+  const r = (role ?? "").toUpperCase().replace(/^(DEPUTY|DEP)[_\s-]+/, "").replace(/[_\s-]+(DEPUTY|DEP|D)$/, "");
+  if (["AM", "CEO", "DAM"].includes(r)) return "Management";
+  if (["CMM", "SM", "SMD", "QM", "COMPLIANCE", "FSO", "SECMAN", "ISM"].includes(r)) return "Compliance & Safety";
+  if (["NPFO", "EFB", "FRM"].includes(r)) return "Flight Operations";
+  if (["NPGO"].includes(r)) return "Ground Operations";
+  if (["NPCT", "CFI", "HT", "CTKI", "FSTD"].includes(r)) return "Training";
+  if (["NPCA", "RE", "RN", "RRO", "CAMO", "MAM", "NPMT"].includes(r)) return "Airworthiness / CAMO";
+  return "Other";
+}
+/** Every task an application depends on, transitively (the work that fills its completion bar). */
+export function upstream(taskId: string, deps: Dep[], byId: Map<string, Task>): Task[] {
+  const seen = new Set<string>(); const out: Task[] = [];
+  const walk = (id: string) => { for (const d of deps.filter((x) => x.task_id === id)) { if (seen.has(d.depends_on)) continue; seen.add(d.depends_on); const t = byId.get(d.depends_on); if (t) { out.push(t); walk(t.id); } } };
+  walk(taskId);
+  return out;
+}

@@ -496,3 +496,7 @@ details.more>summary::-webkit-details-marker{display:none}details.more[open]>sum
 .linkbtn{background:none;border:0;cursor:pointer;color:var(--slate6);text-decoration:underline;font-size:11.5px;padding:0}
 details.addtask>summary{list-style:none;cursor:pointer;padding:8px 14px;color:var(--slate6)}details.addtask>summary::-webkit-details-marker{display:none}details.addtask>summary:hover{color:var(--navy)}
 .pill.later{color:var(--slate45, #9aa8b5);border-color:var(--line);background:#fff}
+.prow.isdone td{background:#f2faf5}.prow.isdone b{color:var(--slate6);font-weight:500}
+.appcard{padding:10px 0;border-top:1px solid var(--line)}.appcard:first-child{border-top:0;padding-top:0}
+.bar.wide{width:100%;height:8px}
+details.card>summary{list-style:none}details.card>summary::-webkit-details-marker{display:none}
