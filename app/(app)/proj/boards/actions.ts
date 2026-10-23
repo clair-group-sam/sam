@@ -5,7 +5,8 @@ import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isCmm } from "@/lib/revisions";
 import { addDays, routeFor, syncTasks, today, type AuthorityFile, type FileType } from "@/lib/authority";
-import { instantiate, type Phase, type Project, type ProjectTemplate, type Task, type TaskStatus, type TemplateTask } from "@/lib/projects";
+import { instantiate, openFileForProjectTask, type Phase, type Project, type ProjectTemplate, type Task, type TaskStatus, type TemplateTask } from "@/lib/projects";
+import { openDraft } from "@/lib/revisions-server";
 import { daysBetween } from "@/lib/authority";
 
 type Db = ReturnType<typeof supabaseAdmin>;
@@ -146,32 +147,27 @@ export async function deleteTask(formData: FormData) {
   paths(p.id);
 }
 
-/** Opens the authority file a task calls for, pre-filled from the task's type and the project's pivots, and binds it to the task. */
+/** Opens now the authority file a task calls for (S.A.M. does it by itself once the task's dependencies are done). */
 export async function openFileForTask(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
-  const taskId = str(formData, "task_id");
-  const { data: t } = await db.from("project_tasks").select("*").eq("id", taskId).eq("project_id", p.id).maybeSingle();
-  if (!t) return;
-  const task = t as Task;
-  if (!mayWork(s, cmm, owner, task) || task.link_kind !== "authority_file" || task.link_id) return;
-  const { data: ty } = await db.from("authority_file_types").select("*").eq("code", task.link_ref ?? "").maybeSingle();
-  if (!ty) throw new Error(`Unknown authority file type ${task.link_ref}`);
-  const type = ty as FileType;
-  const route = routeFor(type, p.entity);
-  const pivotTxt = [p.pivot?.aircraft_type, p.pivot?.aircraft_reg, p.pivot?.np_post_code].filter(Boolean).join(" ");
-  const row = { entity: p.entity, type_code: type.code, title: `${task.title}${pivotTxt ? ` — ${pivotTxt}` : ""}`, stage: "draft", category: route.category, authority: route.authority, portal: route.portal,
-    owner_role: task.owner_role ?? type.default_owner_role ?? "CMM", trigger_kind: "other", trigger_note: `Project: ${p.title}`, aircraft_reg: p.pivot?.aircraft_reg ?? null, np_post_code: p.pivot?.np_post_code ?? null,
-    project_id: p.id, triggered_at: today(), target_date: addDays(today(), type.target_days + 14), created_by: s.person?.id ?? null };
-  const { data: created, error } = await db.from("authority_files").insert(row).select("*").single();
-  if (error || !created) throw new Error(error?.message ?? "Could not open the file");
-  const f = created as AuthorityFile;
-  if (type.checklist?.length) await db.from("authority_file_items").insert(type.checklist.map((c, i) => ({ file_id: f.id, ord: i + 1, key: c.key, label: c.label, role: c.role ?? null, required: c.required !== false })));
-  await db.from("authority_file_events").insert({ file_id: f.id, kind: "created", who: s.name, actor: s.person?.id ?? null, note: `Opened from project “${p.title}” (task: ${task.title})`, meta: { project_id: p.id, task_id: task.id } });
-  await db.from("project_tasks").update({ link_id: f.id, status: task.status === "todo" ? "in_progress" : task.status, started_at: task.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", task.id);
-  await syncTasks(db, f);
+  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) return;
+  const f = await openFileForProjectTask(db, { personId: s.person?.id ?? null, name: s.name }, p, task, "Opened from the project");
+  if (!f) throw new Error(`Could not open an authority file of type ${task.link_ref}`);
   await audit(db, s, p, "task_file_opened", { task: task.title, file: f.id });
   paths(p.id); revalidatePath(`/proj/auth/${f.id}`);
   redirect(`/proj/auth/${f.id}`);
+}
+/** Opens now the draft of the manual a task calls for. */
+export async function startDraftForTask(formData: FormData) {
+  const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
+  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task) || task.link_kind !== "manual" || !task.link_ref) return;
+  const { data: m } = await db.from("manuals").select("id").eq("entity", p.entity).eq("code", task.link_ref).maybeSingle();
+  if (!m) throw new Error(`No manual ${task.link_ref} in ${p.entity}`);
+  const d = await openDraft(db, (m as { id: string }).id, { personId: s.person?.id ?? null, name: s.name }, `Project: ${p.title}`);
+  if (!d) throw new Error("No revision to start from");
+  await db.from("project_tasks").update({ link_id: d.id, status: "in_progress", started_at: task.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", task.id);
+  paths(p.id); revalidatePath(`/docs/manual/${(m as { id: string }).id}`); revalidatePath("/docs/drafts");
+  redirect(`/docs/editor/${d.id}`);
 }
 
 /** Binds a task to an authority file that already exists (opened from the editor or by hand). */

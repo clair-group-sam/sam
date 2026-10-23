@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addDays, today } from "@/lib/authority";
+import { addDays, routeFor, syncTasks, today, type AuthorityFile, type FileType } from "@/lib/authority";
+import { openDraft } from "@/lib/revisions-server";
 
 /** PRJ-02 · Projects: any objective broken into phases and tasks, orchestrating the objects S.A.M. already tracks. */
 export type TemplateTask = { key: string; phase: string; title: string; owner_role?: string | null; days?: number | null; deps?: string[]; link_kind?: LinkKind; link_ref?: string; detail?: string; source?: string };
@@ -90,14 +91,48 @@ export function projectedEnd(tasks: Task[], proj: Map<string, Projection>): stri
   return m;
 }
 
+export type Who = { personId: string | null; name: string };
+/** Opens the authority file a task calls for — type from the task, aircraft / post from the project — and binds it. */
+export async function openFileForProjectTask(db: SupabaseClient, who: Who, p: Project, task: Task, origin: string): Promise<AuthorityFile | null> {
+  if (task.link_kind !== "authority_file" || task.link_id) return null;
+  const { data: ty } = await db.from("authority_file_types").select("*").eq("code", task.link_ref ?? "").maybeSingle();
+  if (!ty) return null;
+  const type = ty as FileType;
+  const route = routeFor(type, p.entity);
+  const pivotTxt = [p.pivot?.aircraft_type, p.pivot?.aircraft_reg, p.pivot?.np_post_code].filter(Boolean).join(" ");
+  const row = { entity: p.entity, type_code: type.code, title: `${task.title}${pivotTxt ? ` — ${pivotTxt}` : ""}`, stage: "draft", category: route.category, authority: route.authority, portal: route.portal,
+    owner_role: task.owner_role ?? type.default_owner_role ?? "CMM", trigger_kind: "other", trigger_note: `Project: ${p.title}`, aircraft_reg: p.pivot?.aircraft_reg ?? null, np_post_code: p.pivot?.np_post_code ?? null,
+    project_id: p.id, triggered_at: today(), target_date: addDays(today(), type.target_days + 14), created_by: who.personId };
+  const { data: created, error } = await db.from("authority_files").insert(row).select("*").single();
+  if (error || !created) return null;
+  const f = created as AuthorityFile;
+  if (type.checklist?.length) await db.from("authority_file_items").insert(type.checklist.map((c, i) => ({ file_id: f.id, ord: i + 1, key: c.key, label: c.label, role: c.role ?? null, required: c.required !== false })));
+  await db.from("authority_file_events").insert({ file_id: f.id, kind: "created", who: who.name, actor: who.personId, note: `${origin} — project “${p.title}”, task “${task.title}”`, meta: { project_id: p.id, task_id: task.id } });
+  await db.from("project_tasks").update({ link_id: f.id, status: task.status === "todo" ? "in_progress" : task.status, started_at: task.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", task.id);
+  await syncTasks(db, f);
+  return f;
+}
+
 /**
  * Lazy linking: a task that names a manual code is bound to the first revision of that manual started after the project,
  * and a certificate task to the certificate of the pivot aircraft (or of the organisation) of that kind. Done when the object
  * reaches its final state. Returns the tasks with their live status; writes the link back when it is found.
  */
 export type LiveLink = { label: string; href: string; state: string; tone: string };
-export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]): Promise<Map<string, LiveLink>> {
+export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[], auto?: { ready: Set<string>; who: Who }): Promise<Map<string, LiveLink>> {
   const out = new Map<string, LiveLink>();
+  const automate = !!auto && p.status === "open";
+  // S.A.M. opens by itself what a ready task calls for: the draft of the manual, the authority file with its checklist
+  if (automate) {
+    for (const t of tasks) {
+      if (t.status !== "todo" || !auto!.ready.has(t.id)) continue;
+      if (t.link_kind === "authority_file" && !t.link_id) { const f = await openFileForProjectTask(db, auto!.who, p, t, "Opened by S.A.M."); if (f) { t.link_id = f.id; t.status = "in_progress"; } }
+      if (t.link_kind === "manual" && t.link_ref) {
+        const { data: m } = await db.from("manuals").select("id").eq("entity", p.entity).eq("code", t.link_ref).maybeSingle();
+        if (m) { const d = await openDraft(db, (m as { id: string }).id, auto!.who, `Project: ${p.title}`).catch(() => null); if (d) { await db.from("project_tasks").update({ link_id: d.id, status: "in_progress", started_at: t.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", t.id); t.link_id = d.id; t.status = "in_progress"; } }
+      }
+    }
+  }
   const manualTasks = tasks.filter((t) => t.link_kind === "manual");
   if (manualTasks.length) {
     const codes = [...new Set(manualTasks.map((t) => t.link_ref).filter((x): x is string => !!x))];

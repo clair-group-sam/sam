@@ -10,7 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { htmlToText } from "@/lib/wm-import";
 import { structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
 import { TRANSITIONS, isCmm, nextRev, ownsManual, UNDER_REVIEW, EDITING } from "@/lib/revisions";
-import { frozenRefs } from "@/lib/revisions-server";
+import { frozenRefs, openDraft } from "@/lib/revisions-server";
 import { callClaude, parseJsonBlock, userPromptFor, type AiAgent } from "@/lib/ai";
 import { stripHtml } from "@/lib/docs";
 import { blockOf, parentOf, renumber, type Ch } from "@/lib/chapters";
@@ -38,23 +38,12 @@ async function audit(db: ReturnType<typeof supabaseAdmin>, actor: string | null,
 /** Rev N+1 as a draft. Based on the revision under review when there is one (parallel revisions), else on the published one. */
 export async function startRevision(formData: FormData) {
   const fromId = String(formData.get("from_revision") ?? "");
-  const { s, db, rev, manual, may } = await guard(fromId);
+  const { s, db, manual, may } = await guard(fromId);
   if (!may) throw new Error("Only the owner NP or Compliance can start a revision");
-  const { data: open } = await db.from("revisions").select("id,rev,step,created_at").eq("manual_id", manual.id).not("step", "in", "(published,repository)").order("created_at", { ascending: false });
-  const opens = (open ?? []) as { id: string; rev: string; step: string }[];
-  const editing = opens.find((x) => EDITING.includes(x.step));
-  if (editing) redirect(`/docs/editor/${editing.id}`);                 // one revision per upstream step: resume it
-  const underReview = opens.find((x) => UNDER_REVIEW.includes(x.step));
-  const base = underReview ? (await db.from("revisions").select("*").eq("id", underReview.id).single()).data as Revision : rev;
-  const newRev = nextRev(base.rev);
-  const { data: created, error } = await db.from("revisions").insert({ manual_id: manual.id, issue: base.issue, rev: newRev, step: "draft", authority_route: base.authority_route, summary: "", created_by: s.person?.id ?? null, step_changed_by: s.person?.id ?? null, based_on: base.id }).select("id").single();
-  if (error || !created) throw new Error(error?.message ?? "not created");
-  const { data: secs } = await db.from("revision_sections").select("ord,ref,title,body,deleted_at").eq("revision_id", base.id).order("ord");
-  const rows = ((secs ?? []) as (Section & { deleted_at?: string | null })[]).filter((x) => !x.deleted_at).map((x, n) => ({ revision_id: created.id, ord: n + 1, ref: x.ref, base_ref: x.ref, title: x.title, changed: false, body: { ...x.body, uid: (x.body as { uid?: string }).uid ?? randomUUID(), base_norm: null, base_html: x.body.html ?? "" } }));
-  for (let i = 0; i < rows.length; i += 20) await db.from("revision_sections").insert(rows.slice(i, i + 20));
-  await audit(db, s.person?.id ?? null, manual.entity, created.id, "revision_started", { code: manual.code, rev: newRev, based_on: base.rev, parallel: !!underReview, sections: rows.length });
+  const d = await openDraft(db, manual.id, { personId: s.person?.id ?? null, name: s.name });
+  if (!d) throw new Error("No revision to start from");
   revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/drafts");
-  redirect(`/docs/editor/${created.id}`);
+  redirect(`/docs/editor/${d.id}`);
 }
 
 /** Takes the approved text for a conflicting chapter (base wins), or keeps own text (conflict cleared). */

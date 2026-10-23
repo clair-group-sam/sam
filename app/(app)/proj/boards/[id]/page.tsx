@@ -7,7 +7,7 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STAGE_LABEL, fr, today, type AuthorityFile } from "@/lib/authority";
 import { LINK_LABEL, OPEN, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, type Task, type TaskStatus } from "@/lib/projects";
-import { addPhase, addTask, bindFileToTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
+import { addPhase, addTask, bindFileToTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startDraftForTask, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "not_needed", "blocked"];
@@ -22,7 +22,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   if (!loaded) notFound();
   const { project: p, phases, deps, files: taskFiles } = loaded;
   if (!s.group && !s.entities.includes(p.entity)) notFound();
-  const links = await resolveLinks(db, p, loaded.tasks);
+  // ready = no open dependency: S.A.M. opens by itself the drafts and authority files those tasks call for
+  const proj0 = projectDates(loaded.tasks, deps, p.started_at);
+  const ready0 = new Set(loaded.tasks.filter((t) => t.status === "todo" && !proj0.get(t.id)?.openDeps.length).map((t) => t.id));
+  const links = await resolveLinks(db, p, loaded.tasks, { ready: ready0, who: { personId: s.person?.id ?? null, name: s.name } });
   // statuses may have moved while resolving the links: reload the tasks once
   const { data: fresh } = await db.from("project_tasks").select("*").eq("project_id", id).order("ord");
   const tasks = (fresh ?? loaded.tasks) as Task[];
@@ -90,9 +93,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                           {t.detail && <div className="mini">{t.detail}</div>}
                           {t.status === "not_needed" && t.not_needed_reason && <div className="mini">Not needed: {t.not_needed_reason}</div>}
                           {lk && <div className="mini">{lk.href ? <Link className="underline" href={lk.href}>{lk.label}</Link> : lk.label} · <span className={"pill " + lk.tone} style={{ fontSize: 10.5 }}>{lk.state}</span></div>}
-                          {t.link_kind === "authority_file" && !t.link_id && work && (
+                          {t.link_kind === "manual" && !t.link_id && work && t.status !== "done" && t.status !== "not_needed" && (
+                            <div className="flex items-center gap-2 mt-1 flex-wrap"><form action={startDraftForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Start the draft now</button></form><span className="mini">{pj.openDeps.length ? "S.A.M. opens it by itself once the previous tasks are done." : ""}</span></div>
+                          )}
+                          {t.link_kind === "authority_file" && !t.link_id && work && t.status !== "done" && t.status !== "not_needed" && (
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Open the authority file ({t.link_ref})</button></form>
+                              <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Open the file now ({t.link_ref})</button></form><span className="mini">{pj.openDeps.length ? "S.A.M. opens it by itself once the previous tasks are done." : ""}</span>
                               {mayEdit && unbound.length > 0 && <form action={bindFileToTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><select name="file_id" className="inp" style={{ height: 26, fontSize: 12, maxWidth: 260 }}>{unbound.map((f) => <option key={f.id} value={f.id}>{f.type_code} · {f.title} · {f.stage}</option>)}</select><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Bind existing</button></form>}
                             </div>
                           )}
@@ -177,11 +183,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               )}
             </section>
           )}
-          <section className="card"><div className="ch"><span className="eyebrow">How it works</span></div><div className="cb mini grid gap-1">
-            <div>A task bound to a <b>manual</b> follows its revision: started when a revision is opened after the project start, done when published.</div>
-            <div>A task bound to an <b>authority file</b> is opened from here with the right type; waiting while at the authority, done at the decision.</div>
-            <div>A task bound to a <b>certificate</b> is done when the document is filed in Certificates & Validities{p.pivot?.aircraft_reg ? ` for ${p.pivot.aircraft_reg}` : ""}.</div>
-            <div>“Not needed” keeps the task with its reason — the authority may ask.</div>
+          <section className="card"><div className="ch"><span className="eyebrow">What S.A.M. does by itself</span></div><div className="cb mini grid gap-1">
+            <div>When a line's previous tasks are done, S.A.M. <b>opens the draft</b> of the manual (task to its NP) or <b>opens the authority file</b> with its checklist — nobody clicks.</div>
+            <div>A manual line is done when its revision is <b>published</b>; an authority line waits while at the authority and is done at the <b>decision</b>; a certificate line is done when the document is <b>filed</b>{p.pivot?.aircraft_reg ? ` for ${p.pivot.aircraft_reg}` : ""}.</div>
+            <div>Forms, checklists, LEP, organisation chart and attachments are checked in the <b>authority file's checklist</b>, which blocks the submission — not here.</div>
+            <div>You tick only what S.A.M. cannot see: contracts, inspections, training, systems. “Not needed” keeps the line with its reason.</div>
           </div></section>
         </div>
       </div>
