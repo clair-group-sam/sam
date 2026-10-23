@@ -10,8 +10,6 @@ export const TRANSITIONS: Transition[] = [
   { from: "approved_compliance", to: "signed", label: "Mark as signed", by: "cmm", note: "Only for manuals that need signatures (NP + CMM; MSM: AM + CMM)." },
   { from: "approved_compliance", to: "with_civil_aviation", label: "Send to the civil aviation authority", by: "cmm", note: "One application for the whole exchange; corrected manual goes back as a comment." },
   { from: "signed", to: "with_civil_aviation", label: "Send to the civil aviation authority", by: "cmm" },
-  { from: "approved_compliance", to: "published", label: "Publish (no authority route)", by: "cmm", note: "Manuals that need neither notification nor approval." },
-  { from: "signed", to: "published", label: "Publish (no authority route)", by: "cmm" },
   { from: "with_civil_aviation", to: "published", label: "Publish", by: "cmm", note: "After the authority's return has been integrated." },
   { from: "with_civil_aviation", to: "draft", label: "Authority remarks → back to draft", by: "cmm" },
   { from: "published", to: "repository", label: "Deposited on the TM-CAD repository", by: "cmm" },
@@ -30,8 +28,8 @@ export function postMayCreate(s: Session): boolean {
   return s.roles.map(basePost).some((x) => ["AM", "CMM", "SM", "SUPERADMIN"].includes(x) || NP_ROLES.includes(x) || x.startsWith("NP"));
 }
 /**
- * DOC-06: once Compliance has approved, the way forward depends on the authority route it decided:
- * notification / approval → only "Send to the authority"; none → only "Publish"; not decided yet → nothing forward.
+ * DOC-06: once Compliance has approved, the revision goes to the authority (notification or approval — every revision is at
+ * least a notification, decision of 23/10); route not decided yet → nothing forward.
  */
 export function allowedTransitions(s: Session, step: string, ownerRole: string, needsSignature: boolean, toRepo: boolean, route?: string | null, internal?: boolean): Transition[] {
   const cmm = isCmm(s), owner = ownsManual(s, ownerRole);
@@ -40,7 +38,6 @@ export function allowedTransitions(s: Session, step: string, ownerRole: string, 
     // internal documents: draft → published by the author; regulated manuals: never straight from draft
     .filter((t) => (internal ? step !== "draft" || t.to === "published" : !(t.from === "draft" && t.to === "published")))
     .filter((t) => !(t.to === "with_civil_aviation" && !viaAuthority))
-    .filter((t) => !((t.from === "approved_compliance" || t.from === "signed") && t.to === "published" && route !== "none"))
     .filter((t) => (t.by === "cmm" ? cmm : t.by === "owner" ? owner : owner || cmm))
     .filter((t) => !(t.to === "signed" && !needsSignature))
     .filter((t) => !(t.to === "repository" && !toRepo))

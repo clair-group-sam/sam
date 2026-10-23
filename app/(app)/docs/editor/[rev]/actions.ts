@@ -235,7 +235,7 @@ export async function setReturnKind(formData: FormData) {
 }
 
 /** DOC-06 · proposal for the authority route, from the changed chapters and the manual's own amendment procedure. Compliance decides. */
-export type RouteProposal = { route: "notification" | "approval" | "none"; confidence: "high" | "medium" | "low"; reasons: { chapter: string; change: string; rule: string }[]; summary: string; at?: string; model?: string };
+export type RouteProposal = { route: "notification" | "approval"; confidence: "high" | "medium" | "low"; reasons: { chapter: string; change: string; rule: string }[]; summary: string; at?: string; model?: string };
 export async function proposeRoute(input: { revisionId: string }): Promise<{ ok: true; proposal: RouteProposal } | { ok: false; error: string }> {
   try {
     const { s, db, rev, manual } = await guard(input.revisionId);
@@ -253,13 +253,13 @@ export async function proposeRoute(input: { revisionId: string }): Promise<{ ok:
     const procedure = ((all ?? []) as Section[]).filter((x) => /amend|modif|change|approbation|approval|notif/i.test(x.title ?? "")).map((x) => `### ${x.ref} ${x.title}\n${stripHtml(x.body.html ?? "").slice(0, 6000)}`).join("\n\n").slice(0, 14000);
     const blocks = changed.slice(0, 25).map((c) => `### ${c.ref} ${c.title ?? ""}\nBEFORE:\n${(baseMap.get(c.ref) ?? "(not available)").slice(0, 3500)}\nAFTER:\n${stripHtml(c.body.html ?? "").slice(0, 3500)}`).join("\n\n");
     const ent = ENT[manual.entity];
-    const system = `You assist the Compliance Monitoring Manager of an aviation organisation. For a revision of a regulatory manual you propose whether the authority must APPROVE it before publication, only be NOTIFIED, or neither. Base yourself on (1) the manual's own amendment procedure quoted below, which prevails, then (2) the applicable EASA rules for this organisation (Part-CAO: CAO.A.015 / CAO.A.025 changes; Part-CAMO: CAMO.A.130 and the CAME indirect approval procedure; AOC: ORO.GEN.130 and ORO.GEN.200; ATO: ORA.GEN.130). Typical approval items: name, location, accountable manager and nominated persons, scope / ratings, facilities, the change procedure itself. Editorial, typographical or purely internal procedural changes are usually notification or none according to the procedure. Never invent references; when unsure, say so and lower the confidence. Answer ONLY with JSON: {"route":"approval|notification|none","confidence":"high|medium|low","summary":"one or two sentences","reasons":[{"chapter":"ref","change":"what changed","rule":"procedure paragraph or rule that applies"}]}`;
+    const system = `You assist the Compliance Monitoring Manager of an aviation organisation. For a revision of a regulatory manual you propose whether the authority must APPROVE it before publication or only be NOTIFIED (every revision is at least notified: there is no third option). Base yourself on (1) the manual's own amendment procedure quoted below, which prevails, then (2) the applicable EASA rules for this organisation (Part-CAO: CAO.A.015 / CAO.A.025 changes; Part-CAMO: CAMO.A.130 and the CAME indirect approval procedure; AOC: ORO.GEN.130 and ORO.GEN.200; ATO: ORA.GEN.130). Typical approval items: name, location, accountable manager and nominated persons, scope / ratings, facilities, the change procedure itself. Editorial, typographical or purely internal procedural changes are a notification unless the procedure says otherwise. Never invent references; when unsure, say so and lower the confidence. Answer ONLY with JSON: {"route":"approval|notification","confidence":"high|medium|low","summary":"one or two sentences","reasons":[{"chapter":"ref","change":"what changed","rule":"procedure paragraph or rule that applies"}]}`;
     const user = `Organisation: ${ent?.name ?? manual.entity} (${ent?.qual ?? ""}), authority ${ent?.auth ?? ""}. Manual: ${manual.code} — ${manual.title}, Issue ${rev.issue} Rev ${rev.rev}.\nRevision summary by the author: ${rev.summary ?? "(none)"}\n\nAMENDMENT PROCEDURE OF THE MANUAL:\n${procedure || "(no amendment chapter found)"}\n\nCHANGED CHAPTERS:\n${blocks}`;
     const { text, model } = await callClaude({ agent: "route", personId: s.person?.id ?? null, entity: manual.entity, system, user, maxTokens: 2500 });
     const m = /\{[\s\S]*\}/.exec(text);
     if (!m) return { ok: false, error: "No proposal returned." };
     const proposal = { ...(JSON.parse(m[0]) as RouteProposal), at: new Date().toISOString(), model };
-    if (!["approval", "notification", "none"].includes(proposal.route)) return { ok: false, error: "Unexpected proposal." };
+    if (!["approval", "notification"].includes(proposal.route)) return { ok: false, error: "Unexpected proposal." };
     await db.from("revisions").update({ route_proposal: proposal }).eq("id", rev.id);
     revalidatePath(`/docs/editor/${rev.id}`);
     return { ok: true, proposal };
@@ -270,7 +270,7 @@ export async function decideRoute(formData: FormData) {
   const { s, db, rev, manual } = await guard(String(formData.get("revision_id") ?? ""));
   if (!isCmm(s)) return;
   const route = String(formData.get("route") ?? "");
-  if (!["approval", "notification", "none"].includes(route)) return;
+  if (!["approval", "notification"].includes(route)) return;
   await db.from("revisions").update({ authority_route: route, return_kind: expectedReturn(manual.entity, manual.code, route) }).eq("id", rev.id);
   await audit(db, s.person?.id ?? null, manual.entity, rev.id, "authority_route", { route });
   revalidatePath(`/docs/editor/${rev.id}`);

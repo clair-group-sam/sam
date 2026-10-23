@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { proposeRoute, decideRoute, type RouteProposal as Proposal } from "@/app/(app)/docs/editor/[rev]/actions";
 
-const LABEL: Record<string, string> = { approval: "Approval by the authority", notification: "Notification to the authority", none: "No authority route" };
+const LABEL: Record<string, string> = { approval: "Approval by the authority", notification: "Notification to the authority" };
 
 /** DOC-06 · the assistant proposes, Compliance decides. */
 export default function RouteProposal({ revisionId, initial, route, authority }: { revisionId: string; initial: Proposal | null; route: string | null; authority: string }) {
@@ -27,8 +27,8 @@ export default function RouteProposal({ revisionId, initial, route, authority }:
       )}
       <form action={decideRoute} className="flex gap-2 mt-3 flex-wrap">
         <input type="hidden" name="revision_id" value={revisionId} />
-        {(["approval", "notification", "none"] as const).map((r) => (
-          <button key={r} name="route" value={r} type="submit" className={"btn" + ((p?.route === r && route !== r) ? " primary" : "") + (route === r ? " on" : "")}>{r === "none" ? "No route" : r === "approval" ? `Approval (${authority})` : `Notification (${authority})`}</button>
+        {(["approval", "notification"] as const).map((r) => (
+          <button key={r} name="route" value={r} type="submit" className={"btn" + ((p?.route === r && route !== r) ? " primary" : "") + (route === r ? " on" : "")}>{r === "approval" ? `Approval (${authority})` : `Notification (${authority})`}</button>
         ))}
       </form>
     </div>

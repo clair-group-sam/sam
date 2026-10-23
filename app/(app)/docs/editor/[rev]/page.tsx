@@ -99,7 +99,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
     { step: "approved_np", label: `Approve (${ownerPost ?? "author"})`, who: ownerWho, detail: `The owner of the manual${ownerPost && !["CMM", "SM"].includes(ownerPost) ? " (nominated person)" : ""} validates the content and hands over to Compliance.`, done: doneAt("approved_np") },
     { step: "approved_compliance", label: "Approve (Compliance)", who: cmmWho, locked: !cmm, detail: "Checked against the requirements; the authority route is decided here.", done: doneAt("approved_compliance") },
     ...(manual.needs_signature ? [{ step: "signed", label: "Sign", who: signWho, locked: !cmm, done: doneAt("signed") }] : []),
-    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, locked: !cmm, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance.", skipped: route === "none" ? "not required — no authority route for this revision" : undefined, done: doneAt("with_civil_aviation") },
+    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, locked: !cmm, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance — every revision is at least notified.", done: doneAt("with_civil_aviation") },
     { step: "published", label: "Publish", who: "Compliance", locked: !cmm, detail: "Readers are notified; reading is tracked per reader.", done: doneAt("published") },
     ...(manual.to_tmcad_repository ? [{ step: "repository", label: "TM-CAD repository", who: "Compliance", locked: !cmm, done: doneAt("repository") }] : []),
   ];
@@ -231,7 +231,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
             <div className="cb">
               {routeOpen
                 ? <RouteProposal revisionId={rev.id} initial={rev.route_proposal ?? null} route={rev.authority_route} authority={auth} />
-                : <p className="mini">Route: <b>{rev.authority_route ?? "none"}</b>{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""} — fixed once the revision is with the authority.</p>}
+                : <p className="mini">Route: <b>{rev.authority_route ?? "not decided"}</b>{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""} — fixed once the revision is with the authority.</p>}
             </div>
           </section>
           <section className={"card" + (cmm ? "" : " locked")}>
