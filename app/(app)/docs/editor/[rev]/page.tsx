@@ -68,9 +68,9 @@ export default async function Editor({ params, searchParams }: { params: Promise
   if (cmm && retPages.length) { const { data: su } = await admin.storage.from("manuals").createSignedUrls(retPages.map((x) => x.path), 600); for (const x of su ?? []) if (x.path && x.signedUrl) retUrls.set(x.path, x.signedUrl); }
   const { data: noticeData } = cmm || (internal && owner) ? await admin.from("manual_notices").select("sent_at,recipients,emailed,email_status").eq("revision_id", rev.id).order("sent_at") : { data: [] };
   const notices = (noticeData ?? []) as { sent_at: string; recipients: number; emailed: number; email_status: string | null }[];
-  const broken = tab === "publish" ? await checkLinks(admin, rev.id, manual.id) : [];
+  const broken = tab === "write" ? await checkLinks(admin, rev.id, manual.id) : [];
   const linkCard = (
-    <section className="card col-span-2">
+    <section className="card mb-4">
       <div className="ch"><span className="eyebrow">Links check</span><span className={"pill " + (broken.length ? "amber" : "green")}>{broken.length ? `${broken.length} to fix` : "all links resolve"}</span></div>
       <div className="cb">{broken.length ? <table className="tbl"><tbody>{broken.map((b, i) => <tr key={i}><td className="mono" style={{ width: 80 }}><Link className="underline" href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(b.chapter)}`}>{b.chapter}</Link></td><td>“{b.text}”<div className="mini">{b.why}</div></td></tr>)}</tbody></table>
         : <p className="mini">Every link to a chapter of this or another manual points to a chapter that exists.</p>}</div>
@@ -128,6 +128,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
         <div className="draftbar mb-4"><div><b>Rev {rev.rev} — {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
       )}
 
+      {tab === "write" && linkCard}
       {tab === "write" && (
         <div className="flex gap-4 items-start">
           <aside className="card toc edtoc">
@@ -169,7 +170,6 @@ export default async function Editor({ params, searchParams }: { params: Promise
 
       {tab === "publish" && internal && (owner || cmm) && (
         <div className="grid grid-cols-2 gap-4">
-          {linkCard}
           <section className="card">
             <div className="ch"><span className="eyebrow">Revision summary</span></div>
             <form action={saveSummary} className="cb">
@@ -201,7 +201,6 @@ export default async function Editor({ params, searchParams }: { params: Promise
 
       {tab === "publish" && !internal && (
         <div className="grid grid-cols-2 gap-4">
-          {linkCard}
           <section className="card">
             <div className="ch"><span className="eyebrow">Revision summary</span></div>
             <form action={saveSummary} className="cb">
