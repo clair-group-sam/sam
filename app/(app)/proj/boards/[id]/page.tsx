@@ -77,71 +77,79 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <div className="ch"><span className="eyebrow">{ph.label}</span><span className="mini">{done} / {counted}{shown.length !== pt.length ? ` · ${shown.length} shown` : ""}</span></div>
                 {shown.length > 0 && (
                   <table className="tbl ptasks"><tbody>
-                    {shown.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const work = mayWork(t) && p.status !== "closed"; return (
-                      <tr key={t.id} id={`t-${t.id}`} className={t.status === "done" || t.status === "not_needed" ? "muted" : ""}>
-                        <td style={{ width: 150 }}>
-                          <div className="flex items-center gap-2">
-                            <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
-                              <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!work || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? "✓" : ""}</button></form>
-                            {t.status === "todo" && work ? (
-                              <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start (it also starts by itself when you touch the linked manual, open the file or attach a document)">To do ▸</button></form>
-                            ) : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
-                          </div>
+                    {shown.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const work = mayWork(t) && p.status !== "closed"; const tf = taskFiles.filter((f) => f.task_id === t.id); const open = t.status !== "done" && t.status !== "not_needed"; return (
+                      <tr key={t.id} id={`t-${t.id}`} className={"prow" + (open ? "" : " muted")}>
+                        <td style={{ width: 34 }}>
+                          <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
+                            <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!work || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? "✓" : ""}</button></form>
+                        </td>
+                        <td style={{ width: 96 }}>
+                          {t.status === "todo" && work ? (
+                            <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start now — it also starts by itself when the linked manual, file or a document is touched">To do ▸</button></form>
+                          ) : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
                         </td>
                         <td>
-                          <div className="flex items-baseline gap-2 flex-wrap">{pj.critical && t.status !== "done" && <span title="critical path">⚡</span>}<b>{t.title}</b>{t.link_kind && <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span>}</div>
-                          {t.detail && <div className="mini">{t.detail}</div>}
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            {pj.critical && open && <span title="critical path">⚡</span>}
+                            <b>{t.title}</b>
+                            {lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label} · <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span> : null}
+                            {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}>📎 {tf.length}</span>}
+                            {openDs.length > 0 && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(" · ")}`}>waits for {openDs.length}</span>}
+                          </div>
+                          {t.detail && open && <div className="mini">{t.detail}</div>}
                           {t.status === "not_needed" && t.not_needed_reason && <div className="mini">Not needed: {t.not_needed_reason}</div>}
-                          {lk && <div className="mini">{lk.href ? <Link className="underline" href={lk.href}>{lk.label}</Link> : lk.label} · <span className={"pill " + lk.tone} style={{ fontSize: 10.5 }}>{lk.state}</span></div>}
-                          {t.link_kind === "manual" && !t.link_id && work && t.status !== "done" && t.status !== "not_needed" && (
-                            <div className="flex items-center gap-2 mt-1 flex-wrap"><form action={startDraftForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Start the draft now</button></form><span className="mini">{pj.openDeps.length ? "S.A.M. opens it by itself once the previous tasks are done." : ""}</span></div>
-                          )}
-                          {t.link_kind === "authority_file" && !t.link_id && work && t.status !== "done" && t.status !== "not_needed" && (
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Open the file now ({t.link_ref})</button></form><span className="mini">{pj.openDeps.length ? "S.A.M. opens it by itself once the previous tasks are done." : ""}</span>
-                              {mayEdit && unbound.length > 0 && <form action={bindFileToTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><select name="file_id" className="inp" style={{ height: 26, fontSize: 12, maxWidth: 260 }}>{unbound.map((f) => <option key={f.id} value={f.id}>{f.type_code} · {f.title} · {f.stage}</option>)}</select><button className="btn" type="submit" style={{ height: 26, fontSize: 12 }}>Bind existing</button></form>}
-                            </div>
-                          )}
-                          {ds.length > 0 && <div className="mini">after: {ds.map((d) => <span key={d.id} className={openDs.some((o) => o.id === d.id) ? "amber" : ""}>{d.title}{d.status === "done" ? " ✓" : ""}</span>).reduce<React.ReactNode[]>((acc, x, i) => (i ? [...acc, " · ", x] : [x]), [])}</div>}
-                          {t.source && <div className="mini">{/^https?:/.test(t.source) ? <a className="underline" href={t.source} target="_blank" rel="noreferrer">source</a> : t.source}</div>}
-                          {t.note && <div className="mini">✎ {t.note}</div>}
-                          {taskFiles.filter((f) => f.task_id === t.id).map((f) => <div key={f.id} className="mini flex items-center gap-2">📎 {f.path ? <a className="underline" href={`/api/files/${f.path}`} target="_blank" rel="noreferrer">{f.name}</a> : <>{f.name} <span>(on the server)</span></>}{f.size ? <span>{Math.round(f.size / 1024)} KB</span> : null}<span>{fr(f.at)}</span>{mayEdit && <form action={removeTaskFile}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="file_id" value={f.id} /><button className="mini underline" type="submit" style={{ background: "none", border: 0, cursor: "pointer", color: "var(--slate6)" }}>remove</button></form>}</div>)}
-                          {work && t.status !== "done" && t.status !== "not_needed" && (
-                            <form action={uploadTaskFile} className="flex items-center gap-2 mt-1 flex-wrap" encType="multipart/form-data"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
-                              <input type="file" name="file" className="inp" style={{ height: 26, fontSize: 11, maxWidth: 260 }} /><input name="name" className="inp" style={{ height: 26, fontSize: 11, maxWidth: 220 }} placeholder="or name of a file kept on the server" /><button className="btn" type="submit" style={{ height: 26, fontSize: 11 }}>Attach</button></form>
-                          )}
-                          {mayEdit && p.status !== "closed" && (
-                            <details className="mt-1"><summary className="mini underline cursor-pointer">Edit</summary>
-                              <form action={updateTask} className="grid grid-cols-6 gap-2 mt-2 p-2" style={{ background: "#f7f9fb", borderRadius: 8 }}>
-                                <input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><input type="hidden" name="deps_edit" value="1" />
-                                <label className="col-span-3"><span className="mini">Title</span><input name="title" className="inp" defaultValue={t.title} /></label>
-                                <label><span className="mini">Owner post</span><input name="owner_role" className="inp mono" defaultValue={t.owner_role ?? ""} /></label>
-                                <label><span className="mini">Days</span><input name="days" type="number" className="inp" defaultValue={t.days ?? ""} /></label>
-                                <label><span className="mini">Due (fixed)</span><input name="due" type="date" className="inp" defaultValue={t.due ?? ""} /></label>
-                                <label className="col-span-3"><span className="mini">Detail</span><input name="detail" className="inp" defaultValue={t.detail ?? ""} /></label>
-                                <label><span className="mini">Phase</span><select name="phase_id" className="inp" defaultValue={t.phase_id ?? ""}>{phases.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
-                                <label><span className="mini">Linked object</span><select name="link_kind" className="inp" defaultValue={t.link_kind ?? ""}><option value="">none</option>{Object.entries(LINK_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-                                <label><span className="mini">Code / type / kind</span><input name="link_ref" className="inp mono" defaultValue={t.link_ref ?? ""} placeholder="OM-A · AC-NEW · insurance" /></label>
-                                <label className="col-span-4"><span className="mini">Depends on</span><select name="depends_on" multiple className="inp" size={4} defaultValue={ds.map((d) => d.id)}>{tasks.filter((x) => x.id !== t.id).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
-                                <label className="col-span-2"><span className="mini">Note</span><input name="note" className="inp" defaultValue={t.note ?? ""} /></label>
-                                <label><span className="mini">Status</span><select name="status" className="inp" defaultValue={t.status}>{STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}</select></label>
-                                <label className="col-span-3"><span className="mini">If not needed — why (kept for the authority)</span><input name="not_needed_reason" className="inp" defaultValue={t.not_needed_reason ?? ""} /></label>
-                                <div className="col-span-6 flex gap-2"><button className="btn primary" type="submit">Save</button><button className="btn" type="submit" formAction={deleteTask} title="Delete this task">✕ Delete</button></div>
-                              </form>
+                        </td>
+                        <td className="mini" style={{ width: 70 }}>{t.owner_person ? nameOf.get(t.owner_person) : t.owner_role ?? ""}</td>
+                        <td className="mono mini" style={{ width: 150 }}>{t.status === "done" ? `done ${fr(t.done_at)}` : t.status === "not_needed" ? "" : <span className={pj.late ? "red" : ""}>{fr(pj.start)} → {fr(pj.end)}{t.due ? " ·fixed" : ""}</span>}</td>
+                        <td style={{ width: 36 }}>
+                          {(work || tf.length > 0) && (
+                            <details className="more"><summary title="Documents, details, edit">⋯</summary>
+                              <div className="morepanel">
+                                {(t.link_kind === "manual" || t.link_kind === "authority_file") && !t.link_id && work && open && (
+                                  <form action={t.link_kind === "manual" ? startDraftForTask : openFileForTask} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit">{t.link_kind === "manual" ? `Start the draft of ${t.link_ref} now` : `Open the ${t.link_ref} file now`}</button><span className="mini">{pj.openDeps.length ? "otherwise S.A.M. opens it once the previous tasks are done" : ""}</span></form>
+                                )}
+                                {t.link_kind === "authority_file" && !t.link_id && mayEdit && unbound.length > 0 && open && <form action={bindFileToTask} className="flex items-center gap-2"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><select name="file_id" className="inp" style={{ maxWidth: 300 }}>{unbound.map((f) => <option key={f.id} value={f.id}>{f.type_code} · {f.title} · {f.stage}</option>)}</select><button className="btn" type="submit">Bind an existing file</button></form>}
+                                {ds.length > 0 && <div className="mini">After: {ds.map((d) => `${d.title}${d.status === "done" ? " ✓" : ""}`).join(" · ")}</div>}
+                                {t.source && <div className="mini">{/^https?:/.test(t.source) ? <a className="underline" href={t.source} target="_blank" rel="noreferrer">Source</a> : t.source}</div>}
+                                {t.note && <div className="mini">✎ {t.note}</div>}
+                                {tf.map((f) => <div key={f.id} className="mini flex items-center gap-2">📎 {f.path ? <a className="underline" href={`/api/files/${f.path}`} target="_blank" rel="noreferrer">{f.name}</a> : <>{f.name} <span>(on the server)</span></>}{f.size ? <span>{Math.round(f.size / 1024)} KB</span> : null}<span>{fr(f.at)}</span>{mayEdit && <form action={removeTaskFile}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="file_id" value={f.id} /><button className="linkbtn" type="submit">remove</button></form>}</div>)}
+                                {work && open && (
+                                  <form action={uploadTaskFile} className="flex items-center gap-2 flex-wrap" encType="multipart/form-data"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
+                                    <input type="file" name="file" className="inp" style={{ maxWidth: 280 }} /><input name="name" className="inp" style={{ maxWidth: 240 }} placeholder="or the name of a file kept on the server" /><button className="btn" type="submit">Attach a document</button></form>
+                                )}
+                                {mayEdit && p.status !== "closed" && (
+                                  <form action={updateTask} className="grid grid-cols-6 gap-2 mt-1">
+                                    <input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><input type="hidden" name="deps_edit" value="1" />
+                                    <label className="col-span-3"><span className="mini">Title</span><input name="title" className="inp" defaultValue={t.title} /></label>
+                                    <label><span className="mini">Owner post</span><input name="owner_role" className="inp mono" defaultValue={t.owner_role ?? ""} /></label>
+                                    <label><span className="mini">Days</span><input name="days" type="number" className="inp" defaultValue={t.days ?? ""} /></label>
+                                    <label><span className="mini">Due (fixed)</span><input name="due" type="date" className="inp" defaultValue={t.due ?? ""} /></label>
+                                    <label className="col-span-3"><span className="mini">Detail</span><input name="detail" className="inp" defaultValue={t.detail ?? ""} /></label>
+                                    <label><span className="mini">Phase</span><select name="phase_id" className="inp" defaultValue={t.phase_id ?? ""}>{phases.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
+                                    <label><span className="mini">Linked object</span><select name="link_kind" className="inp" defaultValue={t.link_kind ?? ""}><option value="">none</option>{Object.entries(LINK_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+                                    <label><span className="mini">Code / type / kind</span><input name="link_ref" className="inp mono" defaultValue={t.link_ref ?? ""} placeholder="OM-A · AC-NEW · insurance" /></label>
+                                    <label className="col-span-3"><span className="mini">Depends on</span><select name="depends_on" multiple className="inp" size={4} defaultValue={ds.map((d) => d.id)}>{tasks.filter((x) => x.id !== t.id).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
+                                    <label className="col-span-2"><span className="mini">Note</span><input name="note" className="inp" defaultValue={t.note ?? ""} /></label>
+                                    <label><span className="mini">Status</span><select name="status" className="inp" defaultValue={t.status}>{STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}</select></label>
+                                    <label className="col-span-4"><span className="mini">If not needed — why (kept for the authority)</span><input name="not_needed_reason" className="inp" defaultValue={t.not_needed_reason ?? ""} /></label>
+                                    <div className="col-span-2 flex gap-2 items-end"><button className="btn primary" type="submit">Save</button><button className="btn" type="submit" formAction={deleteTask} title="Delete this task">✕ Delete</button></div>
+                                  </form>
+                                )}
+                              </div>
                             </details>
                           )}
                         </td>
-                        <td className="mini" style={{ width: 90 }}>{t.owner_person ? nameOf.get(t.owner_person) : t.owner_role ?? ""}</td>
-                        <td className="mono mini" style={{ width: 150 }}>{t.status === "done" ? `done ${fr(t.done_at)}` : t.status === "not_needed" ? "" : <span className={pj.late ? "red" : ""}>{fr(pj.start)} → {fr(pj.end)}{t.due ? " ·fixed" : ""}</span>}</td>
                       </tr>); })}
                   </tbody></table>
                 )}
                 {!shown.length && <div className="cb mini text-slate6">{pt.length ? "Nothing in this view." : "No task yet."}</div>}
                 {mayEdit && p.status !== "closed" && (
+                  <details className="addtask"><summary className="mini">+ Add a task</summary>
                   <form action={addTask} className="nprow add"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="phase_id" value={ph.id} />
-                    <input name="title" className="inp" placeholder="Add a task to this phase" required /><input name="owner_role" className="inp mono" style={{ maxWidth: 80 }} placeholder="Post" /><input name="days" type="number" className="inp" style={{ maxWidth: 70 }} placeholder="days" />
+                    <input name="title" className="inp" placeholder="Task" required /><input name="owner_role" className="inp mono" style={{ maxWidth: 80 }} placeholder="Post" /><input name="days" type="number" className="inp" style={{ maxWidth: 70 }} placeholder="days" />
                     <select name="link_kind" className="inp" style={{ maxWidth: 150 }} defaultValue=""><option value="">no linked object</option>{Object.entries(LINK_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select><input name="link_ref" className="inp mono" style={{ maxWidth: 100 }} placeholder="OM-A / AC-NEW" />
                     <button className="btn" type="submit">+ Add</button></form>
+                  </details>
                 )}
               </section>);
           })}

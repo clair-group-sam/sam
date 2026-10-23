@@ -485,3 +485,13 @@ body:has(.pm){background:#e9eef2}
 .gtick{position:absolute;top:2px;font-size:10px;color:var(--slate5);border-left:1px solid var(--line);padding-left:3px;height:18px}
 .gkey{display:inline-block;width:12px;height:10px;border-radius:3px;vertical-align:middle;margin-right:3px;background:var(--cyan)}
 .gkey.done{background:var(--green)}.gkey.next{background:#c9d4de}.gkey.waiting{background:#8aa2b8}.gkey.blocked{background:#c35a5a}.gkey.late{background:var(--terra, #c0603a)}
+
+/* project rows: one line per task, secondary actions behind ⋯ */
+.prow td{vertical-align:top;padding-top:8px;padding-bottom:8px}
+.prow.muted td{color:var(--slate5)}.prow.muted b{font-weight:500}
+.objlink{font-size:12px;color:var(--navy)}.objlink .pill{font-size:10.5px;padding:0 6px}
+details.more{position:relative}details.more>summary{list-style:none;cursor:pointer;width:26px;height:24px;border:1px solid var(--line);border-radius:6px;text-align:center;line-height:22px;color:var(--slate6);background:#fff}
+details.more>summary::-webkit-details-marker{display:none}details.more[open]>summary{background:var(--blue05)}
+.morepanel{position:absolute;right:0;top:28px;z-index:30;width:720px;max-width:80vw;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:12px;display:grid;gap:8px;font-size:13px}
+.linkbtn{background:none;border:0;cursor:pointer;color:var(--slate6);text-decoration:underline;font-size:11.5px;padding:0}
+details.addtask>summary{list-style:none;cursor:pointer;padding:8px 14px;color:var(--slate6)}details.addtask>summary::-webkit-details-marker{display:none}details.addtask>summary:hover{color:var(--navy)}
