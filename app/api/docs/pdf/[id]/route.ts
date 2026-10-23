@@ -42,9 +42,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const resp = await page.goto(target, { waitUntil: "networkidle0", timeout: 40_000 });
     if (!resp || !resp.ok()) throw new Error(`print page HTTP ${resp?.status() ?? "?"}`);
     await page.evaluate(async () => { await document.fonts.ready; await Promise.all(Array.from(document.images).map((i) => (i.complete ? null : new Promise((res) => { i.onload = i.onerror = res; })))); });
-    const fileName = (await page.title()) || `${manual.entity}-${manual.code}-Rev${rev.rev}`;
+    // file name computed here (the page title can still be the app's default when a short document finishes loading first)
+    const { data: pubs } = await sb.from("revisions").select("id,published_at").eq("manual_id", id).in("step", ["published", "repository"]).order("published_at", { ascending: false }).limit(1);
+    const isPub = rev.step === "published" || rev.step === "repository";
+    const suffix = !isPub ? "-DRAFT" : pubs?.[0] && pubs[0].id !== rev.id ? "-SUPERSEDED" : "";
+    const fileName = `${manual.entity}-${manual.code}-Iss${rev.issue}-Rev${rev.rev}${suffix}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._-]+/g, "-");
     const pdf = await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true, outline: true, tagged: true, timeout: 40_000 });
-    const path = `${manual.entity}/${manual.code}/${rev.rev}/exports/${fileName}.pdf`;
+    const safe = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._-]+/g, "-");
+    const path = `${manual.entity}/${safe(manual.code)}/${safe(rev.rev)}/exports/${fileName}.pdf`;
     const admin = supabaseAdmin();
     const up = await admin.storage.from("manuals").upload(path, pdf, { upsert: true, contentType: "application/pdf" });
     if (up.error) throw new Error(up.error.message);
