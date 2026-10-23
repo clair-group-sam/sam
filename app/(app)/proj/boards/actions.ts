@@ -5,7 +5,8 @@ import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isCmm } from "@/lib/revisions";
 import { addDays, routeFor, syncTasks, today, type AuthorityFile, type FileType } from "@/lib/authority";
-import { instantiate, type Project, type ProjectTemplate, type Task, type TaskStatus } from "@/lib/projects";
+import { instantiate, type Phase, type Project, type ProjectTemplate, type Task, type TaskStatus, type TemplateTask } from "@/lib/projects";
+import { daysBetween } from "@/lib/authority";
 
 type Db = ReturnType<typeof supabaseAdmin>;
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -184,4 +185,40 @@ export async function bindFileToTask(formData: FormData) {
   await db.from("project_tasks").update({ link_kind: "authority_file", link_id: fileId, status: done ? "done" : "in_progress", done_at: done ? today() : null, updated_at: new Date().toISOString() }).eq("id", taskId).eq("project_id", p.id);
   await db.from("authority_files").update({ project_id: p.id }).eq("id", fileId).is("project_id", null);
   paths(p.id);
+}
+
+const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 32);
+/**
+ * Lessons learned → template: the project's phases and tasks, as they really ran, become the template (update the one it came
+ * from, or a new one). Durations: the real duration of done tasks when known, else the planned days. "Not needed" tasks are kept
+ * (another project may need them). Compliance only.
+ */
+export async function pushToTemplate(formData: FormData) {
+  const { s, db, p, cmm } = await guard(str(formData, "id"));
+  if (!cmm) throw new Error("Compliance only");
+  const mode = str(formData, "mode");
+  const code = (mode === "new" ? str(formData, "code") : p.template_code ?? "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  if (!code) throw new Error(mode === "new" ? "A code is required for the new template" : "This project was not opened from a template: save it as a new one.");
+  const [{ data: phData }, { data: tData }] = await Promise.all([db.from("project_phases").select("*").eq("project_id", p.id).order("ord"), db.from("project_tasks").select("*").eq("project_id", p.id).order("ord")]);
+  const phases = (phData ?? []) as Phase[]; const tasks = (tData ?? []) as Task[];
+  const { data: dData } = tasks.length ? await db.from("project_task_deps").select("*").in("task_id", tasks.map((t) => t.id)) : { data: [] };
+  const deps = (dData ?? []) as { task_id: string; depends_on: string }[];
+  const phaseKey = new Map(phases.map((ph) => [ph.id, ph.key || slug(ph.label)]));
+  const used = new Set<string>(); const keyOf = new Map<string, string>();
+  for (const t of tasks) { let k = t.key || slug(t.title) || "t"; while (used.has(k)) k += "_"; used.add(k); keyOf.set(t.id, k); }
+  const tplTasks: TemplateTask[] = tasks.map((t) => {
+    const real = t.status === "done" && t.started_at && t.done_at ? daysBetween(t.started_at, t.done_at) : null;
+    const x: TemplateTask = { key: keyOf.get(t.id)!, phase: phaseKey.get(t.phase_id ?? "") ?? phaseKey.get(phases[0]?.id ?? "") ?? "tasks", title: t.title, owner_role: t.owner_role, days: real && real > 0 ? real : t.days ?? null, deps: deps.filter((d) => d.task_id === t.id).map((d) => keyOf.get(d.depends_on)!).filter(Boolean) };
+    if (t.link_kind) x.link_kind = t.link_kind; if (t.link_ref) x.link_ref = t.link_ref; if (t.detail) x.detail = t.detail; if (t.source) x.source = t.source;
+    return x;
+  });
+  const { data: before } = await db.from("project_templates").select("*").eq("code", code).maybeSingle();
+  const prev = (before as ProjectTemplate | null) ?? null;
+  const row = { code, name: mode === "new" ? str(formData, "name") || code : prev?.name ?? code, description: prev?.description ?? p.description ?? null, entities: prev?.entities ?? [p.entity], phases: phases.map((ph) => ({ key: phaseKey.get(ph.id)!, label: ph.label })), tasks: tplTasks, pivots: prev?.pivots ?? Object.keys(p.pivot ?? {}), active: true, ord: prev?.ord ?? 99 };
+  const { error } = prev ? await db.from("project_templates").update(row).eq("code", code) : await db.from("project_templates").insert(row);
+  if (error) throw new Error(error.message);
+  await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: p.entity, object_type: "project_template", object_id: code, action: prev ? "template_updated_from_project" : "template_created_from_project", before: prev, after: { ...row, project: p.id } });
+  await audit(db, s, p, "lessons_to_template", { code, tasks: tplTasks.length });
+  revalidatePath("/ref/ptpl"); revalidatePath("/proj/boards/new"); paths(p.id);
+  redirect(`/ref/ptpl?edit=${code}#${code}`);
 }

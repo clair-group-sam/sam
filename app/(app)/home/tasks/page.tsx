@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { basePost, getSession } from "@/lib/session";
 import { PageHeader, Metric } from "@/components/Page";
 import { ENT } from "@/lib/nav";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { OPEN, project as projectDates, type Dep, type Project, type Task as PTask } from "@/lib/projects";
 
 type Task = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null };
 
@@ -16,7 +18,31 @@ export default async function Inbox() {
   if (s.entity !== "ALL") q = q.eq("entity", s.entity);
   const { data } = await q;
   const posts = new Set(s.roles.map(basePost));
-  const tasks = ((data ?? []) as Task[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : true).slice(0, 100);
+  const tasks: Task[] = ((data ?? []) as Task[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : true).slice(0, 100);
+  // project tasks (PRJ-02): mine, open, with no open dependency — due = projected end
+  const admin = supabaseAdmin();
+  let pq = admin.from("projects").select("*").eq("status", "open");
+  pq = s.entity === "ALL" ? pq.in("entity", s.entities) : pq.eq("entity", s.entity);
+  const { data: pData } = await pq;
+  const projects = (pData ?? []) as Project[];
+  if (projects.length) {
+    const { data: ptData } = await admin.from("project_tasks").select("*").in("project_id", projects.map((p) => p.id)).in("status", OPEN);
+    const ptasks = (ptData ?? []) as PTask[];
+    const { data: dData } = ptasks.length ? await admin.from("project_task_deps").select("*").in("task_id", ptasks.map((t) => t.id)) : { data: [] };
+    const deps = (dData ?? []) as Dep[];
+    // the projection needs every task of the project (done ones end the chains): load them too
+    const { data: allData } = await admin.from("project_tasks").select("*").in("project_id", projects.map((p) => p.id));
+    const all = (allData ?? []) as PTask[];
+    for (const p of projects) {
+      const proj = projectDates(all.filter((t) => t.project_id === p.id), deps, p.started_at);
+      for (const t of ptasks.filter((t) => t.project_id === p.id)) {
+        const mine = t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : (p.owner_person ? p.owner_person === s.person?.id : !!p.owner_role && posts.has(basePost(p.owner_role)));
+        if (!mine || proj.get(t.id)?.openDeps.length) continue;
+        tasks.push({ id: t.id, title: t.title, detail: `${p.title}${t.status === "blocked" ? " · blocked" : t.status === "waiting" ? " · waiting" : ""}`, due: t.status === "waiting" ? null : proj.get(t.id)?.end ?? null, entity: p.entity, kind: "project", status: "open", link: `/proj/boards/${p.id}`, owner_person: t.owner_person, owner_role: t.owner_role });
+      }
+    }
+    tasks.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
+  }
   const today = new Date().toISOString().slice(0, 10);
   const late = tasks.filter((t) => t.due && t.due < today).length;
   const first = s.name.split(" ")[0];

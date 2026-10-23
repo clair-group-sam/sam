@@ -7,15 +7,16 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STAGE_LABEL, fr, today, type AuthorityFile } from "@/lib/authority";
 import { LINK_LABEL, OPEN, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, type Task, type TaskStatus } from "@/lib/projects";
-import { addPhase, addTask, bindFileToTask, deleteTask, openFileForTask, saveProject, updateTask } from "../actions";
+import { addPhase, addTask, bindFileToTask, deleteTask, openFileForTask, pushToTemplate, saveProject, updateTask } from "../actions";
+import Gantt from "@/components/Gantt";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked", "done", "not_needed"];
 
-export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string; view?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
   const { id } = await params;
-  const { show = "open" } = await searchParams;
+  const { show = "open", view = "list" } = await searchParams;
   const db = supabaseAdmin();
   const loaded = await loadProject(db, id);
   if (!loaded) notFound();
@@ -62,8 +63,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       <div className="grid grid-cols-3 gap-4 items-start">
         <div className="col-span-2 grid gap-4">
-          <div className="tabs">{[["open", "Open tasks"], ["done", "Done"], ["not_needed", "Not needed"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards/${p.id}?show=${k}`} className={"tab" + (show === k ? " on" : "")}>{l}</Link>)}<span className="mini ml-auto">⚡ critical path · dates projected from durations and dependencies</span></div>
-          {phases.map((ph) => {
+          <div className="tabs">{[["open", "Open tasks"], ["done", "Done"], ["not_needed", "Not needed"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards/${p.id}?show=${k}`} className={"tab" + (view === "list" && show === k ? " on" : "")}>{l}</Link>)}<Link href={`/proj/boards/${p.id}?view=gantt`} className={"tab" + (view === "gantt" ? " on" : "")}>Timeline</Link><span className="mini ml-auto">⚡ critical path · dates projected from durations and dependencies</span></div>
+          {view === "gantt" && <section className="card"><div className="ch"><span className="eyebrow">Timeline</span><span className="mini">projected · {fr(p.started_at)} → {end ? fr(end) : "—"}</span></div><div className="cb"><Gantt projectId={p.id} phases={phases} tasks={tasks} proj={proj} startedAt={p.started_at} target={p.target_date} /></div></section>}
+          {view === "list" && phases.map((ph) => {
             const pt = tasks.filter((t) => t.phase_id === ph.id);
             const shown = pt.filter(visible);
             const done = pt.filter((t) => t.status === "done").length, counted = pt.filter((t) => t.status !== "not_needed").length;
@@ -73,7 +75,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 {shown.length > 0 && (
                   <table className="tbl ptasks"><tbody>
                     {shown.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const work = mayWork(t) && p.status !== "closed"; return (
-                      <tr key={t.id} className={t.status === "done" || t.status === "not_needed" ? "muted" : ""}>
+                      <tr key={t.id} id={`t-${t.id}`} className={t.status === "done" || t.status === "not_needed" ? "muted" : ""}>
                         <td style={{ width: 150 }}>
                           {work ? (
                             <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
@@ -129,7 +131,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 )}
               </section>);
           })}
-          {mayEdit && p.status !== "closed" && <form action={addPhase} className="nprow"><input type="hidden" name="id" value={p.id} /><input name="label" className="inp" placeholder="Add a phase" required /><button className="btn" type="submit">+ Phase</button></form>}
+          {view === "list" && mayEdit && p.status !== "closed" && <form action={addPhase} className="nprow"><input type="hidden" name="id" value={p.id} /><input name="label" className="inp" placeholder="Add a phase" required /><button className="btn" type="submit">+ Phase</button></form>}
         </div>
 
         <div className="grid gap-4">
@@ -154,7 +156,18 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </section>
           {(p.status === "closed" || pr.pct === 100) && (
             <section className="card"><div className="ch"><span className="eyebrow">Lessons learned</span></div>
-              <form action={saveProject} className="cb grid gap-2"><input type="hidden" name="id" value={p.id} /><textarea name="lessons" className="inp" rows={4} defaultValue={p.lessons ?? ""} disabled={!mayEdit} placeholder="What to do differently next time" />{mayEdit && <button className="btn" type="submit">Save</button>}</form></section>
+              <form action={saveProject} className="cb grid gap-2"><input type="hidden" name="id" value={p.id} /><textarea name="lessons" className="inp" rows={4} defaultValue={p.lessons ?? ""} disabled={!mayEdit} placeholder="What to do differently next time" />{mayEdit && <button className="btn" type="submit">Save</button>}</form>
+              {cmm && (
+                <div className="cb grid gap-2" style={{ borderTop: "1px solid var(--line)" }}>
+                  <div className="eyebrow">Improve the template</div>
+                  <p className="mini">Push this project as it really ran — phases, tasks, posts, real durations, dependencies, linked objects — into the template, so the next project starts from what you learned. “Not needed” tasks are kept.</p>
+                  {p.template_code && <form action={pushToTemplate}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="mode" value="update" /><button className="btn" type="submit">Update template {p.template_code}</button></form>}
+                  <form action={pushToTemplate} className="flex gap-2 items-end flex-wrap"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="mode" value="new" />
+                    <label style={{ width: 120 }}><span className="mini">New code</span><input name="code" className="inp mono" placeholder="BASE-NEW" required /></label><label className="flex-1" style={{ minWidth: 140 }}><span className="mini">Name</span><input name="name" className="inp" placeholder="New template name" /></label><button className="btn" type="submit">Save as new template</button></form>
+                  <Link className="mini underline" href={`/ref/ptpl${p.template_code ? `#${p.template_code}` : ""}`}>Edit templates by hand in References</Link>
+                </div>
+              )}
+            </section>
           )}
           <section className="card"><div className="ch"><span className="eyebrow">How it works</span></div><div className="cb mini grid gap-1">
             <div>A task bound to a <b>manual</b> follows its revision: started when a revision is opened after the project start, done when published.</div>
