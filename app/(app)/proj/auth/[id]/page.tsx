@@ -7,7 +7,7 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
 import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today } from "@/lib/authority";
-import { addAttachment, addItem, addNote, moveStage, removeAttachment, saveFile, toggleItem } from "../actions";
+import { addAttachment, addItem, addNote, addRound, moveStage, removeAttachment, saveFile, toggleItem } from "../actions";
 
 const KIND_ICON: Record<string, string> = { created: "＋", stage: "→", note: "✎", item: "☑", submitted: "⇧", remarks: "✉", reply: "↩", decision: "✔", attachment: "📎", link: "🔗", task: "⏰", mail: "✉" };
 
@@ -18,7 +18,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
   const db = supabaseAdmin();
   const loaded = await loadFile(db, id);
   if (!loaded) notFound();
-  const { file: f, items, events, attachments, type } = loaded;
+  const { file: f, items, events, attachments, rounds, type } = loaded;
   if (!s.group && !s.entities.includes(f.entity)) notFound();
   const cmm = isCmm(s);
   const owner = f.owner_person ? s.person?.id === f.owner_person : !!f.owner_role && s.roles.map(basePost).includes(basePost(f.owner_role));
@@ -102,6 +102,28 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
               <form action={addItem} className="nprow add"><input type="hidden" name="file_id" value={f.id} />
                 <input name="label" className="inp" placeholder="Add an item to this dossier" required /><input name="role" className="inp mono" style={{ maxWidth: 90 }} placeholder="Role" />
                 <label className="mini flex items-center gap-1"><input type="checkbox" name="required" /> required</label><button className="btn" type="submit">+ Add</button></form>
+            )}
+          </section>
+
+          {/* exchanges with the authority — the rounds of the same application (DOC-09), shared with the revision's Publish tab */}
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Exchanges with the authority</span><span className="mini">{rounds.length} round{rounds.length === 1 ? "" : "s"} · one application, every reply as a comment or a new version inside it</span></div>
+            <table className="tbl"><tbody>
+              {rounds.map((r) => (
+                <tr key={r.id}>
+                  <td className="mono" style={{ width: 100 }}>{fr(r.at)}</td>
+                  <td style={{ width: 120 }}><span className={"pill " + (r.direction === "sent" ? "" : "amber")}>{r.direction === "sent" ? "⇧ sent" : "⇩ received"}</span></td>
+                  <td>{r.note}<div className="mini">{r.who}{r.revision_id && !r.file_id ? " · from the revision editor" : ""}</div></td>
+                </tr>))}
+              {!rounds.length && <tr><td className="p-5 text-slate6">No exchange yet. The submission, the remarks and the decision are recorded here automatically; mails and calls can be added below.</td></tr>}
+            </tbody></table>
+            {mayEdit && f.stage !== "closed" && (
+              <form action={addRound} className="nprow add"><input type="hidden" name="id" value={f.id} />
+                <select name="direction" className="inp" style={{ maxWidth: 120 }} defaultValue="received"><option value="received">received</option><option value="sent">sent</option></select>
+                <input name="at" type="date" className="inp" style={{ maxWidth: 150 }} defaultValue={t0} />
+                <input name="who" className="inp" style={{ maxWidth: 160 }} placeholder={`Inspector / ${s.name}`} />
+                <input name="note" className="inp" placeholder="What was exchanged (mail, call, portal comment)" required />
+                <button className="btn" type="submit">Record</button></form>
             )}
           </section>
 

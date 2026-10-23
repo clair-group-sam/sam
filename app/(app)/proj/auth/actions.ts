@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isCmm } from "@/lib/revisions";
-import { addDays, movesFrom, routeFor, syncTasks, today, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
+import { addDays, movesFrom, recordRound, routeFor, syncTasks, today, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
 
 type Db = ReturnType<typeof supabaseAdmin>;
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -128,10 +128,11 @@ export async function moveStage(formData: FormData) {
   const kind = to === "submitted" && f.stage === "ready" ? "submitted" : to === "remarks" ? "remarks" : to === "submitted" ? "reply" : to === "approved" ? "decision" : "stage";
   await event(db, s, id, kind, note ?? `${f.stage} → ${to}`, { from: f.stage, to, ...patch });
   await audit(db, s, f, `authority_file_${to}`, { from: f.stage, note });
-  // the linked manual revision follows (DOC-09): submission = with the authority; decision = return received (recorded as a round)
-  if (f.revision_id && (kind === "submitted" || kind === "remarks" || kind === "reply" || kind === "decision")) {
-    await db.from("authority_rounds").insert({ revision_id: f.revision_id, at: today(), direction: kind === "submitted" || kind === "reply" ? "sent" : "received", who: s.name, note: note ?? (kind === "submitted" ? `Application ${patch.portal_ref ?? f.portal_ref ?? ""} submitted` : kind === "decision" ? `Decision: ${patch.outcome}` : `Authority remarks (round ${patch.rounds ?? f.rounds})`) });
-    if (kind === "submitted") await db.from("revisions").update({ authority_ref: patch.portal_ref }).eq("id", f.revision_id).is("authority_ref", null);
+  // every exchange is a round of the same application (DOC-09), on the file and on its manual revision when there is one
+  if (kind === "submitted" || kind === "remarks" || kind === "reply" || kind === "decision") {
+    const at = kind === "submitted" ? String(patch.submitted_at) : kind === "decision" ? String(patch.decision_at) : today();
+    await recordRound(db, f, { at, direction: kind === "submitted" || kind === "reply" ? "sent" : "received", who: s.name, note: note ?? (kind === "submitted" ? `Application ${patch.portal_ref ?? f.portal_ref ?? ""} submitted` : kind === "decision" ? `Decision: ${patch.outcome}` : `Authority remarks (round ${patch.rounds ?? f.rounds})`) });
+    if (kind === "submitted" && f.revision_id) await db.from("revisions").update({ authority_ref: patch.portal_ref }).eq("id", f.revision_id).is("authority_ref", null);
   }
   const { data: fresh } = await db.from("authority_files").select("*").eq("id", id).maybeSingle();
   await syncTasks(db, fresh as AuthorityFile);
@@ -140,10 +141,27 @@ export async function moveStage(formData: FormData) {
 
 export async function addNote(formData: FormData) {
   const id = str(formData, "id");
-  const { s, db } = await guard(id);
+  const { s, db, f } = await guard(id);
   const note = str(formData, "note"); if (!note) return;
-  await event(db, s, id, str(formData, "kind") || "note", note);
+  const kind = str(formData, "kind") || "note";
+  await event(db, s, id, kind, note);
+  // a remark received or a reply sent, noted in the journal, is an exchange round as well
+  if (kind === "remarks" || kind === "reply") await recordRound(db, f, { direction: kind === "reply" ? "sent" : "received", who: s.name, note });
   paths(id);
+}
+/** One exchange with the authority recorded by hand (mail, call, portal comment): shown on the file and on the revision's Publish tab. */
+export async function addRound(formData: FormData) {
+  const id = str(formData, "id");
+  const { s, db, f, cmm, owner } = await guard(id);
+  if (!cmm && !owner) throw new Error("Not allowed");
+  const note = str(formData, "note"); if (!note) return;
+  const direction = str(formData, "direction") === "sent" ? "sent" : "received";
+  const at = opt(formData, "at") ?? today();
+  await recordRound(db, f, { direction, who: opt(formData, "who") ?? s.name, note, at });
+  await event(db, s, id, direction === "sent" ? "reply" : "remarks", `${direction === "sent" ? "Sent to" : "Received from"} ${f.authority ?? "the authority"} (${at}): ${note}`);
+  if (direction === "received" && (f.stage === "submitted" || f.stage === "remarks")) await audit(db, s, f, "authority_round_received", { at, note });
+  paths(id);
+  if (f.revision_id) revalidatePath(`/docs/editor/${f.revision_id}`);
 }
 
 /** Attachment: a file dropped on the page goes to the private bucket evidence/<ENT>/authority/<file id>/<name>. */

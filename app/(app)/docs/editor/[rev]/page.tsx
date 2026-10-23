@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
+import { STAGE_LABEL, type Stage } from "@/lib/authority";
 import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
@@ -50,6 +51,9 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const changedCount = metas.filter((x) => x.changed).length;
   const { data: roundsData } = cmm ? await sb.from("authority_rounds").select("*").eq("revision_id", rev.id).order("at") : { data: [] };
   const rounds = (roundsData ?? []) as Round[];
+  // PRJ-01: the authority file that carries this revision's application (opened automatically when the revision leaves for the authority)
+  const { data: afData } = cmm ? await supabaseAdmin().from("authority_files").select("id,stage,portal_ref,type_code").eq("revision_id", rev.id).not("stage", "in", "(closed,standby)").order("created_at", { ascending: false }).limit(1).maybeSingle() : { data: null };
+  const authFile = afData as { id: string; stage: Stage; portal_ref: string | null; type_code: string } | null;
   const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository, rev.authority_route, internal);
   // DOC-03: what the authority sends back, and whether it is in
   const returnKind = (rev.return_kind ?? expectedReturn(manual.entity, manual.code, rev.authority_route)) as ReturnKind;
@@ -185,6 +189,9 @@ export default async function Editor({ params, searchParams }: { params: Promise
                 </form>
               ); })}
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
+              {cmm && (rev.authority_route === "approval" || rev.authority_route === "notification") && (
+                <p className="mini mt-3">Authority file: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
+              )}
               {rounds.length > 0 && (<>
                 <div className="eyebrow mt-4 mb-2">Exchanges with the authority</div>
                 <table className="tbl"><tbody>{rounds.map((x) => <tr key={x.id}><td className="mono" style={{ width: 100 }}>{x.at}</td><td style={{ width: 80 }}><span className={"pill " + (x.direction === "sent" ? "" : "green")}>{x.direction}</span></td><td><b>{x.who}</b><div className="mini">{x.note}</div></td></tr>)}</tbody></table>

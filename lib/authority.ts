@@ -20,6 +20,8 @@ export type AuthorityFile = {
 export type FileItem = { id: string; file_id: string; ord: number; key: string; label: string; role: string | null; required: boolean; done: boolean; done_by: string | null; done_at: string | null; note: string | null };
 export type FileEvent = { id: number; file_id: string; at: string; kind: string; who: string | null; note: string | null; meta: Record<string, unknown> | null };
 export type FileAttachment = { id: string; file_id: string; name: string; kind: string | null; path: string | null; size: number | null; at: string };
+/** One exchange with the authority (DOC-09: all rounds live in the same application). Shared with the revision's Publish tab. */
+export type Round = { id: string; file_id: string | null; revision_id: string | null; at: string; direction: "sent" | "received"; who: string; note: string };
 
 export type Stage = "draft" | "compliance" | "signing" | "ready" | "submitted" | "remarks" | "approved" | "published" | "closed" | "standby";
 export const STAGES: Stage[] = ["draft", "compliance", "signing", "ready", "submitted", "remarks", "approved", "published", "closed"];
@@ -91,17 +93,29 @@ export async function loadTypes(db: SupabaseClient): Promise<FileType[]> {
   const { data } = await db.from("authority_file_types").select("*").eq("active", true).order("ord");
   return (data ?? []) as FileType[];
 }
-export async function loadFile(db: SupabaseClient, id: string): Promise<{ file: AuthorityFile; items: FileItem[]; events: FileEvent[]; attachments: FileAttachment[]; type: FileType | null } | null> {
+export async function loadFile(db: SupabaseClient, id: string): Promise<{ file: AuthorityFile; items: FileItem[]; events: FileEvent[]; attachments: FileAttachment[]; rounds: Round[]; type: FileType | null } | null> {
   const { data: f } = await db.from("authority_files").select("*").eq("id", id).maybeSingle();
   if (!f) return null;
   const file = f as AuthorityFile;
-  const [{ data: items }, { data: events }, { data: attachments }, { data: type }] = await Promise.all([
+  const [{ data: items }, { data: events }, { data: attachments }, { data: type }, rounds] = await Promise.all([
     db.from("authority_file_items").select("*").eq("file_id", id).order("ord"),
     db.from("authority_file_events").select("*").eq("file_id", id).order("at", { ascending: false }).limit(200),
     db.from("authority_file_attachments").select("*").eq("file_id", id).order("at"),
     db.from("authority_file_types").select("*").eq("code", file.type_code).maybeSingle(),
+    loadRounds(db, file),
   ]);
-  return { file, items: (items ?? []) as FileItem[], events: (events ?? []) as FileEvent[], attachments: (attachments ?? []) as FileAttachment[], type: (type as FileType | null) ?? null };
+  return { file, items: (items ?? []) as FileItem[], events: (events ?? []) as FileEvent[], attachments: (attachments ?? []) as FileAttachment[], rounds, type: (type as FileType | null) ?? null };
+}
+/** Rounds of the file: its own, plus those written on its revision from the editor (same application). */
+export async function loadRounds(db: SupabaseClient, f: Pick<AuthorityFile, "id" | "revision_id">): Promise<Round[]> {
+  const q = db.from("authority_rounds").select("id,file_id,revision_id,at,direction,who,note");
+  const { data } = f.revision_id ? await q.or(`file_id.eq.${f.id},revision_id.eq.${f.revision_id}`) : await q.eq("file_id", f.id);
+  const rows = ((data ?? []) as Round[]).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  return rows;
+}
+/** Records one exchange on the file (and on its revision when there is one — the trigger fills the missing side). */
+export async function recordRound(db: SupabaseClient, f: Pick<AuthorityFile, "id" | "revision_id">, r: { direction: "sent" | "received"; who: string; note: string; at?: string }): Promise<void> {
+  await db.from("authority_rounds").insert({ file_id: f.id, revision_id: f.revision_id, at: r.at ?? today(), direction: r.direction, who: r.who, note: r.note });
 }
 
 /** Inbox tasks follow the stage: the previous task of the file is closed, one new task per stage (PRJ-01 §6). */
@@ -163,6 +177,8 @@ export async function followRevision(db: SupabaseClient, who: { name: string; pe
     await ev(f.id, "stage", `Revision published → close-out`);
   } else return;
   if (!f) return;
+  // rounds written on the revision before its file existed (the editor records the round, then calls us) join the file
+  await db.from("authority_rounds").update({ file_id: f.id }).eq("revision_id", rev.id).is("file_id", null);
   const { data: fresh } = await db.from("authority_files").select("*").eq("id", f.id).maybeSingle();
   if (fresh) await syncTasks(db, fresh as AuthorityFile);
 }

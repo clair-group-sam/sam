@@ -106,6 +106,18 @@ function RailLink({ m, role, on, small }: { m: Module; role: RoleKey; on: boolea
 function TopBar({ session, crumb }: { session: Session; crumb: [string, string] }) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
+  // UX-03 §7: one "+ Create" for the office — what exists opens, what is not built yet is listed greyed with its step
+  const [create, setCreate] = useState(false);
+  const canCreateFile = session.role !== "user";
+  const CREATE: { label: string; href?: string; hint: string }[] = [
+    { label: "Authority file", href: canCreateFile ? "/proj/auth/new" : undefined, hint: "application, notification, report to the authority" },
+    { label: "Manual or internal document", href: "/docs/new", hint: "a new manual in the library" },
+    { label: "To-do", href: "/home/todo", hint: "personal reminder" },
+    { label: "Finding", hint: "Compliance — step 6" },
+    { label: "Action", hint: "Compliance — step 6" },
+    { label: "Safety report", hint: "Safety — step 5" },
+    { label: "Communication", hint: "Communication module" },
+  ];
   const chips = session.group ? ["ALL", ...session.entities] : session.entities;
   async function pick(ent: string) {
     await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });
@@ -127,7 +139,20 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
       {chips.length === 1 && <span className={"ent " + chips[0] + " on"}>{chips[0]}</span>}
       <div className="flex-1" />
       <div className="searchbox"><Icon name="search" size={14} /><span>Search</span><kbd>Ctrl K</kbd></div>
-      {session.role !== "user" && <button type="button" className="btn primary" onClick={() => router.push("/home/todo")}><Icon name="plus" size={14} /> Create</button>}
+      {session.role !== "user" && (
+        <div className="relative">
+          <button type="button" className="btn primary" onClick={() => setCreate((v) => !v)} aria-expanded={create}><Icon name="plus" size={14} /> Create</button>
+          {create && (
+            <div className="menu" style={{ width: 300 }} onMouseLeave={() => setCreate(false)}>
+              {CREATE.map((c) => c.href ? (
+                <button key={c.label} type="button" className="mi" onClick={() => { setCreate(false); router.push(c.href!); }}><b>{c.label}</b><small style={{ display: "block", color: "var(--slate6)", fontSize: 11.5 }}>{c.hint}</small></button>
+              ) : (
+                <div key={c.label} className="mi muted" style={{ fontStyle: "italic" }}>{c.label}<small style={{ display: "block", fontSize: 11 }}>{c.hint}</small></div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <Link href="/erp/activate" className="btn erp">ERP</Link>
       <div className="relative">
         <button type="button" className="user" onClick={() => setMenu((v) => !v)}>
