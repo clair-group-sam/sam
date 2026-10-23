@@ -169,6 +169,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
 
       {tab === "publish" && internal && (owner || cmm) && (
         <div className="grid grid-cols-2 gap-4">
+          {linkCard}
           <section className="card">
             <div className="ch"><span className="eyebrow">Revision summary</span></div>
             <form action={saveSummary} className="cb">
@@ -191,7 +192,6 @@ export default async function Editor({ params, searchParams }: { params: Promise
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
             </div>
           </section>
-          {linkCard}
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Review before publication</span></div>
             <div className="cb"><ReviewPanel revisionId={rev.id} initial={rev.review ?? null} editable={rev.step === "draft"} /></div>
@@ -201,6 +201,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
 
       {tab === "publish" && !internal && (
         <div className="grid grid-cols-2 gap-4">
+          {linkCard}
           <section className="card">
             <div className="ch"><span className="eyebrow">Revision summary</span></div>
             <form action={saveSummary} className="cb">
@@ -259,7 +260,6 @@ export default async function Editor({ params, searchParams }: { params: Promise
               ) : <p className="mini">{returnKind === "none" ? "Nothing to integrate." : "Available once the revision has been sent to the authority."}</p>}
             </div>
           </section>
-          {linkCard}
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Changed chapters in this revision</span><span className="mini">{changedCount}</span></div>
             <div className="cb">
