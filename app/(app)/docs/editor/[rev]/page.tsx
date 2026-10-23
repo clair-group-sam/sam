@@ -84,7 +84,8 @@ export default async function Editor({ params, searchParams }: { params: Promise
   // DOC-09 workflow rows: who does each step (names from NP management), what was done when (document journal)
   const posts = internal ? [] : await postsOf(admin, manual.entity);
   const holder = (code: string) => posts.find((p) => p.code === basePost(code))?.holder_name ?? null;
-  const ownerWho = manual.owner_role.startsWith("PERSON:") ? (manual.owner_name ?? "the author") : [holder(manual.owner_role), `(${basePost(manual.owner_role)})`].filter(Boolean).join(" ");
+  const ownerPost = manual.owner_role.startsWith("PERSON:") ? null : basePost(manual.owner_role);
+  const ownerWho = !ownerPost ? (manual.owner_name ?? "the author") : holder(ownerPost) ? `${holder(ownerPost)} (${ownerPost})` : `holder of the ${ownerPost} post — not named in NP management for ${manual.entity}`;
   const cmmWho = `Compliance department${holder("CMM") ? ` · ${holder("CMM")}` : ""}`;
   const signWho = /MSM/i.test(manual.code) ? `Accountable Manager${holder("AM") ? ` ${holder("AM")}` : ""} + CMM` : `${ownerWho} + CMM`;
   const { data: histData } = internal ? { data: [] } : await admin.from("audit_log").select("action,at,actor").eq("object_type", "revision").eq("object_id", rev.id).like("action", "step_%").order("at");
@@ -95,7 +96,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const doneAt = (step: string) => { const h = [...hist].reverse().find((x) => x.action === `step_${step}`); return h ? { at: h.at, by: h.actor ? actorName.get(h.actor) ?? null : null } : null; };
   const route = rev.authority_route;
   const wfRows: StepRow[] = [
-    { step: "approved_np", label: "Approve (NP)", who: ownerWho, detail: "The nominated person validates the content and hands over to Compliance.", done: doneAt("approved_np") },
+    { step: "approved_np", label: `Approve (${ownerPost ?? "author"})`, who: ownerWho, detail: `The owner of the manual${ownerPost && !["CMM", "SM"].includes(ownerPost) ? " (nominated person)" : ""} validates the content and hands over to Compliance.`, done: doneAt("approved_np") },
     { step: "approved_compliance", label: "Approve (Compliance)", who: cmmWho, detail: "Checked against the requirements; the authority route is decided here.", done: doneAt("approved_compliance") },
     ...(manual.needs_signature ? [{ step: "signed", label: "Sign", who: signWho, done: doneAt("signed") }] : []),
     { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance.", skipped: route === "none" ? "not required — no authority route for this revision" : undefined, done: doneAt("with_civil_aviation") },
