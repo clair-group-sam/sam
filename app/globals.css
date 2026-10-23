@@ -359,3 +359,9 @@ body:has(.pm){background:#e9eef2}
 .previewbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:10px;border:1px solid #f1c27d;color:#7a4a00;
   background:repeating-linear-gradient(135deg,#fff6e6 0 14px,#fdefd6 14px 28px)}
 .previewbar > div{flex:1;min-width:260px;font-size:13.5px}
+
+/* unsaved work: recovery banner and leave dialog */
+.recoverbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 14px 0;padding:10px 12px;border-radius:8px;background:#fff4e5;border:1px solid #f1c27d;color:#7a4a00;font-size:13px}
+.recoverbar span{flex:1}
+.modalbg{position:fixed;inset:0;background:rgba(13,42,63,.35);z-index:80;display:grid;place-items:center}
+.modal{background:#fff;border-radius:12px;padding:18px 20px;max-width:460px;width:calc(100% - 32px);box-shadow:0 20px 50px rgba(13,42,63,.3)}

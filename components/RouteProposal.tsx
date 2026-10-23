@@ -15,12 +15,12 @@ export default function RouteProposal({ revisionId, initial, route, authority }:
       <div className="flex items-center gap-3 mb-3">
         <span className="mini">Decided route:</span>
         <b>{route ? LABEL[route] ?? route : "not decided yet"}</b>
-        <button type="button" className="btn ml-auto" disabled={busy} onClick={ask}>{busy ? "Reading the changes…" : p ? "Propose again" : "Propose a route"}</button>
+        <button type="button" className="btn ml-auto" disabled={busy} onClick={ask}>{busy ? "SAM is reading the changes…" : p ? "Ask SAM again" : "🤝 Ask SAM for the route"}</button>
       </div>
       {err && <p className="mini red mb-2">{err}</p>}
       {p && (
         <div className="rprop">
-          <div className="flex items-center gap-2 mb-1"><span className={"pill " + (p.route === "approval" ? "amber" : p.route === "notification" ? "" : "green")}>{LABEL[p.route]}</span><span className="mini">proposed · confidence {p.confidence}{p.at ? ` · ${p.at.slice(0, 16).replace("T", " ")}` : ""}</span></div>
+          <div className="flex items-center gap-2 mb-1"><span className={"pill " + (p.route === "approval" ? "amber" : p.route === "notification" ? "" : "green")}>{LABEL[p.route]}</span><span className="mini">proposed by SAM · confidence {p.confidence}{p.at ? ` · ${p.at.slice(0, 16).replace("T", " ")}` : ""}</span></div>
           <p className="text-[13px] mb-2">{p.summary}</p>
           {p.reasons?.length > 0 && <table className="tbl"><tbody>{p.reasons.map((r, i) => <tr key={i}><td className="mono" style={{ width: 70 }}>{r.chapter}</td><td>{r.change}<div className="mini">{r.rule}</div></td></tr>)}</tbody></table>}
         </div>

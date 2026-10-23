@@ -42,13 +42,13 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
 
   return (
     <aside className="aipanel">
-      <div className="ch"><span className="eyebrow">Draft with AI</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
+      <div className="ch"><span className="eyebrow">🤝 Work with SAM</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
       <div className="p-3">
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
         <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
         <div className="flex items-center gap-2 mt-2">
-          <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? "Thinking…" : "Propose"}</button>
-          <span className="mini">Nothing enters the manual until you insert it.</span>
+          <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? "SAM is working…" : "Ask SAM"}</button>
+          <span className="mini">SAM proposes; nothing enters the manual until you insert it.</span>
         </div>
         {err && <div className="lockbar mt-3" style={{ margin: "12px 0 0" }}>{err}</div>}
         {prop && (

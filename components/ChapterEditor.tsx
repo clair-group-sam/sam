@@ -24,6 +24,12 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const [changed, setChanged] = useState(changed0);
   const [msg, setMsg] = useState("");
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null); // where the user wanted to go with unsaved changes
+  const [recover, setRecover] = useState<{ html: string; title: string; at: string } | null>(null);
+  const titleRef = useRef(title0);
+  const draftKey = `sam_unsaved_${sectionId}`;
+  const keepLocal = (h: string) => { try { localStorage.setItem(draftKey, JSON.stringify({ html: h, title: titleRef.current, at: new Date().toTimeString().slice(0, 5) })); } catch {} };
+  const dropLocal = () => { try { localStorage.removeItem(draftKey); } catch {} };
   const [ai, setAi] = useState(false);
   const [linking, setLinking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -35,9 +41,28 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     editable,
     immediatelyRender: false,
     onCreate: ({ editor }) => { baseNorm.current = editor.getHTML(); },
-    onUpdate: () => { setDirty(true); setMsg(""); },
+    onUpdate: ({ editor: ed }) => { setDirty(true); setMsg(""); keepLocal(ed.getHTML()); },
   });
   useEffect(() => { setTitle(title0); setDirty(false); setChanged(changed0); setMsg(""); setSavedAt(null); }, [sectionId, title0, changed0]);
+  // unsaved work left behind earlier (another chapter opened, menu clicked, tab closed…): offer to restore it
+  useEffect(() => {
+    try { const raw = localStorage.getItem(draftKey); if (!raw) return; const d = JSON.parse(raw) as { html: string; title: string; at: string }; if (d.html && d.html !== html) setRecover(d); else dropLocal(); } catch {}
+  }, [draftKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // any link clicked with unsaved changes: ask (save / leave without saving / stay)
+  useEffect(() => {
+    if (!dirty) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || a.closest(".ProseMirror")) return;
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname + url.search === window.location.pathname + window.location.search) return;
+      e.preventDefault(); e.stopPropagation();
+      setPending(url.pathname + url.search + url.hash);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [dirty]);
   // leaving the page with unsaved changes asks first
   useEffect(() => {
     if (!dirty) return;
@@ -45,26 +70,26 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  async function save() {
-    if (!editor || saving) return;
+  async function save(): Promise<boolean> {
+    if (!editor || saving) return false;
     setSaving(true); setMsg("");
     const r = await saveSection({ revisionId, sectionId, html: editor.getHTML(), title, baseNorm: baseNorm.current ?? undefined });
     setSaving(false);
-    if (r.ok) { setDirty(false); setChanged(!!r.changed); setSavedAt(new Date().toTimeString().slice(0, 5)); setMsg(r.changed ? "marked as changed" : "identical to the published text"); router.refresh(); }
-    else setMsg(r.error ?? "Error");
+    if (r.ok) { setDirty(false); dropLocal(); setRecover(null); setChanged(!!r.changed); setSavedAt(new Date().toTimeString().slice(0, 5)); setMsg(r.changed ? "marked as changed" : "identical to the published text"); router.refresh(); return true; }
+    setMsg(r.error ?? "Error"); return false;
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   });
-  function discard() { if (!editor) return; editor.commands.setContent(html, false); setTitle(title0); setDirty(false); setMsg("back to the last saved state"); }
+  function discard() { if (!editor) return; editor.commands.setContent(html, false); setTitle(title0); titleRef.current = title0; setDirty(false); dropLocal(); setMsg("back to the last saved state"); }
   async function revert() {
     if (!editor || saving) return;
     if (!window.confirm(`Revert chapter ${refCode} to the text of ${baseRevLabel}? Your changes in this revision will be lost.`)) return;
     setSaving(true);
     const r = await revertSection({ revisionId, sectionId });
     setSaving(false);
-    if (r.ok) { editor.commands.setContent(r.html ?? "", false); baseNorm.current = editor.getHTML(); setDirty(false); setChanged(false); setMsg("Chapter reverted"); router.refresh(); } else setMsg(r.error ?? "Error");
+    if (r.ok) { editor.commands.setContent(r.html ?? "", false); baseNorm.current = editor.getHTML(); setDirty(false); dropLocal(); setChanged(false); setMsg("Chapter reverted"); router.refresh(); } else setMsg(r.error ?? "Error");
   }
   if (!editor) return <div className="cb text-slate6">Loading editor…</div>;
   function pickLink(href: string, label: string) {
@@ -89,10 +114,30 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     <div className="edwrap">
       <div className="edhead">
         <span className="badge big">{refCode}</span>
-        <input className="edtitle" value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} disabled={!editable} />
+        <input className="edtitle" value={title} onChange={(e) => { setTitle(e.target.value); titleRef.current = e.target.value; setDirty(true); keepLocal(editor.getHTML()); }} disabled={!editable} />
         {changed && <span className="pill amber">changed in this revision</span>}
         {frozenBy && <span className="pill red">frozen · changed in Rev {frozenBy}, under review</span>}
       </div>
+      {recover && editable && (
+        <div className="recoverbar">
+          <span>You left unsaved changes in this chapter at {recover.at}.</span>
+          <button type="button" className="btn primary" onClick={() => { editor.commands.setContent(recover.html); setTitle(recover.title); titleRef.current = recover.title; setDirty(true); setRecover(null); setMsg(""); }}>Restore them</button>
+          <button type="button" className="btn" onClick={() => { dropLocal(); setRecover(null); }}>Discard</button>
+        </div>
+      )}
+      {pending && (
+        <div className="modalbg" onClick={() => setPending(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <b>Unsaved changes in chapter {refCode}</b>
+            <p className="mini mt-1 mb-3">Save them before leaving the chapter, or leave without saving (they will be lost).</p>
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" className="btn save dirty" disabled={saving} onClick={async () => { const to = pending; if (await save()) { setPending(null); router.push(to); } }}>{saving ? "Saving…" : "Save and continue"}</button>
+              <button type="button" className="btn" onClick={() => { const to = pending; dropLocal(); setDirty(false); setPending(null); router.push(to); }}>Leave without saving</button>
+              <button type="button" className="btn" onClick={() => setPending(null)}>Stay</button>
+            </div>
+          </div>
+        </div>
+      )}
       {frozenBy && <div className="lockbar">This chapter was modified in Rev {frozenBy}, which is still with Compliance or the authority. It is read-only here and will receive the approved text automatically when Rev {frozenBy} is published.</div>}
       {editable && (
         <div className="toolbar">
@@ -121,12 +166,12 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <B label="↶" title="Undo" act={() => editor.chain().focus().undo().run()} />
           <B label="↷" title="Redo" act={() => editor.chain().focus().redo().run()} />
           <span className="sep" />
-          <button type="button" className={"tb ai" + (ai ? " on" : "")} onClick={() => setAi((v) => !v)} title="Draft with AI">✦ AI</button>
+          <button type="button" className={"tb ai" + (ai ? " on" : "")} onClick={() => setAi((v) => !v)} title="Work with SAM: draft, rewrite, translate or check this chapter">🤝 Work with SAM</button>
           <span className="flex-1" />
           <span className={"mini" + (dirty ? " savestate dirty" : "")}>{dirty ? "● Unsaved changes" : msg}</span>
           {dirty && <button type="button" className="btn" onClick={discard} disabled={saving} title="Back to the last saved state of this chapter">Cancel changes</button>}
           {changed && !dirty && <button type="button" className="btn" onClick={revert} disabled={saving} title="Back to the text of the base revision">Revert chapter</button>}
-          <button type="button" className={"btn save " + (saving ? "busy" : dirty ? "dirty" : "clean")} onClick={save} disabled={saving || !dirty}
+          <button type="button" className={"btn save " + (saving ? "busy" : dirty ? "dirty" : "clean")} onClick={() => void save()} disabled={saving || !dirty}
             title={dirty ? "Save this chapter (⌘S)" : "Everything is saved"}>
             {saving ? "Saving…" : dirty ? "Save changes (⌘S)" : savedAt ? `✓ Saved ${savedAt}` : "✓ Up to date"}
           </button>
@@ -138,7 +183,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
         <div className="edbody">
           <EditorContent editor={editor} className="reader" />
         </div>
-        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} onInserted={() => { setDirty(true); setMsg("Proposal inserted — review, then save"); }} onClose={() => setAi(false)} />}
+        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} onInserted={() => { setDirty(true); setMsg("SAM's proposal inserted — review, then save"); }} onClose={() => setAi(false)} />}
       </div>
     </div>
   );
