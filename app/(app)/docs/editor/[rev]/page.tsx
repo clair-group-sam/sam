@@ -206,7 +206,6 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <input type="hidden" name="revision_id" value={rev.id} />
               <label className="block mb-3"><span className="eyebrow">What changes in Rev {rev.rev} (shown to readers in “What changed”)</span>
                 <textarea name="summary" defaultValue={rev.summary ?? ""} rows={5} className="inp" placeholder="Short summary of the revision, in English…" /></label>
-              {cmm && <label className="block"><span className="eyebrow">Application / dossier reference at the authority</span><input name="authority_ref" defaultValue={rev.authority_ref ?? ""} className="inp" placeholder="TM-CAD OPS-…, METEOR …, OSAC …" /></label>}
               <button className="btn primary mt-3" type="submit">Save</button>
             </form>
           </section>
@@ -237,6 +236,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
           {cmm && <section className="card">
             <div className="ch"><span className="eyebrow">Authority return · DOC-03</span><span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
             <div className="cb">
+              <p className="mini mb-3">Application / dossier reference: {rev.authority_ref || authFile?.portal_ref ? <b className="mono">{rev.authority_ref ?? authFile?.portal_ref}</b> : <i>none yet</i>} — {authFile ? <>from the <Link className="underline" href={`/proj/auth/${authFile.id}`}>authority file</Link>, filled when the submission is recorded there</> : "filled automatically from the authority file when the submission is recorded"}.</p>
               <form action={setReturnKind} className="flex items-center gap-2 mb-3">
                 <input type="hidden" name="revision_id" value={rev.id} />
                 <span className="mini">Expected from {auth}:</span>

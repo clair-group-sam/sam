@@ -71,6 +71,8 @@ export async function saveFile(formData: FormData) {
   for (const k of fields) if (formData.has(k)) patch[k] = opt(formData, k);
   if (cmm) { if (formData.has("category")) patch.category = opt(formData, "category"); if (formData.has("portal")) patch.portal = opt(formData, "portal"); if (formData.has("fee")) patch.fee = str(formData, "fee") ? Number(str(formData, "fee")) : null; }
   await db.from("authority_files").update(patch).eq("id", id);
+  // the manual revision carries the same reference (shown read-only in the editor's Authority return card)
+  if ("portal_ref" in patch && f.revision_id) { await db.from("revisions").update({ authority_ref: patch.portal_ref }).eq("id", f.revision_id); revalidatePath(`/docs/editor/${f.revision_id}`); }
   await event(db, s, id, "note", "Details updated", patch);
   await audit(db, s, f, "authority_file_updated", patch);
   paths(id);
