@@ -44,12 +44,10 @@ export default async function NewManual({ searchParams }: { searchParams: Promis
           <label><span className="eyebrow">Folder</span>
             <select name="folder" className="inp" defaultValue=""><option value="">— choose —</option>{folders.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
           <label><span className="eyebrow">…or a new folder</span><input name="folder_new" className="inp" placeholder="e.g. 4. PROCESS MANUAL › #GLOBAL › POLICIES" /></label>
-          {cmm ? (
           <label className="col-span-2 flex items-start gap-3 p-3 border border-line rounded-lg">
             <input type="checkbox" name="internal" className="mt-1" />
             <span><b>Internal document</b> — no approval by or notification to the civil aviation authority. You review it with the assistant (comments you can use or ignore) and publish it yourself. Leave unticked for a regulated manual (NP → Compliance → authority).</span>
           </label>
-          ) : <p className="col-span-2 mini">The manual is created as a <b>regulated manual</b>. Compliance can make it an internal document while it is a draft.</p>}
           <label className="col-span-2"><span className="eyebrow">Chapters — one per line (“1.2 Scope” keeps its number; a plain title is numbered in order)</span>
             <textarea name="chapters" rows={7} className="inp" placeholder={"Purpose and scope\nDefinitions\nResponsibilities\nProcedure\nRecords"} /></label>
         </div>

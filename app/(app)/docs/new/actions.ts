@@ -18,7 +18,7 @@ export async function createManual(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const folder = String(formData.get("folder_new") ?? "").trim() || String(formData.get("folder") ?? "").trim() || null;
   const owner = String(formData.get("owner") ?? "");
-  const internal = formData.get("internal") === "on" && isCmm(s); // regulated by default; only Compliance classifies a document as internal
+  const internal = formData.get("internal") === "on"; // chosen by the creator; afterwards only Compliance changes it, in a draft
   if (!code || !title || !owner) throw new Error("Code, title and owner are required.");
   const db = supabaseAdmin();
   const { data: dup } = await db.from("manuals").select("id").eq("entity", entity).eq("code", code).maybeSingle();
