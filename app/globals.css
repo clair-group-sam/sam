@@ -526,3 +526,23 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 .cf-mailgrp+.cf-mailgrp{border-top:1px solid var(--line)}
 tr.cf-free td{color:#8a98a6}
 .mini.red{color:var(--terra)}
+/* Safety reports (SAF-01) */
+.rep-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.rep-grid > .rep-prec{grid-column:2;grid-row:1}
+.rep-text{min-height:180px}
+.rchips{display:flex;flex-wrap:wrap;gap:6px}
+.rchip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:12.5px;cursor:pointer}
+.rchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.rep-prec{border-color:#bcd3e6;background:#f7fbfe}
+.rep-help p+p{margin-top:8px}
+.erc{border-collapse:separate;border-spacing:3px;font-size:12px}
+.erc th{font-weight:600;text-align:left;padding:4px 6px;color:#44546a}
+.erc td button{width:64px;height:34px;border-radius:6px;border:1px solid transparent;font-weight:700;cursor:pointer}
+.erc .red button{background:#fbe3df;color:#a3271b}.erc .amber button{background:#fff1d6;color:#8a5a00}.erc .green button{background:#e3f4e8;color:#1e7a3c}
+.erc td button.on{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
+.repgrid2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.narr{white-space:pre-wrap;line-height:1.6}
+.journal li{padding:6px 0;border-top:1px solid var(--line);font-size:12.5px}
+.journal li:first-child{border-top:0}
+@media (max-width:900px){.rep-grid,.repgrid2{grid-template-columns:1fr}.rep-grid > .rep-prec{grid-column:1;grid-row:auto}}
+.kind.k-safe{background:#fff0e6;color:#a64b00}

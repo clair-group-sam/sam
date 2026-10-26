@@ -96,12 +96,12 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
   // 3 · MOR 72 h clocks still running (safety desk)
   const mor: Line[] = [];
   if (safetyDesk) {
-    const { data } = await db.from("reports").select("id,entity,headline,received_at,status,report_analysis(mor_status)").in("entity", scope).gte("received_at", new Date(now.getTime() - 72 * 3600e3).toISOString()).in("status", ["received", "acknowledged", "classified"]);
+    const { data } = await db.from("reports").select("id,entity,headline,received_at,status,mor_filed_at,report_analysis(mor_status,confirmed_at)").in("entity", scope).gte("received_at", new Date(now.getTime() - 72 * 3600e3).toISOString()).in("status", ["received", "acknowledged", "classified"]);
     for (const r of (data ?? []) as unknown as { id: string; entity: string; headline: string; received_at: string; report_analysis: { mor_status: string | null } | { mor_status: string | null }[] | null }[]) {
       const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis;
-      if (a?.mor_status === "voluntary") continue;
+      if ((r as { mor_filed_at?: string | null }).mor_filed_at || (a?.mor_status === "voluntary" && (a as { confirmed_at?: string | null }).confirmed_at)) continue;
       const left = Math.max(0, Math.round(72 - (now.getTime() - new Date(r.received_at).getTime()) / 3600e3));
-      mor.push({ kind: "mor", label: `${left} h left`, cls: left <= 24 ? "k-comp" : "k-cert", title: `Report ${r.id} · ${r.headline}`, note: a?.mor_status ? `MOR ${a.mor_status}` : "MOR to assess", entity: r.entity, link: `/safe/reports` });
+      mor.push({ kind: "mor", label: `${left} h left`, cls: left <= 24 ? "k-comp" : "k-cert", title: `Report ${r.id} · ${r.headline}`, note: a?.mor_status ? `MOR ${a.mor_status}` : "MOR to assess", entity: r.entity, link: `/safe/reports/${r.id}` });
     }
   }
 

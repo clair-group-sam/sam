@@ -12,6 +12,7 @@ export const KIND: Record<string, [string, string]> = {
   project: ["Project", "k-proj"], authority: ["Authority file", "k-auth"], authority_followup: ["Authority follow-up", "k-auth"],
   reading: ["Read & acknowledge", "k-read"], certificate_validity: ["Validity", "k-cert"], finding: ["Finding", "k-comp"], action: ["Action", "k-comp"],
   check: ["Compliance check", "k-comp"], change_request: ["Change request", "k-docs"], signature: ["Signature", "k-docs"], status_review: ["Status review", "k-comp"],
+  safety_report: ["Safety report", "k-safe"], safety_question: ["Safety question", "k-safe"],
 };
 export const kindLabel = (k: string) => KIND[k]?.[0] ?? k.replace(/_/g, " ");
 
