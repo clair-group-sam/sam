@@ -1,13 +1,15 @@
 // Microsoft Graph mail (application permission Mail.Send, limited by Exchange RBAC to the sender mailbox).
 // Set in Vercel: GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, MAIL_FROM (e.g. compliance@clair-group.com).
 
+import { CLIENT_ID, TENANT_ID } from "@/lib/msgraph-user";
+
 export function mailConfigured(): boolean {
-  return !!(process.env.GRAPH_TENANT_ID && process.env.GRAPH_CLIENT_ID && process.env.GRAPH_CLIENT_SECRET && process.env.MAIL_FROM);
+  return !!(process.env.GRAPH_CLIENT_SECRET && process.env.MAIL_FROM);
 }
 
 async function token(): Promise<string> {
-  const body = new URLSearchParams({ client_id: process.env.GRAPH_CLIENT_ID!, client_secret: process.env.GRAPH_CLIENT_SECRET!, scope: "https://graph.microsoft.com/.default", grant_type: "client_credentials" });
-  const r = await fetch(`https://login.microsoftonline.com/${process.env.GRAPH_TENANT_ID}/oauth2/v2.0/token`, { method: "POST", body });
+  const body = new URLSearchParams({ client_id: CLIENT_ID, client_secret: process.env.GRAPH_CLIENT_SECRET!.trim(), scope: "https://graph.microsoft.com/.default", grant_type: "client_credentials" });
+  const r = await fetch(`https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`, { method: "POST", body });
   const j = (await r.json()) as { access_token?: string; error_description?: string };
   if (!j.access_token) throw new Error(j.error_description?.split("\n")[0] ?? `token HTTP ${r.status}`);
   return j.access_token;

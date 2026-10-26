@@ -21,7 +21,12 @@ function open(sealed: string): string {
   return Buffer.concat([d.update(enc), d.final()]).toString("utf8");
 }
 
-export const graphConfigured = () => !!(process.env.GRAPH_TENANT_ID && process.env.GRAPH_CLIENT_ID && process.env.GRAPH_CLIENT_SECRET);
+// The S.A.M. app registration (Entra ID, Arthur Boutin 20/10). These ids are not secrets: the env vars win only when they are well-formed GUIDs,
+// so a mistyped value in Vercel cannot break the connection.
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const CLIENT_ID = GUID.test((process.env.GRAPH_CLIENT_ID ?? "").trim()) ? process.env.GRAPH_CLIENT_ID!.trim() : "f5834b34-2908-4ab2-a5ae-0673d98c7752";
+export const TENANT_ID = GUID.test((process.env.GRAPH_TENANT_ID ?? "").trim()) ? process.env.GRAPH_TENANT_ID!.trim() : "e5ea6d43-2b89-4845-899c-a8240c5099d1";
+export const graphConfigured = () => !!process.env.GRAPH_CLIENT_SECRET;
 
 type Stored = { r?: string; a?: string; exp?: number };
 const read = (sealed: string): Stored => { const v = open(sealed); return v.startsWith("{") ? (JSON.parse(v) as Stored) : { r: v }; };
@@ -49,12 +54,12 @@ export async function userToken(personId: string, opts: { force?: boolean } = {}
   const st = read((data as { refresh_enc: string }).refresh_enc);
   if (!opts.force && st.a && st.exp && st.exp - Date.now() > 120_000) return st.a; // access token from the sign-in, still valid
   if (!st.r) throw new Error("Microsoft session expired: sign out of S.A.M. and sign in again.");
-  const body = new URLSearchParams({ client_id: process.env.GRAPH_CLIENT_ID!, client_secret: process.env.GRAPH_CLIENT_SECRET!, grant_type: "refresh_token", refresh_token: st.r, scope: GRAPH_SCOPES });
-  const r = await fetch(`https://login.microsoftonline.com/${process.env.GRAPH_TENANT_ID}/oauth2/v2.0/token`, { method: "POST", body });
+  const body = new URLSearchParams({ client_id: CLIENT_ID, client_secret: process.env.GRAPH_CLIENT_SECRET!.trim(), grant_type: "refresh_token", refresh_token: st.r, scope: GRAPH_SCOPES });
+  const r = await fetch(`https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`, { method: "POST", body });
   const j = (await r.json()) as { access_token?: string; refresh_token?: string; error?: string; error_description?: string };
   if (!j.access_token) {
     const detail = (j.error_description ?? "").split("\n")[0].replace(/Trace ID.*$/i, "").trim();
-    console.error("[graph] refresh failed", j.error, detail, "refresh-token shape:", st.r.length, st.r.slice(0, 4), "client id length:", process.env.GRAPH_CLIENT_ID?.length, "tenant id length:", process.env.GRAPH_TENANT_ID?.length, "secret length:", process.env.GRAPH_CLIENT_SECRET?.length);
+    console.error("[graph] refresh failed", j.error, detail, "refresh-token shape:", st.r.length, st.r.slice(0, 4), "client id from env ok:", CLIENT_ID === (process.env.GRAPH_CLIENT_ID ?? "").trim(), "tenant id length:", process.env.GRAPH_TENANT_ID?.length, "secret length:", process.env.GRAPH_CLIENT_SECRET?.length);
     // only a dead token is forgotten (expired, revoked, password changed); other errors are shown as they are
     const dead = j.error === "invalid_grant" && /AADSTS(70008|700082|50173|50133|700084)\b/.test(detail);
     if (dead) await db.from("graph_tokens").delete().eq("person_id", personId);
