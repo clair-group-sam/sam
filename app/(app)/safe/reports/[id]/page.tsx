@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
+import AutoRefresh from "@/components/AutoRefresh";
 import { ENT } from "@/lib/nav";
 import { ERC_BARRIERS, ERC_OUTCOMES, STATUS, ercTone, ercValue, isSafetyDesk, morClock, seesReporter } from "@/lib/safety";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
@@ -84,7 +85,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">SAM · analysis for the Safety Manager</span><span className="mini">never shown to the reporter</span></div>
             <div className="cb">
-              {!a?.ran_at && <p className="mini">The analysis is being prepared — refresh in a few seconds.</p>}
+              {!a?.ran_at && <p className="mini">SAM is preparing the analysis (about 30 seconds) — this page refreshes by itself.<AutoRefresh every={5000} /></p>}
               {a?.error && <p className="mini red">The analysis could not be prepared: {a.error}</p>}
               {a?.summary && <p className="mb-3">{a.summary}</p>}
               {a?.adrep?.length ? <p className="mb-2"><span className="eyebrow mr-2">ADREP / CICTT</span>{a.adrep.map((x) => <span key={x} className="kind k-comp mr-1">{x}</span>)}</p> : null}
@@ -112,7 +113,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               {!a?.confirmed_at && !closed ? (
                 <form action={classify} className="mt-2"><input type="hidden" name="id" value={r.id} />
                   <input name="basis" className="inp mb-2" defaultValue={a?.mor_basis ?? ""} placeholder="Basis (2015/1018 annex item, or why not reportable)" />
-                  <div className="flex gap-2"><button className="btn primary" name="mor" value="mandatory">Mandatory — MOR to file</button><button className="btn" name="mor" value="voluntary">Not reportable — voluntary</button></div>
+                  <div className="flex gap-2 flex-wrap"><label className="rchip-radio"><input type="radio" name="mor" value="mandatory" defaultChecked={a?.mor_status !== "voluntary"} required /> Mandatory — MOR to file</label><label className="rchip-radio"><input type="radio" name="mor" value="voluntary" defaultChecked={a?.mor_status === "voluntary"} /> Not reportable — voluntary</label><button className="btn primary">Confirm the decision</button></div>
                 </form>
               ) : a?.confirmed_at && <p className="mini">Decided by the SM: {a.mor_status === "mandatory" ? "MOR to file" : "not a mandatory occurrence"}.</p>}
               {a?.mor_status === "mandatory" && a?.confirmed_at && !r.mor_filed_at && (
@@ -136,8 +137,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <section className="card">
             <div className="ch"><span className="eyebrow">Report status</span></div>
             <div className="cb flex gap-2">
-              {r.status !== "investigation" && !closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><button className="btn" name="status" value="investigation">Open an investigation</button></form>}
-              {!closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><button className="btn" name="status" value="closed" disabled={clock.state === "running" || clock.state === "late"} title={clock.state === "running" || clock.state === "late" ? "Decide on the MOR first" : ""}>Close the report</button></form>}
+              {r.status !== "investigation" && !closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="investigation" /><button className="btn">Open an investigation</button></form>}
+              {!closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="closed" /><button className="btn" disabled={clock.state === "running" || clock.state === "late"} title={clock.state === "running" || clock.state === "late" ? "Decide on the MOR first" : ""}>Close the report</button></form>}
               {closed && <span className="mini">Closed.</span>}
             </div>
           </section>

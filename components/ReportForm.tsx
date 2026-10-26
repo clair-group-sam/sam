@@ -4,7 +4,8 @@ import Link from "next/link";
 import { proposePrecisions, submitReport, type NewReport } from "@/app/(app)/safe/new/actions";
 import { PHASES, type Precision } from "@/lib/safety-shared";
 
-const DK = "I don't know";
+const DKS: Record<string, string> = { fr: "Je ne sais pas", en: "I don't know", it: "Non lo so", es: "No lo sé", de: "Weiß ich nicht" };
+const DKRE = /(ne sais? pas|don'?t know|unknown|inconnu|non lo so|no lo s[ée]|wei(ß|ss) (ich )?nicht)/i;
 type Step = "write" | "precise" | "sent";
 
 /** SAF-01 New report: the reporter writes; on Send, SAM proposes a few factual precisions as form fields (never a chat); "Send as written" is always possible. */
@@ -17,6 +18,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
   const [sentId, setSentId] = useState<string | null>(null);
   const set = (p: Partial<NewReport>) => setR((x) => ({ ...x, ...p }));
   const setPrec = (k: string, v: string) => setR((x) => ({ ...x, precisions: { ...x.precisions, [k]: v } }));
+  const DK = DKS[r.language] ?? DKS.en;
   const ready = r.headline.trim().length > 0 && r.narrative.trim().length >= 10;
 
   async function next() {
@@ -75,7 +77,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
               <div key={q.key} className="mb-3">
                 <div className="text-[13px] font-semibold mb-1">{q.label}</div>
                 {q.type === "choice" && q.options?.length ? (
-                  <div className="rchips">{[...q.options, DK].map((o) => <button key={o} type="button" className={"rchip" + (r.precisions[q.key] === o ? " on" : "")} onClick={() => setPrec(q.key, r.precisions[q.key] === o ? "" : o)}>{o}</button>)}</div>
+                  <div className="rchips">{[...q.options.filter((o) => !DKRE.test(o)), DK].map((o) => <button key={o} type="button" className={"rchip" + (r.precisions[q.key] === o ? " on" : "")} onClick={() => setPrec(q.key, r.precisions[q.key] === o ? "" : o)}>{o}</button>)}</div>
                 ) : (
                   <div className="flex gap-2"><input type={q.type === "time" ? "time" : "text"} className="inp flex-1" value={r.precisions[q.key] === DK ? "" : (r.precisions[q.key] ?? "")} onChange={(e) => setPrec(q.key, e.target.value)} />
                     <button type="button" className={"rchip" + (r.precisions[q.key] === DK ? " on" : "")} onClick={() => setPrec(q.key, r.precisions[q.key] === DK ? "" : DK)}>{DK}</button></div>
