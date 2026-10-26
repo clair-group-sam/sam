@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { proposePrecisions, submitReport, type NewReport } from "@/app/(app)/safe/new/actions";
-import { PHASES, type Precision } from "@/lib/safety";
+import { PHASES, type Precision } from "@/lib/safety-shared";
 
 const DK = "I don't know";
 type Step = "write" | "precise" | "sent";

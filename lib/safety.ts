@@ -1,5 +1,7 @@
 // SAF-01 Safety reports: roles, report ids, the 72 h MOR clock (376/2014 art. 4(8): from RECEIPT in S.A.M.), ERC (ARMS) matrix.
 import { basePost, type Session } from "@/lib/session";
+import { PHASES, DEFAULT_PRECISIONS, type Precision } from "@/lib/safety-shared";
+export { PHASES, DEFAULT_PRECISIONS, type Precision };
 
 /** Safety desk = the people who read and analyse reports: CMM / SM / FSO (and their deputies). */
 export function isSafetyDesk(s: Session): boolean {
@@ -16,7 +18,6 @@ export const STATUS: Record<string, [string, string]> = {
   received: ["Received", "amber"], acknowledged: ["Acknowledged", "blue"], classified: ["Classified", "blue"],
   investigation: ["Under investigation", "amber"], closed: ["Closed", "green"],
 };
-export const PHASES = ["Parked / ground", "Taxi", "Take-off", "Initial climb", "Climb", "Cruise", "Descent", "Approach", "Landing", "After landing", "Training / simulator", "Maintenance", "Not in flight"];
 
 export const MOR_HOURS = 72;
 export function morClock(receivedAt: string, filedAt: string | null, status: string | null, now = Date.now()) {
@@ -51,11 +52,3 @@ export function nextReportId(existing: string[], year = new Date().getUTCFullYea
   return `${year}-${String((n.length ? Math.max(...n) : 0) + 1).padStart(3, "0")}`;
 }
 
-export type Precision = { key: string; label: string; type: "choice" | "text" | "time"; options?: string[] };
-/** Used when the assistant is not reachable: the usual missing facts. */
-export const DEFAULT_PRECISIONS: Precision[] = [
-  { key: "time_utc", label: "Time of the event (UTC)", type: "time" },
-  { key: "phase", label: "Phase of flight", type: "choice", options: PHASES },
-  { key: "alert", label: "What made you notice it?", type: "text" },
-  { key: "consequence", label: "Any consequence (damage, injury, delay, go-around…)?", type: "text" },
-];
