@@ -500,3 +500,13 @@ details.addtask>summary{list-style:none;cursor:pointer;padding:8px 14px;color:va
 .appcard{padding:10px 0;border-top:1px solid var(--line)}.appcard:first-child{border-top:0;padding-top:0}
 .bar.wide{width:100%;height:8px}
 details.card>summary{list-style:none}details.card>summary::-webkit-details-marker{display:none}
+/* Inbox: what each item is */
+.kind{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.03em;background:#eef2f5;color:#44546a;white-space:nowrap}
+.kind.k-proj{background:#efe9fb;color:#5b3fb0}
+.kind.k-auth{background:#e5f1fb;color:#0d4f86}
+.kind.k-read{background:#eaf6ee;color:#1e7a3c}
+.kind.k-cert{background:#fff4e5;color:#9a5b00}
+.kind.k-comp{background:#fdecea;color:#a3271b}
+.kind.k-docs{background:#eef3f7;color:#0d2a3f}
+.ctx{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5b3fb0;margin-bottom:2px}
+.ctx a{color:inherit}

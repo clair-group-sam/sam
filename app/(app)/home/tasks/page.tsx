@@ -7,7 +7,14 @@ import { ENT } from "@/lib/nav";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { OPEN, project as projectDates, type Dep, type Project, type Task as PTask } from "@/lib/projects";
 
-type Task = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null };
+type Task = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null; ctx?: string; ctxLink?: string };
+
+/** What each item is, at a glance (label + colour), whatever module created it. */
+const KIND: Record<string, [string, string]> = {
+  project: ["Project", "k-proj"], authority: ["Authority file", "k-auth"], authority_followup: ["Authority follow-up", "k-auth"],
+  reading: ["Read & acknowledge", "k-read"], certificate_validity: ["Validity", "k-cert"], finding: ["Finding", "k-comp"], action: ["Action", "k-comp"],
+  check: ["Compliance check", "k-comp"], change_request: ["Change request", "k-docs"], signature: ["Signature", "k-docs"], status_review: ["Status review", "k-comp"],
+};
 
 export default async function Inbox() {
   const s = await getSession();
@@ -38,7 +45,7 @@ export default async function Inbox() {
       for (const t of ptasks.filter((t) => t.project_id === p.id && t.link_kind !== "authority_file")) {
         const mine = t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : (p.owner_person ? p.owner_person === s.person?.id : !!p.owner_role && posts.has(basePost(p.owner_role)));
         if (!mine || proj.get(t.id)?.openDeps.length) continue;
-        tasks.push({ id: t.id, title: t.title, detail: `${p.title}${t.status === "blocked" ? " · blocked" : t.status === "waiting" ? " · waiting" : ""}`, due: t.status === "waiting" ? null : proj.get(t.id)?.end ?? null, entity: p.entity, kind: "project", status: "open", link: `/proj/boards/${p.id}`, owner_person: t.owner_person, owner_role: t.owner_role });
+        tasks.push({ id: t.id, title: t.title, ctx: p.title, ctxLink: `/proj/boards/${p.id}`, detail: t.status === "blocked" ? "blocked" : t.status === "waiting" ? "waiting" : null, due: t.status === "waiting" ? null : proj.get(t.id)?.end ?? null, entity: p.entity, kind: "project", status: "open", link: `/proj/boards/${p.id}`, owner_person: t.owner_person, owner_role: t.owner_role });
       }
     }
     tasks.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
@@ -58,14 +65,17 @@ export default async function Inbox() {
       </div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th>Entity</th><th>Due</th><th>Item</th><th>Kind</th></tr></thead>
+          <thead><tr><th style={{ width: 70 }}>Entity</th><th style={{ width: 160 }}>What</th><th style={{ width: 110 }}>Due</th><th>Item</th></tr></thead>
           <tbody>
             {tasks.map((t) => (
               <tr key={t.id}>
                 <td><span className={"ent " + t.entity}>{t.entity}</span></td>
+                <td><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span></td>
                 <td className={"mono" + (t.due && t.due < today ? " red" : "")}>{t.due ?? "—"}</td>
-                <td>{t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}</td>
-                <td className="mini">{t.kind}</td>
+                <td>
+                  {t.ctx && <div className="ctx">{t.kind === "project" ? "Project · " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
+                  {t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}
+                </td>
               </tr>
             ))}
             {!tasks.length && (
