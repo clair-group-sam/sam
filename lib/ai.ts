@@ -1,7 +1,7 @@
 // Server-side Claude calls (AI-01). The key lives in Vercel only; every call is logged in ai_usage.
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "route" | "file";
+export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "route" | "file" | "coffee";
 const HEADERS = (key: string) => ({ "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" });
 let modelCache: { id: string; at: number } | null = null;
 /** Lists the models available to the group's key (ids + display names). */

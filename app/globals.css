@@ -510,3 +510,15 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 .kind.k-docs{background:#eef3f7;color:#0d2a3f}
 .ctx{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5b3fb0;margin-bottom:2px}
 .ctx a{color:inherit}
+/* Morning coffee (UX-02) */
+.coffee-box{border-color:#e6d6c3;background:linear-gradient(90deg,#fdf8f2,#fff 60%)}
+.cf-head{display:flex;align-items:center;gap:14px}
+.cf-cup{font-size:26px;line-height:1}
+.cf-form{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:12px;flex-wrap:wrap}
+.cf-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;font-size:13px}
+.cf-src{display:flex;align-items:center;gap:6px}
+.cf-src.off{color:#8a98a6}
+.coffee-syn .cb{display:flex;align-items:flex-start;gap:14px;font-size:16px;font-weight:600;line-height:1.5}
+.coffee-syn.hot{border-color:#f0c9a8;background:#fff8f1}
+.coffee-soon{border-style:dashed;background:#fbfcfd}
+@media (max-width:760px){.cf-sources{grid-template-columns:1fr}.cf-head{flex-wrap:wrap}}
