@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { STEPS, STEP_LABEL } from "@/lib/docs";
+import { STEPS } from "@/lib/docs";
 import type { Transition } from "@/lib/revisions";
 import { moveStep } from "@/app/(app)/docs/editor/[rev]/actions";
 
@@ -11,13 +11,15 @@ export type WorkflowProps = {
   blockedNote?: string | null;
   /** Where the route decision is made (Compliance card below) — shown when the route is still open at that step. */
   routeHint?: string | null;
+  /** FB-012 · transitions that cannot be taken yet, with the reason shown instead of an active button (keyed by target step). */
+  blocked?: Record<string, string>;
 };
 
 /**
  * DOC-09 workflow for a regulated manual: every step in order, the one to do now with its action, the next ones greyed with
  * the person or department expected. Steps that do not apply (no signature, no authority route) are shown as "not required".
  */
-export default function Workflow({ revisionId, current, rows, transitions, blockedNote, routeHint }: WorkflowProps) {
+export default function Workflow({ revisionId, current, rows, transitions, blockedNote, routeHint, blocked = {} }: WorkflowProps) {
   const idx = STEPS.indexOf(current);
   // the "now" row is the first row after the current step that is not skipped
   const nowRow = rows.find((r) => STEPS.indexOf(r.step) > idx && !r.skipped) ?? null;
@@ -40,8 +42,8 @@ export default function Workflow({ revisionId, current, rows, transitions, block
                 <form key={t.to} action={moveStep} className="wfact">
                   <input type="hidden" name="revision_id" value={revisionId} /><input type="hidden" name="to" value={t.to} />
                   <div className="flex items-center gap-3 flex-wrap">
-                    <button className="btn primary" type="submit" disabled={!!blockedNote && t.to === "published"}>{t.label}</button>
-                    <span className="mini">{blockedNote && t.to === "published" ? blockedNote : t.to === "published" ? `${t.note ?? ""} The update notice goes to every reader of the manual.` : t.note}</span>
+                    <button className="btn primary" type="submit" disabled={(!!blockedNote && t.to === "published") || !!blocked[t.to]}>{t.label}</button>
+                    <span className={"mini" + (blocked[t.to] ? " red" : "")}>{blocked[t.to] ? blocked[t.to] : blockedNote && t.to === "published" ? blockedNote : t.to === "published" ? `${t.note ?? ""} The update notice goes to every reader of the manual.` : t.note}</span>
                   </div>
                   {(t.to === "with_civil_aviation" || t.from === "with_civil_aviation") && <input name="note" className="inp mt-2" placeholder="Note for the authority exchange (what was sent / received)…" />}
                 </form>
@@ -61,7 +63,7 @@ export default function Workflow({ revisionId, current, rows, transitions, block
           ))}
         </div>
       )}
-      <p className="mini mt-2">Steps: {STEP_LABEL.draft} → {rows.map((r) => r.label).join(" → ")}. <Link className="underline" href="/docs/drafts">Who does what</Link>.</p>
+      <p className="mini mt-2"><Link className="underline" href="/docs/drafts">Who does what</Link> (DOC-09).</p>
     </div>
   );
 }

@@ -42,6 +42,7 @@ export default async function MorningCoffee() {
   const Err = ({ k }: { k: string }) => err[k] ? <div className="cb mini red">Could not read it this time: {err[k]}</div> : null;
   const actions = r.mail?.groups.reduce((n, g) => n + g.items.filter((m) => m.action).length, 0) ?? 0;
   const urgent = r.overdue.length + r.today.length + r.mor.length;
+  const c = r.counts ?? { overdue: r.overdue.length, today: r.today.length, week: r.week.length }; // FB-002 · same unit as the Inbox: tasks
   return (
     <>
       <PageHeader eyebrow="Home · Morning coffee" title={`Your morning, ${s.name.split(" ")[0]}`}
@@ -53,7 +54,7 @@ export default async function MorningCoffee() {
       </section>
 
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <div className={"metric" + (r.overdue.length ? " red" : "")}><div className="eyebrow">Overdue</div><div className="val">{r.overdue.length}</div><div className="mini">{r.today.length} due today · {r.week.length} this week</div></div>
+        <div className={"metric" + (c.overdue ? " red" : "")}><div className="eyebrow">Overdue tasks</div><div className="val">{c.overdue}</div><div className="mini">{c.today} due today · {c.week} this week</div></div>
         <div className="metric"><div className="eyebrow">Meetings today</div><div className="val">{r.agenda ? r.agenda.items.filter((i) => !i.allDay).length : "—"}</div>{r.agenda && <div className="mini">{r.agenda.free.length ? `free ${r.agenda.free.slice(0, 2).map((f) => f.from + "–" + f.to).join(", ")}` : "no free slot"}</div>}</div>
         <div className={"metric" + (actions ? " amber" : "")}><div className="eyebrow">Unread mail</div><div className="val">{r.mail ? r.mail.total : "—"}</div>{r.mail && <div className="mini">{actions} to act on</div>}</div>
         <div className="metric"><div className="eyebrow">Teams</div><div className="val">{r.teams ? r.teams.chats.length + r.teams.mentions.length : "—"}</div>{r.teams && <div className="mini">{r.teams.chats.length} chats · {r.teams.mentions.length} mentions</div>}</div>
@@ -106,9 +107,9 @@ export default async function MorningCoffee() {
       )}
 
       <Block title="Regulatory clocks · MOR 72 h" lines={r.mor} dueCol={false} />
-      <Block title="Overdue" lines={r.overdue} />
-      <Block title="Due today" lines={r.today} empty={r.overdue.length ? undefined : "Nothing due today."} />
-      <Block title="Next 7 days" lines={r.week} />
+      <Block title="Overdue" hint={c.overdue !== r.overdue.length ? `${c.overdue} tasks · ${r.overdue.length} lines` : undefined} lines={r.overdue} />
+      <Block title="Due today" hint={c.today !== r.today.length ? `${c.today} tasks · ${r.today.length} lines` : undefined} lines={r.today} empty={r.overdue.length ? undefined : "Nothing due today."} />
+      <Block title="Next 7 days" hint={c.week !== r.week.length ? `${c.week} tasks · ${r.week.length} lines` : undefined} lines={r.week} />
       <Block title="Read & acknowledge" lines={r.readings} />
       <Block title="Validities ending within 90 days" lines={r.validities} />
       <Block title={`What moved since ${dayLabel(r.since)}`} lines={r.moved} dueCol={false} empty="Nothing moved overnight in your scope." />

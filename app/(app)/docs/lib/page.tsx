@@ -9,6 +9,7 @@ import { mayCreateManual } from "@/lib/create";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENTS4 } from "@/lib/nav";
 import FolderTree, { type TNode } from "@/components/FolderTree";
+import { isTestData, TEST_PILL_TITLE } from "@/lib/testdata";
 
 const FAMILY_COLORS: Record<string, string> = { "1": "#7d166d", "2": "#0e8cc4", "3": "#248a3d", "4": "#b86e00", "5": "#b43a0f", "6": "#6b5bd2" };
 type Row = Awaited<ReturnType<typeof listManuals>>[number];
@@ -63,17 +64,24 @@ export default async function Library({ searchParams }: { searchParams: Promise<
     recent = ((v.data ?? []) as { manual_id: string }[]).map((x) => byId.get(x.manual_id)).filter(Boolean).slice(0, 8) as Row[];
     toRead = ((t.data ?? []) as { title: string; link: string; entity: string }[]).filter((x) => s.entity === "ALL" || x.entity === s.entity);
   }
-  const published = rows.filter((r) => r.current).length, drafts = rows.filter((r) => r.workings.length).length, never = rows.filter((r) => !r.current).length;
+  const realRows = rows.filter((r) => !isTestData(r.manual.code, r.manual.title)); // FB-024
+  const testRows = rows.length - realRows.length;
+  const published = realRows.filter((r) => r.current).length, drafts = realRows.filter((r) => r.workings.length).length, never = realRows.filter((r) => !r.current).length;
 
-  let hits: { manual_id: string; entity: string; code: string; title: string; ref: string; stitle: string | null; snippet: string }[] = [];
+  let hits: { manual_id: string; entity: string; code: string; title: string; ref: string; stitle: string | null; snippet: string; also?: string[] }[] = [];
   if (q.trim()) {
     const sb = await supabaseServer();
     const { data } = await sb.from("revision_sections").select("ref,title,body_text,revision_id,revisions!inner(manual_id,step,manuals!inner(code,title,entity))").textSearch("body_text", q, { type: "websearch", config: "simple" }).limit(30);
     type Hit = { ref: string; title: string | null; body_text: string; revision_id: string; revisions: { manual_id: string; step: string; manuals: { code: string; title: string; entity: string } } };
+    // FB-007 · the same passage (a table repeated in several chapters) is shown once, with the chapters it sits in
     hits = ((data ?? []) as unknown as Hit[]).filter((h) => (s.entity === "ALL" || h.revisions.manuals.entity === s.entity) && (h.revisions.step === "published" || h.revisions.step === "repository")).map((h) => {
       const i = h.body_text.toLowerCase().indexOf(q.toLowerCase().split(" ")[0]);
       return { manual_id: h.revisions.manual_id, entity: h.revisions.manuals.entity, code: h.revisions.manuals.code, title: h.revisions.manuals.title, ref: h.ref, stitle: h.title, snippet: h.body_text.slice(Math.max(0, i - 80), i + 160).replace(/\s+/g, " ") };
-    });
+    }).reduce((acc, h) => {
+      const k = `${h.manual_id}|${h.snippet}`; const prev = acc.find((x) => `${x.manual_id}|${x.snippet}` === k);
+      if (prev) { prev.also = [...(prev.also ?? []), h.ref]; return acc; }
+      return [...acc, { ...h, also: [] as string[] }];
+    }, [] as (typeof hits[number] & { also?: string[] })[]);
   }
   const scope = s.entity === "ALL" ? "all entities" : `${ENT[s.entity]?.name} (${s.entity})`;
   const famColor = (name: string) => FAMILY_COLORS[name.trim()[0]] ?? "#5b7183";
@@ -130,7 +138,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
         <section className="card mb-5">
           <div className="ch"><span className="eyebrow">{hits.length} passage{hits.length === 1 ? "" : "s"} for “{q}” in published manuals</span></div>
           <table className="tbl"><tbody>
-            {hits.map((h, i) => (<tr key={i}><td className="mono" style={{ width: 190 }}><span className={"ent " + h.entity}>{h.entity}</span> {h.code} · {h.ref}</td><td><Link href={`/docs/manual/${h.manual_id}?sec=${encodeURIComponent(h.ref)}&q=${encodeURIComponent(q)}`}><b>{h.stitle ?? h.ref}</b></Link><div className="mini">…{h.snippet}…</div></td></tr>))}
+            {hits.map((h, i) => (<tr key={i}><td className="mono" style={{ width: 190 }}><span className={"ent " + h.entity}>{h.entity}</span> {h.code} · {h.ref}</td><td><Link href={`/docs/manual/${h.manual_id}?sec=${encodeURIComponent(h.ref)}&q=${encodeURIComponent(q)}`}><b>{h.stitle ?? h.ref}</b></Link>{h.also?.length ? <span className="mini"> · also in {h.also.join(", ")}</span> : null}<div className="mini">…{h.snippet}…</div></td></tr>))}
             {!hits.length && <tr><td className="p-5 text-slate6">No passage found.</td></tr>}
           </tbody></table>
         </section>
@@ -148,8 +156,9 @@ export default async function Library({ searchParams }: { searchParams: Promise<
             {!recent.length && <div className="row mini">—</div>}</section>
         </div>
       )}
-      <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Manuals" value={rows.length} hint="structured, revisable" />
+      {q && <p className="mini mb-4">The passages above are the search result. <Link className="underline" href="/docs/lib">Clear the search</Link> to browse the library.</p>}
+      {!q && <><div className="grid grid-cols-4 gap-4 mb-5">
+        <Metric label="Manuals" value={realRows.length} hint={`structured, revisable${testRows ? ` · + ${testRows} test` : ""}${certCount ? ` · + ${certCount} certificate${certCount > 1 ? "s" : ""} in the folders` : ""}`} />
         <Metric label="Published" value={published} hint="current revision available" />
         <Metric label="Revisions in progress" value={drafts} tone={drafts ? "amber" : undefined} hint="draft, review or authority" />
         <Metric label="Never published" value={never} tone={never ? "red" : undefined} hint="to clean or publish" />
@@ -157,7 +166,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       <div className="flex gap-4 items-start">
         <aside className="card folders">
           <div className="ch"><span className="eyebrow">Folders</span><span className="mini">colour = worst status inside</span></div>
-          <FolderTree nodes={tnodes} selected={folder} total={rows.length} several={several} />
+          <FolderTree nodes={tnodes} selected={folder} total={rows.length + (certCount ?? 0)} several={several} />{/* FB-006 · folder counts include certificates, so does the total */}
         </aside>
         <section className="card flex-1 min-w-0">
           <div className="ch"><span className="eyebrow">{folder || "All documents"}</span><span className="mini">{inFolder.length} document{inFolder.length > 1 ? "s" : ""}</span></div>
@@ -168,7 +177,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
                 <tr key={manual.id}>
                   <td><span className={"ent " + manual.entity}>{manual.entity}</span></td>
                   <td className="mono">{manual.code}</td>
-                  <td><Link href={`/docs/manual/${manual.id}`}><b>{manual.title}</b></Link>{(manual as typeof manual & { internal?: boolean }).internal && <span className="nature ml-2">internal</span>}{!folder && <div className="mini">{manual.path}</div>}</td>
+                  <td><Link href={`/docs/manual/${manual.id}`}><b>{manual.title}</b></Link>{(manual as typeof manual & { internal?: boolean }).internal && <span className="nature ml-2">internal</span>}{isTestData(manual.code, manual.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}{!folder && <div className="mini">{manual.path}</div>}</td>
                   <td className="mini">{manual.owner_role}</td>
                   <td className="mono">{current ? `Iss ${current.issue} Rev ${current.rev}` : "—"}{current?.published_at && <div className="mini">{current.published_at}</div>}</td>
                   <td>{current ? <span className="pill green">Published</span> : <span className="pill red">Never published</span>}{workings.map((w) => <span key={w.id} className="pill amber ml-1">Rev {w.rev} · {STEP_LABEL[w.step]}</span>)}</td>
@@ -178,7 +187,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
             </tbody>
           </table>
         </section>
-      </div>
+      </div></>}
     </>
   );
 }

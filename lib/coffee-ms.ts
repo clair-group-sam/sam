@@ -42,6 +42,10 @@ export async function agenda(token: string, day: string, targets: SamTarget[], n
 const AUTH = /(transport\.gov\.mt|aviation-civile\.gouv\.fr|dgac|easa\.europa\.eu|osac\.aero|centrik\.net|developpement-durable\.gouv\.fr|ecologie\.gouv\.fr)$/i;
 const INTERNAL = /(clair-group\.com|astonjet\.(com|fr|mt)|astonfly\.(com|fr)|astontec\.(com|fr)|aston-?jet|aston-?fly)$/i;
 const NOTIF = /(no-?reply|do-?not-?reply|notification|notifications|mailer|alerts?|bounce|news(letter)?)@/i;
+// FB-001 · one-time codes (security / verification / login codes, OTP, 2FA) are never summarised nor sent to the assistant: the code must not appear in a recap.
+const OTP = /((security|verification|one[- ]?time|confirmation|login|sign[- ]?in|authentication|access|2fa|mfa|recovery)\s*(code|pin|passcode)|\bcode\s+(de\s+)?(s[ée]curit[ée]|v[ée]rification|confirmation|connexion|validation)|\bOTP\b|\bpasscode\b|\bvotre code\b|\byour code\b)/i;
+const isOtp = (subject: string, preview: string) => OTP.test(subject) || (OTP.test(preview) && /\b\d{4,8}\b/.test(preview));
+const hideCode = (t: string) => t.replace(/\b\d{4,8}\b/g, "••••••");
 
 /** Unread mail in the Inbox since the previous evening, grouped, one line each + "Action" marker (SAM). Private / Personal left out. */
 export async function mail(token: string, s: Session, since: string): Promise<MailGroups> {
@@ -59,9 +63,10 @@ export async function mail(token: string, s: Session, since: string): Promise<Ma
   };
   // one line + action marker for each mail, in one call (subject + sender + the preview Outlook already shows)
   let lines: { i: number; s: string; a: boolean }[] = [];
-  if (keep.length) {
+  const otp = keep.map((m) => isOtp(m.subject ?? "", m.bodyPreview ?? ""));
+  if (keep.some((_, i) => !otp[i])) {
     try {
-      const list = keep.map((m, i) => ({ i, from: `${m.from?.emailAddress?.name ?? ""} <${m.from?.emailAddress?.address ?? ""}>`, subject: m.subject ?? "", preview: (m.bodyPreview ?? "").slice(0, 300), group: groupOf(m) }));
+      const list = keep.map((m, i) => ({ i, from: `${m.from?.emailAddress?.name ?? ""} <${m.from?.emailAddress?.address ?? ""}>`, subject: m.subject ?? "", preview: (m.bodyPreview ?? "").slice(0, 300), group: groupOf(m) })).filter((x) => !otp[x.i]);
       const { text } = await callClaude({ agent: "coffee", personId: s.person?.id ?? null, entity: null, maxTokens: 2500,
         system: `You sort the unread e-mails of ${s.name} (${s.roles.join(", ") || "staff"}, compliance & safety in an aviation group). For each mail write ONE short line in English (max 16 words) saying what it is about, and set "a" to true only when ${s.name.split(" ")[0]} has to do something (answer, decide, sign, submit, a deadline, an authority request). Newsletters and automatic notifications are never an action unless they announce a deadline or a finding. Never invent. Answer ONLY with JSON: [{"i":0,"s":"…","a":false}]`,
         user: JSON.stringify(list) });
@@ -72,8 +77,18 @@ export async function mail(token: string, s: Session, since: string): Promise<Ma
   const groups = order.map((name) => ({ name, items: [] as MailItem[] }));
   keep.forEach((m, i) => {
     const l = lines.find((x) => x.i === i);
-    groups[order.indexOf(groupOf(m))].items.push({ from: m.from?.emailAddress?.name || m.from?.emailAddress?.address || "?", subject: m.subject || "(no subject)", at: m.receivedDateTime, summary: l?.s ?? (m.bodyPreview ?? "").slice(0, 120), action: l ? !!l.a : m.importance === "high", link: m.webLink });
+    const from = m.from?.emailAddress?.name || m.from?.emailAddress?.address || "?";
+    if (otp[i]) { groups[order.indexOf(groupOf(m))].items.push({ from, subject: hideCode(m.subject || "Security code"), at: m.receivedDateTime, summary: "One-time code — not shown here (expires quickly, read it in Outlook).", action: false, link: m.webLink }); return; }
+    groups[order.indexOf(groupOf(m))].items.push({ from, subject: m.subject || "(no subject)", at: m.receivedDateTime, summary: l?.s ?? (m.bodyPreview ?? "").slice(0, 120), action: l ? !!l.a : m.importance === "high", link: m.webLink });
   });
+  // FB-005 · identical automatic notifications (same sender, same subject once numbers are removed) are shown once, with a count
+  const norm = (t: string) => t.replace(/\(?[0-9a-f]{7,40}\)?/gi, "").replace(/\d+/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  for (const g of groups) {
+    if (g.name !== "Notifications") continue;
+    const seen = new Map<string, MailItem & { n: number }>();
+    for (const it of g.items) { const k = it.from.toLowerCase() + "|" + norm(it.subject); const cur = seen.get(k); if (cur) { cur.n++; if (it.at > cur.at) cur.at = it.at; cur.action = cur.action || it.action; } else seen.set(k, { ...it, n: 1 }); }
+    g.items = [...seen.values()].map(({ n, ...it }) => (n > 1 ? { ...it, subject: `${it.subject} (×${n})`, summary: `${n} similar notifications since the last recap — ${it.summary}` } : it));
+  }
   for (const g of groups) g.items.sort((a, b) => Number(b.action) - Number(a.action) || b.at.localeCompare(a.at));
   return { total: keep.length, groups: groups.filter((g) => g.items.length) };
 }

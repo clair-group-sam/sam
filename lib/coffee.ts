@@ -14,6 +14,8 @@ export type Line = { kind: string; label: string; cls: string; title: string; ct
 export type Recap = {
   day: string; at: string; since: string; sources: string[];
   overdue: Line[]; today: Line[]; week: Line[]; later: number;
+  /** FB-002 · counts in TASKS (the Inbox unit), while the lines above group a project's tasks on one line */
+  counts?: { overdue: number; today: number; week: number };
   readings: Line[]; validities: Line[]; mor: Line[]; moved: Line[];
   agenda?: Agenda; mail?: MailGroups; teams?: TeamsRecap; errors?: Record<string, string>;
   synthesis: string;
@@ -73,9 +75,11 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
   const inbox = await myInbox(s);
   const dl = inbox.filter((t) => t.kind !== "reading" && t.kind !== "certificate_validity");
   // a project is one line per block (its tasks of that block counted), never one line per task
-  const overdue = groupProjects(dl.filter((t) => t.due && t.due < day), day).map(line);
-  const today = groupProjects(dl.filter((t) => t.due === day), day).map(line);
-  const week = groupProjects(dl.filter((t) => t.due && t.due > day && t.due <= in7), day).map(line);
+  const ov = dl.filter((t) => t.due && t.due < day), td = dl.filter((t) => t.due === day), wk = dl.filter((t) => t.due && t.due > day && t.due <= in7);
+  const counts = { overdue: ov.length, today: td.length, week: wk.length };
+  const overdue = groupProjects(ov, day).map(line);
+  const today = groupProjects(td, day).map(line);
+  const week = groupProjects(wk, day).map(line);
   const later = groupProjects(dl.filter((t) => !t.due || t.due > in7), day).length;
   const readings = inbox.filter((t) => t.kind === "reading").map(line);
 
@@ -144,7 +148,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
     }
   }
   moved.sort((a, b) => b.at.localeCompare(a.at));
-  return { day, at: now.toISOString(), since: sinceIso, sources: ["sam"], overdue, today, week, later, readings, validities, mor, moved: moved.slice(0, 25).map((m) => m.l) };
+  return { day, at: now.toISOString(), since: sinceIso, sources: ["sam"], overdue, today, week, later, counts, readings, validities, mor, moved: moved.slice(0, 25).map((m) => m.l) };
 }
 
 /** One sentence by SAM on what matters most today (falls back to a plain sentence if the assistant is not reachable). */
@@ -154,15 +158,16 @@ export async function synthesise(s: Session, r: Omit<Recap, "synthesis">): Promi
     return bits.length ? `Today: ${bits.join(", ")}.` : "Nothing urgent in S.A.M. this morning.";
   };
   const pick = (l: Line[]) => l.slice(0, 6).map((x) => `${x.entity} · ${x.label} · ${x.ctx ? x.ctx + " › " : ""}${x.title}${x.due ? " (due " + x.due + ")" : ""}${x.note ? " [" + x.note + "]" : ""}`);
-  const facts = { today: r.day,
-    agenda: r.agenda?.items.filter((i) => !i.allDay).slice(0, 8).map((i) => `${i.start.slice(11)}–${i.end.slice(11)} ${i.subject}${i.sam ? " [" + i.sam.label + "]" : ""}`),
+  const np = parisParts(); const nowHm = `${String(np.hour).padStart(2, "0")}:${String(np.minute).padStart(2, "0")}`; // FB-004 · the recap knows what time it is
+  const facts = { today: r.day, time_now: nowHm,
+    agenda: r.agenda?.items.filter((i) => !i.allDay).slice(0, 8).map((i) => `${i.start.slice(11)}–${i.end.slice(11)} ${i.subject}${i.sam ? " [" + i.sam.label + "]" : ""}${i.end.slice(11) <= nowHm ? " (already over)" : i.start.slice(11) <= nowHm ? " (in progress)" : ""}`),
     free_slots: r.agenda?.free.map((f) => `${f.from}–${f.to}`),
     mails_to_act_on: r.mail?.groups.flatMap((g) => g.items.filter((m) => m.action).map((m) => `${g.name} · ${m.from}: ${m.summary}`)).slice(0, 8),
     unread_mails: r.mail?.total, teams_unread_chats: r.teams?.chats.length, teams_mentions: r.teams?.mentions.slice(0, 4).map((m) => `${m.name}: ${m.preview}`),
     overdue: pick(r.overdue), due_today: pick(r.today), next_7_days: pick(r.week), readings: r.readings.length, validities: pick(r.validities), mor_72h: pick(r.mor), moved_since_last_evening: pick(r.moved) };
   try {
     const { text } = await callClaude({ agent: "coffee", personId: s.person?.id ?? null, entity: null, maxTokens: 220,
-      system: `You prepare the morning recap of ${s.name.split(" ")[0]} (${s.roles.join(", ") || "staff"}) in the compliance & safety software of an aviation group. Write ONE or two sentences in English (max 50 words): what matters most today and what to do first, based ONLY on the facts given (agenda, mails to act on, Teams, S.A.M. deadlines). Regulatory clocks (MOR 72 h, expired validities, overdue authority items) and authority mails come first; you may suggest using a free slot. No greeting, no emoji, no list, never invent anything. If nothing is urgent, say so plainly.`,
+      system: `You prepare the morning recap of ${s.name.split(" ")[0]} (${s.roles.join(", ") || "staff"}) in the compliance & safety software of an aviation group. Write ONE or two sentences in English (max 50 words): what matters most today and what to do first, based ONLY on the facts given (agenda, mails to act on, Teams, S.A.M. deadlines). Regulatory clocks (MOR 72 h, expired validities, overdue authority items) and authority mails come first; you may suggest using a free slot. It is time_now: never tell the person to do something at a time already passed — meetings marked "already over" are done, mention them in the past tense or not at all. No greeting, no emoji, no list, never invent anything. If nothing is urgent, say so plainly.`,
       user: JSON.stringify(facts) });
     const t = text.trim().replace(/^["']|["']$/g, "");
     return t || fallback();

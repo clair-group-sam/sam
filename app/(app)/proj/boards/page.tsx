@@ -7,6 +7,7 @@ import { ENT, ENTS4 } from "@/lib/nav";
 import { fr, today } from "@/lib/authority";
 import { PROJECT_STATUS_LABEL, progress, project as projectDates, projectedEnd, type Dep, type Project, type Task } from "@/lib/projects";
 import { cancelProject, deleteProject } from "./actions";
+import { isTestData, TEST_PILL_TITLE } from "@/lib/testdata";
 
 /** Projects › Projects: every project of the entity (aircraft addition, NP change, new SPA…), its progress and what it waits for. */
 export default async function Projects({ searchParams }: { searchParams: Promise<{ entity?: string; status?: string }> }) {
@@ -39,7 +40,8 @@ export default async function Projects({ searchParams }: { searchParams: Promise
     const next = pt.filter((t) => t.status !== "done" && t.status !== "not_needed" && !(proj.get(t.id)?.openDeps.length)).sort((a, b) => (proj.get(a.id)!.end < proj.get(b.id)!.end ? -1 : 1)).slice(0, 2);
     return { p, pr, late, blocked, end, next };
   });
-  const open = rows.filter((r) => r.p.status === "open");
+  const open = rows.filter((r) => r.p.status === "open" && !isTestData(r.p.title)); // FB-024 · counters without test projects
+  const testOpen = rows.filter((r) => r.p.status === "open" && isTestData(r.p.title)).length;
   const superadmin = s.roles.includes("SUPERADMIN");
   return (
     <>
@@ -47,8 +49,8 @@ export default async function Projects({ searchParams }: { searchParams: Promise
         right={<><Link href="/proj/auth" className="btn">Authority files</Link><Link href="/proj/boards/new" className="btn primary">+ New project</Link></>} />
       {ents.length > 1 && <div className="chips mb-4" style={{ display: "inline-flex" }}>{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={`/proj/boards?entity=${e}&status=${status}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Open projects" value={open.length} />
-        <Metric label="Tasks late" value={open.reduce((n, r) => n + r.late, 0)} tone={open.some((r) => r.late) ? "red" : undefined} hint="projected end before today" />
+        <Metric label="Open projects" value={open.length} hint={testOpen ? `+ ${testOpen} test` : undefined} />
+        <Metric label="Tasks late" value={open.reduce((n, r) => n + r.late, 0)} tone={open.some((r) => r.late) ? "red" : undefined} hint="due date passed, or started and over its duration" />
         <Metric label="Blocked" value={open.reduce((n, r) => n + r.blocked, 0)} tone={open.some((r) => r.blocked) ? "amber" : undefined} />
         <Metric label="Done this scope" value={`${open.reduce((n, r) => n + r.pr.done, 0)} / ${open.reduce((n, r) => n + r.pr.total, 0)}`} hint="tasks, open projects" />
       </div>
@@ -60,7 +62,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
             {rows.map(({ p, pr, late, blocked, end, next }) => (
               <tr key={p.id}>
                 <td><span className={"ent " + p.entity}>{p.entity}</span></td>
-                <td><Link href={`/proj/boards/${p.id}`}><b>{p.title}</b></Link><div className="mini">{p.template_code ?? "blank project"} · started {fr(p.started_at)}{p.target_date ? ` · target ${fr(p.target_date)}` : ""}</div></td>
+                <td><Link href={`/proj/boards/${p.id}`}><b>{p.title}</b></Link>{isTestData(p.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}<div className="mini">{p.template_code ?? "blank project"} · started {fr(p.started_at)}{p.target_date ? ` · target ${fr(p.target_date)}` : ""}</div></td>
                 <td className="mini">{p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"}</td>
                 <td><div className="bar"><i style={{ width: `${pr.pct}%` }} /></div><div className="mini">{pr.done} / {pr.total} · {pr.pct} %{late ? <span className="red"> · {late} late</span> : ""}{blocked ? <span className="amber"> · {blocked} blocked</span> : ""}</div></td>
                 <td className="mini">{p.status === "closed" ? "—" : next.length ? next.map((t) => <div key={t.id}>{t.title}{t.owner_role ? ` · ${t.owner_role}` : ""}</div>) : "nothing ready to start"}</td>

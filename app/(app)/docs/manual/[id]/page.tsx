@@ -71,7 +71,10 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
     readings = (rd ?? []) as unknown as Reading[];
     mine = readings.find((r) => r.person_id === s.person?.id) ?? null;
   }
-  const activeMeta = sections.find((x) => x.ref === sec) ?? sections.find((x) => x.ord === 1) ?? sections[0] ?? null;
+  // FB-008 · without ?sec, open the first content chapter: the imported cover / table of contents / LEP (part 0) duplicate the sidebar
+  const FRONT = /^(cover|couverture|table des mati|contents|sommaire|liste des pages|list of effective|r[ée]visions?$|record of revisions|liste de diffusion|distribution list)/i;
+  const isFront = (x: { ref: string; title: string | null }) => partOf(x.ref) === "0" || FRONT.test((x.title ?? "").trim());
+  const activeMeta = sections.find((x) => x.ref === sec) ?? sections.find((x) => !isFront(x)) ?? sections.find((x) => x.ord === 1) ?? sections[0] ?? null;
   let active: Section | null = null;
   if (activeMeta) {
     const { data: one } = await sb.from("revision_sections").select("id,ord,ref,title,body,changed").eq("id", activeMeta.id).maybeSingle();
@@ -146,7 +149,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       <EntityBand entity={manual.entity} current={s.entity} multi={multi} />
       <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
         tag={<ManualClass internal={!!(manual as Manual & { internal?: boolean }).internal} entity={manual.entity} />}
-        sub={current ? `Issue ${current.issue} Rev ${current.rev} · ${STEP_LABEL[current.step]}${current.published_at ? " · " + current.published_at : ""} · owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}` : "No revision yet"}
+        sub={current ? `owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${manual.path ? ` · ${manual.path}` : ""}${published.length ? ` · ${published.length} published revision${published.length > 1 ? "s" : ""}` : ""}` : "No revision yet"}
         right={<>
           {isCmm(s) ? (
             <form action={setNature} className="flex items-center" title="Nature of the document (Compliance): a regulated manual follows the DOC-09 cycle with an authority route; an internal document is reviewed and published by its author">
@@ -158,7 +161,6 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             </form>
           ) : <span className="nature" style={{ alignSelf: "center" }}>{(manual as Manual & { internal?: boolean }).internal ? "internal document" : "regulated manual"}</span>}
           <form action={toggleFavourite}><input type="hidden" name="manual_id" value={manual.id} /><button type="submit" className={"star" + (fav ? "" : " off")} title={fav ? "Remove from my favourites" : "Add to my favourites (Library shortcuts)"}>{fav ? "★" : "☆"}</button></form>
-          <Link href="/docs/lib" className="btn">‹ Library</Link>
           {canDownloadPdf(s.roles) && revs.length > 0 && (
             <DownloadMenu manualId={manual.id}
               published={published[0] ? { id: published[0].id, label: `Iss ${published[0].issue} Rev ${published[0].rev}`, sub: published[0].published_at ? `effective ${published[0].published_at}` : "published" } : null}
@@ -219,7 +221,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
           <div className="cb">
             <p className="mb-4">{current?.summary ?? "No revision summary recorded."}</p>
             {!changes.length && <p className="mini">No chapter is marked as changed in this revision.</p>}
-            {changes.map((c) => (
+            {changes.filter((c) => !isFront(c)).map((c) => (
               <div key={c.id} className="wchg">
                 <div className="wchg-h"><span className="mono">{c.ref}</span> <b>{c.title}</b>{c.note && <span className="pill amber">{c.note}</span>}<Link className="mini underline ml-auto" href={`/docs/manual/${manual.id}?rev=${current?.id}&sec=${encodeURIComponent(c.ref)}`}>Open the chapter ›</Link></div>
                 {c.rows ? <DiffTable rows={c.rows} left={baseRevLabel} right={`Rev ${current?.rev}`} />
@@ -227,6 +229,18 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
                   : <p className="mini">New chapter, or no previous text available in S.A.M.</p>}
               </div>
             ))}
+            {changes.some((c) => isFront(c)) && (
+              <details className="mt-3"><summary className="mini" style={{ cursor: "pointer" }}>Front matter also revised — cover, table of contents, list of effective pages… ({changes.filter((c) => isFront(c)).length} chapter{changes.filter((c) => isFront(c)).length > 1 ? "s" : ""})</summary>
+                {changes.filter((c) => isFront(c)).map((c) => (
+                  <div key={c.id} className="wchg">
+                    <div className="wchg-h"><span className="mono">{c.ref}</span> <b>{c.title}</b>{c.note && <span className="pill amber">{c.note}</span>}<Link className="mini underline ml-auto" href={`/docs/manual/${manual.id}?rev=${current?.id}&sec=${encodeURIComponent(c.ref)}`}>Open the chapter ›</Link></div>
+                    {c.rows ? <DiffTable rows={c.rows} left={baseRevLabel} right={`Rev ${current?.rev}`} />
+                      : c.passages.length ? <div className="wchg-pass"><div className="mini mb-1">Passages marked as revised by the publisher:</div>{c.passages.map((t, i) => <p key={i} className="ins">{t}</p>)}</div>
+                      : <p className="mini">New chapter, or no previous text available in S.A.M.</p>}
+                  </div>
+                ))}
+              </details>
+            )}
             {current && !mine?.acknowledged_at && changes.length > 0 && (
               <form action={acknowledge} className="mt-5"><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
                 <button className="btn primary" type="submit">I have read the changes of Rev {current.rev}</button></form>

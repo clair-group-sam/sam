@@ -86,7 +86,8 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const posts = internal ? [] : await postsOf(admin, manual.entity);
   const holder = (code: string) => posts.find((p) => p.code === basePost(code))?.holder_name ?? null;
   const ownerPost = manual.owner_role.startsWith("PERSON:") ? null : basePost(manual.owner_role);
-  const ownerWho = !ownerPost ? (manual.owner_name ?? "the author") : holder(ownerPost) ? `${holder(ownerPost)} (${ownerPost})` : `holder of the ${ownerPost} post — not named in NP management for ${manual.entity}`;
+  const ownerMissing = !!ownerPost && !holder(ownerPost); // FB-013 · owner post not in NP management for this entity: say it once, with the way to fix it
+  const ownerWho = !ownerPost ? (manual.owner_name ?? "the author") : holder(ownerPost) ? `${holder(ownerPost)} (${ownerPost})` : `${ownerPost} post — no holder named for ${manual.entity} yet`;
   const cmmWho = `Compliance department${holder("CMM") ? ` · ${holder("CMM")}` : ""}`;
   const signWho = /MSM/i.test(manual.code) ? `Accountable Manager${holder("AM") ? ` ${holder("AM")}` : ""} + CMM` : `${ownerWho} + CMM`;
   const { data: histData } = internal ? { data: [] } : await admin.from("audit_log").select("action,at,actor").eq("object_type", "revision").eq("object_id", rev.id).like("action", "step_%").order("at");
@@ -105,6 +106,12 @@ export default async function Editor({ params, searchParams }: { params: Promise
     ...(manual.to_tmcad_repository ? [{ step: "repository", label: "TM-CAD repository", who: "Compliance", locked: !cmm, done: doneAt("repository") }] : []),
   ];
   const routeHint = (rev.step === "approved_compliance" || rev.step === "signed") && !route ? (cmm ? "Decide the authority route (card on the right) to continue." : "Waiting for Compliance to decide the authority route.") : null;
+  // FB-012 · the NP approval needs something to approve: at least one changed chapter and the summary readers will see
+  const blocked: Record<string, string> = {};
+  if (rev.step === "draft") {
+    if (!changedCount && !conflicts) blocked.approved_np = "Nothing has changed yet in this revision — edit a chapter in Write first.";
+    else if (!rev.summary?.trim()) blocked.approved_np = "Write what changes in this revision (card on the left) before approving: readers see it in “What changed”.";
+  }
 
   return (
     <>
@@ -217,8 +224,9 @@ export default async function Editor({ params, searchParams }: { params: Promise
           <section className="card pubcard">
             <div className="ch"><span className="eyebrow">Approval and publication · DOC-09</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
             <div className="cb">
-              <Workflow revisionId={rev.id} current={rev.step} rows={wfRows} transitions={transitions} routeHint={routeHint}
+              <Workflow revisionId={rev.id} current={rev.step} rows={wfRows} transitions={transitions} routeHint={routeHint} blocked={blocked}
                 blockedNote={rev.step === "with_civil_aviation" && returnMissing ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}) — integrate it in the card below first.` : null} />
+              {ownerMissing && <p className="mini mt-2" style={{ color: "#8a5a00" }}>The manual is owned by the <b>{ownerPost}</b> post, which has no holder in NP management for {manual.entity} (posts there: {posts.map((p) => p.code).join(", ") || "none"}). <Link className="underline" href={`/np/over?entity=${manual.entity}`}>Name the holder</Link>, or change the owner post on the manual page.</p>}
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
               {(rev.authority_route === "approval" || rev.authority_route === "notification") && (
                 <p className="mini mt-3">Authority file: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>

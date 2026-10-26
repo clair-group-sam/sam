@@ -12,13 +12,19 @@ import { savePost, deletePost } from "./actions";
 const STATUS: Record<string, [string, string]> = { accepted: ["green", "accepted by the authority"], pending: ["amber", "acceptance pending"], not_required: ["", "no acceptance required"] };
 
 /** NP management › Overview: posts of the entity and the organisation chart drawn from them; manuals whose chart is out of date. */
-export default async function NpOverview({ searchParams }: { searchParams: Promise<{ entity?: string }> }) {
+export default async function NpOverview({ searchParams }: { searchParams: Promise<{ entity?: string; ent?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
-  const { entity: q } = await searchParams;
+  const sp = await searchParams; const q = sp.entity ?? sp.ent;
   const ents = s.group ? ENTS4 : s.entities;
-  const entity = q && ents.includes(q) ? q : s.entity !== "ALL" && ents.includes(s.entity) ? s.entity : ents[0];
   const db = supabaseAdmin();
+  // FB-019 · one entity selector: the top bar. With "All entities", land on the first entity that has posts (not an empty one).
+  let entity = q && ents.includes(q) ? q : s.entity !== "ALL" && ents.includes(s.entity) ? s.entity : "";
+  if (!entity) {
+    const { data: withPosts } = await db.from("np_posts").select("entity").in("entity", ents);
+    const has = new Set(((withPosts ?? []) as { entity: string }[]).map((x) => x.entity));
+    entity = ents.find((e) => has.has(e)) ?? ents[0];
+  }
   const posts = entity ? await postsOf(db, entity) : [];
   const snap = snapshotOf(entity ?? "", posts);
   const cmm = isCmm(s);
@@ -42,7 +48,7 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader eyebrow="NP management · Overview" title={`Nominated persons — ${ENT[entity ?? ""]?.name ?? entity}`} sub="Posts, holders and deputies. The organisation charts of the manuals are drawn from this list." />
-      {ents.length > 1 && <div className="chips mb-4">{ents.map((e) => <Link key={e} href={`/np/over?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
+      {ents.length > 1 && s.entity === "ALL" && <div className="chips mb-4 flex items-center gap-2">{ents.map((e) => <Link key={e} href={`/np/over?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}<span className="mini">— or pick the entity in the top bar</span></div>}
 
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">Organisation chart</span><span className="mini">as it is today in NP management</span></div>

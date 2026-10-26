@@ -6,7 +6,7 @@ import { PageHeader, Metric } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STAGE_LABEL, STAGE_TONE, fr, today, type AuthorityFile } from "@/lib/authority";
-import { DEPARTMENTS, LINK_LABEL, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, departmentOf, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, upstream, type Task, type TaskStatus } from "@/lib/projects";
+import { DEPARTMENTS, LINK_LABEL, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, departmentOf, isConditional, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, upstream, type Task, type TaskStatus } from "@/lib/projects";
 import { addTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startDraftForTask, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
 
@@ -62,7 +62,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Progress" value={`${pr.pct} %`} hint={`${pr.done} / ${pr.total} tasks${tasks.length - pr.total ? ` · ${tasks.length - pr.total} not needed` : ""}`} tone={pr.pct === 100 ? "green" : undefined} />
         <Metric label="Projected end" value={end ? fr(end) : "—"} hint={p.target_date ? (end && end > p.target_date ? `after the target (${fr(p.target_date)})` : `target ${fr(p.target_date)}`) : "from durations and dependencies"} tone={end && p.target_date && end > p.target_date ? "red" : undefined} />
-        <Metric label="Late" value={late} tone={late ? "red" : undefined} hint="projected end before today" />
+        <Metric label="Late" value={late} tone={late ? "red" : undefined} hint="due date passed, or started and over its duration" />
         <Metric label="Ready to do" value={ready.length} hint="no open dependency" tone={ready.length ? "amber" : undefined} />
       </div>
 
@@ -173,7 +173,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     </div>
                     <div className="bar wide mt-1"><i style={{ width: `${pct}%` }} /></div>
                     <div className="mini flex items-center gap-2 flex-wrap mt-1">
-                      {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"} — {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
+                      {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : isConditional(a) ? <span><span className="pill">Conditional</span> {up.length ? `${doneUp} / ${up.length} tasks done — ` : ""}your call: open it, or mark it not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"} — {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
                       {canOpen && <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><button className="linkbtn" type="submit">open now</button></form>}
                       {mayEdit && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="not_needed" /><input name="not_needed_reason" className="inp" style={{ height: 22, fontSize: 11, width: 150 }} placeholder="not needed because…" required /><button className="linkbtn" type="submit">not needed</button></form>}
                     </div>

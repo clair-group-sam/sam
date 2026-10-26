@@ -20,6 +20,8 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = { open: "Open
 export const LINK_LABEL: Record<LinkKind, string> = { manual: "Manual revision", authority_file: "Authority file", certificate: "Certificate", moc: "MOC / risk assessment" };
 export const PIVOT_LABEL: Record<string, string> = { aircraft_type: "Aircraft type", aircraft_reg: "Registration", np_post_code: "Nominated post" };
 export const OPEN: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked"];
+/** FB-003 · a conditional line of a template ("If the aircraft leaves the French AOC…", "Only if a simulator is used"). */
+export const isConditional = (t: { title: string; detail?: string | null }) => /^\s*(if|only if|when|unless|in case|si|seulement si)\b/i.test(t.title) || /^\s*\(?(if|only if|conditional)\b/i.test(t.detail ?? "");
 
 export async function loadTemplates(db: SupabaseClient): Promise<ProjectTemplate[]> {
   const { data } = await db.from("project_templates").select("*").eq("active", true).order("ord");
@@ -66,6 +68,9 @@ export function project(tasks: Task[], deps: Dep[], startedAt: string): Map<stri
       if (d.status !== "done" && d.status !== "not_needed") openDeps.push(dId);
     }
     if (t.started_at && t.started_at < start) start = t.started_at;
+    // FB-016 · a task nobody has started yet cannot be late by projection alone: its projected start slides to today.
+    // "Late" then means: a due date set by hand has passed, or a task that WAS started has run past its duration.
+    if (t.status === "todo" && !t.started_at && !openDeps.length && start < t0) start = t0;
     const end = t.status === "done" ? (t.done_at ?? start) : t.due ?? addDays(start, Math.max(0, t.days ?? 1));
     const late = t.status !== "done" && t.status !== "not_needed" && end < t0;
     const p = { start, end, late, openDeps, critical: false };
@@ -126,6 +131,7 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
   if (automate) {
     for (const t of tasks) {
       if (t.status !== "todo" || !auto!.ready.has(t.id)) continue;
+      if (isConditional(t)) continue; // FB-003 · "If the aircraft leaves…": a human decides (open now / not needed), S.A.M. never opens it alone
       if (t.link_kind === "authority_file" && !t.link_id) { const f = await openFileForProjectTask(db, auto!.who, p, t, "Opened by S.A.M."); if (f) { t.link_id = f.id; t.status = "in_progress"; } }
       if (t.link_kind === "manual" && t.link_ref) {
         const { data: m } = await db.from("manuals").select("id").eq("entity", p.entity).eq("code", t.link_ref).maybeSingle();
