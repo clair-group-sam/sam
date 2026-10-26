@@ -8,7 +8,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm run lint --if-present
+      # no ESLint config in the repo yet: `next lint` prompts for one and fails in CI — type-check instead
+      - run: npx tsc --noEmit
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
