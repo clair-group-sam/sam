@@ -42,8 +42,12 @@ export async function userToken(personId: string): Promise<string> {
   const r = await fetch(`https://login.microsoftonline.com/${process.env.GRAPH_TENANT_ID}/oauth2/v2.0/token`, { method: "POST", body });
   const j = (await r.json()) as { access_token?: string; refresh_token?: string; error?: string; error_description?: string };
   if (!j.access_token) {
-    if (j.error === "invalid_grant") await db.from("graph_tokens").delete().eq("person_id", personId);
-    throw new Error(j.error === "invalid_grant" ? "Microsoft session expired: sign out of S.A.M. and sign in again." : (j.error_description?.split("\n")[0] ?? `token HTTP ${r.status}`));
+    const detail = (j.error_description ?? "").split("\n")[0].replace(/Trace ID.*$/i, "").trim();
+    console.error("[graph] refresh failed", j.error, detail);
+    // only a dead token is forgotten (expired, revoked, password changed); other errors are shown as they are
+    const dead = j.error === "invalid_grant" && /AADSTS(70008|700082|50173|50133|700084)\b/.test(detail);
+    if (dead) await db.from("graph_tokens").delete().eq("person_id", personId);
+    throw new Error(dead ? "Microsoft session expired: sign out of S.A.M. and sign in again." : `Microsoft refused the connection (${j.error ?? r.status}${detail ? ": " + detail.slice(0, 220) : ""}).`);
   }
   if (j.refresh_token) await saveRefreshToken(personId, j.refresh_token);
   return j.access_token;
