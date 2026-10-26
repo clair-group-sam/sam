@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/Page";
 import AutoRefresh from "@/components/AutoRefresh";
 import { ENT } from "@/lib/nav";
 import { ERC_BARRIERS, ERC_OUTCOMES, STATUS, ercTone, ercValue, isSafetyDesk, morClock, seesReporter } from "@/lib/safety";
+import { createHazard } from "../../risk/actions";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
 
 export const maxDuration = 60;
@@ -133,6 +134,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               </div>
             </section>
           ) : null}
+
+          <section className="card mb-4">
+            <div className="ch"><span className="eyebrow">Risk register</span><span className="mini">hazard log</span></div>
+            <form action={createHazard} className="cb grid gap-2"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} />
+              <input name="title" className="inp" defaultValue={a?.primary_hazard ?? r.headline_en ?? r.headline} required />
+              <div className="flex justify-end"><button className="btn">Add to the risk register</button></div></form>
+          </section>
 
           <section className="card">
             <div className="ch"><span className="eyebrow">Report status</span></div>
