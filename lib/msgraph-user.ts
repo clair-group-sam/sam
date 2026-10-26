@@ -41,20 +41,20 @@ export async function hasGraph(personId: string): Promise<boolean> {
 }
 
 /** A fresh access token for this person (the rotated refresh token is stored back). */
-export async function userToken(personId: string): Promise<string> {
+export async function userToken(personId: string, opts: { force?: boolean } = {}): Promise<string> {
   if (!graphConfigured()) throw new Error("Microsoft Graph is not configured in Vercel (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET).");
   const db = supabaseAdmin();
   const { data } = await db.from("graph_tokens").select("refresh_enc").eq("person_id", personId).maybeSingle();
   if (!data) throw new Error("Microsoft not connected yet: sign out of S.A.M. and sign in again.");
   const st = read((data as { refresh_enc: string }).refresh_enc);
-  if (st.a && st.exp && st.exp - Date.now() > 120_000) return st.a; // access token from the sign-in, still valid
+  if (!opts.force && st.a && st.exp && st.exp - Date.now() > 120_000) return st.a; // access token from the sign-in, still valid
   if (!st.r) throw new Error("Microsoft session expired: sign out of S.A.M. and sign in again.");
   const body = new URLSearchParams({ client_id: process.env.GRAPH_CLIENT_ID!, client_secret: process.env.GRAPH_CLIENT_SECRET!, grant_type: "refresh_token", refresh_token: st.r, scope: GRAPH_SCOPES });
   const r = await fetch(`https://login.microsoftonline.com/${process.env.GRAPH_TENANT_ID}/oauth2/v2.0/token`, { method: "POST", body });
   const j = (await r.json()) as { access_token?: string; refresh_token?: string; error?: string; error_description?: string };
   if (!j.access_token) {
     const detail = (j.error_description ?? "").split("\n")[0].replace(/Trace ID.*$/i, "").trim();
-    console.error("[graph] refresh failed", j.error, detail, "refresh-token shape:", st.r.length, st.r.slice(0, 4));
+    console.error("[graph] refresh failed", j.error, detail, "refresh-token shape:", st.r.length, st.r.slice(0, 4), "client id length:", process.env.GRAPH_CLIENT_ID?.length, "tenant id length:", process.env.GRAPH_TENANT_ID?.length, "secret length:", process.env.GRAPH_CLIENT_SECRET?.length);
     // only a dead token is forgotten (expired, revoked, password changed); other errors are shown as they are
     const dead = j.error === "invalid_grant" && /AADSTS(70008|700082|50173|50133|700084)\b/.test(detail);
     if (dead) await db.from("graph_tokens").delete().eq("person_id", personId);

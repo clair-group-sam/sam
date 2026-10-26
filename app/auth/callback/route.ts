@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { saveTokens } from "@/lib/msgraph-user";
+import { saveTokens, userToken } from "@/lib/msgraph-user";
 
 /** OAuth return from Supabase (Entra ID). Exchanges the code, then refreshes the person row (scope from Entra groups when present). */
 export async function GET(req: NextRequest) {
@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
       if (refresh || access) {
         try {
           const { data: p } = await supabaseAdmin().from("people").select("id").eq("auth_uid", user.id).maybeSingle();
-          if (p) await saveTokens((p as { id: string }).id, { refresh, access, expiresIn: 3000 });
+          if (p) {
+            await saveTokens((p as { id: string }).id, { refresh, access, expiresIn: 3000 });
+            // diagnosis: renew once right away, so a refusal shows in the logs at sign-in rather than an hour later
+            if (refresh) await userToken((p as { id: string }).id, { force: true }).then(() => console.log("[graph] refresh test ok")).catch((e) => console.error("[graph] refresh test failed", e instanceof Error ? e.message : e));
+          }
         } catch { /* the recap will ask to sign in again */ }
       }
     }

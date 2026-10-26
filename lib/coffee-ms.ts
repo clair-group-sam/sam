@@ -18,7 +18,7 @@ const mins = (localIso: string) => Number(localIso.slice(11, 13)) * 60 + Number(
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 /** Today's agenda (Paris time) + free slots of 30 min or more between 08:00 and 18:00; meetings linked to the S.A.M. object they name. */
-export async function agenda(token: string, day: string, targets: SamTarget[]): Promise<Agenda> {
+export async function agenda(token: string, day: string, targets: SamTarget[], nowMin = 0): Promise<Agenda> {
   type Ev = { subject?: string; start: { dateTime: string }; end: { dateTime: string }; isAllDay: boolean; isCancelled?: boolean; showAs?: string; sensitivity?: string; location?: { displayName?: string }; onlineMeeting?: { joinUrl?: string } | null; webLink?: string; responseStatus?: { response?: string } };
   const q = `/me/calendarView?startDateTime=${day}T00:00:00&endDateTime=${day}T23:59:59&$select=subject,start,end,isAllDay,isCancelled,showAs,sensitivity,location,onlineMeeting,webLink,responseStatus&$orderby=start/dateTime&$top=60`;
   const { value } = await graphGet<{ value: Ev[] }>(token, q, TZH);
@@ -33,7 +33,7 @@ export async function agenda(token: string, day: string, targets: SamTarget[]): 
   }
   // free slots
   const busy = items.filter((i) => i.busy && !i.allDay).map((i) => [Math.max(480, mins(i.start)), Math.min(1080, i.end.slice(0, 10) > day ? 1440 : mins(i.end))]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
-  const free: { from: string; to: string }[] = []; let cur = 480;
+  const free: { from: string; to: string }[] = []; let cur = Math.max(480, Math.ceil(nowMin / 15) * 15); // from now on, in quarters
   for (const [a, b] of busy) { if (a - cur >= 30) free.push({ from: hm(cur), to: hm(a) }); cur = Math.max(cur, b); }
   if (1080 - cur >= 30) free.push({ from: hm(cur), to: hm(1080) });
   return { items, free };
@@ -45,10 +45,11 @@ const NOTIF = /(no-?reply|do-?not-?reply|notification|notifications|mailer|alert
 
 /** Unread mail in the Inbox since the previous evening, grouped, one line each + "Action" marker (SAM). Private / Personal left out. */
 export async function mail(token: string, s: Session, since: string): Promise<MailGroups> {
-  type M = { id: string; subject?: string; from?: { emailAddress?: { name?: string; address?: string } }; receivedDateTime: string; bodyPreview?: string; sensitivity?: string; importance?: string; webLink?: string; inferenceClassification?: string; categories?: string[] };
-  const q = `/me/mailFolders/inbox/messages?$filter=isRead eq false and receivedDateTime ge ${since}&$select=id,subject,from,receivedDateTime,bodyPreview,sensitivity,importance,webLink,inferenceClassification,categories&$orderby=receivedDateTime desc&$top=60`;
+  type M = { id: string; subject?: string; from?: { emailAddress?: { name?: string; address?: string } }; receivedDateTime: string; bodyPreview?: string; importance?: string; webLink?: string; inferenceClassification?: string; categories?: string[]; singleValueExtendedProperties?: { id: string; value: string }[] };
+  const q = `/me/mailFolders/inbox/messages?$filter=isRead eq false and receivedDateTime ge ${since}&$select=id,subject,from,receivedDateTime,bodyPreview,importance,webLink,inferenceClassification,categories&$expand=singleValueExtendedProperties($filter=id eq 'Integer 0x0036')&$orderby=receivedDateTime desc&$top=60`;
   const { value } = await graphGet<{ value: M[] }>(token, q);
-  const keep = (value ?? []).filter((m) => !["private", "personal"].includes((m.sensitivity ?? "normal").toLowerCase()) && !(m.categories ?? []).some((c) => /^(private|personal|priv[ée]|personnel)$/i.test(c)));
+  // sensitivity (MAPI 0x0036): 1 = Personal, 2 = Private — left out
+  const keep = (value ?? []).filter((m) => !["1", "2"].includes(String(m.singleValueExtendedProperties?.[0]?.value ?? "0")) && !(m.categories ?? []).some((c) => /^(private|personal|priv[ée]|personnel)$/i.test(c)));
   const groupOf = (m: M) => {
     const a = (m.from?.emailAddress?.address ?? "").toLowerCase();
     if (AUTH.test(a.split("@")[1] ?? "")) return "Authorities";
@@ -98,12 +99,19 @@ export async function teams(token: string, since: string): Promise<TeamsRecap> {
   try {
     type H = { summary?: string; resource?: { createdDateTime?: string; from?: { emailAddress?: { name?: string } }; channelIdentity?: { teamId?: string; channelId?: string } | null; webLink?: string; subject?: string } };
     const r = await graphPost<{ value?: { hitsContainers?: { hits?: H[] }[] }[] }>(token, "/search/query", { requests: [{ entityTypes: ["chatMessage"], query: { queryString: `"${me.displayName}"` }, from: 0, size: 25 }] });
+    const per = new Map<string, TeamsItem & { n: number }>();
     for (const h of r.value?.[0]?.hitsContainers?.[0]?.hits ?? []) {
-      const x = h.resource; if (!x?.channelIdentity?.channelId) continue;
+      const x = h.resource; if (!x?.channelIdentity?.channelId) continue;              // channel posts only (chats are above)
+      if (!/<c0>/i.test(h.summary ?? "")) continue;                                    // my name really is in the text
       if ((x.createdDateTime ?? "") < since) continue;
-      if ((x.from?.emailAddress?.name ?? "") === me.displayName) continue;
-      mentions.push({ name: x.from?.emailAddress?.name ?? "Channel", preview: strip(h.summary ?? x.subject ?? "").slice(0, 160), at: x.createdDateTime ?? "", link: x.webLink });
+      const who = x.from?.emailAddress?.name ?? "Channel";
+      if (who === me.displayName) continue;
+      const k = `${x.channelIdentity.channelId}|${who}`;
+      const cur = per.get(k);
+      if (cur) { cur.n++; continue; }                                                  // hits come newest first
+      per.set(k, { name: who, preview: strip(h.summary ?? x.subject ?? "").slice(0, 160), at: x.createdDateTime ?? "", link: x.webLink, n: 1 });
     }
+    for (const m of per.values()) mentions.push({ name: m.n > 1 ? `${m.name} (${m.n} messages)` : m.name, preview: m.preview, at: m.at, link: m.link });
   } catch { /* search unavailable: chats are still shown */ }
   return { chats: chats.slice(0, 20), mentions: mentions.slice(0, 15) };
 }

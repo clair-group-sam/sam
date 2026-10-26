@@ -196,7 +196,7 @@ export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.i
     if (token) {
       const t = token;
       await Promise.all([
-        want.has("calendar") && targetsOf(s).then((tg) => agenda(t, g.day, tg)).then((v) => { r.agenda = v; }).catch((e) => { r.errors!.calendar = String(e?.message ?? e); }),
+        want.has("calendar") && targetsOf(s).then((tg) => { const n = parisParts(); return agenda(t, g.day, tg, n.hour * 60 + n.minute); }).then((v) => { r.agenda = v; }).catch((e) => { r.errors!.calendar = String(e?.message ?? e); }),
         want.has("mail") && mail(t, s, g.since).then((v) => { r.mail = v; }).catch((e) => { r.errors!.mail = String(e?.message ?? e); }),
         want.has("teams") && teams(t, g.since).then((v) => { r.teams = v; }).catch((e) => { r.errors!.teams = String(e?.message ?? e); }),
       ]);
