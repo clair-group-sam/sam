@@ -49,3 +49,24 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
   }
   return tasks;
 }
+
+/**
+ * One line per project instead of one line per task: the project's title, how many of its tasks wait for me,
+ * how many are late, and the next one. Other items are left as they are. The list stays sorted by due date.
+ */
+export function groupProjects(items: InboxItem[], today: string): InboxItem[] {
+  const out: InboxItem[] = []; const by = new Map<string, InboxItem[]>();
+  for (const t of items) {
+    if (t.kind !== "project" || !t.ctxLink) { out.push(t); continue; }
+    if (!by.has(t.ctxLink)) by.set(t.ctxLink, []);
+    by.get(t.ctxLink)!.push(t);
+  }
+  for (const [link, ts] of by) {
+    ts.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
+    const late = ts.filter((t) => t.due && t.due < today).length;
+    const blocked = ts.filter((t) => t.detail === "blocked").length;
+    const parts = [`${ts.length} task${ts.length > 1 ? "s" : ""} for you`, late && `${late} late`, blocked && `${blocked} blocked`, `next: ${ts[0].title}`].filter(Boolean);
+    out.push({ ...ts[0], id: "proj:" + link, title: ts[0].ctx ?? "Project", ctx: undefined, ctxLink: undefined, link, detail: parts.join(" · ") });
+  }
+  return out.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
+}

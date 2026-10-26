@@ -3,7 +3,7 @@
 // Phase 2 (Outlook calendar + mail, Teams) needs delegated Graph rights (Calendars.Read, Mail.Read, Chat.Read) — not granted yet.
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost, type Session } from "@/lib/session";
-import { myInbox, kindLabel, KIND, type InboxItem } from "@/lib/inbox";
+import { myInbox, groupProjects, kindLabel, KIND, type InboxItem } from "@/lib/inbox";
 import { callClaude } from "@/lib/ai";
 
 export const TZ = "Europe/Paris";
@@ -66,10 +66,11 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis">> {
   // 1 · deadlines from the Inbox (readings and validities have their own blocks)
   const inbox = await myInbox(s);
   const dl = inbox.filter((t) => t.kind !== "reading" && t.kind !== "certificate_validity");
-  const overdue = dl.filter((t) => t.due && t.due < day).map(line);
-  const today = dl.filter((t) => t.due === day).map(line);
-  const week = dl.filter((t) => t.due && t.due > day && t.due <= in7).map(line);
-  const later = dl.length - overdue.length - today.length - week.length;
+  // a project is one line per block (its tasks of that block counted), never one line per task
+  const overdue = groupProjects(dl.filter((t) => t.due && t.due < day), day).map(line);
+  const today = groupProjects(dl.filter((t) => t.due === day), day).map(line);
+  const week = groupProjects(dl.filter((t) => t.due && t.due > day && t.due <= in7), day).map(line);
+  const later = groupProjects(dl.filter((t) => !t.due || t.due > in7), day).length;
   const readings = inbox.filter((t) => t.kind === "reading").map(line);
 
   // 2 · validities ending within 90 days (office profiles)
@@ -121,10 +122,18 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis">> {
     const { data: projs } = await db.from("projects").select("id,title,entity").in("entity", scope).eq("status", "open");
     const ps = (projs ?? []) as { id: string; title: string; entity: string }[];
     if (ps.length) {
-      const { data: done } = await db.from("project_tasks").select("project_id,title,updated_at,status").in("project_id", ps.map((p) => p.id)).in("status", ["done", "blocked"]).gte("updated_at", sinceIso).order("updated_at", { ascending: false }).limit(20);
+      const { data: done } = await db.from("project_tasks").select("project_id,title,updated_at,status").in("project_id", ps.map((p) => p.id)).in("status", ["done", "blocked"]).gte("updated_at", sinceIso).order("updated_at", { ascending: false }).limit(300);
+      const per = new Map<string, { at: string; done: string[]; blocked: number }>();
       for (const t of (done ?? []) as { project_id: string; title: string; updated_at: string; status: string }[]) {
-        const p = ps.find((x) => x.id === t.project_id)!;
-        moved.push({ at: t.updated_at, l: { kind: "project", label: "Project", cls: "k-proj", title: t.title, ctx: "Project · " + p.title, note: t.status === "done" ? "done" : "blocked", entity: p.entity, link: `/proj/boards/${p.id}` } });
+        const g = per.get(t.project_id) ?? { at: t.updated_at, done: [], blocked: 0 };
+        if (t.status === "done") g.done.push(t.title); else g.blocked++;
+        if (t.updated_at > g.at) g.at = t.updated_at;
+        per.set(t.project_id, g);
+      }
+      for (const [pid, g] of per) {
+        const p = ps.find((x) => x.id === pid)!;
+        const note = [g.done.length && `${g.done.length} task${g.done.length > 1 ? "s" : ""} done (${g.done.slice(0, 2).join(", ")}${g.done.length > 2 ? "…" : ""})`, g.blocked && `${g.blocked} blocked`].filter(Boolean).join(" · ");
+        moved.push({ at: g.at, l: { kind: "project", label: "Project", cls: "k-proj", title: p.title, note, entity: p.entity, link: `/proj/boards/${p.id}` } });
       }
     }
   }
