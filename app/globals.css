@@ -522,3 +522,7 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 .coffee-syn.hot{border-color:#f0c9a8;background:#fff8f1}
 .coffee-soon{border-style:dashed;background:#fbfcfd}
 @media (max-width:760px){.cf-sources{grid-template-columns:1fr}.cf-head{flex-wrap:wrap}}
+.cf-grp{padding:10px 18px 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#44546a}
+.cf-mailgrp+.cf-mailgrp{border-top:1px solid var(--line)}
+tr.cf-free td{color:#8a98a6}
+.mini.red{color:var(--terra)}

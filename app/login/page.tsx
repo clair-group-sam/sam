@@ -2,10 +2,12 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
+// keep in step with SIGNIN_SCOPES in lib/msgraph-user.ts (server file, not imported here)
+const SIGNIN_SCOPES = "openid profile email offline_access User.Read Calendars.Read Mail.Read Chat.Read ChannelMessage.Read.All";
 function LoginCard() {
   const setup = useSearchParams().get("setup") === "1";
   const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  const signIn = () => supabaseBrowser().auth.signInWithOAuth({ provider: "azure", options: { scopes: "openid profile email", redirectTo: `${location.origin}/auth/callback` } });
+  const signIn = () => supabaseBrowser().auth.signInWithOAuth({ provider: "azure", options: { scopes: SIGNIN_SCOPES, redirectTo: `${location.origin}/auth/callback` } });
   return (<div className="bg-white border border-line rounded-xl p-10 w-[420px] text-center shadow-sm">
     <div className="text-3xl font-extrabold tracking-tight">S.A.M.</div><div className="text-slate6 text-sm mt-1">Safety · Assurance · Management</div>
     {configured

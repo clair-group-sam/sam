@@ -6,12 +6,15 @@ import { ENT } from "@/lib/nav";
 import { KIND, myInbox, groupProjects } from "@/lib/inbox";
 import { CoffeeBox } from "@/components/CoffeeBox";
 import { todaysRecap, parisParts } from "@/lib/coffee";
+import { hasGraph } from "@/lib/msgraph-user";
+
+export const maxDuration = 60;
 
 export default async function Inbox() {
   const s = await getSession();
   if (!s) redirect("/login");
   const all = await myInbox(s);
-  const recap = s.person ? await todaysRecap(s.person.id) : null;
+  const [recap, connected] = s.person ? await Promise.all([todaysRecap(s.person.id), hasGraph(s.person.id)]) : [null, false];
   const { day: today, hour } = parisParts();
   const late = all.filter((t) => t.due && t.due < today).length;
   // projects: one line each (title, tasks waiting for me, late, next) — the detail is on the project page
@@ -21,7 +24,7 @@ export default async function Inbox() {
   return (
     <>
       <PageHeader eyebrow="S.A.M. · Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
-      <CoffeeBox recap={recap} />
+      <CoffeeBox recap={recap} connected={connected} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Open items" value={all.length} hint={s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name} />
         <Metric label="Overdue" value={late} tone={late ? "red" : undefined} hint="past due date" />

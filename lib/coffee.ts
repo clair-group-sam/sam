@@ -1,10 +1,13 @@
 // Morning coffee (UX-02), phase 1: a recap of what S.A.M. holds for the person this morning, prepared ON DEMAND only.
 // Read-only: nothing is marked read, moved or sent. Kept for the day (one recap per person and day, replaced by "brew again").
-// Phase 2 (Outlook calendar + mail, Teams) needs delegated Graph rights (Calendars.Read, Mail.Read, Chat.Read) — not granted yet.
+// Phase 2 (26/10): Outlook agenda, unread mail and Teams through the user's delegated Graph rights (lib/coffee-ms.ts).
+// The recap is deleted in the evening (20:00 Paris on read, and by the evening cron).
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost, type Session } from "@/lib/session";
 import { myInbox, groupProjects, kindLabel, KIND, type InboxItem } from "@/lib/inbox";
 import { callClaude } from "@/lib/ai";
+import { userToken } from "@/lib/msgraph-user";
+import { agenda, mail, teams, type Agenda, type MailGroups, type TeamsRecap, type SamTarget } from "@/lib/coffee-ms";
 
 export const TZ = "Europe/Paris";
 export type Line = { kind: string; label: string; cls: string; title: string; ctx?: string; due?: string | null; entity: string; link?: string | null; note?: string };
@@ -12,13 +15,14 @@ export type Recap = {
   day: string; at: string; since: string; sources: string[];
   overdue: Line[]; today: Line[]; week: Line[]; later: number;
   readings: Line[]; validities: Line[]; mor: Line[]; moved: Line[];
+  agenda?: Agenda; mail?: MailGroups; teams?: TeamsRecap; errors?: Record<string, string>;
   synthesis: string;
 };
 export const SOURCES = [
   { id: "sam", label: "S.A.M. — deadlines, readings, validities, what moved", ready: true },
-  { id: "calendar", label: "Outlook calendar — today's agenda", ready: false },
-  { id: "mail", label: "Outlook mail — unread since yesterday 18:00", ready: false },
-  { id: "teams", label: "Teams — unread chats and @mentions", ready: false },
+  { id: "calendar", label: "Outlook calendar — today's agenda", ready: true },
+  { id: "mail", label: "Outlook mail — unread since yesterday 18:00", ready: true },
+  { id: "teams", label: "Teams — unread chats and @mentions", ready: true },
 ];
 
 /** Date (YYYY-MM-DD) and wall-clock parts in Paris time. */
@@ -44,15 +48,17 @@ export const hhmm = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone
 export const dayLabel = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 
 export async function todaysRecap(personId: string): Promise<Recap | null> {
-  const { day } = parisParts();
-  const { data } = await supabaseAdmin().from("coffee_recaps").select("data").eq("person_id", personId).eq("day", day).maybeSingle();
+  const { day, hour } = parisParts();
+  const db = supabaseAdmin();
+  if (hour >= 20) { await db.from("coffee_recaps").delete().eq("person_id", personId); return null; } // kept until the evening only
+  const { data } = await db.from("coffee_recaps").select("data").eq("person_id", personId).eq("day", day).maybeSingle();
   return ((data as { data: Recap } | null)?.data) ?? null;
 }
 
 const line = (t: InboxItem): Line => ({ kind: t.kind, label: kindLabel(t.kind), cls: KIND[t.kind]?.[1] ?? "", title: t.title, ctx: t.ctx ? (t.kind === "project" ? "Project · " : "") + t.ctx : undefined, due: t.due, entity: t.entity, link: t.link, note: t.detail ?? undefined });
 
 /** Gathers the recap (no AI yet). */
-export async function gather(s: Session): Promise<Omit<Recap, "synthesis">> {
+export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "agenda" | "mail" | "teams" | "errors">> {
   const now = new Date();
   const { day, weekday } = parisParts(now);
   const since = sinceOf(day, weekday);
@@ -148,19 +154,55 @@ export async function synthesise(s: Session, r: Omit<Recap, "synthesis">): Promi
     return bits.length ? `Today: ${bits.join(", ")}.` : "Nothing urgent in S.A.M. this morning.";
   };
   const pick = (l: Line[]) => l.slice(0, 6).map((x) => `${x.entity} · ${x.label} · ${x.ctx ? x.ctx + " › " : ""}${x.title}${x.due ? " (due " + x.due + ")" : ""}${x.note ? " [" + x.note + "]" : ""}`);
-  const facts = { today: r.day, overdue: pick(r.overdue), due_today: pick(r.today), next_7_days: pick(r.week), readings: r.readings.length, validities: pick(r.validities), mor_72h: pick(r.mor), moved_since_last_evening: pick(r.moved) };
+  const facts = { today: r.day,
+    agenda: r.agenda?.items.filter((i) => !i.allDay).slice(0, 8).map((i) => `${i.start.slice(11)}–${i.end.slice(11)} ${i.subject}${i.sam ? " [" + i.sam.label + "]" : ""}`),
+    free_slots: r.agenda?.free.map((f) => `${f.from}–${f.to}`),
+    mails_to_act_on: r.mail?.groups.flatMap((g) => g.items.filter((m) => m.action).map((m) => `${g.name} · ${m.from}: ${m.summary}`)).slice(0, 8),
+    unread_mails: r.mail?.total, teams_unread_chats: r.teams?.chats.length, teams_mentions: r.teams?.mentions.slice(0, 4).map((m) => `${m.name}: ${m.preview}`),
+    overdue: pick(r.overdue), due_today: pick(r.today), next_7_days: pick(r.week), readings: r.readings.length, validities: pick(r.validities), mor_72h: pick(r.mor), moved_since_last_evening: pick(r.moved) };
   try {
     const { text } = await callClaude({ agent: "coffee", personId: s.person?.id ?? null, entity: null, maxTokens: 220,
-      system: `You prepare the morning recap of ${s.name.split(" ")[0]} (${s.roles.join(", ") || "staff"}) in the compliance & safety software of an aviation group. Write ONE or two sentences in English (max 45 words): what matters most today and what to do first, based ONLY on the facts given. Regulatory clocks (MOR 72 h, expired validities, overdue authority items) come first. No greeting, no emoji, no list, never invent anything. If nothing is urgent, say so plainly.`,
+      system: `You prepare the morning recap of ${s.name.split(" ")[0]} (${s.roles.join(", ") || "staff"}) in the compliance & safety software of an aviation group. Write ONE or two sentences in English (max 50 words): what matters most today and what to do first, based ONLY on the facts given (agenda, mails to act on, Teams, S.A.M. deadlines). Regulatory clocks (MOR 72 h, expired validities, overdue authority items) and authority mails come first; you may suggest using a free slot. No greeting, no emoji, no list, never invent anything. If nothing is urgent, say so plainly.`,
       user: JSON.stringify(facts) });
     const t = text.trim().replace(/^["']|["']$/g, "");
     return t || fallback();
   } catch { return fallback(); }
 }
 
-export async function brew(s: Session): Promise<Recap> {
+/** S.A.M. objects a meeting subject may name (manual codes, projects, authority files of the person's scope). */
+async function targetsOf(s: Session): Promise<SamTarget[]> {
+  const db = supabaseAdmin();
+  const scope = s.entity === "ALL" ? s.entities : [s.entity];
+  const [m, p, a] = await Promise.all([
+    db.from("manuals").select("id,code,title,entity").in("entity", scope),
+    db.from("projects").select("id,title").in("entity", scope).eq("status", "open"),
+    db.from("authority_files").select("id,title").in("entity", scope).not("stage", "in", "(closed)"),
+  ]);
+  return [
+    ...((p.data ?? []) as { id: string; title: string }[]).map((x) => ({ label: "Project · " + x.title, link: `/proj/boards/${x.id}`, match: x.title })),
+    ...((a.data ?? []) as { id: string; title: string }[]).map((x) => ({ label: "Authority file · " + x.title, link: `/proj/auth/${x.id}`, match: x.title })),
+    ...((m.data ?? []) as { id: string; code: string; title: string; entity: string }[]).flatMap((x) => [{ label: `${x.entity} ${x.code}`, link: `/docs/manual/${x.id}`, match: x.code }]),
+  ].sort((x, y) => y.match.length - x.match.length);
+}
+
+export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.id)): Promise<Recap> {
   const g = await gather(s);
-  const recap: Recap = { ...g, synthesis: await synthesise(s, g) };
+  const want = new Set(["sam", ...wanted]);
+  const r: Omit<Recap, "synthesis"> = { ...g, sources: [...want], errors: {} };
+  const ms = ["calendar", "mail", "teams"].filter((x) => want.has(x));
+  if (ms.length) {
+    let token: string | null = null;
+    try { token = await userToken(s.person!.id); } catch (e) { for (const x of ms) r.errors![x] = e instanceof Error ? e.message : String(e); }
+    if (token) {
+      const t = token;
+      await Promise.all([
+        want.has("calendar") && targetsOf(s).then((tg) => agenda(t, g.day, tg)).then((v) => { r.agenda = v; }).catch((e) => { r.errors!.calendar = String(e?.message ?? e); }),
+        want.has("mail") && mail(t, s, g.since).then((v) => { r.mail = v; }).catch((e) => { r.errors!.mail = String(e?.message ?? e); }),
+        want.has("teams") && teams(t, g.since).then((v) => { r.teams = v; }).catch((e) => { r.errors!.teams = String(e?.message ?? e); }),
+      ]);
+    }
+  }
+  const recap: Recap = { ...r, synthesis: await synthesise(s, r) };
   const db = supabaseAdmin();
   await db.from("coffee_recaps").upsert({ person_id: s.person!.id, day: recap.day, data: recap, created_at: recap.at }, { onConflict: "person_id,day" });
   await db.from("coffee_recaps").delete().eq("person_id", s.person!.id).lt("day", recap.day);

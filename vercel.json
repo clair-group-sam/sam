@@ -1,6 +1,15 @@
 {
-  "regions": ["cdg1"],
+  "regions": [
+    "cdg1"
+  ],
   "crons": [
-    { "path": "/api/cron/hourly", "schedule": "0 6 * * *" }
+    {
+      "path": "/api/cron/hourly",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/evening",
+      "schedule": "0 19 * * *"
+    }
   ]
 }
