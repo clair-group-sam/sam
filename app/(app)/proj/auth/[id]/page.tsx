@@ -8,7 +8,7 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
 import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
-import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, removeAttachment, saveFile, toggleItem } from "../actions";
+import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, removeAttachment, saveFile, toggleItem } from "../actions";
 
 const KIND_ICON: Record<string, string> = { created: "＋", stage: "→", note: "✎", item: "☑", submitted: "⇧", remarks: "✉", reply: "↩", decision: "✔", attachment: "📎", link: "🔗", task: "⏰", mail: "✉" };
 
@@ -80,6 +80,17 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                   </form>
                 ))}
               </div>
+              {cmm && ["draft", "compliance", "signing", "ready", "standby"].includes(f.stage) && (
+                <details className="mt-3"><summary className="mini underline cursor-pointer">Already granted before S.A.M. (taken over from Monday / Centrik)</summary>
+                  <form action={recordGrantedOutside} className="flex gap-2 items-end flex-wrap mt-2"><input type="hidden" name="id" value={f.id} />
+                    <label style={{ width: 150 }}><span className="mini">Submitted on</span><input name="submitted_at" type="date" className="inp" /></label>
+                    <label style={{ width: 150 }}><span className="mini">Decision on</span><input name="decision_at" type="date" className="inp" required /></label>
+                    <label style={{ width: 150 }}><span className="mini">Outcome</span><select name="outcome" className="inp" defaultValue={f.category === "notification" ? "acknowledged" : "approved"}><option value="approved">approved</option><option value="acknowledged">acknowledged</option></select></label>
+                    <label style={{ width: 220 }}><span className="mini">Portal reference</span><input name="portal_ref" className="inp mono" placeholder="APP/AJD/… · METEOR …" /></label>
+                    <button className="btn" type="submit">Record as granted</button></form>
+                  <p className="mini mt-1">The file jumps to Decision received, its checklist is marked done, the project task follows. Close-out still applies.</p>
+                </details>
+              )}
               {f.stage === "ready" && <p className="mini mt-3">Submit / « Envoyer à la DSAC » is the CMM's click on the portal; record it here right after, with the reference the portal gives.</p>}
               {f.stage === "remarks" && <p className="mini mt-3">Answer in the same application (Review tab / new dossier version), one sentence per remark; never open a new application.</p>}
             </div>

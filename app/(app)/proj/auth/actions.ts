@@ -221,3 +221,24 @@ export async function deleteFile(formData: FormData) {
   paths();
   redirect("/proj/auth");
 }
+
+/** Taken over from Monday / Centrik: the application was submitted and granted before S.A.M. — recorded as Decision received in one go. */
+export async function recordGrantedOutside(formData: FormData) {
+  const id = str(formData, "id");
+  const { s, db, f, cmm } = await guard(id);
+  if (!cmm) throw new Error("Compliance only");
+  if (!["draft", "compliance", "signing", "ready", "standby"].includes(f.stage)) throw new Error("This file already has its own history.");
+  const decision = opt(formData, "decision_at") ?? today();
+  const submitted = opt(formData, "submitted_at") ?? decision;
+  const outcome = opt(formData, "outcome") ?? (f.category === "notification" ? "acknowledged" : "approved");
+  const ref = opt(formData, "portal_ref");
+  const patch = { stage: "approved", submitted_at: submitted, decision_at: decision, outcome, portal_ref: ref ?? f.portal_ref, portal_url: opt(formData, "portal_url") ?? f.portal_url, updated_at: new Date().toISOString() };
+  await db.from("authority_files").update(patch).eq("id", id);
+  await db.from("authority_file_items").update({ done: true, done_by: s.person?.id ?? null, done_at: new Date().toISOString(), note: "granted before S.A.M." }).eq("file_id", id).eq("done", false);
+  await event(db, s, id, "decision", `Granted outside S.A.M. (taken over): submitted ${submitted}, decision ${decision}, ${outcome}${ref ? `, ref. ${ref}` : ""}`, { from: f.stage, to: "approved", takeover: true });
+  await recordRound(db, f, { at: decision, direction: "received", who: s.name, note: `Decision: ${outcome} (granted before S.A.M.)` });
+  await audit(db, s, f, "authority_file_taken_over", { submitted, decision, outcome, ref });
+  const { data: fresh } = await db.from("authority_files").select("*").eq("id", id).maybeSingle();
+  await syncTasks(db, fresh as AuthorityFile);
+  paths(id);
+}
