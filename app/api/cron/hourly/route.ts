@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   jobs.certificate_alerts = c;
   // 3 · risk register (MSM §3.2.2 / 3.5): reviews past due, residual risk intolerable → SM (+ AM), one open task each, never duplicated
   const openTask = async (kind: string, ref: string) => { const { data } = await db.from("tasks").select("id").eq("kind", kind).eq("ref_id", ref).eq("status", "open").limit(1); return !!data?.length; };
-  const { data: due } = await db.from("risk_assessments").select("id,entity,number,name,next_due,owner_role").in("status", ["draft", "validated", "accepted"]).neq("kind", "moc").lt("next_due", t0);
+  const { data: due } = await db.from("risk_assessments").select("id,entity,number,name,next_due,owner_role").in("status", ["draft", "validated", "accepted"]).eq("kind", "hazard_log").lt("next_due", t0); // periodic review = the hazard log; a one-off RA is closed when its case is over
   let rv = 0;
   for (const a of (due ?? []) as { id: string; entity: string; number: string; name: string; next_due: string; owner_role: string | null }[]) {
     if (await openTask("risk_review", a.id)) continue;
@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
   const { data: hz } = await db.from("hazards").select("id,entity,ref,title,lik_before,sev_before,lik_after,sev_after,assessment_id").eq("proposed", false).neq("status", "closed").not("assessment_id", "is", null);
   const { schemeOf, tolerability } = await import("@/lib/risk-shared");
   const ids = [...new Set(((hz ?? []) as { assessment_id: string }[]).map((h) => h.assessment_id))];
-  const { data: decided } = ids.length ? await db.from("risk_assessments").select("id").in("id", ids).not("accepted_at", "is", null) : { data: [] };
-  const amDecided = new Set(((decided ?? []) as { id: string }[]).map((r) => r.id)); // the AM already approved / stopped it
+  const { data: decided } = ids.length ? await db.from("risk_assessments").select("id").in("id", ids).or("accepted_at.not.is.null,decision.eq.stop,status.in.(archived,cancelled)") : { data: [] }; // AM decided, stopped (no-go), closed
+  const amDecided = new Set(((decided ?? []) as { id: string }[]).map((r) => r.id)); // nothing left to decide
   let ti = 0;
   for (const h of (hz ?? []) as { id: string; entity: string; ref: string; title: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; assessment_id: string }[]) {
     if (amDecided.has(h.assessment_id)) continue;

@@ -151,6 +151,40 @@ export async function mocStep(fd: FormData) {
   touchRa(ra.id);
 }
 
+/** A residual risk that stays red but was signed without the AM (e.g. imported from Centrik): send it to the AM for his decision in S.A.M. */
+export async function referToAm(fd: FormData) {
+  const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity);
+  if (ra.status !== "accepted" || ra.decision === "stop") throw new Error("Only a signed assessment that continues can be referred to the AM.");
+  await db().from("risk_assessments").update({ status: "validated", accepted_by: null, accepted_name: null, accepted_at: null, updated_at: new Date().toISOString() }).eq("id", ra.id);
+  await db().from("tasks").insert({ entity: ra.entity, kind: "risk_acceptance", title: `Red residual risk — decide on ${ra.number} ${ra.name}`.slice(0, 200), detail: "The residual risk stays red: approve the activity anyway (with justification) or stop it (MSM §3.5.3 / §3.4).", owner_role: "AM", status: "open", link: `/safe/risk/a/${ra.id}`, ref_id: ra.id });
+  await log({ assessment_id: ra.id, kind: "referred", actor: s.person?.id ?? null, note: `Red residual risk referred to the Accountable Manager by ${s.name}` });
+  touchRa(ra.id);
+}
+/** The AM decided outside S.A.M. (e-mail, meeting): the safety desk records it, with its date and reference, so the file is complete. */
+export async function recordAmDecision(fd: FormData) {
+  const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity);
+  const on = str(fd, "on"); const ref = str(fd, "reference"); const am = str(fd, "am_name") ?? "Accountable Manager";
+  const stop = fd.get("verdict") === "stop";
+  if (!on || !ref) throw new Error("Give the date and the reference of the AM's decision (e.g. e-mail of 02/03/2026, subject …).");
+  await finalise(ra, stop ? "stop" : (ra.decision ?? "continue_with_conditions"), { accepted_by: null, accepted_name: am, accepted_at: new Date(on + "T12:00:00Z").toISOString() });
+  await log({ assessment_id: ra.id, kind: "accepted", actor: s.person?.id ?? null, note: `${stop ? "Stopped" : "Red residual risk approved"} by the AM (${am}) outside S.A.M. on ${on} — ${ref} — recorded by ${s.name}` });
+  touchRa(ra.id);
+}
+/** Several assessments at once: close one-off RAs whose case is over (kept, read-only, under "Closed"), or move signed MOCs to implemented / closed. */
+export async function bulkAssessments(fd: FormData) {
+  const s = await who(); const op = String(fd.get("op") ?? ""); const ids = fd.getAll("ids").map(String).filter(Boolean);
+  if (!ids.length || !["close", "implemented", "closed"].includes(op)) return;
+  const { data } = await db().from("risk_assessments").select("id,entity,kind,number,status,moc_status").in("id", ids);
+  let n = 0;
+  for (const a of (data ?? []) as { id: string; entity: string; kind: string; number: string; status: string; moc_status: string | null }[]) {
+    if (!s.entities.includes(a.entity)) continue;
+    if (op === "close" && a.kind !== "moc" && a.status !== "archived") { await db().from("risk_assessments").update({ status: "archived", updated_at: new Date().toISOString() }).eq("id", a.id); await log({ assessment_id: a.id, kind: "closed", actor: s.person?.id ?? null, note: `Closed — case over (${s.name}); kept read-only` }); n++; }
+    if (op !== "close" && a.kind === "moc" && a.status === "accepted" && a.moc_status !== op && !(op === "implemented" && a.moc_status === "closed")) { await db().from("risk_assessments").update({ moc_status: op, updated_at: new Date().toISOString() }).eq("id", a.id); await log({ assessment_id: a.id, kind: "status", actor: s.person?.id ?? null, note: `${op === "implemented" ? "Change implemented" : "MOC closed"} (${s.name})` }); n++; }
+  }
+  revalidatePath("/safe/ra"); revalidatePath("/safe/moc"); revalidatePath("/safe/risk");
+  return;
+}
+
 // ── Hazards ──────────────────────────────────────────────────────────────
 async function insertHazard(s: Session, x: { entity: string; assessment_id: string; title: string; consequence?: string | null; description?: string | null; owner_role?: string | null; report_id?: string | null }) {
   const ref = await nextHazardRef(db(), x.entity);

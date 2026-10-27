@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { DECISIONS, DOMAINS, KINDS, MOC_CATEGORIES, MOC_STATUS, MSM_REF, RA_STATUS, mayAccept, mayEditRisk, mayValidate, msmChecks, riskLabel, schemeOf, tolerability, tolTone, worstTol, type Hz, type Ra } from "@/lib/risk";
 import { PdfButton } from "@/components/RiskPdfButton";
-import { keepLocal, linkToLog, promoteToLog, suggestMatches, unlinkLog } from "../../actions";
+import { keepLocal, linkToLog, promoteToLog, recordAmDecision, referToAm, suggestMatches, unlinkLog } from "../../actions";
 import type { Suggestion } from "@/lib/risk-match";
 import { acceptAssessment, createHazard, discardHazard, keepHazard, mocStep, proposeHazards, reopenAssessment, updateAssessment, validateAssessment } from "../../actions";
 
@@ -130,6 +130,22 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                   <div className="flex gap-2"><button className="btn primary" name="verdict" value="approve">Approve the red risk (AM)</button><button className="btn" name="verdict" value="stop">Stop (AM)</button></div>
                 </form>
               ) : <p className="mini">Residual risk red: waiting for the Accountable Manager&apos;s decision.</p>)}
+              {a.status === "validated" && mayEditRisk(s) && !mayAccept(s) && <><details className="mt-2"><summary className="mini cursor-pointer underline">The AM already decided outside S.A.M. (e-mail, meeting) — record it</summary>
+                  <form action={recordAmDecision} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
+                    <div className="grid grid-cols-2 gap-2"><input type="date" name="on" className="inp" required /><input name="am_name" className="inp" placeholder="AM name" /></div>
+                    <input name="reference" className="inp" required placeholder="Reference — e.g. e-mail of 02/03/2026 “RE: RA 25 …”" />
+                    <select name="verdict" className="inp" defaultValue="approve"><option value="approve">Approved the red residual risk</option><option value="stop">Stopped it (no-go)</option></select>
+                    <button className="btn">Record the AM&apos;s decision</button></form></details></>}
+              {a.status === "accepted" && !a.accepted_at && worstPost === "intolerable" && a.decision !== "stop" && mayEditRisk(s) && (
+                <div className="hz-proposed p-3 mb-2" style={{ borderRadius: 8 }}><p className="mini mb-2"><b>Residual risk red, no decision of the AM recorded</b> (MSM: the AM decides on a red residual risk).</p>
+                  <form action={referToAm}><input type="hidden" name="id" value={a.id} /><button className="btn primary">Refer to the AM — he decides in S.A.M.</button></form>
+                  <details className="mt-2"><summary className="mini cursor-pointer underline">The AM already decided outside S.A.M. (e-mail, meeting) — record it</summary>
+                  <form action={recordAmDecision} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
+                    <div className="grid grid-cols-2 gap-2"><input type="date" name="on" className="inp" required /><input name="am_name" className="inp" placeholder="AM name" /></div>
+                    <input name="reference" className="inp" required placeholder="Reference — e.g. e-mail of 02/03/2026 “RE: RA 25 …”" />
+                    <select name="verdict" className="inp" defaultValue="approve"><option value="approve">Approved the red residual risk</option><option value="stop">Stopped it (no-go)</option></select>
+                    <button className="btn">Record the AM&apos;s decision</button></form></details>
+                </div>)}
               {a.status === "accepted" && !a.accepted_at && <p className="mini mb-2">Accepted by the sign-off (green / yellow residual risk) — the AM may overrule it by opening a new version.</p>}
               {a.accepted_at && <p className="mb-2">✓ Decided by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
               {moc && a.status === "accepted" && a.moc_status === "approved" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="implemented" /><button className="btn primary">Mark the change as implemented</button></form>}
