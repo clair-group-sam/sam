@@ -21,8 +21,8 @@ export async function matchToLog(entity: string, subjects: Subject[], personId: 
   if (!lg.length || !subjects.length) return out;
   const byRef = new Map(lg.map((h) => [h.ref, h]));
   const catalogue = lg.map((h) => ({ ref: h.ref, hazard: h.title, consequence: h.consequence ?? undefined, domain: h.domain ?? undefined }));
-  for (let i = 0; i < subjects.length; i += 25) {
-    const batch = subjects.slice(i, i + 25);
+  const batches: Subject[][] = []; for (let i = 0; i < subjects.length; i += 25) batches.push(subjects.slice(i, i + 25));
+  const runOne = async (batch: Subject[]) => {
     const { text } = await callClaude({ agent: "safety", personId, entity, maxTokens: 3000,
       system: `You maintain the hazard log of an EASA organisation (${entity}). The hazard log lists each lasting hazard once (hazard → consequence). ` +
         (mode === "duplicate"
@@ -30,16 +30,18 @@ export async function matchToLog(entity: string, subjects: Subject[], personId: 
           : "For each subject (a hazard written in a management of change, a one-off risk assessment, or a safety report), list the hazards of the log it is about: same hazard, same operational context — the log hazard whose rating it should update. Do not match on a shared generic word only (e.g. 'fatigue' in crew rostering vs. in maintenance).") +
         ` Score 0–1 (0.8+ = clearly the same, 0.5–0.8 = probably). At most 3 per subject, best first; none if nothing fits. Plain English, reason in under 15 words. Answer ONLY JSON: {"m":[{"k":"subject key","r":[{"ref":"log ref","s":0.9,"why":"…"}]}]}`,
       user: JSON.stringify({ log: catalogue, subjects: batch.map((b) => ({ k: b.key, hazard: b.title, consequence: b.consequence ?? undefined, context: b.context ?? undefined })) }) });
-    const j = /\{[\s\S]*\}/.exec(text); if (!j) continue;
+    const j = /\{[\s\S]*\}/.exec(text); if (!j) return;
     let parsed: { m?: { k: string; r?: { ref: string; s?: number; why?: string }[] }[] } = {};
-    try { parsed = JSON.parse(j[0]); } catch { continue; }
+    try { parsed = JSON.parse(j[0]); } catch { return; }
     for (const m of parsed.m ?? []) {
       const subj = batch.find((b) => b.key === m.k); if (!subj) continue;
       out[m.k] = (m.r ?? []).map((r) => ({ h: byRef.get(r.ref), s: Math.max(0, Math.min(1, Number(r.s) || 0)), why: String(r.why ?? "").slice(0, 160) }))
         .filter((x) => x.h && x.h.id !== subj.key && x.s >= 0.5).slice(0, 3)
         .map((x) => ({ id: x.h!.id, ref: x.h!.ref, title: x.h!.title, score: Math.round(x.s * 100) / 100, why: x.why }));
     }
-  }
+  };
+  const queue = [...batches]; // 4 calls at a time: a big log (Centrik) stays within the page time limit
+  await Promise.all(Array.from({ length: 4 }, async () => { while (queue.length) { try { await runOne(queue.shift()!); } catch { /* next batch */ } } }));
   return out;
 }
 
@@ -51,10 +53,14 @@ export async function matchPending(entity: string, personId: string | null, opts
   const { data } = await q;
   let rows = (data ?? []) as unknown as { id: string; title: string; consequence: string | null; risk_assessments: { kind: string; number: string; name: string } }[];
   if (!opts.force && !opts.hazardIds?.length) {
-    const { data: done } = await db.from("risk_matches").select("subject_id").eq("subject_kind", "hazard").in("subject_id", rows.map((r) => r.id));
-    const seen = new Set(((done ?? []) as { subject_id: string }[]).map((d) => d.subject_id)); rows = rows.filter((r) => !seen.has(r.id));
+    // already checked = checked after the newest hazard of the log (an import adds log hazards: earlier checks are stale)
+    const { data: last } = await db.from("hazards").select("created_at,risk_assessments!inner(kind)").eq("entity", entity).eq("risk_assessments.kind", "hazard_log").order("created_at", { ascending: false }).limit(1);
+    const since = ((last ?? []) as { created_at: string }[])[0]?.created_at ?? "1970-01-01";
+    const seenIds = new Set<string>();
+    for (let i = 0; i < rows.length; i += 300) { const { data: done } = await db.from("risk_matches").select("subject_id").eq("subject_kind", "hazard").gte("ran_at", since).in("subject_id", rows.slice(i, i + 300).map((r) => r.id)); for (const d of (done ?? []) as { subject_id: string }[]) seenIds.add(d.subject_id); }
+    rows = rows.filter((r) => !seenIds.has(r.id));
   }
-  rows = rows.slice(0, opts.limit ?? 75);
+  rows = rows.slice(0, opts.limit ?? 150);
   if (!rows.length) return 0;
   const res = await matchToLog(entity, rows.map((r) => ({ key: r.id, title: r.title, consequence: r.consequence, context: `${r.risk_assessments.number} ${r.risk_assessments.name}` })), personId);
   const now = new Date().toISOString();

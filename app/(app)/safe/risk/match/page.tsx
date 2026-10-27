@@ -21,13 +21,15 @@ export default async function MatchPage() {
   const db = supabaseAdmin();
   const { data } = await db.from("hazards").select("id,ref,title,consequence,entity,lik_after,sev_after,risk_assessments!inner(id,kind,number,name,status)").in("entity", scope).eq("proposed", false).eq("local_only", false).is("log_hazard_id", null).neq("status", "closed").in("risk_assessments.kind", ["moc", "ra"]).not("risk_assessments.status", "in", "(archived,cancelled)").order("created_at", { ascending: false });
   const hs = (data ?? []) as unknown as H[];
-  const [{ data: mm }, { data: dd }] = await Promise.all([
-    hs.length ? db.from("risk_matches").select("subject_id,suggestions,ran_at").eq("subject_kind", "hazard").in("subject_id", hs.map((h) => h.id)) : Promise.resolve({ data: [] }),
+  const chunks: string[][] = []; for (let i = 0; i < hs.length; i += 200) chunks.push(hs.slice(i, i + 200).map((h) => h.id));
+  const [parts, { data: dd }] = await Promise.all([
+    Promise.all(chunks.map((c) => db.from("risk_matches").select("subject_id,suggestions,ran_at").eq("subject_kind", "hazard").in("subject_id", c))),
     db.from("risk_matches").select("subject_id,suggestions,ran_at").eq("subject_kind", "duplicate").in("entity", scope),
   ]);
-  const sug = new Map(((mm ?? []) as M[]).map((m) => [m.subject_id, m]));
+  const mm = parts.flatMap((p) => (p.data ?? []) as M[]);
+  const sug = new Map(mm.map((m) => [m.subject_id, m]));
   const dups = ((dd ?? []) as M[]).filter((d) => d.suggestions.length);
-  const { data: dh } = dups.length ? await db.from("hazards").select("id,ref,title").in("id", dups.map((d) => d.subject_id)) : { data: [] };
+  const { data: dh } = dups.length ? await db.from("hazards").select("id,ref,title").in("id", dups.map((d) => d.subject_id).slice(0, 300)) : { data: [] };
   const dName = new Map(((dh ?? []) as { id: string; ref: string; title: string }[]).map((h) => [h.id, h]));
   const pending = hs.filter((h) => !sug.has(h.id)).length;
   const edit = mayEditRisk(s);
