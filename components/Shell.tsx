@@ -143,7 +143,7 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   const choices = session.entities;
   const cur = session.entity;
   const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
-  const curSub = cur === "ALL" ? `all entities · ${choices.join(" · ")}` : `${cur} · ${ENT[cur]?.qual ?? ""} · ${ENT[cur]?.auth ?? ""}`;
+  const curSub = cur === "ALL" ? `lists across every entity · ${choices.join(" · ")}` : `${ENT[cur]?.qual ?? ""} · ${ENT[cur]?.auth ?? ""}`;
   async function pick(ent: string) {
     setEntOpen(false);
     await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });
@@ -151,29 +151,21 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   }
   return (
     <header className={"topbar ent-" + cur} style={{ ["--entc" as string]: ENT_COLOR[cur] ?? "#0b2a4a" } as React.CSSProperties}>
-      <div className="relative">
-        <button type="button" className={"entblock " + cur} onClick={() => choices.length > 1 || session.group ? setEntOpen((v) => !v) : undefined} aria-expanded={entOpen} title={choices.length > 1 ? "Change the entity you work in" : undefined}>
-          <span className="entcode">{cur === "ALL" ? "ALL" : cur}</span>
-          <span className="enttext"><b>{curName}</b><small>{curSub}</small></span>
-          {(choices.length > 1 || session.group) && <span className="caret">▾</span>}
-        </button>
-        {entOpen && (
-          <div className="menu entmenu" onMouseLeave={() => setEntOpen(false)}>
-            <div className="mi muted">Work in</div>
-            {choices.map((e) => (
-              <button key={e} type="button" className={"mi entmi" + (cur === e ? " on" : "")} onClick={() => pick(e)}>
-                <i className="entdot" style={{ background: ENT_COLOR[e] }} /><span><b>{ENT[e]?.name ?? e}</b><small>{e} · {ENT[e]?.qual} · {ENT[e]?.auth}</small></span>
-              </button>
-            ))}
-            {session.group && <button type="button" className={"mi entmi" + (cur === "ALL" ? " on" : "")} onClick={() => pick("ALL")}><i className="entdot" style={{ background: ENT_COLOR.ALL }} /><span><b>Group view</b><small>lists across every entity — dashboards, projects, authority files, library</small></span></button>}
-          </div>
-        )}
+      <div className="entid" title={curSub}>
+        {!(choices.length > 1 || session.group) && <span className="entcode">{cur}</span>}
+        <span className="enttext"><b>{curName}</b><small>{curSub}</small></span>
       </div>
-      <div className="crumb"><b>{crumb[0]}</b>{crumb[1] && <> · <span>{crumb[1]}</span></>}</div>
-      <div className="flex-1" />
+      {(choices.length > 1 || session.group) && (
+        <nav className="entswitch" aria-label="Entity you work in">
+          {choices.map((e) => <button key={e} type="button" className={cur === e ? "on" : ""} aria-pressed={cur === e} title={`${ENT[e]?.name ?? e} — ${ENT[e]?.qual ?? ""} · ${ENT[e]?.auth ?? ""}`} onClick={() => cur !== e && pick(e)}>{e}</button>)}
+          {session.group && <button type="button" className={cur === "ALL" ? "on" : ""} aria-pressed={cur === "ALL"} title="Group view — lists across every entity" onClick={() => cur !== "ALL" && pick("ALL")}>Group</button>}
+        </nav>
+      )}
+      <div className="topsearch">
       <form className="searchbox" action="/docs/lib" method="get" role="search" title="Search the published manuals (title, chapter or text)">
         <Icon name="search" size={14} /><input ref={searchRef} name="q" placeholder="Search manuals" aria-label="Search the manuals" /><kbd>Ctrl K</kbd>
       </form>
+      </div>
       {session.role !== "user" && (
         <div className="relative">
           <button type="button" className="btn primary" onClick={() => setCreate((v) => !v)} aria-expanded={create}><Icon name="plus" size={14} /> Create</button>

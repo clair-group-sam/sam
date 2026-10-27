@@ -570,21 +570,25 @@ tr.cf-free td{color:#8a98a6}
 details.more[open]{z-index:40}
 
 /* the working entity, always visible top-left; a coloured rule under the bar says where you are */
-/* the whole top bar takes the working entity's colour (AJD blue, ASJ green, ASF gold, TEC rust, group purple): you always know where you are */
-.topbar{background:color-mix(in srgb,var(--entc,#0b2a4a) 90%,#000);border-bottom:0;color:#fff;box-shadow:0 1px 0 rgba(0,0,0,.08)}
-.entblock{display:flex;align-items:center;gap:10px;background:transparent;border:0;border-radius:8px;padding:4px 8px 4px 0;cursor:pointer;text-align:left;height:46px;color:#fff;max-width:420px}
-.entblock:hover{background:rgba(255,255,255,.12)}
-.entcode{background:#fff;color:var(--entc,#0b2a4a);font-weight:800;font-size:13px;letter-spacing:.05em;border-radius:6px;padding:0 8px;height:30px;display:flex;align-items:center;flex:0 0 auto}
+/* Top bar = the working entity (UX-04): the whole bar in its colour (AJD blue, ASJ green, ASF gold, TEC rust, group purple).
+   Left: who you work for (code badge, name, qualification · authority) and a one-click switch; centre: search; right: Create, ERP, you.
+   No breadcrumb here — the page header already says where you are. */
+.topbar{height:60px;gap:16px;background:color-mix(in srgb,var(--entc,#0b2a4a) 90%,#000);border-bottom:0;color:#fff;box-shadow:inset 0 -1px 0 rgba(0,0,0,.12)}
+.entid{display:flex;align-items:center;gap:12px;min-width:0;flex:0 1 auto;width:250px} /* fixed width: the switch stays in place whatever the entity */
+.entcode{background:#fff;color:var(--entc,#0b2a4a);font-weight:800;font-size:13px;letter-spacing:.06em;border-radius:8px;padding:0 10px;height:34px;display:flex;align-items:center;flex:0 0 auto;box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .entdot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;display:inline-block}
-.enttext{display:flex;flex-direction:column;line-height:1.15;min-width:0}.enttext em{display:none}.enttext b{font-size:16px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.enttext small{font-size:11px;color:rgba(255,255,255,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
-.entblock .caret{color:rgba(255,255,255,.9);font-size:12px;margin-left:2px}
-.topbar .crumb{color:#fff;border-left:1px solid rgba(255,255,255,.3);padding-left:14px}.topbar .crumb span{color:rgba(255,255,255,.75)}
-.topbar .searchbox{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:rgba(255,255,255,.85)}
-.topbar .searchbox input{color:#fff}.topbar .searchbox input::placeholder{color:rgba(255,255,255,.75)}.topbar .searchbox:focus-within{background:#fff;color:var(--slate5)}.topbar .searchbox:focus-within input{color:var(--navy)}
-.topbar .searchbox kbd{background:rgba(255,255,255,.2);color:#fff}
+.enttext{display:flex;flex-direction:column;line-height:1.2;min-width:0}.enttext b{font-size:17px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.005em}.enttext small{font-size:11.5px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entswitch{display:flex;gap:2px;padding:3px;border-radius:9px;background:rgba(0,0,0,.18);flex:0 0 auto;margin-left:4px}
+.entswitch button{border:0;background:transparent;color:rgba(255,255,255,.82);font:700 11.5px/1 inherit;letter-spacing:.06em;padding:7px 10px;border-radius:7px;cursor:pointer}
+.entswitch button:hover{background:rgba(255,255,255,.14);color:#fff}
+.entswitch button.on{background:#fff;color:var(--entc,#0b2a4a);cursor:default;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.topsearch{flex:1 1 auto;display:flex;justify-content:center;min-width:0}
+.topbar .searchbox{width:100%;max-width:440px;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:rgba(255,255,255,.85);padding:8px 12px}
+.topbar .searchbox input{color:#fff;flex:1;width:auto;min-width:0}.topbar .searchbox input::placeholder{color:rgba(255,255,255,.72)}.topbar .searchbox:focus-within{background:#fff;border-color:#fff;color:var(--slate5)}.topbar .searchbox:focus-within input{color:var(--navy)}
+.topbar .searchbox kbd{background:rgba(255,255,255,.2);color:#fff}.topbar .searchbox:focus-within kbd{background:var(--blue1);color:var(--slate6)}
 .topbar .btn.primary{background:#fff;color:var(--entc,#0b2a4a);border-color:#fff}
-.topbar .btn.erp{border-color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
-.topbar .user{color:#fff}.topbar .user .who small{color:rgba(255,255,255,.8)}.topbar .user .caret{color:rgba(255,255,255,.85)}
+.topbar .btn.erp{border-color:rgba(255,255,255,.85)}
+.topbar .user{color:#fff;padding-left:14px;border-left:1px solid rgba(255,255,255,.22)}.topbar .user .who small{color:rgba(255,255,255,.78)}.topbar .user .caret{color:rgba(255,255,255,.85)}
 .topbar .user .avatar{background:#fff;color:var(--entc,#0b2a4a)}
 .entmenu{left:0;right:auto;width:360px}
 .entmi{display:flex;align-items:center;gap:10px}.entmi span{display:flex;flex-direction:column;line-height:1.15}.entmi small{font-size:11px;color:var(--slate5)}.entmi.on{background:var(--blue05)}
@@ -595,12 +599,13 @@ details.more[open]{z-index:40}
    metric rows go to two columns. The rail starts compact on these widths (Shell). */
 @media (max-width:1200px){
   .pagehead{flex-wrap:wrap}.pagehead .ph-right{width:100%;flex:0 0 100%;justify-content:flex-start}
-  .topbar{padding:0 12px;gap:8px}.topbar .crumb{display:none}.topbar .enttext small,.topbar .enttext em{display:none}.topbar .entblock .caret{font-size:11px}.topbar .searchbox input{width:90px}.topbar .searchbox kbd{display:none}.topbar .who{display:none}.topbar .btn.erp{display:none}
+  .topbar{padding:0 12px;gap:10px}.topbar .crumb{display:none}.topbar .enttext small{display:none}.topbar .enttext b{font-size:15px}.topbar .entid{width:auto}.topbar .searchbox{max-width:260px}.topbar .searchbox kbd{display:none}.topbar .who{display:none}.topbar .btn.erp{display:none}
   main.px-8{padding-left:16px;padding-right:16px}
   .grid-cols-4,.grid-cols-3{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
   .groupband{font-size:12px}
 }
 @media (max-width:900px){
+  .topbar .enttext{display:none}
   .grid-cols-4,.grid-cols-3,.grid-cols-2{grid-template-columns:1fr !important}
   .sub{width:170px}
 }
