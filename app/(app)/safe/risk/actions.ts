@@ -1,9 +1,11 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getSession, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { callClaude } from "@/lib/ai";
+import { findDuplicates, logHazards, matchPending, matchReport } from "@/lib/risk-match";
 import { addMonths, mayAccept, mayEditRisk, mayValidate, nextAssessmentNumber, nextHazardRef, postOf, schemeOf, tolerability, KINDS } from "@/lib/risk";
 
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
@@ -76,6 +78,23 @@ async function finalise(ra: ARow, decision: string, patch: Record<string, unknow
   await db().from("tasks").update({ status: "done" }).eq("kind", "risk_acceptance").eq("ref_id", ra.id).eq("status", "open");
   if (ra.project_task_id && decision !== "stop") await db().from("project_tasks").update({ status: "done", done_at: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq("id", ra.project_task_id).neq("status", "done");
   if (ra.project_id) revalidatePath(`/proj/boards/${ra.project_id}`);
+  if (decision !== "stop" && ra.kind !== "hazard_log") await pushToLog(ra);
+}
+
+/** A MOC / RA accepted: each log hazard it is linked to gets a reassessment (its rating in the log stays signed until its own new version). */
+async function pushToLog(ra: ARow) {
+  const { data } = await db().from("hazards").select("id,ref,title,lik_after,sev_after,log_hazard_id").eq("assessment_id", ra.id).eq("proposed", false).not("log_hazard_id", "is", null);
+  for (const h of (data ?? []) as { id: string; ref: string; title: string; lik_after: number | null; sev_after: string | null; log_hazard_id: string }[]) {
+    const { data: lh } = await db().from("hazards").select("id,ref,title,entity,assessment_id,lik_after,sev_after").eq("id", h.log_hazard_id).maybeSingle();
+    const L = lh as { id: string; ref: string; title: string; entity: string; assessment_id: string | null; lik_after: number | null; sev_after: string | null } | null; if (!L) continue;
+    const same = L.lik_after === h.lik_after && L.sev_after === h.sev_after;
+    const note = `${KINDS[ra.kind]} ${ra.number} accepted — its residual rating ${h.lik_after ?? "?"}${h.sev_after ?? "?"} vs ${L.lik_after ?? "?"}${L.sev_after ?? "?"} in the log${same ? " (same)" : ""}`;
+    await log({ hazard_id: L.id, assessment_id: L.assessment_id, kind: "study", actor: null, note });
+    if (same) continue;
+    await db().from("hazards").update({ needs_review: true }).eq("id", L.id);
+    await db().from("tasks").insert({ entity: L.entity, kind: "risk_review", title: `Reassess ${L.ref} after ${ra.number}`.slice(0, 200), detail: note, owner_role: "SM", status: "open", link: `/safe/risk/${L.id}`, ref_id: L.id });
+    revalidatePath(`/safe/risk/${L.id}`);
+  }
 }
 
 /** Electronic sign-off by the most relevant NP (or deputy / SM) — MSM rule: green / yellow residual risks are accepted by this sign-off;
@@ -149,6 +168,7 @@ export async function createHazard(fd: FormData) {
   const ra = await raOf(raId); const s = await who(ra.entity);
   const title = str(fd, "title"); if (!title) return;
   const id = await insertHazard(s, { entity: ra.entity, assessment_id: ra.id, title, consequence: str(fd, "consequence"), description: str(fd, "description"), owner_role: str(fd, "owner_role"), report_id: str(fd, "report_id") });
+  if (id && ra.kind !== "hazard_log") after(() => matchPending(ra.entity, s.person?.id ?? null, { hazardIds: [id] }).then(() => {}, () => {})); // is it already in the hazard log?
   touchRa(ra.id);
   if (fd.get("stay")) return;
   if (id) redirect(`/safe/risk/${id}`);
@@ -238,17 +258,19 @@ export async function proposeHazards(fd: FormData) {
   const f = full as { description: string | null; reason: string | null; affected: string | null; category: string | null; domain: string | null };
   const { data: ex } = await db().from("hazards").select("title").eq("assessment_id", ra.id);
   const sch = schemeOf(ra.entity);
+  const lg = ra.kind === "hazard_log" ? [] : await logHazards(ra.entity);
   const { text } = await callClaude({ agent: "safety", personId: s.person?.id ?? null, entity: ra.entity, maxTokens: 3500,
-    system: `You help the Safety Manager of an EASA organisation (${ra.entity}) write a risk assessment (${KINDS[ra.kind]}) with the hazard–consequence method of its MSM: severity A Catastrophic, B Hazardous, C Major, D Minor, E Negligible; likelihood 5 Frequent, 4 Occasional, 3 Remote, 2 Improbable, 1 Extremely improbable; consider the "reasonably worst case", not systematically the extreme one. ${sch === "centrik" ? "Scores: green 1–10 acceptable, yellow 20–100 tolerable, red 300–2500 intolerable." : "ICAO tolerability table."} Propose 3 to 6 hazards SPECIFIC to this subject (not generic), each with its consequence, the initial rating, current mitigations (barriers already in place), planned mitigations with the post that owns them (AM, NPFO, NPCT, NPGO, NPCA, CMM, SM, HT, CFI, ISM…), and the residual rating. Prefer hard mitigations (engineering, control) over personnel ones when realistic. Plain English, no markdown. Answer ONLY JSON: {"hazards":[{"title":"…","consequence":"…","lik_before":4,"sev_before":"C","existing":["…"],"mitigations":[{"text":"…","owner_role":"NPFO"}],"lik_after":2,"sev_after":"C"}]}`,
-    user: JSON.stringify({ subject: ra.name, description: f.description, reason: f.reason, affected: f.affected, category: f.category, domain: f.domain, already_listed: ((ex ?? []) as { title: string }[]).map((x) => x.title) }) });
+    system: `You help the Safety Manager of an EASA organisation (${ra.entity}) write a risk assessment (${KINDS[ra.kind]}) with the hazard–consequence method of its MSM: severity A Catastrophic, B Hazardous, C Major, D Minor, E Negligible; likelihood 5 Frequent, 4 Occasional, 3 Remote, 2 Improbable, 1 Extremely improbable; consider the "reasonably worst case", not systematically the extreme one. ${sch === "centrik" ? "Scores: green 1–10 acceptable, yellow 20–100 tolerable, red 300–2500 intolerable." : "ICAO tolerability table."} Propose 3 to 6 hazards SPECIFIC to this subject (not generic), each with its consequence, the initial rating, current mitigations (barriers already in place), planned mitigations with the post that owns them (AM, NPFO, NPCT, NPGO, NPCA, CMM, SM, HT, CFI, ISM…), and the residual rating. Prefer hard mitigations (engineering, control) over personnel ones when realistic.${lg.length ? " The organisation's hazard log is given: when a hazard you propose IS one of the log (same hazard, same context), give its ref in log_ref and start from its wording; otherwise leave log_ref empty." : ""} Plain English, no markdown. Answer ONLY JSON: {"hazards":[{"log_ref":"","title":"…","consequence":"…","lik_before":4,"sev_before":"C","existing":["…"],"mitigations":[{"text":"…","owner_role":"NPFO"}],"lik_after":2,"sev_after":"C"}]}`,
+    user: JSON.stringify({ subject: ra.name, description: f.description, reason: f.reason, affected: f.affected, category: f.category, domain: f.domain, already_listed: ((ex ?? []) as { title: string }[]).map((x) => x.title), hazard_log: lg.length ? lg.map((h) => ({ ref: h.ref, hazard: h.title, consequence: h.consequence ?? undefined })) : undefined }) });
   const j = /\{[\s\S]*\}/.exec(text); if (!j) throw new Error("SAM did not return hazards.");
-  type P = { title: string; consequence?: string; lik_before?: number; sev_before?: string; existing?: string[]; mitigations?: { text: string; owner_role?: string }[]; lik_after?: number; sev_after?: string };
+  const logRef = new Map(lg.map((h) => [h.ref, h.id]));
+  type P = { log_ref?: string; title: string; consequence?: string; lik_before?: number; sev_before?: string; existing?: string[]; mitigations?: { text: string; owner_role?: string }[]; lik_after?: number; sev_after?: string };
   const list = ((JSON.parse(j[0]) as { hazards?: P[] }).hazards ?? []).slice(0, 6);
   const okL = (x?: number) => (x && x >= 1 && x <= 5 ? Math.round(x) : null); const okS = (x?: string) => (x && /^[A-E]$/.test(x) ? x : null);
   for (const p of list) {
     if (!p?.title) continue;
     const ref = await nextHazardRef(db(), ra.entity);
-    const { data: h } = await db().from("hazards").insert({ entity: ra.entity, ref, title: p.title.slice(0, 200), consequence: p.consequence ?? null, source: ra.kind === "moc" ? "moc" : "other", assessment_id: ra.id, proposed: true, lik_before: okL(p.lik_before), sev_before: okS(p.sev_before), lik_after: okL(p.lik_after), sev_after: okS(p.sev_after), review_date: addMonths(12), created_by: s.person?.id ?? null }).select("id").single();
+    const { data: h } = await db().from("hazards").insert({ entity: ra.entity, ref, title: p.title.slice(0, 200), consequence: p.consequence ?? null, source: ra.kind === "moc" ? "moc" : "other", assessment_id: ra.id, proposed: true, lik_before: okL(p.lik_before), sev_before: okS(p.sev_before), lik_after: okL(p.lik_after), sev_after: okS(p.sev_after), review_date: addMonths(12), created_by: s.person?.id ?? null, log_hazard_id: (p.log_ref && logRef.get(p.log_ref)) || null }).select("id").single();
     const hid = (h as { id: string } | null)?.id; if (!hid) continue;
     const rows = [...(p.existing ?? []).map((t) => ({ hazard_id: hid, text: t, existing: true })), ...(p.mitigations ?? []).map((x) => ({ hazard_id: hid, text: x.text, existing: false, owner_role: x.owner_role ?? null }))].filter((r) => r.text);
     if (rows.length) await db().from("hazard_mitigations").insert(rows);
@@ -266,4 +288,80 @@ export async function createImportToken(): Promise<{ token: string; expires: str
   const expires = new Date(Date.now() + 30 * 60e3).toISOString();
   await db().from("import_tokens").insert({ token_hash: createHash("sha256").update(token).digest("hex"), purpose: "risk", created_by: s.person?.id ?? null, expires_at: expires });
   return { token, expires };
+}
+
+
+// ── Hazard log ⇄ studies (MOC / RA): link, keep local, add to the log; SAM suggestions ──────────────────────────────
+const touchMatch = () => { revalidatePath("/safe/risk/match"); revalidatePath("/safe/risk"); revalidatePath("/safe/ra"); revalidatePath("/safe/moc"); };
+
+export async function linkToLog(fd: FormData) {
+  const h = await hazardOf(String(fd.get("id"))); const s = await who(h.entity);
+  const L = await hazardOf(String(fd.get("log_id")));
+  if (L.entity !== h.entity) throw new Error("The log hazard belongs to another entity.");
+  await db().from("hazards").update({ log_hazard_id: L.id, local_only: false, updated_at: new Date().toISOString() }).eq("id", h.id);
+  await log({ hazard_id: h.id, assessment_id: h.assessment_id, kind: "linked", actor: s.person?.id ?? null, note: `Linked to the hazard log: ${L.ref} — ${L.title}` });
+  await log({ hazard_id: L.id, assessment_id: L.assessment_id, kind: "linked", actor: s.person?.id ?? null, note: `Referenced by ${h.ref} — ${h.title}` });
+  touchH(h); touchH(L); touchMatch();
+}
+export async function unlinkLog(fd: FormData) {
+  const h = await hazardOf(String(fd.get("id"))); const s = await who(h.entity);
+  await db().from("hazards").update({ log_hazard_id: null, local_only: false }).eq("id", h.id);
+  await log({ hazard_id: h.id, assessment_id: h.assessment_id, kind: "unlinked", actor: s.person?.id ?? null, note: "Link to the hazard log removed" });
+  touchH(h); touchMatch();
+}
+export async function keepLocal(fd: FormData) {
+  const h = await hazardOf(String(fd.get("id"))); const s = await who(h.entity);
+  await db().from("hazards").update({ local_only: true, log_hazard_id: null }).eq("id", h.id);
+  await log({ hazard_id: h.id, assessment_id: h.assessment_id, kind: "local", actor: s.person?.id ?? null, note: "Kept local to this study (temporary hazard, not in the hazard log)" });
+  touchH(h); touchMatch();
+}
+/** A study hazard that is lasting → new hazard log entry (draft) with the same rating and mitigations; the study hazard links to it. */
+export async function promoteToLog(fd: FormData) {
+  const h = await hazardOf(String(fd.get("id"))); const s = await who(h.entity);
+  const { data: full } = await db().from("hazards").select("*,hazard_mitigations(text,existing,owner_role,due)").eq("id", h.id).single();
+  const f = full as Record<string, unknown> & { hazard_mitigations: { text: string; existing: boolean; owner_role: string | null; due: string | null }[] };
+  const { data: st } = h.assessment_id ? await db().from("risk_assessments").select("number,domain").eq("id", h.assessment_id).single() : { data: null };
+  const study = st as { number: string; domain: string | null } | null;
+  const number = await nextAssessmentNumber(db(), h.entity, "hazard_log", study?.domain);
+  const { data: ra } = await db().from("risk_assessments").insert({ entity: h.entity, kind: "hazard_log", number, name: `HZ - ${h.title}`.slice(0, 160), domain: study?.domain ?? null, owner_role: (f.owner_role as string | null) ?? "SM", next_due: addMonths(12), conducted_on: new Date().toISOString().slice(0, 10), created_by: s.person?.id ?? null, description: study ? `Added to the hazard log from ${study.number}.` : null }).select("id").single();
+  const raId = (ra as { id: string }).id;
+  const ref = await nextHazardRef(db(), h.entity);
+  const { data: nh } = await db().from("hazards").insert({ entity: h.entity, ref, title: h.title, consequence: f.consequence ?? null, description: f.description ?? null, main_impact: f.main_impact ?? null, owner_role: f.owner_role ?? null, assessment_id: raId, source: f.source ?? "other", lik_before: f.lik_before ?? null, sev_before: f.sev_before ?? null, lik_after: f.lik_after ?? null, sev_after: f.sev_after ?? null, review_date: addMonths(12), created_by: s.person?.id ?? null }).select("id").single();
+  const nid = (nh as { id: string }).id;
+  if (f.hazard_mitigations?.length) await db().from("hazard_mitigations").insert(f.hazard_mitigations.map((m) => ({ hazard_id: nid, text: m.text, existing: m.existing, owner_role: m.owner_role, due: m.due })));
+  await db().from("hazards").update({ log_hazard_id: nid, local_only: false }).eq("id", h.id);
+  await log({ assessment_id: raId, kind: "created", actor: s.person?.id ?? null, note: `${number} opened from ${study?.number ?? "a study"} (${h.ref})` });
+  await log({ hazard_id: h.id, assessment_id: h.assessment_id, kind: "linked", actor: s.person?.id ?? null, note: `Added to the hazard log as ${ref} (${number}) — to be signed off` });
+  touchH(h); touchMatch();
+}
+export async function suggestMatches(fd: FormData) {
+  const s = await who(); const ents = str(fd, "entity") ? [str(fd, "entity")!] : (s.entity === "ALL" ? s.entities : [s.entity]);
+  const only = str(fd, "hazard_id");
+  for (const e of ents) await matchPending(e, s.person?.id ?? null, { force: fd.get("force") === "1", hazardIds: only ? [only] : undefined });
+  if (str(fd, "assessment_id")) revalidatePath(`/safe/risk/a/${str(fd, "assessment_id")}`);
+  touchMatch();
+}
+export async function checkDuplicates(fd: FormData) {
+  const s = await who(); const ents = str(fd, "entity") ? [str(fd, "entity")!] : (s.entity === "ALL" ? s.entities : [s.entity]);
+  for (const e of ents) await findDuplicates(e, s.person?.id ?? null);
+  touchMatch();
+}
+export async function suggestForReport(fd: FormData) {
+  const id = String(fd.get("report_id"));
+  const { data } = await db().from("reports").select("id,entity,headline,headline_en,narrative,narrative_en,report_analysis(primary_hazard)").eq("id", id).single();
+  const r = data as { id: string; entity: string; headline: string; headline_en: string | null; narrative: string; narrative_en: string | null; report_analysis: { primary_hazard: string | null } | { primary_hazard: string | null }[] | null };
+  const s = await who(r.entity);
+  const an = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis;
+  await matchReport({ id: r.id, entity: r.entity, headline: r.headline_en ?? r.headline, narrative: r.narrative_en ?? r.narrative, primary_hazard: an?.primary_hazard ?? null }, s.person?.id ?? null);
+  revalidatePath(`/safe/reports/${id}`);
+}
+/** Drop one suggestion ("not the same hazard" / "not a duplicate"). */
+export async function dismissMatch(fd: FormData) {
+  const kind = String(fd.get("kind")); const subject = String(fd.get("subject")); const other = String(fd.get("other"));
+  const { data } = await db().from("risk_matches").select("entity,suggestions").eq("subject_kind", kind).eq("subject_id", subject).maybeSingle();
+  const m = data as { entity: string; suggestions: { id: string }[] } | null; if (!m) return;
+  await who(m.entity);
+  await db().from("risk_matches").update({ suggestions: m.suggestions.filter((x) => x.id !== other) }).eq("subject_kind", kind).eq("subject_id", subject);
+  if (kind === "report") revalidatePath(`/safe/reports/${subject}`);
+  touchMatch();
 }

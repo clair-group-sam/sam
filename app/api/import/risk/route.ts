@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { matchPending } from "@/lib/risk-match";
 import { createHash } from "crypto";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -11,7 +12,7 @@ import { nextHazardRef } from "@/lib/risk";
  * re-importing updates them and replaces their mitigations.
  */
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 const ALLOWED = [/^https:\/\/[a-z0-9-]+\.centrik\.net$/, /^https:\/\/[a-z0-9-]+\.flightlogger\.net$/];
 const cors = (req: NextRequest): Record<string, string> => { const o = req.headers.get("origin") ?? ""; return ALLOWED.some((r) => r.test(o)) ? { "access-control-allow-origin": o, "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "authorization, content-type", "access-control-allow-credentials": "true", "access-control-max-age": "600" } : {}; };
 export function OPTIONS(req: NextRequest) { return new NextResponse(null, { status: 204, headers: cors(req) }); }
@@ -74,5 +75,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) { errors.push(`${a.number}: ${e instanceof Error ? e.message : String(e)}`); }
   }
+  // hazards of imported MOC / RA: SAM checks which ones are already in the hazard log (suggestions on Safety › To match)
+  if (body.assessments.some((a: InA) => (a.kind ?? "") !== "hazard_log" && !/^HZ/i.test(a.number))) after(() => matchPending(entity, actor).then(() => {}, () => {}));
   return NextResponse.json({ ok: true, assessments: na, hazards: nh, errors }, { headers });
 }

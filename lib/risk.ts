@@ -36,7 +36,7 @@ export async function nextAssessmentNumber(db: SupabaseClient, entity: string, k
 export const addMonths = (n: number) => { const d = new Date(); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 10); };
 
 export type Ra = { id: string; entity: string; kind: string; number: string; name: string; description: string | null; domain: string | null; status: string; decision: string | null; decision_comment: string | null; top_risk: boolean; version: number; conducted_on: string | null; next_due: string | null; participants: { name: string; role: string }[]; owner_role: string | null; validated_name: string | null; validated_role: string | null; validated_at: string | null; accepted_name: string | null; accepted_at: string | null; moc_status: string | null; category: string | null; change_type: string | null; start_date: string | null; end_date: string | null; reason: string | null; requestor: string | null; affected: string | null; criticality: string | null; prior_assessments: string | null; actions_in_place: string | null; authority_route: string | null; project_id: string | null; project_task_id: string | null; authority_file_id: string | null; source: string; source_ref: string | null };
-export type Hz = { id: string; ref: string; title: string; description: string | null; consequence: string | null; main_impact: string | null; proposed: boolean; status: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; needs_review: boolean; owner_role: string | null; hazard_mitigations?: { text: string; existing: boolean; owner_role: string | null; due: string | null; done_at: string | null }[] };
+export type Hz = { id: string; ref: string; title: string; description: string | null; consequence: string | null; main_impact: string | null; proposed: boolean; status: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; needs_review: boolean; owner_role: string | null; log_hazard_id?: string | null; local_only?: boolean; hazard_mitigations?: { text: string; existing: boolean; owner_role: string | null; due: string | null; done_at: string | null }[] };
 export type Check = { label: string; ok: boolean; ref: string; detail?: string };
 
 /** What the entity's MSM requires of a risk assessment, checked one by one. */
@@ -55,10 +55,11 @@ export function msmChecks(ra: Ra, hazards: Hz[]): Check[] {
   c.push({ label: "Residual risk accepted (by the sign-off; by the AM when it stays red)", ok: ra.status === "accepted", ref: scheme === "centrik" ? `${ref}.5.3` : `${ref}.4`, detail: ra.accepted_at ? `AM — ${ra.accepted_name ?? ""}` : ra.status === "accepted" ? ra.validated_name ?? "" : ra.status === "validated" ? "red residual risk — waiting for the AM" : undefined });
   if (ra.kind === "moc") {
     c.push({ label: "Change described: what, why, who asks, what is affected, criticality and human performance impact, prior assessments, actions", ok: !!(ra.description && ra.reason && ra.affected && ra.criticality), ref: `${ref}.4 steps 1–6` });
-    c.push({ label: "MOC completed before the change is implemented", ok: !(ra.moc_status === "implemented" || ra.moc_status === "closed") || !!ra.accepted_at, ref: `${ref}.4` });
+    c.push({ label: "MOC completed before the change is implemented", ok: !(ra.moc_status === "implemented" || ra.moc_status === "closed") || ra.status === "accepted", ref: `${ref}.4` });
   } else {
     c.push({ label: "Review date not passed (hazard log kept current, reviewed at the SRB)", ok: !ra.next_due || ra.next_due >= today, ref: `${ref}.2.2 / 3.7`, detail: ra.next_due ? `next due ${ra.next_due}` : "no review date" });
   }
+  if (ra.kind !== "hazard_log" && kept.every((h) => h.log_hazard_id !== undefined)) c.push({ label: "Hazard log kept current: each hazard linked to the log or kept local (temporary)", ok: kept.every((h) => h.log_hazard_id || h.local_only), ref: `${ref}.2.2`, detail: kept.filter((h) => !h.log_hazard_id && !h.local_only).map((h) => h.ref).join(", ") || undefined });
   c.push({ label: "Reassessed after each new occurrence linked to it", ok: !kept.some((h) => h.needs_review), ref: `${ref}.5.1`, detail: kept.filter((h) => h.needs_review).map((h) => h.ref).join(", ") || undefined });
   return c;
 }

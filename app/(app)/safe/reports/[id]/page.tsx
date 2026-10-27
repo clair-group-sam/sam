@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/Page";
 import AutoRefresh from "@/components/AutoRefresh";
 import { ENT } from "@/lib/nav";
 import { ERC_BARRIERS, ERC_OUTCOMES, STATUS, ercTone, ercValue, isSafetyDesk, morClock, seesReporter } from "@/lib/safety";
-import { createAssessment, linkReport } from "../../risk/actions";
+import { createAssessment, dismissMatch, linkReport, suggestForReport } from "../../risk/actions";
+import type { Suggestion } from "@/lib/risk-match";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
 
 export const maxDuration = 60;
@@ -32,10 +33,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     r.reporter_person && seesReporter(s) ? db.from("people").select("display_name,email,job_title").eq("id", r.reporter_person).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const a = an as An | null; const events = (evs ?? []) as Ev[];
-  const [{ data: hzo }, { data: lk }] = await Promise.all([
-    db.from("hazards").select("id,ref,title,status,risk_assessments!inner(number,kind,status)").eq("entity", r.entity).eq("proposed", false).neq("status", "closed").order("ref").limit(500),
+  const [{ data: hzo }, { data: lk }, { data: mt }] = await Promise.all([
+    db.from("hazards").select("id,ref,title,status,risk_assessments!inner(number,kind,status)").eq("entity", r.entity).eq("proposed", false).neq("status", "closed").eq("risk_assessments.kind", "hazard_log").order("ref").limit(500),
     db.from("hazard_reports").select("hazards(id,ref,title)").eq("report_id", id),
+    db.from("risk_matches").select("suggestions,ran_at").eq("subject_kind", "report").eq("subject_id", id).maybeSingle(),
   ]);
+  const sugg = ((mt as { suggestions: Suggestion[] } | null)?.suggestions ?? []);
   const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
   const who = rep.data as { display_name: string; email: string; job_title: string | null } | null;
@@ -145,9 +148,15 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <div className="ch"><span className="eyebrow">Risk register</span><span className="mini">each new occurrence reassesses its hazard (MSM §3.5.1)</span></div>
             <div className="cb grid gap-3">
               {linked.length > 0 && <div className="mini">Linked to: {linked.map((l) => <Link key={l.id} className="underline mr-2" href={`/safe/risk/${l.id}`}>{l.ref} {l.title}</Link>)}</div>}
+              {isSafetyDesk(s) && (mt ? sugg.filter((x) => !linked.some((l) => l.id === x.id)).map((x) => (
+                <div key={x.id} className="flex gap-2 items-center"><span className="flex-1">🤝 <Link className="underline mono" href={`/safe/risk/${x.id}`}>{x.ref}</Link> {x.title} <span className={"pill " + (x.score >= 0.8 ? "green" : "amber")}>{Math.round(x.score * 100)}%</span>{x.why && <div className="mini">{x.why}</div>}</span>
+                  <form action={linkReport}><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="hazard_id" value={x.id} /><button className="btn">Link</button></form>
+                  <form action={dismissMatch}><input type="hidden" name="kind" value="report" /><input type="hidden" name="subject" value={r.id} /><input type="hidden" name="other" value={x.id} /><button className="btn" title="Not this hazard">✕</button></form></div>))
+                : hazOpts.length > 0 && <form action={suggestForReport}><input type="hidden" name="report_id" value={r.id} /><button className="btn">🤝 Which hazard of the log?</button></form>)}
+              {mt && !sugg.length && !linked.length && <p className="mini">SAM found no hazard of the log for this occurrence — create a new entry if it is a lasting hazard.</p>}
               {hazOpts.length > 0 && (
                 <form action={linkReport} className="flex gap-2"><input type="hidden" name="report_id" value={r.id} />
-                  <select name="hazard_id" className="inp flex-1" style={{ marginTop: 0 }} required defaultValue="">{[<option key="" value="" disabled>Link to an existing hazard…</option>, ...hazOpts.map((h) => <option key={h.id} value={h.id}>{h.number} · {h.title}</option>)]}</select>
+                  <select name="hazard_id" className="inp flex-1" style={{ marginTop: 0 }} required defaultValue="">{[<option key="" value="" disabled>Link to a hazard of the log…</option>, ...hazOpts.map((h) => <option key={h.id} value={h.id}>{h.number} · {h.title}</option>)]}</select>
                   <button className="btn">Link</button></form>
               )}
               <form action={createAssessment} className="grid gap-2"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="kind" value="hazard_log" />

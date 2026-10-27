@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { DECISIONS, DOMAINS, KINDS, MOC_CATEGORIES, MOC_STATUS, MSM_REF, RA_STATUS, mayAccept, mayEditRisk, mayValidate, msmChecks, riskLabel, schemeOf, tolerability, tolTone, worstTol, type Hz, type Ra } from "@/lib/risk";
 import { PdfButton } from "@/components/RiskPdfButton";
+import { keepLocal, linkToLog, promoteToLog, suggestMatches, unlinkLog } from "../../actions";
+import type { Suggestion } from "@/lib/risk-match";
 import { acceptAssessment, createHazard, discardHazard, keepHazard, mocStep, proposeHazards, reopenAssessment, updateAssessment, validateAssessment } from "../../actions";
 
 export const maxDuration = 60;
@@ -22,10 +24,18 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
   const a = data as Ra | null;
   if (!a || !s.entities.includes(a.entity)) notFound();
   const [{ data: hz }, { data: ev }] = await Promise.all([
-    db.from("hazards").select("id,ref,title,description,consequence,main_impact,proposed,status,lik_before,sev_before,lik_after,sev_after,needs_review,owner_role,hazard_mitigations(text,existing,owner_role,due,done_at),hazard_reports(report_id)").eq("assessment_id", id).order("created_at"),
+    db.from("hazards").select("id,ref,title,description,consequence,main_impact,proposed,status,lik_before,sev_before,lik_after,sev_after,needs_review,owner_role,log_hazard_id,local_only,hazard_mitigations(text,existing,owner_role,due,done_at),hazard_reports(report_id)").eq("assessment_id", id).order("created_at"),
     db.from("risk_events").select("id,at,kind,note").eq("assessment_id", id).order("at"),
   ]);
-  const hazards = (hz ?? []) as unknown as (Hz & { hazard_reports: { report_id: string }[] })[]; const events = (ev ?? []) as E[];
+  const hazards = (hz ?? []) as unknown as (Hz & { hazard_reports: { report_id: string }[]; log_hazard_id: string | null; local_only: boolean })[]; const events = (ev ?? []) as E[];
+  const study = a.kind !== "hazard_log";
+  const [{ data: lg }, { data: mm }] = study ? await Promise.all([
+    db.from("hazards").select("id,ref,title").in("id", hazards.map((h) => h.log_hazard_id).filter(Boolean) as string[]),
+    db.from("risk_matches").select("subject_id,suggestions").eq("subject_kind", "hazard").in("subject_id", hazards.map((h) => h.id)),
+  ]) : [{ data: [] }, { data: [] }];
+  const logOf = new Map(((lg ?? []) as { id: string; ref: string; title: string }[]).map((x) => [x.id, x]));
+  const sugOf = new Map(((mm ?? []) as { subject_id: string; suggestions: Suggestion[] }[]).map((x) => [x.subject_id, x.suggestions]));
+  const canLink = mayEditRisk(s);
   const sch = schemeOf(a.entity);
   const live = hazards.filter((h) => h.status !== "closed");
   const checks = msmChecks(a, hazards);
@@ -37,10 +47,10 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
   const moc = a.kind === "moc";
   return (
     <>
-      <PageHeader eyebrow={`Safety · Risk register · ${KINDS[a.kind]} · ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number} — ${a.name}`}
+      <PageHeader eyebrow={`Safety · ${KINDS[a.kind]} · ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number} — ${a.name}`}
         tag={<span className="flex gap-2 items-center flex-wrap"><span className={"pill " + (RA_STATUS[a.status]?.[1] ?? "")}>{RA_STATUS[a.status]?.[0]}</span>{moc && a.moc_status && <span className={"pill " + (MOC_STATUS[a.moc_status]?.[1] ?? "")}>MOC · {MOC_STATUS[a.moc_status]?.[0]}</span>}{a.decision && <span className="pill">{DECISIONS[a.decision]}</span>}{worstPost && <span className={"pill " + tolTone(worstPost)}>residual {worstPost}</span>}<span className="mini">v{a.version}{a.source !== "sam" ? ` · imported from ${a.source}` : ""}</span></span>}
         sub={`${a.domain ?? "—"} · owner ${a.owner_role ?? "—"} · ${MSM_REF[a.entity] ?? ""}${a.kind !== "moc" ? ` · next review ${a.next_due ?? "—"}` : a.start_date ? ` · planned ${a.start_date}` : ""}`}
-        right={<><PdfButton id={a.id} />{a.project_id && <Link className="btn" href={`/proj/boards/${a.project_id}`}>Project</Link>}{a.authority_file_id && <Link className="btn" href={`/proj/auth/${a.authority_file_id}`}>Authority file</Link>}<Link className="btn" href={moc ? "/safe/moc" : "/safe/risk"}>{moc ? "All MOCs" : "Register"}</Link></>} />
+        right={<><PdfButton id={a.id} />{a.project_id && <Link className="btn" href={`/proj/boards/${a.project_id}`}>Project</Link>}{a.authority_file_id && <Link className="btn" href={`/proj/auth/${a.authority_file_id}`}>Authority file</Link>}<Link className="btn" href={moc ? "/safe/moc" : a.kind === "ra" ? "/safe/ra" : "/safe/risk"}>{moc ? "All MOCs" : a.kind === "ra" ? "All risk assessments" : "Hazard log"}</Link></>} />
 
       <div className="repgrid2">
         <div>
@@ -53,7 +63,12 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 return (
                   <tr key={h.id} className={(h.proposed ? "hz-proposed" : "") + (h.status === "closed" ? " muted" : "")}>
                     <td style={{ width: 105 }} className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.proposed && <div className="mini">proposed</div>}{h.needs_review && <div className="mini red">to reassess</div>}</td>
-                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div></td>
+                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
+                      {study && !h.proposed && h.status !== "closed" && (h.log_hazard_id ? <div className="mini">📒 Hazard log: <Link className="underline mono" href={`/safe/risk/${h.log_hazard_id}`}>{logOf.get(h.log_hazard_id)?.ref ?? "linked"}</Link> {logOf.get(h.log_hazard_id)?.title}{canLink && <form action={unlinkLog} className="inline ml-2"><input type="hidden" name="id" value={h.id} /><button className="linkbtn mini">unlink</button></form>}</div>
+                        : h.local_only ? <div className="mini">Kept local to this study (temporary)</div>
+                        : <div className="mini mt-1">{(sugOf.get(h.id) ?? []).slice(0, 2).map((x) => <form key={x.id} action={linkToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="log_id" value={x.id} /><button className="btn" disabled={!canLink} title={x.why}>Link to {x.ref} · {x.title.slice(0, 40)} ({Math.round(x.score * 100)}%)</button></form>)}
+                            {canLink && <><form action={promoteToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">+ Add to the log</button></form><form action={keepLocal} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">Keep local</button></form>{!sugOf.has(h.id) && <form action={suggestMatches} className="inline"><input type="hidden" name="entity" value={a.entity} /><input type="hidden" name="hazard_id" value={h.id} /><input type="hidden" name="assessment_id" value={a.id} /><button className="btn">🤝 In the log?</button></form>}</>}</div>)}
+                    </td>
                     <td style={{ width: 165 }}>{pre ? <span className={"pill " + tolTone(pre)}>{riskLabel(h.lik_before, h.sev_before, sch)}</span> : <span className="mini">—</span>} → {po ? <span className={"pill " + tolTone(po)}>{riskLabel(h.lik_after, h.sev_after, sch)}</span> : <span className="mini">—</span>}</td>
                     <td style={{ width: 120 }} className="text-right">{h.proposed && edit && <span className="flex gap-1 justify-end"><form action={keepHazard}><input type="hidden" name="id" value={h.id} /><button className="btn">Keep</button></form><form action={discardHazard}><input type="hidden" name="id" value={h.id} /><button className="btn" title="Discard">✕</button></form></span>}</td>
                   </tr>);

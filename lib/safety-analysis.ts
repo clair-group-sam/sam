@@ -29,6 +29,8 @@ Return ONLY JSON:
       questions: arr(a.questions), suggested_actions: arr(a.suggested_actions), summary: String(a.summary ?? "") || null, ran_at: new Date().toISOString(), model, error: null }, { onConflict: "report_id" });
     await db.from("reports").update({ narrative_en: String(a.narrative_en ?? "") || null, headline_en: String(a.headline_en ?? "") || null }).eq("id", r.id);
     await db.from("report_events").insert({ report_id: r.id, kind: "analysis", note: "Analysis prepared for the Safety Manager" });
+    // which hazard of the log this occurrence is about (MSM §3.5.1: each new occurrence reassesses its hazard) — suggestion only
+    try { const { matchReport } = await import("@/lib/risk-match"); await matchReport({ id: r.id, entity: r.entity, headline: String(a.headline_en ?? "") || r.headline, narrative: String(a.narrative_en ?? "") || r.narrative, primary_hazard: String(a.primary_hazard ?? "") || null }, null); } catch { /* the log may be empty */ }
   } catch (e) {
     await db.from("report_analysis").upsert({ report_id: r.id, ran_at: new Date().toISOString(), error: e instanceof Error ? e.message : String(e) }, { onConflict: "report_id" });
   }
