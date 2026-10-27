@@ -85,7 +85,7 @@ export default async function MorningCoffee() {
               <table className="tbl"><tbody>{g.items.map((m, n) => (
                 <tr key={n}>
                   <td style={{ width: 90 }}>{m.action && <span className="kind k-comp">Action</span>}</td>
-                  <td style={{ width: 200 }}><b>{m.from}</b><div className="mini mono">{hhmm(m.at)}</div></td>
+                  <td style={{ width: 220 }}><b>{m.from}</b><div className="mini mono">{m.count && m.count > 1 ? `${m.count} messages · last ${hhmm(m.at)}` : hhmm(m.at)}</div></td>
                   <td>{m.link ? <a href={m.link} target="_blank" rel="noreferrer" className="underline">{m.subject}</a> : m.subject}<div className="mini">{m.summary}</div></td>
                 </tr>))}</tbody></table>
             </div>

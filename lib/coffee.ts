@@ -119,9 +119,17 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
       .filter((f) => s.role === "cmm" || f.owner_person === s.person?.id || (f.owner_role && posts.has(basePost(f.owner_role))));
     if (mine.length) {
       const { data: ev } = await db.from("authority_file_events").select("file_id,at,kind,note").in("file_id", mine.map((f) => f.id)).gte("at", sinceIso).in("kind", ["stage", "submitted", "remarks", "reply", "decision"]).order("at", { ascending: false }).limit(20);
+      // one line per authority file, its overnight steps together
+      const perFile = new Map<string, { at: string; notes: string[] }>();
       for (const e of (ev ?? []) as { file_id: string; at: string; kind: string; note: string | null }[]) {
         const f = mine.find((x) => x.id === e.file_id)!;
-        moved.push({ at: e.at, l: { kind: "authority", label: "Authority file", cls: "k-auth", title: f.title, note: `${e.kind === "stage" ? "now " + f.stage : e.kind}${e.note ? " · " + e.note.slice(0, 90) : ""}`, entity: f.entity, link: `/proj/auth/${f.id}` } });
+        const g = perFile.get(e.file_id) ?? { at: e.at, notes: [] };
+        g.notes.unshift(`${e.kind === "stage" ? "now " + f.stage : e.kind}${e.note ? " · " + e.note.slice(0, 70) : ""}`);
+        perFile.set(e.file_id, g);
+      }
+      for (const [fid, g] of perFile) {
+        const f = mine.find((x) => x.id === fid)!;
+        moved.push({ at: g.at, l: { kind: "authority", label: "Authority file", cls: "k-auth", title: f.title, note: (g.notes.length > 1 ? `${g.notes.length} steps: ` : "") + g.notes.join(" → "), entity: f.entity, link: `/proj/auth/${f.id}` } });
       }
     }
     const { data: certs } = await db.from("certificates").select("id,entity,title,uploaded_at").in("entity", scope).gte("uploaded_at", sinceIso).limit(10);
@@ -203,7 +211,7 @@ export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.i
       await Promise.all([
         want.has("calendar") && targetsOf(s).then((tg) => { const n = parisParts(); return agenda(t, g.day, tg, n.hour * 60 + n.minute); }).then((v) => { r.agenda = v; }).catch((e) => { r.errors!.calendar = String(e?.message ?? e); }),
         want.has("mail") && mail(t, s, g.since).then((v) => { r.mail = v; }).catch((e) => { r.errors!.mail = String(e?.message ?? e); }),
-        want.has("teams") && teams(t, g.since).then((v) => { r.teams = v; }).catch((e) => { r.errors!.teams = String(e?.message ?? e); }),
+        want.has("teams") && teams(t, g.since, s).then((v) => { r.teams = v; }).catch((e) => { r.errors!.teams = String(e?.message ?? e); }),
       ]);
     }
   }
