@@ -3,12 +3,15 @@ import { getSession } from "@/lib/session";
 import { PageHeader } from "@/components/Page";
 import { listManuals } from "@/lib/docs";
 import WmImport from "@/components/WmImport";
+import RiskImportKey from "@/components/RiskImportKey";
+import { headers } from "next/headers";
 
 export default async function Integrations() {
   const s = await getSession();
   if (!s) redirect("/login");
   const manuals = (await listManuals(s)).map((r) => ({ id: r.manual.id, entity: r.manual.entity, code: r.manual.code, title: r.manual.title, path: r.manual.path }));
   const cmm = s.roles.includes("CMM") || s.roles.includes("SUPERADMIN");
+  const h = await headers(); const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
   return (
     <>
       <PageHeader eyebrow="Settings · Integrations" title="Integrations" sub="Microsoft 365 (Entra ID, Teams, Outlook), Web Manuals import bridge, FlightLogger, Leon, Claude." />
@@ -22,6 +25,13 @@ export default async function Integrations() {
         <div className="cb">
           <p className="mb-3">Export a manual revision from Web Manuals with the S.A.M. export script (pages, images, table of contents), then drop the file here. Images go to the private storage; chapters replace the revision content; pages revised in that revision are flagged for “What changed”.</p>
           {cmm ? <WmImport manuals={manuals} entities={s.group ? ["ASF", "ASJ", "AJD", "TEC"] : s.entities} /> : <p className="mini">Compliance department only.</p>}
+        </div>
+      </section>
+      <section className="card mt-4">
+        <div className="ch"><span className="eyebrow">Risk register import · Centrik / FlightLogger</span><span className="mini">read-only on the source side · re-running updates what was imported</span></div>
+        <div className="cb">
+          <p className="mb-3">Hazard log entries (HZ), MOCs and RAs with their hazards, consequences, current / planned mitigations, pre / post ratings, sign-off and decision are read in the source tool by the S.A.M. export script (scripts/centrik-risk-export.js) and posted here with a one-time key.</p>
+          {cmm ? <RiskImportKey origin={origin} /> : <p className="mini">Compliance department only.</p>}
         </div>
       </section>
     </>

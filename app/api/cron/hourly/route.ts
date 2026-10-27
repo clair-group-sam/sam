@@ -38,5 +38,25 @@ export async function GET(req: NextRequest) {
     c++;
   }
   jobs.certificate_alerts = c;
+  // 3 · risk register (MSM §3.2.2 / 3.5): reviews past due, residual risk intolerable → SM (+ AM), one open task each, never duplicated
+  const openTask = async (kind: string, ref: string) => { const { data } = await db.from("tasks").select("id").eq("kind", kind).eq("ref_id", ref).eq("status", "open").limit(1); return !!data?.length; };
+  const { data: due } = await db.from("risk_assessments").select("id,entity,number,name,next_due,owner_role").in("status", ["draft", "validated", "accepted"]).neq("kind", "moc").lt("next_due", t0);
+  let rv = 0;
+  for (const a of (due ?? []) as { id: string; entity: string; number: string; name: string; next_due: string; owner_role: string | null }[]) {
+    if (await openTask("risk_review", a.id)) continue;
+    await db.from("tasks").insert({ entity: a.entity, kind: "risk_review", title: `Review ${a.number} — ${a.name}`.slice(0, 200), detail: `Review date ${a.next_due} passed: reassess the hazards and sign a new version (hazard log kept current, reviewed at the SRB).`, due: t0, owner_role: a.owner_role ?? "SM", status: "open", link: `/safe/risk/a/${a.id}`, ref_id: a.id });
+    rv++;
+  }
+  jobs.risk_reviews = rv;
+  const { data: hz } = await db.from("hazards").select("id,entity,ref,title,lik_before,sev_before,lik_after,sev_after,assessment_id").eq("proposed", false).neq("status", "closed").not("assessment_id", "is", null);
+  const { schemeOf, tolerability } = await import("@/lib/risk-shared");
+  let ti = 0;
+  for (const h of (hz ?? []) as { id: string; entity: string; ref: string; title: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; assessment_id: string }[]) {
+    if (tolerability(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, schemeOf(h.entity)) !== "intolerable") continue;
+    if (await openTask("risk_intolerable", h.id)) continue;
+    for (const role of ["SM", "AM"]) await db.from("tasks").insert({ entity: h.entity, kind: "risk_intolerable", title: `Intolerable risk — ${h.ref} ${h.title}`.slice(0, 200), detail: "The residual risk is in the red zone: the activity cannot continue as it is until the risk is reduced (MSM §3.5.3).", due: t0, owner_role: role, status: "open", link: `/safe/risk/${h.id}`, ref_id: h.id });
+    ti++;
+  }
+  jobs.risk_intolerable = ti;
   return Response.json({ ran: new Date().toISOString(), jobs });
 }

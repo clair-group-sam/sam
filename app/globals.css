@@ -558,3 +558,8 @@ tr.cf-free td{color:#8a98a6}
 .rmx td button.on,.rmx td .cell.on{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
 .hz-proposed{border-style:dashed;border-color:#bcd3e6;background:#f7fbfe}
 .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:13px}.kv dt{color:#6b7a8c}
+.rmx.heat td .cell{display:block;width:44px;height:30px;line-height:30px;text-align:center;border-radius:6px;font-weight:700;text-decoration:none}
+.rmx.heat td .cell.zero{opacity:.45}
+.rmx.heat .red .cell{background:#fbe3df;color:#a3271b}.rmx.heat .amber .cell{background:#fff1d6;color:#8a5a00}.rmx.heat .green .cell{background:#e3f4e8;color:#1e7a3c}
+.checks li{display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:12.5px}.checks li:first-child{border-top:0}
+.checks .ok{color:#1e7a3c;font-weight:700}.checks .ko{color:#a3271b;font-weight:700}

@@ -173,14 +173,14 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
   // MOC / risk assessment (Safety › Management of change): opened from the task, done when the SM approves the change
   const mocTasks = tasks.filter((t) => t.link_kind === "moc");
   if (mocTasks.length) {
-    const { data: ms } = await db.from("mocs").select("id,ref,status,project_task_id").or(`project_id.eq.${p.id},id.in.(${mocTasks.map((t) => t.link_id).filter(Boolean).join(",") || "00000000-0000-0000-0000-000000000000"})`);
-    const mocs = (ms ?? []) as { id: string; ref: string; status: string; project_task_id: string | null }[];
+    const { data: ms } = await db.from("risk_assessments").select("id,number,status,moc_status,project_task_id").eq("kind", "moc").or(`project_id.eq.${p.id},id.in.(${mocTasks.map((t) => t.link_id).filter(Boolean).join(",") || "00000000-0000-0000-0000-000000000000"})`);
+    const mocs = (ms ?? []) as { id: string; number: string; status: string; moc_status: string | null; project_task_id: string | null }[];
     for (const t of mocTasks) {
       const m = (t.link_id && mocs.find((x) => x.id === t.link_id)) || mocs.find((x) => x.project_task_id === t.id);
       if (!m) { out.set(t.id, { label: "MOC — not opened yet", href: `/safe/moc/new?project=${p.id}&task=${t.id}`, state: "open it", tone: "" }); continue; }
-      const done = ["approved", "implemented", "closed"].includes(m.status);
+      const done = m.status === "accepted" || ["approved", "implemented", "closed"].includes(m.moc_status ?? "");
       if (done && t.status !== "done" && t.status !== "not_needed") await db.from("project_tasks").update({ status: "done", done_at: today(), updated_at: new Date().toISOString() }).eq("id", t.id);
-      out.set(t.id, { label: m.ref, href: `/safe/moc/${m.id}`, state: m.status, tone: done ? "green" : "amber" });
+      out.set(t.id, { label: m.number, href: `/safe/risk/a/${m.id}`, state: m.moc_status ?? m.status, tone: done ? "green" : "amber" });
     }
   }
   const certTasks = tasks.filter((t) => t.link_kind === "certificate");

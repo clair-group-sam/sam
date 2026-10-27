@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/Page";
 import AutoRefresh from "@/components/AutoRefresh";
 import { ENT } from "@/lib/nav";
 import { ERC_BARRIERS, ERC_OUTCOMES, STATUS, ercTone, ercValue, isSafetyDesk, morClock, seesReporter } from "@/lib/safety";
-import { createHazard } from "../../risk/actions";
+import { createAssessment, linkReport } from "../../risk/actions";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
 
 export const maxDuration = 60;
@@ -32,6 +32,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     r.reporter_person && seesReporter(s) ? db.from("people").select("display_name,email,job_title").eq("id", r.reporter_person).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const a = an as An | null; const events = (evs ?? []) as Ev[];
+  const [{ data: hzo }, { data: lk }] = await Promise.all([
+    db.from("hazards").select("id,ref,title,status,risk_assessments!inner(number,kind,status)").eq("entity", r.entity).eq("proposed", false).neq("status", "closed").order("ref").limit(500),
+    db.from("hazard_reports").select("hazards(id,ref,title)").eq("report_id", id),
+  ]);
+  const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
+  const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
   const who = rep.data as { display_name: string; email: string; job_title: string | null } | null;
   const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null);
   const erc = a?.erc_value ?? ercValue(a?.erc_outcome, a?.erc_barriers);
@@ -136,10 +142,19 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           ) : null}
 
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">Risk register</span><span className="mini">hazard log</span></div>
-            <form action={createHazard} className="cb grid gap-2"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} />
-              <input name="title" className="inp" defaultValue={a?.primary_hazard ?? r.headline_en ?? r.headline} required />
-              <div className="flex justify-end"><button className="btn">Add to the risk register</button></div></form>
+            <div className="ch"><span className="eyebrow">Risk register</span><span className="mini">each new occurrence reassesses its hazard (MSM §3.5.1)</span></div>
+            <div className="cb grid gap-3">
+              {linked.length > 0 && <div className="mini">Linked to: {linked.map((l) => <Link key={l.id} className="underline mr-2" href={`/safe/risk/${l.id}`}>{l.ref} {l.title}</Link>)}</div>}
+              {hazOpts.length > 0 && (
+                <form action={linkReport} className="flex gap-2"><input type="hidden" name="report_id" value={r.id} />
+                  <select name="hazard_id" className="inp flex-1" style={{ marginTop: 0 }} required defaultValue="">{[<option key="" value="" disabled>Link to an existing hazard…</option>, ...hazOpts.map((h) => <option key={h.id} value={h.id}>{h.number} · {h.title}</option>)]}</select>
+                  <button className="btn">Link</button></form>
+              )}
+              <form action={createAssessment} className="grid gap-2"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="kind" value="hazard_log" />
+                <input name="name" className="inp" defaultValue={`HZ - ${a?.primary_hazard ?? r.headline_en ?? r.headline}`.slice(0, 160)} required />
+                <input type="hidden" name="hazard_title" value={(a?.primary_hazard ?? r.headline_en ?? r.headline).slice(0, 200)} />
+                <div className="flex justify-end"><button className="btn">New hazard log entry from this report</button></div></form>
+            </div>
           </section>
 
           <section className="card">

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
-const OPEN = ["/login", "/auth", "/api/health", "/api/cron"];
+const OPEN = ["/login", "/auth", "/api/health", "/api/cron", "/api/import"];
 
 /**
  * Session gate. Pages re-check the session themselves (getSession), so the middleware only has to
@@ -33,4 +33,4 @@ export async function middleware(req: NextRequest) {
   } catch { /* let the page decide */ }
   return res;
 }
-export const config = { matcher: ["/((?!_next|favicon.ico|icons|logos|manifest.webmanifest|api/health|api/cron).*)"] };
+export const config = { matcher: ["/((?!_next|favicon.ico|icons|logos|manifest.webmanifest|api/health|api/cron|api/import).*)"] };
