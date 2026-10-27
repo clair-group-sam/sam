@@ -7,7 +7,7 @@ import { isCmm } from "@/lib/revisions";
 import { addDays, routeFor, syncTasks, today, type AuthorityFile, type FileType } from "@/lib/authority";
 import { instantiate, openFileForProjectTask, type Phase, type Project, type ProjectTemplate, type Task, type TaskStatus, type TemplateTask } from "@/lib/projects";
 import { openDraft } from "@/lib/revisions-server";
-import { daysBetween } from "@/lib/authority";
+import { daysBetween, standbyProjectFiles } from "@/lib/authority";
 
 type Db = ReturnType<typeof supabaseAdmin>;
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -277,7 +277,8 @@ export async function cancelProject(formData: FormData) {
   const reason = opt(formData, "reason");
   await db.from("projects").update({ status: "cancelled", closed_at: today(), lessons: reason ? `Cancelled: ${reason}${p.lessons ? `\n${p.lessons}` : ""}` : p.lessons, updated_at: new Date().toISOString() }).eq("id", p.id);
   await db.from("tasks").update({ status: "superseded" }).eq("status", "open").in("ref_id", [p.id]);
-  await audit(db, s, p, "project_cancelled", { reason });
+  const standby = await standbyProjectFiles(db, p.id, { name: s.name, personId: s.person?.id ?? null }, `project cancelled${reason ? `: ${reason}` : ""}`); // FB-030
+  await audit(db, s, p, "project_cancelled", { reason, files_standby: standby });
   paths(p.id);
 }
 export async function deleteProject(formData: FormData) {
@@ -287,8 +288,9 @@ export async function deleteProject(formData: FormData) {
   const { data: fs } = await db.from("project_task_files").select("path").eq("project_id", p.id);
   const keys = ((fs ?? []) as { path: string | null }[]).map((f) => f.path).filter((x): x is string => !!x && x.startsWith("evidence/")).map((x) => x.slice(9));
   if (keys.length) await db.storage.from("evidence").remove(keys);
+  const standby = await standbyProjectFiles(db, p.id, { name: s.name, personId: s.person?.id ?? null }, `project “${p.title}” deleted`); // FB-030
   await db.from("authority_files").update({ project_id: null }).eq("project_id", p.id);
-  await audit(db, s, p, "project_deleted", { title: p.title, template: p.template_code, files: keys.length });
+  await audit(db, s, p, "project_deleted", { title: p.title, template: p.template_code, files: keys.length, files_standby: standby });
   await db.from("projects").delete().eq("id", p.id);   // phases, tasks, dependencies and attachments follow (on delete cascade)
   paths();
   redirect("/proj/boards");

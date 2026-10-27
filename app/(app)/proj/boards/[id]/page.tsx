@@ -93,7 +93,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                         <div className="flex items-baseline gap-2 flex-wrap">
                           {pj.critical && open && <span title="critical path">⚡</span>}
                           <b>{t.title}</b>
-                          {lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label} · <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span> : null}
+                          {lk && t.status === "done" && !t.link_id && (lk.tone === "" || lk.tone === "amber") && lk.state !== "filed" ? ( // FB-031 · ticked done by hand, object not in S.A.M.: no call to action
+                            <span className="objlink" title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> done outside S.A.M.{t.link_kind === "certificate" ? <> · <Link className="underline" href={lk.href}>attach the certificate</Link></> : t.link_kind === "manual" && lk.state === "create it" ? <> · {t.link_ref} not in S.A.M. yet</> : null}</span>
+                          ) : lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label} · <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span> : null}
                           {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}>📎 {tf.length}</span>}
                           {openDs.length > 0 && t.status !== "todo" && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(" · ")}`}>waits for {openDs.length}</span>}
                         </div>

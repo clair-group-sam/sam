@@ -134,7 +134,9 @@ export async function syncTasks(db: SupabaseClient, f: AuthorityFile): Promise<v
     case "ready": rows.push(t(`Submit — ${f.title}`, `Dossier complete: submit on ${f.portal ?? "the portal"} and record the reference.`, cmm, addDays(today(), 1))); break;
     case "submitted": rows.push(t(`Follow up — ${f.title}`, `At ${f.authority ?? "the authority"} since ${fr(f.submitted_at)}${f.portal_ref ? ` (${f.portal_ref})` : ""}.`, cmm, f.target_date)); break;
     case "remarks": rows.push(t(`Answer the remarks — ${f.title}`, "Reply in the same application with the corrected version.", cmm, addDays(today(), 5)), t(`Correct the dossier after remarks — ${f.title}`, "See the authority's remarks in the file journal.", owner, addDays(today(), 3))); break;
-    case "approved": rows.push(t(`Integrate and publish — ${f.title}`, "Letter and signed pages to file, manual to publish.", cmm, addDays(today(), 5))); break;
+    case "approved": rows.push(/CERT/i.test(f.type_code ?? "") // FB-032 · a certificate file has nothing to publish
+      ? t(`File the certificate — ${f.title}`, "Certificate received: file it in Certificates & Validities with its expiry, then close the file.", cmm, addDays(today(), 5))
+      : t(`Integrate and publish — ${f.title}`, "Letter and signed pages to file, manual to publish.", cmm, addDays(today(), 5))); break;
     case "published": rows.push(t(`Close-out — ${f.title}`, "Repository deposit, APP - Approvals, fee form, linked finding or NP record.", cmm, addDays(today(), 5))); break;
     default: break;
   }
@@ -185,4 +187,19 @@ export async function followRevision(db: SupabaseClient, who: { name: string; pe
   await db.from("authority_rounds").update({ file_id: f.id }).eq("revision_id", rev.id).is("file_id", null);
   const { data: fresh } = await db.from("authority_files").select("*").eq("id", f.id).maybeSingle();
   if (fresh) await syncTasks(db, fresh as AuthorityFile);
+}
+
+/**
+ * FB-030 · When a project is cancelled or deleted, the authority files it opened and that never reached the authority go on standby
+ * (their open tasks are superseded); files already submitted are left as they are, only detached. Returns the number put on standby.
+ */
+export async function standbyProjectFiles(db: SupabaseClient, projectId: string, who: { name: string; personId: string | null }, why: string): Promise<number> {
+  const { data } = await db.from("authority_files").select("id,stage,title").eq("project_id", projectId).in("stage", ["draft", "compliance", "signing", "ready"]);
+  const files = (data ?? []) as { id: string; stage: string; title: string }[];
+  for (const f of files) {
+    await db.from("authority_files").update({ stage: "standby", updated_at: new Date().toISOString() }).eq("id", f.id);
+    await db.from("tasks").update({ status: "superseded" }).eq("ref_id", f.id).eq("status", "open");
+    await db.from("authority_file_events").insert({ file_id: f.id, kind: "stage", who: who.name, actor: who.personId, note: `Standby — ${why} (was ${f.stage})`, meta: { project_id: projectId } });
+  }
+  return files.length;
 }

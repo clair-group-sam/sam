@@ -25,10 +25,14 @@ export default function Shell({ session, children }: Props) {
   // hover with a short opening delay (no accidental flashes) and a longer closing delay (smooth exit)
   const rail = useDelayedHover(120, 450);
   const subH = useDelayedHover(80, 450);
-  useEffect(() => { try { setCompact(localStorage.getItem("sam_compact") === "1"); } catch {} }, []);
+  // FB-027 · on an iPad / narrow window with no saved choice, start compact (icons only) so the page keeps its width
+  useEffect(() => { try { const v = localStorage.getItem("sam_compact"); setCompact(v === null ? window.innerWidth < 1200 : v === "1"); } catch {} }, []);
   const toggleCompact = () => setCompact((v) => { const n = !v; try { localStorage.setItem("sam_compact", n ? "1" : "0"); } catch {} return n; });
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { const t = e.target as HTMLElement; if (e.key === "[" && !["INPUT", "TEXTAREA"].includes(t?.tagName) && !t?.isContentEditable) toggleCompact(); };
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.key === "[" && !["INPUT", "TEXTAREA"].includes(t?.tagName) && !t?.isContentEditable) toggleCompact();
+    };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   const subs = subsFor(role, mod).filter((s) => !s.hidden || s.id === sub);
@@ -122,6 +126,16 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   ];
   // the working entity: one at a time, always shown in full at the top-left; group view only for group functions
   const [entOpen, setEntOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // FB-028 · Ctrl / ⌘ K focuses the search (full text of the published manuals) instead of doing nothing
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
+      // FB-021 · Escape closes the open menus
+      if (e.key === "Escape") { setCreate(false); setMenu(false); setEntOpen(false); }
+    };
+    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const choices = session.entities;
   const cur = session.entity;
   const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
@@ -153,7 +167,9 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
       </div>
       <div className="crumb"><b>{crumb[0]}</b>{crumb[1] && <> · <span>{crumb[1]}</span></>}</div>
       <div className="flex-1" />
-      <div className="searchbox"><Icon name="search" size={14} /><span>Search</span><kbd>Ctrl K</kbd></div>
+      <form className="searchbox" action="/docs/lib" method="get" role="search" title="Search the published manuals (title, chapter or text)">
+        <Icon name="search" size={14} /><input ref={searchRef} name="q" placeholder="Search manuals" aria-label="Search the manuals" /><kbd>Ctrl K</kbd>
+      </form>
       {session.role !== "user" && (
         <div className="relative">
           <button type="button" className="btn primary" onClick={() => setCreate((v) => !v)} aria-expanded={create}><Icon name="plus" size={14} /> Create</button>

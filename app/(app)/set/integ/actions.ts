@@ -32,7 +32,8 @@ export async function importWmBundle(input: ImportInput): Promise<ImportResult> 
   }
   // revision (find by issue/rev or create as published)
   const published = b.manual.publishedDate ? b.manual.publishedDate.slice(0, 10) : null;
-  const { data: r0 } = await db.from("revisions").select("id").eq("manual_id", manualId).eq("rev", rev).eq("issue", issue).maybeSingle();
+  // FB-029 · one revision per (manual, issue, rev): if duplicates already exist, the import updates the most recent one and never adds a third
+  const { data: r0 } = await db.from("revisions").select("id").eq("manual_id", manualId).eq("rev", rev).eq("issue", issue).order("published_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
   let revisionId = r0?.id as string | undefined;
   const source = { system: "webmanuals", manualId: b.manual.wmId, revisionId: b.manual.revisionId, pdfURL: b.manual.pdfURL ?? null, revisionDate: b.manual.revisionDate ?? null, importedAt: new Date().toISOString(), by: s.email };
   if (!revisionId) {
