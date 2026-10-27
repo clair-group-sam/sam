@@ -587,7 +587,7 @@ details.more[open]{z-index:40}
    metric rows go to two columns. The rail starts compact on these widths (Shell). */
 @media (max-width:1200px){
   .pagehead{flex-wrap:wrap}.pagehead .ph-right{width:100%;flex:0 0 100%;justify-content:flex-start}
-  .topbar{padding:0 12px;gap:8px}.topbar .crumb{display:none}.topbar .searchbox input{width:90px}.topbar .searchbox kbd{display:none}.topbar .who{display:none}.topbar .btn.erp{display:none}
+  .topbar{padding:0 12px;gap:8px}.topbar .crumb{display:none}.topbar .enttext small,.topbar .enttext em{display:none}.topbar .entblock .caret{font-size:11px}.topbar .searchbox input{width:90px}.topbar .searchbox kbd{display:none}.topbar .who{display:none}.topbar .btn.erp{display:none}
   main.px-8{padding-left:16px;padding-right:16px}
   .grid-cols-4,.grid-cols-3{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
   .groupband{font-size:12px}

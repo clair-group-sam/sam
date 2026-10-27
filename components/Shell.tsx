@@ -26,7 +26,11 @@ export default function Shell({ session, children }: Props) {
   const rail = useDelayedHover(120, 450);
   const subH = useDelayedHover(80, 450);
   // FB-027 · on an iPad / narrow window with no saved choice, start compact (icons only) so the page keeps its width
-  useEffect(() => { try { const v = localStorage.getItem("sam_compact"); setCompact(v === null ? window.innerWidth < 1200 : v === "1"); } catch {} }, []);
+  // Under 1100 px (iPad) the menus always collapse, whatever was saved: the page needs the width more than the labels do.
+  useEffect(() => {
+    const apply = () => { try { const v = localStorage.getItem("sam_compact"); setCompact(window.innerWidth < 1100 || (v === null ? window.innerWidth < 1200 : v === "1")); } catch {} };
+    apply(); window.addEventListener("resize", apply); return () => window.removeEventListener("resize", apply);
+  }, []);
   const toggleCompact = () => setCompact((v) => { const n = !v; try { localStorage.setItem("sam_compact", n ? "1" : "0"); } catch {} return n; });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
