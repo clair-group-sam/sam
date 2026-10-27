@@ -1,0 +1,44 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "f5834b34-2908-4ab2-a5ae-0673d98c7752",
+  "developer": {
+    "name": "Clair Group — Compliance & Safety",
+    "websiteUrl": "https://sam.clair-group.com",
+    "privacyUrl": "https://sam.clair-group.com/login",
+    "termsOfUseUrl": "https://sam.clair-group.com/login"
+  },
+  "name": { "short": "S.A.M.", "full": "S.A.M. — Safety · Assurance · Management" },
+  "description": {
+    "short": "What needs you in S.A.M., with buttons to answer from Teams.",
+    "full": "S.A.M. sends you personal cards for the dossiers to prepare, the manuals to read, the findings and actions to answer, and writes your answers back in S.A.M. In a conversation, mention @S.A.M. to draft a report from the thread (next iteration)."
+  },
+  "icons": { "color": "color.png", "outline": "outline.png" },
+  "accentColor": "#0D2A3F",
+  "bots": [
+    {
+      "botId": "f5834b34-2908-4ab2-a5ae-0673d98c7752",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": true,
+      "isNotificationOnly": false,
+      "commandLists": [
+        { "scopes": ["personal"], "commands": [{ "title": "tasks", "description": "What is waiting for me in S.A.M." }] }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["sam.clair-group.com", "sam-jet-sigma.vercel.app", "*.vercel.app"],
+  "webApplicationInfo": {
+    "id": "f5834b34-2908-4ab2-a5ae-0673d98c7752",
+    "resource": "api://sam.clair-group.com/f5834b34-2908-4ab2-a5ae-0673d98c7752"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        { "name": "ChannelMessage.Read.Group", "type": "Application" },
+        { "name": "ChatMessage.Read.Chat", "type": "Application" }
+      ]
+    }
+  }
+}

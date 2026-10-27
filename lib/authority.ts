@@ -138,7 +138,11 @@ export async function syncTasks(db: SupabaseClient, f: AuthorityFile): Promise<v
     case "published": rows.push(t(`Close-out — ${f.title}`, "Repository deposit, APP - Approvals, fee form, linked finding or NP record.", cmm, addDays(today(), 5))); break;
     default: break;
   }
-  if (rows.length) await db.from("tasks").insert(rows);
+  if (rows.length) {
+    const { data: inserted } = await db.from("tasks").insert(rows).select("*");
+    // TMS-01: the card goes to Teams right away (best effort)
+    if (inserted?.length) { const { notifyTasks } = await import("@/lib/teams"); await notifyTasks(db, inserted as Parameters<typeof notifyTasks>[1]); }
+  }
 }
 
 /**
