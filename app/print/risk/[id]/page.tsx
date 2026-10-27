@@ -79,7 +79,7 @@ export default async function PrintRisk({ params }: { params: Promise<{ id: stri
       <table className="kv sig"><tbody>
         <tr><td>Decision</td><td>{a.decision ? DECISIONS[a.decision] : "—"}{a.decision_comment ? ` — ${a.decision_comment}` : ""}</td></tr>
         <tr><td>Validated by (nominated person / SM)</td><td>{a.validated_at ? `${a.validated_name ?? ""}${a.validated_role ? " (" + a.validated_role + ")" : ""} — ${a.validated_at.slice(0, 10)} (electronic sign-off in S.A.M.)` : ""}</td></tr>
-        <tr><td>Residual risk accepted by the Accountable Manager</td><td>{a.accepted_at ? `${a.accepted_name ?? ""} — ${a.accepted_at.slice(0, 10)} (electronic sign-off in S.A.M.)` : ""}</td></tr>
+        <tr><td>Residual risk accepted</td><td>{a.accepted_at ? `Accountable Manager ${a.accepted_name ?? ""} — ${a.accepted_at.slice(0, 10)} (electronic sign-off in S.A.M.)` : a.status === "accepted" ? `By the sign-off above (residual risk not red) — the Accountable Manager keeps the final say (MSM)` : ""}</td></tr>
       </tbody></table>
 
       <h2>Conformity with the MSM</h2>

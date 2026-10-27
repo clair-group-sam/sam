@@ -50,8 +50,12 @@ export async function GET(req: NextRequest) {
   jobs.risk_reviews = rv;
   const { data: hz } = await db.from("hazards").select("id,entity,ref,title,lik_before,sev_before,lik_after,sev_after,assessment_id").eq("proposed", false).neq("status", "closed").not("assessment_id", "is", null);
   const { schemeOf, tolerability } = await import("@/lib/risk-shared");
+  const ids = [...new Set(((hz ?? []) as { assessment_id: string }[]).map((h) => h.assessment_id))];
+  const { data: decided } = ids.length ? await db.from("risk_assessments").select("id").in("id", ids).not("accepted_at", "is", null) : { data: [] };
+  const amDecided = new Set(((decided ?? []) as { id: string }[]).map((r) => r.id)); // the AM already approved / stopped it
   let ti = 0;
   for (const h of (hz ?? []) as { id: string; entity: string; ref: string; title: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; assessment_id: string }[]) {
+    if (amDecided.has(h.assessment_id)) continue;
     if (tolerability(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, schemeOf(h.entity)) !== "intolerable") continue;
     if (await openTask("risk_intolerable", h.id)) continue;
     for (const role of ["SM", "AM"]) await db.from("tasks").insert({ entity: h.entity, kind: "risk_intolerable", title: `Intolerable risk — ${h.ref} ${h.title}`.slice(0, 200), detail: "The residual risk is in the red zone: the activity cannot continue as it is until the risk is reduced (MSM §3.5.3).", due: t0, owner_role: role, status: "open", link: `/safe/risk/${h.id}`, ref_id: h.id });

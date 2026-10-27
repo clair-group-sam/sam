@@ -109,12 +109,17 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 </form>)) : <p className="mini">Waiting for the sign-off of the most relevant nominated person (or deputy / SM).</p>)}
               {a.validated_at && <p className="mb-2">✓ Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""} · {a.validated_at.slice(0, 10)}{a.decision ? ` · ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
               {a.status === "validated" && (mayAccept(s) ? (
-                <form action={acceptAssessment} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} /><input name="comment" className="inp" placeholder="Comment (optional)" /><button className="btn primary">Accept the residual risk (AM)</button></form>
-              ) : <p className="mini">Waiting for the Accountable Manager&apos;s final acceptance.</p>)}
-              {a.accepted_at && <p className="mb-2">✓ Accepted by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
+                <form action={acceptAssessment} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
+                  <p className="mini">The residual risk stays red. Approve the activity anyway (justification required) or stop it.</p>
+                  <textarea name="comment" className="inp" rows={2} placeholder="Justification / conditions" />
+                  <div className="flex gap-2"><button className="btn primary" name="verdict" value="approve">Approve the red risk (AM)</button><button className="btn" name="verdict" value="stop">Stop (AM)</button></div>
+                </form>
+              ) : <p className="mini">Residual risk red: waiting for the Accountable Manager&apos;s decision.</p>)}
+              {a.status === "accepted" && !a.accepted_at && <p className="mini mb-2">Accepted by the sign-off (green / yellow residual risk) — the AM may overrule it by opening a new version.</p>}
+              {a.accepted_at && <p className="mb-2">✓ Decided by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
               {moc && a.status === "accepted" && a.moc_status === "approved" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="implemented" /><button className="btn primary">Mark the change as implemented</button></form>}
               {moc && a.moc_status === "implemented" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="closed" /><button className="btn primary">Close the MOC</button></form>}
-              {!draft && mayEditRisk(s) && !["archived", "cancelled"].includes(a.status) && <form action={reopenAssessment} className="mt-3"><input type="hidden" name="id" value={a.id} /><button className="btn">Reopen — new version (v{a.version + 1})</button></form>}
+              {!draft && mayEditRisk(s) && !["archived", "cancelled"].includes(a.status) && <form action={reopenAssessment} className="mt-3 grid gap-2"><input type="hidden" name="id" value={a.id} />{mayAccept(s) && <input name="comment" className="inp" placeholder="Reason (AM overrule: scoring / decision changed)" />}<button className="btn">{mayAccept(s) ? "Overrule — new version" : "Reopen — new version"} (v{a.version + 1})</button></form>}
             </div>
           </section>
 

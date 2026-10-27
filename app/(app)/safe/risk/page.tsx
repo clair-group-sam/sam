@@ -52,7 +52,7 @@ export default async function RiskRegister({ searchParams }: { searchParams: Pro
         <Metric label="Residual intolerable" value={intoler} tone={intoler ? "red" : undefined} hint="current rating" />
         <Metric label="To reassess" value={allLive.filter((h) => h.needs_review).length} tone={allLive.some((h) => h.needs_review) ? "amber" : undefined} hint="new occurrence linked" />
         <Metric label="Review overdue" value={openRa.filter((a) => a.kind !== "moc" && a.next_due && a.next_due < today).length} tone={openRa.some((a) => a.kind !== "moc" && a.next_due && a.next_due < today) ? "red" : undefined} />
-        <Metric label="Awaiting AM acceptance" value={openRa.filter((a) => a.status === "validated").length} tone={openRa.some((a) => a.status === "validated") ? "amber" : undefined} />
+        <Metric label="Red — AM decision" value={openRa.filter((a) => a.status === "validated").length} tone={openRa.some((a) => a.status === "validated") ? "amber" : undefined} />
       </div>
 
       <div className="grid gap-4 mb-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 360px" }}>

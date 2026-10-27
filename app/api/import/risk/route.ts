@@ -17,7 +17,7 @@ const cors = (req: NextRequest): Record<string, string> => { const o = req.heade
 export function OPTIONS(req: NextRequest) { return new NextResponse(null, { status: 204, headers: cors(req) }); }
 
 type InH = { source_ref?: string; title: string; description?: string; consequence?: string; main_impact?: string; lik_before?: number; sev_before?: string; lik_after?: number; sev_after?: string; current?: string[]; planned?: { text: string; owner_role?: string }[] | string[]; status?: string };
-type InA = { number: string; kind?: string; name: string; description?: string; domain?: string; status?: string; decision?: string; decision_comment?: string; top_risk?: boolean; version?: number; conducted_on?: string; next_due?: string; signed_by_name?: string; signed_by_role?: string; signed_at?: string; participants?: { name: string; role: string }[]; source_ref?: string;
+type InA = { number: string; kind?: string; name: string; description?: string; domain?: string; status?: string; decision?: string; decision_comment?: string; top_risk?: boolean; version?: number; conducted_on?: string; next_due?: string; signed_by_name?: string; signed_by_role?: string; signed_at?: string; accepted_by_name?: string; accepted_at?: string; participants?: { name: string; role: string }[]; source_ref?: string;
   moc_status?: string; category?: string; change_type?: string; start_date?: string; end_date?: string; reason?: string; requestor?: string; affected?: string; criticality?: string; prior_assessments?: string; actions_in_place?: string; authority_route?: string; hazards?: InH[] };
 
 export async function POST(req: NextRequest) {
@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
     try {
       const kind = ["hazard_log", "moc", "ra"].includes(a.kind ?? "") ? a.kind! : /^HZ/i.test(a.number) ? "hazard_log" : /^MOC/i.test(a.number) ? "moc" : "ra";
       const signed = a.status === "signed_off" || !!a.signed_at;
-      const row: Record<string, unknown> = { entity, kind, number: a.number.trim(), name: a.name.trim(), description: a.description ?? null, domain: a.domain ?? null, status: a.status === "archived" ? "archived" : signed ? "validated" : "draft",
+      const row: Record<string, unknown> = { entity, kind, number: a.number.trim(), name: a.name.trim(), description: a.description ?? null, domain: a.domain ?? null, status: a.status === "archived" ? "archived" : signed ? "accepted" : "draft", // MSM: signed by the NP / SM = accepted (the AM decides only on red)
         decision: a.decision && ["continue", "continue_with_conditions", "stop"].includes(a.decision) ? a.decision : null, decision_comment: a.decision_comment ?? null, top_risk: !!a.top_risk, version: a.version ?? 1, conducted_on: d(a.conducted_on), next_due: d(a.next_due),
-        participants: a.participants ?? [], validated_name: signed ? a.signed_by_name ?? null : null, validated_role: signed ? a.signed_by_role ?? null : null, validated_at: signed ? (d(a.signed_at) ?? null) : null,
+        participants: a.participants ?? [], validated_name: signed ? a.signed_by_name ?? null : null, validated_role: signed ? a.signed_by_role ?? null : null, validated_at: signed ? (d(a.signed_at) ?? null) : null, accepted_name: a.accepted_by_name ?? null, accepted_at: d(a.accepted_at),
         moc_status: kind === "moc" ? (a.moc_status ?? (signed ? "approved" : "assessment")) : null, category: a.category ?? null, change_type: a.change_type ?? null, start_date: d(a.start_date), end_date: d(a.end_date), reason: a.reason ?? null, requestor: a.requestor ?? null,
         affected: a.affected ?? null, criticality: a.criticality ?? null, prior_assessments: a.prior_assessments ?? null, actions_in_place: a.actions_in_place ?? null, authority_route: a.authority_route ?? null, source, source_ref: a.source_ref ?? null, updated_at: new Date().toISOString() };
       let q = db.from("risk_assessments").select("id").eq("entity", entity).eq("number", row.number as string);

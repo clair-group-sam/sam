@@ -9,7 +9,8 @@ export * from "@/lib/risk-shared";
 export const mayEditRisk = (s: Session) => isSafetyDesk(s) || s.role === "np" || s.role === "am";
 /** Validation (electronic sign-off) by the most relevant nominated person, his/her deputy, or the SM (AJD/ASJ MSM §3.4, §3.5.3). */
 export const mayValidate = (s: Session) => isSafetyDesk(s) || s.role === "np";
-/** Final acceptance of the residual risk: the Accountable Manager (AJD MSM §3.5.3, ASF MSM §3.4). */
+/** The Accountable Manager keeps the final say (AJD MSM §3.5.3, ASF MSM §3.4): he does not sign every assessment, but decides on a red residual risk
+ *  (forced approval or stop) and may overrule any scoring / sign-off by opening a new version. Green / yellow are accepted by the NP / SM sign-off. */
 export const mayAccept = (s: Session) => s.roles.map(basePost).some((p) => p === "AM" || p === "SUPERADMIN");
 export const mayApproveMoc = mayValidate;
 export const postOf = (s: Session) => s.roles.map(basePost).find((p) => p !== "SUPERADMIN") ?? s.roles[0] ?? "";
@@ -51,7 +52,7 @@ export function msmChecks(ra: Ra, hazards: Hz[]): Check[] {
   c.push({ label: "Mitigations to put in place assigned to a post", ok: kept.every((h) => (h.hazard_mitigations ?? []).filter((m) => !m.existing && !m.done_at).every((m) => !!m.owner_role)), ref: ra.kind === "moc" ? `${ref}.4 step 8` : `${ref}.5.2` });
   if (scheme === "centrik" || ra.kind === "moc") c.push({ label: "Participants formally identified (names and roles)", ok: (ra.participants ?? []).length > 0, ref: ra.kind === "moc" ? `${ref}.4` : `${ref}.5.1` });
   c.push({ label: "Validated by the most relevant nominated person (or deputy / SM)", ok: !!ra.validated_at, ref: `${ref}.5.3`, detail: ra.validated_at ? `${ra.validated_name ?? ""} (${ra.validated_role ?? ""})` : undefined });
-  c.push({ label: "Residual risk accepted by the Accountable Manager", ok: !!ra.accepted_at, ref: scheme === "centrik" ? `${ref}.5.3` : `${ref}.4`, detail: ra.accepted_at ? ra.accepted_name ?? "" : undefined });
+  c.push({ label: "Residual risk accepted (by the sign-off; by the AM when it stays red)", ok: ra.status === "accepted", ref: scheme === "centrik" ? `${ref}.5.3` : `${ref}.4`, detail: ra.accepted_at ? `AM — ${ra.accepted_name ?? ""}` : ra.status === "accepted" ? ra.validated_name ?? "" : ra.status === "validated" ? "red residual risk — waiting for the AM" : undefined });
   if (ra.kind === "moc") {
     c.push({ label: "Change described: what, why, who asks, what is affected, criticality and human performance impact, prior assessments, actions", ok: !!(ra.description && ra.reason && ra.affected && ra.criticality), ref: `${ref}.4 steps 1–6` });
     c.push({ label: "MOC completed before the change is implemented", ok: !(ra.moc_status === "implemented" || ra.moc_status === "closed") || !!ra.accepted_at, ref: `${ref}.4` });

@@ -68,7 +68,18 @@ export async function updateAssessment(fd: FormData) {
   touchRa(ra.id);
 }
 
-/** Electronic sign-off by the most relevant NP (or deputy / SM). Every hazard kept and rated after mitigation; an intolerable residual risk can only be signed with "Stop". */
+/** Accepted: MOC approved (or cancelled on Stop), linked project task done, AM task closed. */
+async function finalise(ra: ARow, decision: string, patch: Record<string, unknown>) {
+  const p: Record<string, unknown> = { ...patch, status: "accepted", decision, updated_at: new Date().toISOString() };
+  if (ra.kind === "moc") p.moc_status = decision === "stop" ? "cancelled" : "approved";
+  await db().from("risk_assessments").update(p).eq("id", ra.id);
+  await db().from("tasks").update({ status: "done" }).eq("kind", "risk_acceptance").eq("ref_id", ra.id).eq("status", "open");
+  if (ra.project_task_id && decision !== "stop") await db().from("project_tasks").update({ status: "done", done_at: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq("id", ra.project_task_id).neq("status", "done");
+  if (ra.project_id) revalidatePath(`/proj/boards/${ra.project_id}`);
+}
+
+/** Electronic sign-off by the most relevant NP (or deputy / SM) — MSM rule: green / yellow residual risks are accepted by this sign-off;
+ *  a residual risk that stays red goes to the Accountable Manager, unless the decision is Stop. */
 export async function validateAssessment(fd: FormData) {
   const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity, mayValidate, "Validation is made by the most relevant nominated person, his/her deputy or the Safety Manager.");
   const decision = str(fd, "decision") ?? ra.decision;
@@ -76,24 +87,28 @@ export async function validateAssessment(fd: FormData) {
   const hs = ((hz ?? []) as { proposed: boolean; lik_after: number | null; sev_after: string | null; status: string }[]).filter((h) => h.status !== "closed");
   if (!hs.length || hs.some((h) => h.proposed || !h.lik_after || !h.sev_after)) throw new Error("Every hazard must be kept and rated after mitigation before the sign-off.");
   if (!decision) throw new Error("Choose the decision (continue / continue with conditions / stop).");
-  if (hs.some((h) => tolerability(h.lik_after, h.sev_after, schemeOf(ra.entity)) === "intolerable") && decision !== "stop") throw new Error("A residual risk stays intolerable: the only possible decision is Stop (MSM §3.5.3).");
-  await db().from("risk_assessments").update({ status: "validated", decision, decision_comment: str(fd, "decision_comment"), validated_by: s.person?.id ?? null, validated_name: s.name, validated_role: postOf(s), validated_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", ra.id);
-  await log({ assessment_id: ra.id, kind: "validated", actor: s.person?.id ?? null, note: `Signed off by ${s.name} (${postOf(s)}) — ${decision.replace(/_/g, " ")}` });
-  await db().from("tasks").insert({ entity: ra.entity, kind: "risk_acceptance", title: `Accept the residual risk — ${ra.number} ${ra.name}`.slice(0, 200), detail: "Final decision on the acceptability of the risk (MSM §3.5.3).", owner_role: "AM", status: "open", link: `/safe/risk/a/${ra.id}`, ref_id: ra.id });
+  const red = hs.some((h) => tolerability(h.lik_after, h.sev_after, schemeOf(ra.entity)) === "intolerable");
+  const signed = { decision_comment: str(fd, "decision_comment"), validated_by: s.person?.id ?? null, validated_name: s.name, validated_role: postOf(s), validated_at: new Date().toISOString(), accepted_by: null, accepted_name: null, accepted_at: null };
+  if (red && decision !== "stop") {
+    await db().from("risk_assessments").update({ ...signed, status: "validated", decision, updated_at: new Date().toISOString() }).eq("id", ra.id);
+    await log({ assessment_id: ra.id, kind: "validated", actor: s.person?.id ?? null, note: `Signed off by ${s.name} (${postOf(s)}) — ${decision.replace(/_/g, " ")} — residual risk red: referred to the Accountable Manager` });
+    await db().from("tasks").insert({ entity: ra.entity, kind: "risk_acceptance", title: `Red residual risk — decide on ${ra.number} ${ra.name}`.slice(0, 200), detail: "The residual risk stays red: approve the activity anyway (with justification) or stop it (MSM §3.5.3 / §3.4).", owner_role: "AM", status: "open", link: `/safe/risk/a/${ra.id}`, ref_id: ra.id });
+  } else {
+    await finalise(ra, decision, signed);
+    await log({ assessment_id: ra.id, kind: "accepted", actor: s.person?.id ?? null, note: `Signed off and accepted by ${s.name} (${postOf(s)}) — ${decision.replace(/_/g, " ")}` });
+  }
   touchRa(ra.id);
 }
 
-/** Final decision of the Accountable Manager on the acceptability of the residual risk; a MOC is then approved. */
+/** Accountable Manager's decision on a red residual risk: forced approval (justification required) or stop. */
 export async function acceptAssessment(fd: FormData) {
-  const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity, mayAccept, "The final acceptance of the risk rests with the Accountable Manager.");
-  if (ra.status !== "validated") throw new Error("The assessment must first be validated by the nominated person.");
-  const patch: Record<string, unknown> = { status: "accepted", accepted_by: s.person?.id ?? null, accepted_name: s.name, accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-  if (ra.kind === "moc") patch.moc_status = ra.decision === "stop" ? "cancelled" : "approved";
-  await db().from("risk_assessments").update(patch).eq("id", ra.id);
-  await db().from("tasks").update({ status: "done" }).eq("kind", "risk_acceptance").eq("ref_id", ra.id).eq("status", "open");
-  if (ra.project_task_id && ra.decision !== "stop") await db().from("project_tasks").update({ status: "done", done_at: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq("id", ra.project_task_id).neq("status", "done");
-  await log({ assessment_id: ra.id, kind: "accepted", actor: s.person?.id ?? null, note: `Residual risk accepted by the AM (${s.name})${str(fd, "comment") ? " — " + str(fd, "comment") : ""}` });
-  touchRa(ra.id); if (ra.project_id) revalidatePath(`/proj/boards/${ra.project_id}`);
+  const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity, mayAccept, "The decision on a red residual risk rests with the Accountable Manager.");
+  if (ra.status !== "validated") throw new Error("Only an assessment whose residual risk stays red waits for the Accountable Manager.");
+  const stop = fd.get("verdict") === "stop"; const comment = str(fd, "comment");
+  if (!stop && !comment) throw new Error("Give the justification for approving a red residual risk.");
+  await finalise(ra, stop ? "stop" : (ra.decision ?? "continue_with_conditions"), { accepted_by: s.person?.id ?? null, accepted_name: s.name, accepted_at: new Date().toISOString() });
+  await log({ assessment_id: ra.id, kind: "accepted", actor: s.person?.id ?? null, note: stop ? `Stopped by the AM (${s.name})${comment ? " — " + comment : ""}` : `Red residual risk approved by the AM (${s.name}) — ${comment}` });
+  touchRa(ra.id);
 }
 
 /** Reopen = new version (Centrik "Copy new version"): back to draft, sign-offs cleared, history kept in the journal. */
@@ -102,7 +117,8 @@ export async function reopenAssessment(fd: FormData) {
   const { data } = await db().from("risk_assessments").select("version").eq("id", ra.id).single();
   const v = ((data as { version: number } | null)?.version ?? 1) + 1;
   await db().from("risk_assessments").update({ status: "draft", version: v, validated_by: null, validated_name: null, validated_role: null, validated_at: null, accepted_by: null, accepted_name: null, accepted_at: null, conducted_on: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq("id", ra.id);
-  await log({ assessment_id: ra.id, kind: "new_version", actor: s.person?.id ?? null, note: `Version ${v} opened for review` });
+  const why = str(fd, "comment");
+  await log({ assessment_id: ra.id, kind: "new_version", actor: s.person?.id ?? null, note: `Version ${v} opened for review${mayAccept(s) ? " by the AM" : ""}${why ? " — " + why : ""}` });
   touchRa(ra.id);
 }
 

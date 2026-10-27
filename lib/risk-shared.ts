@@ -52,7 +52,7 @@ export const worstTol = (ts: (Tol | null)[]): Tol | null => (ts.includes("intole
 export const KINDS: Record<string, string> = { hazard_log: "Hazard log", moc: "Management of change", ra: "Risk assessment" };
 export const KIND_PREFIX: Record<string, string> = { hazard_log: "HZ", moc: "MOC", ra: "RA" };
 export const DOMAINS = ["Flight Ops", "Ground Ops", "Crew Training", "CAMO", "Maintenance", "ATO", "FSTD", "Information security", "Compliance & Safety", "Organisation"];
-export const RA_STATUS: Record<string, [string, string]> = { draft: ["Draft", "amber"], validated: ["Validated by the NP", "blue"], accepted: ["Accepted by the AM", "green"], archived: ["Archived", ""], cancelled: ["Cancelled", ""] };
+export const RA_STATUS: Record<string, [string, string]> = { draft: ["Draft", "amber"], validated: ["Red — AM decision", "red"], accepted: ["Accepted", "green"], archived: ["Archived", ""], cancelled: ["Cancelled", ""] };
 export const DECISIONS: Record<string, string> = { continue: "Continue", continue_with_conditions: "Continue with conditions", stop: "Stop / do not implement" };
 export const MOC_CATEGORIES: Record<string, string> = { organisation: "Organisation / structure", np: "Nominated person / key staff", aircraft: "Aircraft / type / fleet", procedure: "Procedure / manual", equipment: "Equipment / EFB / IT", base: "Base / route / aerodrome", subcontractor: "Subcontractor / provider", training: "Training programme", other: "Other" };
 export const MOC_STATUS: Record<string, [string, string]> = { assessment: ["Risk assessment", "amber"], approved: ["Approved", "blue"], implemented: ["Implemented", "green"], closed: ["Closed", "green"], cancelled: ["Cancelled", ""] };
