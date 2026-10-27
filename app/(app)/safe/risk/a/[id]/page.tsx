@@ -6,11 +6,13 @@ import { PageHeader } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { DECISIONS, DOMAINS, KINDS, MOC_CATEGORIES, MOC_STATUS, MSM_REF, RA_STATUS, mayAccept, mayEditRisk, mayValidate, msmChecks, riskLabel, schemeOf, tolerability, tolTone, worstTol, type Hz, type Ra } from "@/lib/risk";
 import { PdfButton } from "@/components/RiskPdfButton";
+import RiskStart from "@/components/RiskStart";
+import { saveAsTemplate } from "../../start-actions";
 import { keepLocal, linkToLog, promoteToLog, recordAmDecision, referToAm, suggestMatches, unlinkLog } from "../../actions";
 import type { Suggestion } from "@/lib/risk-match";
 import { acceptAssessment, createHazard, discardHazard, keepHazard, mocStep, proposeHazards, reopenAssessment, updateAssessment, validateAssessment } from "../../actions";
 
-export const maxDuration = 60;
+export const maxDuration = 300; // SAM prepares a draft from a base
 type E = { id: number; at: string; kind: string; note: string | null };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -24,10 +26,10 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
   const a = data as Ra | null;
   if (!a || !s.entities.includes(a.entity)) notFound();
   const [{ data: hz }, { data: ev }] = await Promise.all([
-    db.from("hazards").select("id,ref,title,description,consequence,main_impact,proposed,status,lik_before,sev_before,lik_after,sev_after,needs_review,owner_role,log_hazard_id,local_only,hazard_mitigations(text,existing,owner_role,due,done_at),hazard_reports(report_id)").eq("assessment_id", id).order("created_at"),
+    db.from("hazards").select("id,ref,title,description,consequence,main_impact,proposed,status,lik_before,sev_before,lik_after,sev_after,needs_review,owner_role,log_hazard_id,local_only,prefill_note,hazard_mitigations(text,existing,owner_role,due,done_at),hazard_reports(report_id)").eq("assessment_id", id).order("created_at"),
     db.from("risk_events").select("id,at,kind,note").eq("assessment_id", id).order("at"),
   ]);
-  const hazards = (hz ?? []) as unknown as (Hz & { hazard_reports: { report_id: string }[]; log_hazard_id: string | null; local_only: boolean })[]; const events = (ev ?? []) as E[];
+  const hazards = (hz ?? []) as unknown as (Hz & { hazard_reports: { report_id: string }[]; log_hazard_id: string | null; local_only: boolean; prefill_note: string | null })[]; const events = (ev ?? []) as E[];
   const study = a.kind !== "hazard_log";
   const [{ data: lg }, { data: mm }] = study ? await Promise.all([
     db.from("hazards").select("id,ref,title").in("id", hazards.map((h) => h.log_hazard_id).filter(Boolean) as string[]),
@@ -54,6 +56,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
 
       <div className="repgrid2">
         <div>
+          {draft && a.kind !== "hazard_log" && !hazards.length && mayEditRisk(s) && <RiskStart a={a as unknown as Parameters<typeof RiskStart>[0]["a"]} />}
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Hazards summary</span><span className="mini">hazard – consequence · pre → post mitigation{sch === "centrik" ? " · score" : ""}</span></div>
             <table className="tbl"><tbody>
@@ -63,7 +66,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 return (
                   <tr key={h.id} className={(h.proposed ? "hz-proposed" : "") + (h.status === "closed" ? " muted" : "")}>
                     <td style={{ width: 105 }} className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.proposed && <div className="mini">proposed</div>}{h.needs_review && <div className="mini red">to reassess</div>}</td>
-                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
+                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}{h.proposed && h.prefill_note && <div className="mini">🤝 {h.prefill_note}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
                       {study && !h.proposed && h.status !== "closed" && (h.log_hazard_id ? <div className="mini">📒 Hazard log: <Link className="underline mono" href={`/safe/risk/${h.log_hazard_id}`}>{logOf.get(h.log_hazard_id)?.ref ?? "linked"}</Link> {logOf.get(h.log_hazard_id)?.title}{canLink && <form action={unlinkLog} className="inline ml-2"><input type="hidden" name="id" value={h.id} /><button className="linkbtn mini">unlink</button></form>}</div>
                         : h.local_only ? <div className="mini">Kept local to this study (temporary)</div>
                         : <div className="mini mt-1">{(sugOf.get(h.id) ?? []).slice(0, 2).map((x) => <form key={x.id} action={linkToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="log_id" value={x.id} /><button className="btn" disabled={!canLink} title={x.why}>Link to {x.ref} · {x.title.slice(0, 40)} ({Math.round(x.score * 100)}%)</button></form>)}
@@ -150,6 +153,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
               {a.accepted_at && <p className="mb-2">✓ Decided by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
               {moc && a.status === "accepted" && a.moc_status === "approved" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="implemented" /><button className="btn primary">Mark the change as implemented</button></form>}
               {moc && a.moc_status === "implemented" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="closed" /><button className="btn primary">Close the MOC</button></form>}
+              {a.kind !== "hazard_log" && ["accepted", "archived"].includes(a.status) && mayEditRisk(s) && <form action={saveAsTemplate} className="mt-3 flex gap-2"><input type="hidden" name="id" value={a.id} /><input name="name" className="inp flex-1" style={{ marginTop: 0 }} placeholder="Template name (e.g. Ferry flight)" /><button className="btn">Save as a template</button></form>}
               {!draft && mayEditRisk(s) && !["archived", "cancelled"].includes(a.status) && <form action={reopenAssessment} className="mt-3 grid gap-2"><input type="hidden" name="id" value={a.id} />{mayAccept(s) && <input name="comment" className="inp" placeholder="Reason (AM overrule: scoring / decision changed)" />}<button className="btn">{mayAccept(s) ? "Overrule — new version" : "Reopen — new version"} (v{a.version + 1})</button></form>}
             </div>
           </section>
