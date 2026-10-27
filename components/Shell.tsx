@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
-import { ENT, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, type Module, type RoleKey } from "@/lib/nav";
+import { ENT, ENT_COLOR, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
 
 type Props = { session: Session; children: React.ReactNode };
@@ -89,6 +89,7 @@ export default function Shell({ session, children }: Props) {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar session={session} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
+        {session.entity === "ALL" && <div className="groupband"><b>Group view</b> — lists show every entity in your scope ({session.entities.join(" · ")}). Pick an entity at the top-left to work on its documents, projects and files.</div>}
         <main className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
@@ -119,25 +120,38 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
     { label: "Safety report", hint: "Safety — step 5" },
     { label: "Communication", hint: "Communication module" },
   ];
-  const chips = session.group ? ["ALL", ...session.entities] : session.entities;
+  // the working entity: one at a time, always shown in full at the top-left; group view only for group functions
+  const [entOpen, setEntOpen] = useState(false);
+  const choices = session.entities;
+  const cur = session.entity;
+  const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
+  const curSub = cur === "ALL" ? `all entities · ${choices.join(" · ")}` : `${cur} · ${ENT[cur]?.qual ?? ""} · ${ENT[cur]?.auth ?? ""}`;
   async function pick(ent: string) {
+    setEntOpen(false);
     await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });
     router.refresh();
   }
   return (
-    <header className="topbar">
+    <header className={"topbar ent-" + cur} style={{ borderBottomColor: ENT_COLOR[cur] ?? "var(--line)" }}>
+      <div className="relative">
+        <button type="button" className={"entblock " + cur} onClick={() => choices.length > 1 || session.group ? setEntOpen((v) => !v) : undefined} aria-expanded={entOpen} title={choices.length > 1 ? "Change the entity you work in" : undefined}>
+          <i className="entdot" style={{ background: ENT_COLOR[cur] }} />
+          <span className="enttext"><b>{curName}</b><small>{curSub}</small></span>
+          {(choices.length > 1 || session.group) && <span className="caret">▾</span>}
+        </button>
+        {entOpen && (
+          <div className="menu entmenu" onMouseLeave={() => setEntOpen(false)}>
+            <div className="mi muted">Work in</div>
+            {choices.map((e) => (
+              <button key={e} type="button" className={"mi entmi" + (cur === e ? " on" : "")} onClick={() => pick(e)}>
+                <i className="entdot" style={{ background: ENT_COLOR[e] }} /><span><b>{ENT[e]?.name ?? e}</b><small>{e} · {ENT[e]?.qual} · {ENT[e]?.auth}</small></span>
+              </button>
+            ))}
+            {session.group && <button type="button" className={"mi entmi" + (cur === "ALL" ? " on" : "")} onClick={() => pick("ALL")}><i className="entdot" style={{ background: ENT_COLOR.ALL }} /><span><b>Group view</b><small>lists across every entity — dashboards, projects, authority files, library</small></span></button>}
+          </div>
+        )}
+      </div>
       <div className="crumb"><b>{crumb[0]}</b>{crumb[1] && <> · <span>{crumb[1]}</span></>}</div>
-      {chips.length > 1 && (
-        <div className="chips">
-          {chips.map((e) => (
-            <button key={e} type="button" className={"ent " + e + (session.entity === e ? " on" : "")} onClick={() => pick(e)}
-              title={e === "ALL" ? "All entities in your scope" : `${ENT[e]?.name} · ${ENT[e]?.qual} · ${ENT[e]?.auth}`}>
-              {e === "ALL" ? "All" : e}
-            </button>
-          ))}
-        </div>
-      )}
-      {chips.length === 1 && <span className={"ent " + chips[0] + " on"}>{chips[0]}</span>}
       <div className="flex-1" />
       <div className="searchbox"><Icon name="search" size={14} /><span>Search</span><kbd>Ctrl K</kbd></div>
       {session.role !== "user" && (

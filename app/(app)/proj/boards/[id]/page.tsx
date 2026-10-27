@@ -9,6 +9,7 @@ import { STAGE_LABEL, STAGE_TONE, fr, today, type AuthorityFile } from "@/lib/au
 import { DEPARTMENTS, LINK_LABEL, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, departmentOf, isConditional, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, upstream, type Task, type TaskStatus } from "@/lib/projects";
 import { addTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startDraftForTask, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
+import EntityBand from "@/components/EntityBand";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "not_needed", "blocked"];
 
@@ -54,6 +55,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
   return (
     <>
+      <EntityBand entity={p.entity} current={s.entity} multi={s.group || s.entities.length > 1} what="project" />
       <PageHeader eyebrow={`Projects · ${p.entity} · ${p.template_code ?? "project"}`} title={p.title}
         sub={`${ENT[p.entity]?.name ?? p.entity}${pivotTxt ? ` · ${pivotTxt}` : ""} · owner ${p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"} · started ${fr(p.started_at)}${p.target_date ? ` · target ${fr(p.target_date)}` : ""}`}
         right={<><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")} style={{ alignSelf: "center" }}>{PROJECT_STATUS_LABEL[p.status]}</span><Link href="/proj/boards" className="btn">‹ Projects</Link></>} />

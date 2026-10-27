@@ -13,7 +13,7 @@ export default async function Rex({ searchParams }: { searchParams: Promise<{ en
   if (!s) redirect("/login");
   const { entity: q } = await searchParams;
   const ents = s.group ? ENTS4 : s.entities;
-  const entity = q && (q === "ALL" ? s.group : ents.includes(q)) ? q : s.entity;
+  const entity = s.entity;
   const db = supabaseAdmin();
   let fq = db.from("authority_files").select("*").in("stage", ["closed", "standby"]).order("closed_at", { ascending: false, nullsFirst: false }).limit(300);
   fq = entity === "ALL" ? fq.in("entity", ents) : fq.eq("entity", entity);
@@ -32,7 +32,6 @@ export default async function Rex({ searchParams }: { searchParams: Promise<{ en
   return (
     <>
       <PageHeader eyebrow="Projects · Closed & lessons learned" title="Closed projects and files" sub="Durations, rounds and lessons — the numbers that tell whether the one-round workflow holds." />
-      {ents.length > 1 && <div className="chips mb-4" style={{ display: "inline-flex" }}>{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={`/proj/rex?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Closed files" value={closed.length} />
         <Metric label="Approved in one round" value={`${oneRound} %`} tone={closed.length && oneRound < 80 ? "amber" : undefined} hint="target 100 %" />

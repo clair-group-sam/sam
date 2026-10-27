@@ -10,12 +10,12 @@ import { cancelProject, deleteProject } from "./actions";
 import { isTestData, TEST_PILL_TITLE } from "@/lib/testdata";
 
 /** Projects › Projects: every project of the entity (aircraft addition, NP change, new SPA…), its progress and what it waits for. */
-export default async function Projects({ searchParams }: { searchParams: Promise<{ entity?: string; status?: string }> }) {
+export default async function Projects({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
-  const { entity: q, status = "open" } = await searchParams;
+  const { status = "open" } = await searchParams;
   const ents = s.group ? ENTS4 : s.entities;
-  const entity = q && (q === "ALL" ? s.group : ents.includes(q)) ? q : s.entity;
+  const entity = s.entity;
   const db = supabaseAdmin();
   let pq = db.from("projects").select("*").order("created_at", { ascending: false });
   pq = entity === "ALL" ? pq.in("entity", ents) : pq.eq("entity", entity);
@@ -47,14 +47,13 @@ export default async function Projects({ searchParams }: { searchParams: Promise
     <>
       <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks — aircraft addition or removal, nominated person change, new approval… The manuals, authority files and certificates it needs are the real objects of S.A.M., linked to their task."
         right={<><Link href="/proj/auth" className="btn">Authority files</Link><Link href="/proj/boards/new" className="btn primary">+ New project</Link></>} />
-      {ents.length > 1 && <div className="chips mb-4" style={{ display: "inline-flex" }}>{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={`/proj/boards?entity=${e}&status=${status}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open projects" value={open.length} hint={testOpen ? `+ ${testOpen} test` : undefined} />
         <Metric label="Tasks late" value={open.reduce((n, r) => n + r.late, 0)} tone={open.some((r) => r.late) ? "red" : undefined} hint="due date passed, or started and over its duration" />
         <Metric label="Blocked" value={open.reduce((n, r) => n + r.blocked, 0)} tone={open.some((r) => r.blocked) ? "amber" : undefined} />
         <Metric label="Done this scope" value={`${open.reduce((n, r) => n + r.pr.done, 0)} / ${open.reduce((n, r) => n + r.pr.total, 0)}`} hint="tasks, open projects" />
       </div>
-      <div className="tabs mb-4">{[["open", "Open & on hold"], ["closed", "Closed & cancelled"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards?entity=${entity}&status=${k}`} className={"tab" + (status === k ? " on" : "")}>{l}</Link>)}</div>
+      <div className="tabs mb-4">{[["open", "Open & on hold"], ["closed", "Closed & cancelled"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards?status=${k}`} className={"tab" + (status === k ? " on" : "")}>{l}</Link>)}</div>
       <section className="card">
         <table className="tbl">
           <thead><tr><th style={{ width: 60 }}>Entity</th><th>Project</th><th style={{ width: 120 }}>Owner</th><th style={{ width: 170 }}>Progress</th><th>Next</th><th style={{ width: 120 }}>Projected end</th><th style={{ width: 110 }}>Status</th>{superadmin && <th style={{ width: 150 }} />}</tr></thead>

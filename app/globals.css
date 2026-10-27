@@ -567,3 +567,15 @@ tr.cf-free td{color:#8a98a6}
 /* ⋯ panels must escape their card and table */
 .card:has(details.more[open]),.tbl:has(details.more[open]){overflow:visible}
 details.more[open]{z-index:40}
+
+/* the working entity, always visible top-left; a coloured rule under the bar says where you are */
+.topbar{border-bottom-width:3px}
+.entblock{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 12px 5px 8px;cursor:pointer;min-width:240px;text-align:left;height:40px}
+.entblock:hover{background:var(--blue05)}
+.entdot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;display:inline-block}
+.enttext{display:flex;flex-direction:column;line-height:1.15;min-width:0}.enttext b{font-size:14px;color:var(--navy);white-space:nowrap}.enttext small{font-size:11px;color:var(--slate5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.entblock .caret{color:var(--slate5);font-size:11px;margin-left:auto}
+.entmenu{left:0;right:auto;width:360px}
+.entmi{display:flex;align-items:center;gap:10px}.entmi span{display:flex;flex-direction:column;line-height:1.15}.entmi small{font-size:11px;color:var(--slate5)}.entmi.on{background:var(--blue05)}
+.groupband{padding:6px 24px;font-size:12.5px;color:#7d166d;background:#faf3f9;border-bottom:1px solid #ecd9e8}
+.entband .btn{margin-left:8px}

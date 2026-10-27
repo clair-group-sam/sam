@@ -28,7 +28,6 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader eyebrow="Projects" title="New project" sub={`${ENT[entity]?.name ?? entity} · pick a template or start blank; phases and tasks can be changed afterwards.`} right={<Link href="/proj/boards" className="btn">‹ Projects</Link>} />
-      {ents.length > 1 && <div className="chips mb-4" style={{ display: "inline-flex" }}>{ents.map((e) => <Link key={e} href={`/proj/boards/new?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
       <div className="grid grid-cols-3 gap-4 items-start">
         <section className="card">
           <div className="ch"><span className="eyebrow">Template</span><span className="mini">{templates.length} for {entity}</span></div>
@@ -45,7 +44,8 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
         <section className="card col-span-2">
           <div className="ch"><span className="eyebrow">{chosen ? chosen.name : "Blank project"}</span></div>
           <form action={createProject} className="cb grid gap-3">
-            <input type="hidden" name="entity" value={entity} /><input type="hidden" name="template_code" value={chosen?.code ?? ""} />
+            <input type="hidden" name="template_code" value={chosen?.code ?? ""} />
+            {s.entity === "ALL" ? <label><span className="mini">Entity (group view: choose)</span><select name="entity" className="inp" defaultValue={entity} style={{ maxWidth: 320 }}>{ents.map((e) => <option key={e} value={e}>{ENT[e]?.name ?? e} ({e})</option>)}</select></label> : <input type="hidden" name="entity" value={entity} />}
             {chosen?.description && <p className="mini">{chosen.description}</p>}
             <label><span className="mini">Title</span><input name="title" className="inp" placeholder={chosen ? `${chosen.name} — …` : "What this project achieves"} /></label>
             {pivots.length > 0 && (

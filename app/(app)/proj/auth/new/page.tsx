@@ -31,9 +31,8 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
   return (
     <>
       <PageHeader eyebrow="Projects · Authority files" title="New authority file" sub={`${ENT[entity]?.name ?? entity} — ${ENT[entity]?.auth ?? ""}. The type sets the route, the checklist and the expected time at the authority.`} />
-      {ents.length > 1 && <div className="chips mb-4">{ents.map((e) => <Link key={e} href={`/proj/auth/new?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
       <form action={createFile} className="grid grid-cols-3 gap-4 items-start">
-        <input type="hidden" name="entity" value={entity} />
+        {s.entity === "ALL" ? <div className="mb-3"><label><span className="mini">Entity (group view: choose, the form reloads)</span><div className="flex gap-2 flex-wrap mt-1">{ents.map((e) => <Link key={e} href={`/proj/auth/new?entity=${e}`} className={"btn" + (e === entity ? " primary" : "")}>{ENT[e]?.name ?? e}</Link>)}</div></label><input type="hidden" name="entity" value={entity} /></div> : <input type="hidden" name="entity" value={entity} />}
         <section className="card col-span-2">
           <div className="ch"><span className="eyebrow">The file</span></div>
           <div className="cb grid grid-cols-2 gap-3">
