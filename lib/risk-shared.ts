@@ -1,8 +1,8 @@
 // Risk matrices of the group's MSMs (shared with the browser, no server import).
 // Likelihood 5 → 1 × severity A → E (ICAO Doc 9859). Two tolerability schemes:
 //  · "centrik" — AJD MSM §3.5.1 / ASJ MSM: zone by SCORE (green 1–10 acceptable, yellow 20–100 tolerable, red 300–2500 intolerable),
-//    scores as configured in Centrik (read on the AJD Risk matrix, 27/10/2026; 4E and 5E not displayed there → set to 2 and 4, green).
-//  · "icao" — ASF MSM Ed.10 §3.4 (and TEC until its MOE says otherwise): the ICAO tolerability table, no score.
+//    scores of the MSM matrix (AJD MSM §3.5.1 p.3-19 and ASJ MSM, identical to Centrik — checked 27/10/2026; column E = 1 throughout).
+//  · "icao" — ASF MSM Ed.10 §3.4 matrix (checked 27/10/2026, = ICAO tolerability table), no score; TEC until its CAE says otherwise.
 export const SEVERITIES = [
   { id: "A", label: "Catastrophic", hint: "multiple deaths, equipment destroyed" },
   { id: "B", label: "Hazardous", hint: "large reduction in safety margins, serious injury, major equipment damage" },
@@ -23,8 +23,8 @@ export const schemeOf = (entity?: string | null): Scheme => (entity === "AJD" ||
 export const MSM_REF: Record<string, string> = { AJD: "AJD MSM Iss 01 Rev 09 §3", ASJ: "ASJ MSM Iss 10 Rev 07 §3", ASF: "ASF MSM Ed.10 Rev 01 §3", TEC: "TEC — CAE (risk method to confirm)" };
 
 const SCORE: Record<string, number> = {
-  "5A": 2500, "5B": 1000, "5C": 300, "5D": 100, "5E": 4,
-  "4A": 1000, "4B": 300, "4C": 100, "4D": 40, "4E": 2,
+  "5A": 2500, "5B": 1000, "5C": 300, "5D": 100, "5E": 1,
+  "4A": 1000, "4B": 300, "4C": 100, "4D": 40, "4E": 1,
   "3A": 300, "3B": 100, "3C": 40, "3D": 10, "3E": 1,
   "2A": 100, "2B": 40, "2C": 10, "2D": 4, "2E": 1,
   "1A": 50, "1B": 20, "1C": 5, "1D": 2, "1E": 1,
