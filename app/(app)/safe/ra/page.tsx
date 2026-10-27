@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader, Metric } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { DOMAINS, KINDS, LIKELIHOODS, MSM_REF, RA_STATUS, SEVERITIES, mayEditRisk, msmChecks, riskIndex, riskLabel, riskScore, schemeOf, tolerability, tolTone, worstTol, type Hz, type Ra } from "@/lib/risk";
-import { createAssessment } from "../risk/actions";
+import { bulkAssessments, createAssessment } from "../risk/actions";
 import { RiskTabs } from "@/components/RiskTabs";
 import { toMatchCount } from "@/lib/risk-count";
 
@@ -47,6 +47,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
   const allLive = hazards.filter(live);
   const intoler = allLive.filter((h) => tolerability(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, schemeOf(h.entity)) === "intolerable").length;
   const edit = mayEditRisk(s);
+  const old = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10); // pre-ticked for closing: conducted more than 2 weeks ago
   return (
     <>
       <PageHeader eyebrow="Safety · Risk management" title="Risk assessments" sub={`One-off, dated assessments — their lasting hazards are linked to the hazard log · ${scope.map((e) => MSM_REF[e] ?? e).join(" · ")}`} />
@@ -84,7 +85,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
 
       <section className="card mb-5">
         <table className="tbl">
-          <thead><tr><th style={{ width: 120 }}>Number</th><th style={{ width: 55 }}>Entity</th><th>Assessment</th><th style={{ width: 70 }}>Hazards</th><th style={{ width: 150 }}>Highest pre → post</th><th style={{ width: 100 }}>Next due</th><th style={{ width: 150 }}>Status</th><th style={{ width: 80 }}>MSM</th></tr></thead>
+          <thead><tr>{edit && sp.st !== "archived" && <th style={{ width: 30 }} title="Select to close" />}<th style={{ width: 120 }}>Number</th><th style={{ width: 55 }}>Entity</th><th>Assessment</th><th style={{ width: 70 }}>Hazards</th><th style={{ width: 150 }}>Highest pre → post</th><th style={{ width: 100 }}>Next due</th><th style={{ width: 150 }}>Status</th><th style={{ width: 80 }}>MSM</th></tr></thead>
           <tbody>
             {rows.map((a) => {
               const hs = (byRa.get(a.id) ?? []).filter(live); const sc = schemeOf(a.entity);
@@ -93,6 +94,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
               const ch = msmChecks(a, (byRa.get(a.id) ?? []) as Hz[]); const okN = ch.filter((c) => c.ok).length;
               return (
                 <tr key={a.id}>
+                  {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" defaultChecked={!!a.conducted_on && a.conducted_on < old && a.status !== "validated"} title="Close — case over" /></td>}
                   <td className="mono"><Link className="underline" href={`/safe/risk/a/${a.id}`}>{a.number}</Link></td>
                   <td><span className={"ent " + a.entity}>{a.entity}</span></td>
                   <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? ` · ${a.domain}` : ""}{a.top_risk ? " · top risk" : ""}{a.source !== "sam" ? ` · from ${a.source}` : ""}{hs.some((h) => h.needs_review) ? " · ⚠ to reassess" : ""}</div></td>
@@ -107,7 +109,8 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
           </tbody>
         </table>
       </section>
-      <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: sp.st === "archived" ? undefined : "archived" })}>{sp.st === "archived" ? "Back to current assessments" : "Archived and cancelled"}</Link></p>
+      {edit && sp.st !== "archived" && rows.length > 0 && <form id="bulk-ra" action={bulkAssessments} className="flex gap-2 items-center mb-3"><input type="hidden" name="op" value="close" /><button className="btn">Close the ticked assessments — case over</button><span className="mini">pre-ticked: conducted more than 2 weeks ago (not the ones waiting for the AM). They stay readable under “Closed”.</span></form>}
+      <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: sp.st === "archived" ? undefined : "archived" })}>{sp.st === "archived" ? "Back to current assessments" : "Closed and cancelled assessments"}</Link></p>
 
       {edit && (
         <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New risk assessment</span><span className="mini">hazards are added on its page — SAM checks them against the hazard log</span></summary>
