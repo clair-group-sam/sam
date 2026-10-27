@@ -563,3 +563,7 @@ tr.cf-free td{color:#8a98a6}
 .rmx.heat .red .cell{background:#fbe3df;color:#a3271b}.rmx.heat .amber .cell{background:#fff1d6;color:#8a5a00}.rmx.heat .green .cell{background:#e3f4e8;color:#1e7a3c}
 .checks li{display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:12.5px}.checks li:first-child{border-top:0}
 .checks .ok{color:#1e7a3c;font-weight:700}.checks .ko{color:#a3271b;font-weight:700}
+
+/* ⋯ panels must escape their card and table */
+.card:has(details.more[open]),.tbl:has(details.more[open]){overflow:visible}
+details.more[open]{z-index:40}

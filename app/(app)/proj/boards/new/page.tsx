@@ -16,8 +16,14 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const ents = s.group ? ENTS4 : s.entities;
   const entity = sp.entity && ents.includes(sp.entity) ? sp.entity : s.entity !== "ALL" && ents.includes(s.entity) ? s.entity : ents[0];
-  const templates = (await loadTemplates(supabaseAdmin())).filter((t) => t.entities.includes(entity));
+  const db = supabaseAdmin();
+  const templates = (await loadTemplates(db)).filter((t) => t.entities.includes(entity));
   const chosen = templates.find((t) => t.code === sp.template) ?? null;
+  // recently used: the templates of the last projects opened in this scope, most recent first
+  const { data: recentRows } = await db.from("projects").select("template_code,created_at").in("entity", ents).not("template_code", "is", null).order("created_at", { ascending: false }).limit(30);
+  const recent: typeof templates = [];
+  for (const r of (recentRows ?? []) as { template_code: string }[]) { const t = templates.find((x) => x.code === r.template_code); if (t && !recent.includes(t)) recent.push(t); if (recent.length >= 3) break; }
+  const others = templates.filter((t) => !recent.includes(t));
   const pivots = chosen ? chosen.pivots : ["aircraft_type", "aircraft_reg", "np_post_code"];
   return (
     <>
@@ -27,8 +33,12 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
         <section className="card">
           <div className="ch"><span className="eyebrow">Template</span><span className="mini">{templates.length} for {entity}</span></div>
           <div className="cb grid gap-2">
-            <Link href={`/proj/boards/new?entity=${entity}`} className={"tplrow" + (!chosen ? " on" : "")}><b>Blank project</b><span className="mini">One phase, add your own tasks.</span></Link>
-            {templates.map((t) => <Link key={t.code} href={`/proj/boards/new?entity=${entity}&template=${t.code}`} className={"tplrow" + (chosen?.code === t.code ? " on" : "")}><b>{t.name}</b><span className="mini">{t.code} · {t.phases.length} phases · {t.tasks.length} tasks</span></Link>)}
+            {recent.length > 0 && <><div className="eyebrow">Recently used</div>
+              {recent.map((t) => <Link key={t.code} href={`/proj/boards/new?entity=${entity}&template=${t.code}`} className={"tplrow" + (chosen?.code === t.code ? " on" : "")}><b>{t.name}</b><span className="mini">{t.code} · {t.phases.length} phases · {t.tasks.length} tasks</span></Link>)}</>}
+            <div className="eyebrow mt-1">Blank</div>
+            <Link href={`/proj/boards/new?entity=${entity}`} className={"tplrow" + (!chosen ? " on" : "")}><b>Blank project</b><span className="mini">Add your own tasks and applications.</span></Link>
+            {others.length > 0 && <><div className="eyebrow mt-1">All templates</div>
+              {others.map((t) => <Link key={t.code} href={`/proj/boards/new?entity=${entity}&template=${t.code}`} className={"tplrow" + (chosen?.code === t.code ? " on" : "")}><b>{t.name}</b><span className="mini">{t.code} · {t.phases.length} phases · {t.tasks.length} tasks</span></Link>)}</>}
             <p className="mini">Templates are maintained in the database (project_templates); a change applies to projects opened afterwards.</p>
           </div>
         </section>

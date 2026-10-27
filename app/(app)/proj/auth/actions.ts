@@ -202,3 +202,22 @@ export async function removeAttachment(formData: FormData) {
   await event(db, s, id, "attachment", `Removed: ${att.name}`);
   paths(id);
 }
+
+/** Super admin only: delete an authority file that never left the house (draft / compliance / ready, no portal reference). Attachments go with it. */
+export async function deleteFile(formData: FormData) {
+  const id = str(formData, "id");
+  const { s, db, f } = await guard(id);
+  if (!s.roles.includes("SUPERADMIN")) throw new Error("Super admin only");
+  if (formData.get("confirm") !== "on") throw new Error("Tick the confirmation to delete");
+  if (f.portal_ref || !["draft", "compliance", "signing", "ready", "standby"].includes(f.stage)) throw new Error("A file that reached the authority is never deleted — put it on standby or close it.");
+  const { data: atts } = await db.from("authority_file_attachments").select("path").eq("file_id", id);
+  const keys = ((atts ?? []) as { path: string | null }[]).map((a) => a.path).filter((x): x is string => !!x && x.startsWith("evidence/")).map((x) => x.slice(9));
+  if (keys.length) await db.storage.from("evidence").remove(keys);
+  await db.from("tasks").update({ status: "superseded" }).eq("ref_id", id).eq("status", "open");
+  await db.from("project_tasks").update({ link_id: null, status: "todo", updated_at: new Date().toISOString() }).eq("link_kind", "authority_file").eq("link_id", id);
+  await db.from("authority_rounds").delete().eq("file_id", id).is("revision_id", null);
+  await audit(db, s, f, "authority_file_deleted", { title: f.title, type: f.type_code, stage: f.stage });
+  await db.from("authority_files").delete().eq("id", id);   // items, events, attachments: on delete cascade
+  paths();
+  redirect("/proj/auth");
+}

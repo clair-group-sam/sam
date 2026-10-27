@@ -7,7 +7,7 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
 import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
-import { addAttachment, addItem, addNote, addRound, moveStage, removeAttachment, saveFile, toggleItem } from "../actions";
+import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, removeAttachment, saveFile, toggleItem } from "../actions";
 
 const KIND_ICON: Record<string, string> = { created: "＋", stage: "→", note: "✎", item: "☑", submitted: "⇧", remarks: "✉", reply: "↩", decision: "✔", attachment: "📎", link: "🔗", task: "⏰", mail: "✉" };
 
@@ -198,6 +198,13 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
             </form>
           </section>
 
+          {s.roles.includes("SUPERADMIN") && !f.portal_ref && ["draft", "compliance", "signing", "ready", "standby"].includes(f.stage) && (
+            <details className="card"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">Delete this file</span><span className="mini">super admin · never submitted</span></summary>
+              <form action={deleteFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />
+                <label className="mini flex items-center gap-2"><input type="checkbox" name="confirm" /> I confirm — checklist, journal and attachments are deleted for good; a project task bound to it goes back to “to do”.</label>
+                <div><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></div></form>
+            </details>
+          )}
           {/* close-out */}
           {type && type.closeout.length > 0 && (
             <section className="card">
