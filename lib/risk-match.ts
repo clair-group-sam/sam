@@ -53,9 +53,9 @@ export async function matchPending(entity: string, personId: string | null, opts
   const { data } = await q;
   let rows = (data ?? []) as unknown as { id: string; title: string; consequence: string | null; risk_assessments: { kind: string; number: string; name: string } }[];
   if (!opts.force && !opts.hazardIds?.length) {
-    // already checked = checked after the newest hazard of the log (an import adds log hazards: earlier checks are stale)
-    const { data: last } = await db.from("hazards").select("created_at,risk_assessments!inner(kind)").eq("entity", entity).eq("risk_assessments.kind", "hazard_log").order("created_at", { ascending: false }).limit(1);
-    const since = ((last ?? []) as { created_at: string }[])[0]?.created_at ?? "1970-01-01";
+    // already checked = checked after the latest change of the log (an import adds or rewrites log hazards: earlier checks are stale)
+    const { data: last } = await db.from("hazards").select("updated_at,risk_assessments!inner(kind)").eq("entity", entity).eq("risk_assessments.kind", "hazard_log").order("updated_at", { ascending: false }).limit(1);
+    const since = ((last ?? []) as { updated_at: string }[])[0]?.updated_at ?? "1970-01-01"; // newest change in the log (import, edit)
     const seenIds = new Set<string>();
     for (let i = 0; i < rows.length; i += 300) { const { data: done } = await db.from("risk_matches").select("subject_id").eq("subject_kind", "hazard").gte("ran_at", since).in("subject_id", rows.slice(i, i + 300).map((r) => r.id)); for (const d of (done ?? []) as { subject_id: string }[]) seenIds.add(d.subject_id); }
     rows = rows.filter((r) => !seenIds.has(r.id));
