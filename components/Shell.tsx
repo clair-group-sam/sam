@@ -146,12 +146,12 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
     router.refresh();
   }
   return (
-    <header className={"topbar ent-" + cur} style={{ borderBottomColor: ENT_COLOR[cur] ?? "var(--line)" }}>
+    <header className={"topbar ent-" + cur} style={{ borderBottomColor: ENT_COLOR[cur] ?? "var(--line)", ["--entc" as string]: ENT_COLOR[cur] ?? "#0b2a4a" } as React.CSSProperties}>
       <div className="relative">
         <button type="button" className={"entblock " + cur} onClick={() => choices.length > 1 || session.group ? setEntOpen((v) => !v) : undefined} aria-expanded={entOpen} title={choices.length > 1 ? "Change the entity you work in" : undefined}>
-          <i className="entdot" style={{ background: ENT_COLOR[cur] }} />
-          <span className="enttext"><b>{curName}</b><small>{curSub}</small></span>
-          {(choices.length > 1 || session.group) && <span className="caret">▾</span>}
+          <span className="entcode">{cur === "ALL" ? "ALL" : cur}</span>
+          <span className="enttext"><em>Working in</em><b>{curName}</b><small>{curSub}</small></span>
+          {(choices.length > 1 || session.group) && <span className="caret">Change ▾</span>}
         </button>
         {entOpen && (
           <div className="menu entmenu" onMouseLeave={() => setEntOpen(false)}>
