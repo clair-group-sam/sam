@@ -68,20 +68,35 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   const testRows = rows.length - realRows.length;
   const published = realRows.filter((r) => r.current).length, drafts = realRows.filter((r) => r.workings.length).length, never = realRows.filter((r) => !r.current).length;
 
-  let hits: { manual_id: string; entity: string; code: string; title: string; ref: string; stitle: string | null; snippet: string; also?: string[] }[] = [];
+  // Search: the manuals of the working entity, or every manual of the scope in group view; published text only. Results grouped by manual,
+  // each with the chapters where the words are found (one line per passage, a passage repeated in several chapters shown once).
+  type Hit = { manual_id: string; entity: string; code: string; title: string; ref: string; stitle: string | null; snippet: string; also: string[] };
+  type Group = { manual_id: string; entity: string; code: string; title: string; titleMatch: boolean; hits: Hit[] };
+  let groups: Group[] = []; let nHits = 0;
   if (q.trim()) {
     const sb = await supabaseServer();
-    const { data } = await sb.from("revision_sections").select("ref,title,body_text,revision_id,revisions!inner(manual_id,step,manuals!inner(code,title,entity))").textSearch("body_text", q, { type: "websearch", config: "simple" }).limit(30);
-    type Hit = { ref: string; title: string | null; body_text: string; revision_id: string; revisions: { manual_id: string; step: string; manuals: { code: string; title: string; entity: string } } };
-    // FB-007 · the same passage (a table repeated in several chapters) is shown once, with the chapters it sits in
-    hits = ((data ?? []) as unknown as Hit[]).filter((h) => (s.entity === "ALL" || h.revisions.manuals.entity === s.entity) && (h.revisions.step === "published" || h.revisions.step === "repository")).map((h) => {
-      const i = h.body_text.toLowerCase().indexOf(q.toLowerCase().split(" ")[0]);
-      return { manual_id: h.revisions.manual_id, entity: h.revisions.manuals.entity, code: h.revisions.manuals.code, title: h.revisions.manuals.title, ref: h.ref, stitle: h.title, snippet: h.body_text.slice(Math.max(0, i - 80), i + 160).replace(/\s+/g, " ") };
-    }).reduce((acc, h) => {
-      const k = `${h.manual_id}|${h.snippet}`; const prev = acc.find((x) => `${x.manual_id}|${x.snippet}` === k);
-      if (prev) { prev.also = [...(prev.also ?? []), h.ref]; return acc; }
-      return [...acc, { ...h, also: [] as string[] }];
-    }, [] as (typeof hits[number] & { also?: string[] })[]);
+    let qq = sb.from("revision_sections").select("ref,title,body_text,revision_id,revisions!inner(manual_id,step,manuals!inner(code,title,entity))").textSearch("body_text", q, { type: "websearch", config: "simple" }).in("revisions.step", ["published", "repository"]);
+    qq = s.entity === "ALL" ? (s.group ? qq : qq.in("revisions.manuals.entity", s.entities)) : qq.eq("revisions.manuals.entity", s.entity);
+    const { data } = await qq.limit(400);
+    type Row = { ref: string; title: string | null; body_text: string; revision_id: string; revisions: { manual_id: string; step: string; manuals: { code: string; title: string; entity: string } } };
+    const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !/^(or|and|et|ou)$/.test(w)).map((w) => w.replace(/^[-"]+|"+$/g, ""));
+    const byM = new Map<string, Group>();
+    for (const h of (data ?? []) as unknown as Row[]) {
+      const m = h.revisions.manuals; const low = h.body_text.toLowerCase();
+      const i = Math.max(0, Math.min(...words.map((w) => { const k = low.indexOf(w); return k < 0 ? Infinity : k; })));
+      const snippet = h.body_text.slice(Math.max(0, (Number.isFinite(i) ? i : 0) - 80), (Number.isFinite(i) ? i : 0) + 170).replace(/\s+/g, " ");
+      if (!byM.has(h.revisions.manual_id)) byM.set(h.revisions.manual_id, { manual_id: h.revisions.manual_id, entity: m.entity, code: m.code, title: m.title, titleMatch: false, hits: [] });
+      const g = byM.get(h.revisions.manual_id)!; const dup = g.hits.find((x) => x.snippet === snippet);
+      if (dup) dup.also.push(h.ref); else g.hits.push({ manual_id: h.revisions.manual_id, entity: m.entity, code: m.code, title: m.title, ref: h.ref, stitle: h.title, snippet, also: [] });
+    }
+    // manuals whose code or title matches come first, even without a passage
+    const ql = q.toLowerCase();
+    for (const r of realRows) if (`${r.manual.code} ${r.manual.title}`.toLowerCase().includes(ql) && (s.entity === "ALL" || r.manual.entity === s.entity)) {
+      const g = byM.get(r.manual.id) ?? { manual_id: r.manual.id, entity: r.manual.entity, code: r.manual.code, title: r.manual.title, titleMatch: true, hits: [] }; g.titleMatch = true; byM.set(r.manual.id, g);
+    }
+    const nat = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+    groups = [...byM.values()].map((g) => ({ ...g, hits: g.hits.sort((x, y) => nat(x.ref, y.ref)) })).sort((x, y) => Number(y.titleMatch) - Number(x.titleMatch) || y.hits.length - x.hits.length || nat(x.code, y.code));
+    nHits = groups.reduce((n, g) => n + g.hits.length, 0);
   }
   const scope = s.entity === "ALL" ? "all entities" : `${ENT[s.entity]?.name} (${s.entity})`;
   const famColor = (name: string) => FAMILY_COLORS[name.trim()[0]] ?? "#5b7183";
@@ -136,11 +151,20 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       </form>
       {q && (
         <section className="card mb-5">
-          <div className="ch"><span className="eyebrow">{hits.length} passage{hits.length === 1 ? "" : "s"} for “{q}” in published manuals</span></div>
-          <table className="tbl"><tbody>
-            {hits.map((h, i) => (<tr key={i}><td className="mono" style={{ width: 190 }}><span className={"ent " + h.entity}>{h.entity}</span> {h.code} · {h.ref}</td><td><Link href={`/docs/manual/${h.manual_id}?sec=${encodeURIComponent(h.ref)}&q=${encodeURIComponent(q)}`}><b>{h.stitle ?? h.ref}</b></Link>{h.also?.length ? <span className="mini"> · also in {h.also.join(", ")}</span> : null}<div className="mini">…{h.snippet}…</div></td></tr>))}
-            {!hits.length && <tr><td className="p-5 text-slate6">No passage found.</td></tr>}
-          </tbody></table>
+          <div className="ch"><span className="eyebrow">“{q}” · {groups.length} manual{groups.length === 1 ? "" : "s"} · {nHits} passage{nHits === 1 ? "" : "s"}</span><span className="mini">published text · {s.entity === "ALL" ? "every manual of the group" : `manuals of ${ENT[s.entity]?.name ?? s.entity}`}</span></div>
+          <div className="srch">
+            {groups.map((g) => {
+              const href = (ref?: string) => `/docs/manual/${g.manual_id}?${ref ? `sec=${encodeURIComponent(ref)}&` : ""}q=${encodeURIComponent(q)}`;
+              return (
+                <details key={g.manual_id} className="srch-m" open={groups.length <= 6 || g.titleMatch}>
+                  <summary><span className={"ent " + g.entity}>{g.entity}</span><Link href={href()} className="srch-t"><b>{g.code}</b> {g.title}</Link><span className="mini ml-auto">{g.hits.length ? `${g.hits.length} passage${g.hits.length === 1 ? "" : "s"}` : "title"}</span></summary>
+                  {g.hits.length > 0 && <ul>{g.hits.slice(0, 12).map((h, i) => (
+                    <li key={i}><Link href={href(h.ref)}><span className="mono">{h.ref}</span> <b>{h.stitle ?? ""}</b></Link>{h.also.length ? <span className="mini"> · also in {h.also.join(", ")}</span> : null}<div className="mini">…{h.snippet}…</div></li>))}
+                    {g.hits.length > 12 && <li><Link className="underline mini" href={href()}>+ {g.hits.length - 12} more in {g.code} — open the manual with the search</Link></li>}</ul>}
+                </details>);
+            })}
+            {!groups.length && <p className="p-5 text-slate6">Nothing found in the published manuals{s.entity === "ALL" ? "" : ` of ${ENT[s.entity]?.name ?? s.entity} — try the group view to search every manual`}.</p>}
+          </div>
         </section>
       )}
       {!q && (toRead.length > 0 || favs.length > 0 || recent.length > 0) && (

@@ -573,23 +573,22 @@ details.more[open]{z-index:40}
 /* Top bar = the working entity (UX-04): the whole bar in its colour (AJD blue, ASJ green, ASF gold, TEC rust, group purple).
    Left: who you work for (code badge, name, qualification · authority) and a one-click switch; centre: search; right: Create, ERP, you.
    No breadcrumb here — the page header already says where you are. */
-.topbar{height:60px;gap:16px;background:color-mix(in srgb,var(--entc,#0b2a4a) 90%,#000);border-bottom:0;color:#fff;box-shadow:inset 0 -1px 0 rgba(0,0,0,.12)}
+.topbar{height:60px;gap:16px;color:#fff;border-bottom:0;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--entc,#0b2a4a) 25%,transparent);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--entc,#0b2a4a) 90%,#000) 0%,var(--entc,#0b2a4a) 30%,color-mix(in srgb,var(--entc,#0b2a4a) 55%,#fff) 52%,color-mix(in srgb,var(--entc,#0b2a4a) 12%,#fff) 72%,color-mix(in srgb,var(--entc,#0b2a4a) 5%,#fff) 100%)}
 .entid{display:flex;align-items:center;gap:12px;min-width:0;flex:0 1 auto;width:250px} /* fixed width: the switch stays in place whatever the entity */
 .entcode{background:#fff;color:var(--entc,#0b2a4a);font-weight:800;font-size:13px;letter-spacing:.06em;border-radius:8px;padding:0 10px;height:34px;display:flex;align-items:center;flex:0 0 auto;box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .entdot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;display:inline-block}
-.enttext{display:flex;flex-direction:column;line-height:1.2;min-width:0}.enttext b{font-size:17px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.005em}.enttext small{font-size:11.5px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.entswitch{display:flex;gap:2px;padding:3px;border-radius:9px;background:rgba(0,0,0,.18);flex:0 0 auto;margin-left:4px}
-.entswitch button{border:0;background:transparent;color:rgba(255,255,255,.82);font:700 11.5px/1 inherit;letter-spacing:.06em;padding:7px 10px;border-radius:7px;cursor:pointer}
-.entswitch button:hover{background:rgba(255,255,255,.14);color:#fff}
+.enttext{display:flex;flex-direction:column;line-height:1.2;min-width:0}.enttext b{font-size:17px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.005em}.enttext small{font-size:11.5px;color:rgba(255,255,255,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entswitch{display:flex;gap:2px;padding:3px;border-radius:9px;background:rgba(0,0,0,.2);flex:0 0 auto;margin-left:4px}
+.entswitch button{border:0;background:transparent;color:rgba(255,255,255,.88);font:700 11.5px/1 inherit;letter-spacing:.06em;padding:7px 10px;border-radius:7px;cursor:pointer}
+.entswitch button:hover{background:rgba(255,255,255,.16);color:#fff}
 .entswitch button.on{background:#fff;color:var(--entc,#0b2a4a);cursor:default;box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .topsearch{flex:1 1 auto;display:flex;justify-content:center;min-width:0}
-.topbar .searchbox{width:100%;max-width:440px;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:rgba(255,255,255,.85);padding:8px 12px}
-.topbar .searchbox input{color:#fff;flex:1;width:auto;min-width:0}.topbar .searchbox input::placeholder{color:rgba(255,255,255,.72)}.topbar .searchbox:focus-within{background:#fff;border-color:#fff;color:var(--slate5)}.topbar .searchbox:focus-within input{color:var(--navy)}
-.topbar .searchbox kbd{background:rgba(255,255,255,.2);color:#fff}.topbar .searchbox:focus-within kbd{background:var(--blue1);color:var(--slate6)}
-.topbar .btn.primary{background:#fff;color:var(--entc,#0b2a4a);border-color:#fff}
-.topbar .btn.erp{border-color:rgba(255,255,255,.85)}
-.topbar .user{color:#fff;padding-left:14px;border-left:1px solid rgba(255,255,255,.22)}.topbar .user .who small{color:rgba(255,255,255,.78)}.topbar .user .caret{color:rgba(255,255,255,.85)}
-.topbar .user .avatar{background:#fff;color:var(--entc,#0b2a4a)}
+.topbar .searchbox{width:100%;max-width:440px;background:#fff;border-color:color-mix(in srgb,var(--entc,#0b2a4a) 25%,#fff);color:var(--slate5);padding:8px 12px;box-shadow:0 1px 2px rgba(13,42,63,.06)}
+.topbar .searchbox input{color:var(--navy);flex:1;width:auto;min-width:0}.topbar .searchbox:focus-within{border-color:var(--entc,#0b2a4a);box-shadow:0 0 0 3px color-mix(in srgb,var(--entc,#0b2a4a) 18%,transparent)}
+.topbar .btn.primary{background:var(--entc,#0b2a4a);color:#fff;border-color:var(--entc,#0b2a4a)}
+.topbar .user{color:var(--navy);padding-left:14px;border-left:1px solid color-mix(in srgb,var(--entc,#0b2a4a) 20%,#fff)}
+.topbar .user .avatar{background:var(--entc,#0b2a4a);color:#fff}
 .entmenu{left:0;right:auto;width:360px}
 .entmi{display:flex;align-items:center;gap:10px}.entmi span{display:flex;flex-direction:column;line-height:1.15}.entmi small{font-size:11px;color:var(--slate5)}.entmi.on{background:var(--blue05)}
 .groupband{padding:6px 24px;font-size:12.5px;color:#7d166d;background:#faf3f9;border-bottom:1px solid #ecd9e8}
@@ -609,3 +608,22 @@ details.more[open]{z-index:40}
   .grid-cols-4,.grid-cols-3,.grid-cols-2{grid-template-columns:1fr !important}
   .sub{width:170px}
 }
+
+/* every button answers the click: slight press, quick transition, visible focus for the keyboard */
+button,.btn,a.btn,summary,.linkbtn,[role="button"]{transition:transform .08s ease,box-shadow .15s ease,background-color .15s ease,filter .15s ease}
+button:not(:disabled):active,.btn:active,a.btn:active,[role="button"]:active{transform:translateY(1px) scale(.97);filter:brightness(.94)}
+.btn:not(:disabled):hover{filter:brightness(1.03);box-shadow:0 1px 3px rgba(13,42,63,.12)}
+button:disabled,.btn[disabled]{opacity:.55;cursor:not-allowed}
+button:focus-visible,.btn:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* a form being sent: its submit button shows it is working */
+form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([type]){opacity:.7;cursor:progress}
+
+/* library search: results by manual, chapters inside */
+.srch{padding:6px 10px 12px}
+.srch-m{border:1px solid var(--line);border-radius:10px;margin:8px 0;background:#fff}
+.srch-m summary{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;list-style:none}.srch-m summary::-webkit-details-marker{display:none}
+.srch-m summary::before{content:"▸";color:var(--slate5);font-size:11px;transition:transform .15s}.srch-m[open] summary::before{transform:rotate(90deg)}
+.srch-t{font-size:14px}.srch-t:hover{text-decoration:underline}
+.srch-m ul{margin:0;padding:0 12px 10px 34px;list-style:none;border-top:1px solid var(--line)}
+.srch-m li{padding:8px 0;border-bottom:1px dashed var(--line)}.srch-m li:last-child{border-bottom:0}
+.srch-m li a:hover b{text-decoration:underline}

@@ -20,6 +20,16 @@ export default function Shell({ session, children }: Props) {
   const inRare = rare.some((m) => m.id === mod);
   const [more, setMore] = useState(inRare);
   useEffect(() => { if (inRare) setMore(true); }, [inRare]);
+  // every form shows it is working once sent (its submit button dims, cursor "progress") until the page answers
+  useEffect(() => {
+    const on = (e: Event) => { const f = e.target as HTMLFormElement; if (f?.tagName !== "FORM" || f.method === "get") return; f.setAttribute("aria-busy", "true");
+      const t0 = Date.now(); const done = () => { f.removeAttribute("aria-busy"); mo.disconnect(); };
+      const mo = new MutationObserver(() => { if (Date.now() - t0 > 400) done(); }); // the page re-rendered with the answer
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true }); window.setTimeout(done, 20000); };
+    document.addEventListener("submit", on, true);
+    return () => document.removeEventListener("submit", on, true);
+  }, []);
+  useEffect(() => { document.querySelectorAll('form[aria-busy="true"]').forEach((f) => f.removeAttribute("aria-busy")); }, [path]);
   // compact mode: rail = icons only, sub-menu hidden; both expand on hover as overlays. Remembered per browser.
   const [compact, setCompact] = useState(false);
   // hover with a short opening delay (no accidental flashes) and a longer closing delay (smooth exit)
