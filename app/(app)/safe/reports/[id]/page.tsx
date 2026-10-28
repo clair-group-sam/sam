@@ -12,7 +12,7 @@ import { ACTION_STATUS } from "@/lib/actions-shared";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
 
 export const maxDuration = 60;
-type Rep = { id: string; entity: string; received_at: string; event_date: string | null; event_time_utc: string | null; aircraft: string | null; flight_ref: string | null; phase: string | null; location: string | null; headline: string; headline_en: string | null; narrative: string; narrative_en: string | null; complements: Record<string, string>; contributing: string | null; anonymous: boolean; reporter_person: string | null; status: string; language: string | null; feedback: string | null; mor_ref: string | null; mor_filed_at: string | null };
+type Rep = { id: string; entity: string; received_at: string; event_date: string | null; event_time_utc: string | null; aircraft: string | null; flight_ref: string | null; phase: string | null; location: string | null; headline: string; headline_en: string | null; narrative: string; narrative_en: string | null; complements: Record<string, string>; contributing: string | null; anonymous: boolean; reporter_person: string | null; status: string; language: string | null; feedback: string | null; mor_ref: string | null; mor_filed_at: string | null; source?: string; external_no?: string | null; report_type?: string | null; reporter_name?: string | null; source_erc?: number | null; occurrence_class?: string | null; risk_category?: string | null; event_type?: string | null; investigation?: string | null; findings?: string | null; closed_by_name?: string | null; hazard_label?: string | null };
 type An = { adrep: string[]; primary_hazard: string | null; erc_outcome: string | null; erc_barriers: string | null; erc_value: number | null; erc_override_by: string | null; mor_status: string | null; mor_basis: string | null; mor_draft: string | null; questions: string[]; suggested_actions: string[]; summary: string | null; confirmed_at: string | null; ran_at: string | null; error: string | null };
 type Ev = { id: number; at: string; kind: string; note: string | null; to_reporter: boolean };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -62,7 +62,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <div className="repgrid2">
         <div>
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">The report, as sent</span><span className="mini">{r.anonymous ? "anonymous" : who ? `${who.display_name}${who.job_title ? " · " + who.job_title : ""}` : seesReporter(s) ? "reporter not found" : "reporter identity: SM / FSO only"}</span></div>
+            <div className="ch"><span className="eyebrow">The report, as sent</span><span className="mini">{r.source && r.source !== "sam" ? (seesReporter(s) ? (r.reporter_name ?? (r.anonymous ? "anonymous" : "—")) + " · " : "") + `imported from Centrik · ${r.external_no ?? ""}` : r.anonymous ? "anonymous" : who ? `${who.display_name}${who.job_title ? " · " + who.job_title : ""}` : seesReporter(s) ? "reporter not found" : "reporter identity: SM / FSO only"}</span></div>
             <div className="cb">
               <table className="tbl mb-3"><tbody>
                 <tr><td className="mini" style={{ width: 130 }}>When</td><td>{r.event_date ?? "—"} {r.event_time_utc ? r.event_time_utc.slice(0, 5) + " UTC" : ""}</td></tr>
@@ -75,6 +75,25 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               {translated && <details className="mt-4"><summary className="mini underline cursor-pointer">Original text ({r.language})</summary><div className="narr mt-2">{r.narrative}</div></details>}
             </div>
           </section>
+
+          {r.source && r.source !== "sam" && (
+            <section className="card mb-4">
+              <div className="ch"><span className="eyebrow">As recorded in Centrik</span><span className="mini">report {r.external_no} · read-only history</span></div>
+              <div className="cb">
+                <table className="tbl mb-3"><tbody>
+                  {r.report_type && <tr><td className="mini" style={{ width: 150 }}>Report type</td><td>{r.report_type}</td></tr>}
+                  {r.source_erc != null && <tr><td className="mini">ERC (Centrik)</td><td><span className={"pill " + (r.source_erc >= 300 ? "red" : r.source_erc >= 20 ? "amber" : "green")}>{r.source_erc}</span></td></tr>}
+                  {r.occurrence_class && <tr><td className="mini">Occurrence class</td><td>{r.occurrence_class}</td></tr>}
+                  {r.risk_category && <tr><td className="mini">Risk category</td><td>{r.risk_category}</td></tr>}
+                  {r.event_type && <tr><td className="mini">Event type</td><td>{r.event_type}</td></tr>}
+                  {r.hazard_label && <tr><td className="mini">Risk register</td><td>{r.hazard_label}</td></tr>}
+                  {r.closed_by_name && <tr><td className="mini">Closed by</td><td>{r.closed_by_name}</td></tr>}
+                </tbody></table>
+                {r.investigation && <><div className="eyebrow mb-1">Investigation</div><div className="narr mb-3">{r.investigation}</div></>}
+                {r.findings && <><div className="eyebrow mb-1">Findings and observations</div><div className="narr">{r.findings}</div></>}
+              </div>
+            </section>
+          )}
 
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Journal</span><span className="mini">append-only · ✉ = seen by the reporter</span></div>
