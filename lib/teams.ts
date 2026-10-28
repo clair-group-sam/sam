@@ -30,7 +30,7 @@ export async function botToken(): Promise<string> {
   botTok = { v, exp: Date.now() + 50 * 60_000 };
   return v;
 }
-const graphToken = () => clientToken("https://graph.microsoft.com/.default");
+export const graphToken = () => clientToken("https://graph.microsoft.com/.default");
 
 /* ---------- incoming JWT (Bot Framework → our endpoint) ---------- */
 type Jwk = { kid: string; kty: string; n: string; e: string; x5c?: string[] };

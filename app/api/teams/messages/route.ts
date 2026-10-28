@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
 import { ANSWERABLE_KINDS, infoCard, personFor, refreshCards, sendCard, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
 import { syncTasks, type AuthorityFile } from "@/lib/authority";
+import { after } from "next/server";
+import { createFromCard, createdCard, discardedCard, draftCard, draftReport, readThread, threadRefOf } from "@/lib/teams-draft";
+import { runAnalysis } from "@/lib/safety-analysis";
 
 // TMS-01 · the bot's messaging endpoint (Azure Bot → here). Three kinds of activity: the person opens the bot (install),
 // writes to it, or presses a button on a card (Universal Action). Every answer is written in S.A.M. "via Teams".
@@ -13,6 +16,7 @@ type Activity = {
   from: { id: string; name?: string; aadObjectId?: string }; recipient?: { id: string };
   conversation: { id: string; conversationType?: string; tenantId?: string };
   membersAdded?: { id: string; aadObjectId?: string }[];
+  replyToId?: string; channelData?: { team?: { id?: string; aadGroupId?: string; name?: string }; channel?: { id?: string; name?: string } };
   value?: { action?: { verb?: string; data?: Record<string, string>; type?: string }; comment?: string } & Record<string, unknown>;
   entities?: { type: string; mentioned?: { id: string } }[];
 };
@@ -77,6 +81,16 @@ export async function POST(req: NextRequest) {
       if (verb === "task_done") await refreshCards(db, { ...task, status: "done", answered_via: "teams", answer: comment || null }, state, ref.conversation_id);
       return cardResponse(taskCard(task, state));
     }
+    if (verb === "report_discard") return cardResponse(discardedCard(p.display_name));
+    if (verb === "report_create") {
+      const { data: pe } = await db.from("people").select("entities").eq("id", p.id).maybeSingle();
+      const res = await createFromCard(db, { id: p.id, display_name: p.display_name, entities: ((pe as { entities?: string[] } | null)?.entities ?? []) }, data as Record<string, unknown>);
+      await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, text: res.ok ? res.id : res.error, meta: { conversation: a.conversation.id } });
+      if (!res.ok) return msgResponse(`Not created: ${res.error}`);
+      await db.from("audit_log").insert({ actor: p.id, entity: String(data.entity ?? ""), object_type: "report", object_id: res.id, action: "create", after: { via: "teams" } });
+      const id = res.id; after(() => runAnalysis(id));
+      return cardResponse(createdCard(res.id, res.headline, p.display_name));
+    }
     return msgResponse("Unknown action.");
   }
 
@@ -86,7 +100,23 @@ export async function POST(req: NextRequest) {
     const p = await personFor(db, a.from, ref, a.conversation.tenantId);
     await db.from("teams_inbound").insert({ person_id: p?.id ?? null, aad_object_id: a.from.aadObjectId ?? null, kind: "message", text, meta: { conversation: a.conversation.id, type: a.conversation.conversationType ?? "personal" } });
     if (!p) { await sendCard(ref, infoCard("Not attached yet", "Your Teams account is not attached to a person in S.A.M. — ask the Compliance department, then write to me again.")); return json({}); }
-    if (!personal) { await sendCard(ref, infoCard("Soon", "Drafting a report from a conversation (@S.A.M.) arrives in the next iteration. For now I work in our personal chat: write “tasks” there.")); return json({}); }
+    if (!personal) {
+      // TMS-03 · @S.A.M. in a chat or a channel: draft a safety report from the thread, as an editable card in the same thread
+      const tref = threadRefOf(a);
+      if (!tref) { await sendCard(ref, infoCard("Not here", "I can draft from a group chat or a channel conversation where S.A.M. has been added.")); return json({}); }
+      let thread; try { thread = await readThread(tref); } catch (e) {
+        await sendCard(ref, infoCard("I cannot read this conversation yet", `Add S.A.M. to this ${tref.kind === "chat" ? "chat" : "team"} (… › Manage apps) so I may read the thread, then mention me again. (${e instanceof Error ? e.message.slice(0, 160) : "Graph refused"})`)); return json({});
+      }
+      if (!thread.length) { await sendCard(ref, infoCard("Nothing to draft from", "This conversation has no message I can read.")); return json({}); }
+      const { data: pe } = await db.from("people").select("entities").eq("id", p.id).maybeSingle();
+      const entities = ((pe as { entities?: string[] } | null)?.entities ?? []);
+      if (!entities.length) { await sendCard(ref, infoCard("No entity", "Your S.A.M. profile has no entity: ask the Compliance department.")); return json({}); }
+      try {
+        const d = await draftReport(db, p.id, entities, thread, text);
+        await sendCard(ref, draftCard(d, entities, tref, p.display_name), "Safety report — draft");
+      } catch (e) { await sendCard(ref, infoCard("Draft failed", e instanceof Error ? e.message.slice(0, 200) : "Unknown error")); }
+      return json({});
+    }
     // personal chat: list what waits for the person, as cards (up to 5), whatever the text says
     const { data: all } = await db.from("tasks").select("*").eq("status", "open").order("due", { ascending: true, nullsFirst: false }).limit(300);
     const posts = new Set(p.roles.map(basePost));

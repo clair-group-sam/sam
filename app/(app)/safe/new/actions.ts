@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { callClaude } from "@/lib/ai";
-import { DEFAULT_PRECISIONS, nextReportId, type Precision } from "@/lib/safety";
+import { DEFAULT_PRECISIONS, type Precision } from "@/lib/safety";
+import { createReport, type NewReport } from "@/lib/safety-create";
 import { runAnalysis } from "@/lib/safety-analysis";
 
 /** Step 1 · SAM reads the narrative and proposes 3 to 5 FACTUAL precisions, in the reporter's language. No chat, nothing stored. */
@@ -23,7 +24,7 @@ export async function proposePrecisions(input: { narrative: string; known: Recor
   } catch { return { lang: "en", items: DEFAULT_PRECISIONS }; }
 }
 
-export type NewReport = { entity: string; headline: string; narrative: string; event_date: string; event_time_utc: string; aircraft: string; flight_ref: string; phase: string; location: string; contributing: string; anonymous: boolean; language: string; precisions: Record<string, string> };
+export type { NewReport };
 
 /** Step 2 · the report as validated by the reporter is stored; SM / FSO get an Inbox item; the analysis runs afterwards. */
 export async function submitReport(r: NewReport): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -31,23 +32,9 @@ export async function submitReport(r: NewReport): Promise<{ ok: true; id: string
   if (!s?.person) return { ok: false, error: "Your account is not attached to a person in S.A.M. yet." };
   if (!s.entities.includes(r.entity)) return { ok: false, error: "Entity outside your scope." };
   if (r.narrative.trim().length < 10 || !r.headline.trim()) return { ok: false, error: "Write what happened and a one-line title." };
-  const db = supabaseAdmin();
-  const { data: ids } = await db.from("reports").select("id").like("id", `${new Date().getUTCFullYear()}-%`);
-  const complements = Object.fromEntries(Object.entries(r.precisions).filter(([, v]) => v && v.trim()));
-  let id = nextReportId(((ids ?? []) as { id: string }[]).map((x) => x.id));
-  for (let tries = 0; tries < 3; tries++) {
-    const { error } = await db.from("reports").insert({ id, entity: r.entity, headline: r.headline.trim().slice(0, 200), narrative: r.narrative.trim(), event_date: r.event_date || null, event_time_utc: r.event_time_utc || null,
-      aircraft: r.aircraft.trim().toUpperCase() || null, flight_ref: r.flight_ref.trim() || null, phase: r.phase || null, location: r.location.trim() || null, contributing: r.contributing.trim() || null,
-      complements, anonymous: r.anonymous, reporter_person: r.anonymous ? null : s.person.id, language: r.language || null, status: "received" });
-    if (!error) break;
-    if (!/duplicate/i.test(error.message) || tries === 2) return { ok: false, error: error.message };
-    id = nextReportId([id]);
-  }
-  const due = new Date(Date.now() + 72 * 3600e3).toISOString().slice(0, 10);
-  await db.from("report_events").insert({ report_id: id, kind: "received", to_reporter: true, note: r.anonymous ? "Received (anonymous)" : "Received" });
-  for (const role of ["SM"]) {
-    await db.from("tasks").insert({ entity: r.entity, kind: "safety_report", title: `Safety report ${id} — ${r.headline.trim().slice(0, 120)}`, detail: "New report: acknowledge, classify and decide on the MOR within 72 h of receipt.", due, owner_role: role, status: "open", link: `/safe/reports/${id}` });
-  }
+  const res = await createReport(supabaseAdmin(), r, s.person.id, { source: "app" });
+  if (!res.ok) return res;
+  const id = res.id;
   after(() => runAnalysis(id));
   revalidatePath("/safe/mine"); revalidatePath("/safe/reports");
   return { ok: true, id };
