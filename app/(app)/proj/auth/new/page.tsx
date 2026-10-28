@@ -8,7 +8,7 @@ import { STEP_LABEL } from "@/lib/docs";
 import { FAMILIES, TRIGGERS, type FileType } from "@/lib/authority";
 import { createFile } from "../actions";
 
-/** Projects › Authority files › New: a file is opened from a type; S.A.M. copies the route and the checklist of the type. */
+/** Projects › CAA applications › New: a file is opened from a type; S.A.M. copies the route and the checklist of the type. */
 export default async function NewAuthorityFile({ searchParams }: { searchParams: Promise<{ entity?: string; type?: string; revision?: string; finding?: string; aircraft?: string; np?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
@@ -30,7 +30,7 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader eyebrow="Projects · Authority files" title="New authority file" sub={`${ENT[entity]?.name ?? entity} — ${ENT[entity]?.auth ?? ""}. The type sets the route, the checklist and the expected time at the authority.`} />
+      <PageHeader eyebrow="Projects · CAA applications" title="New CAA application" sub={`${ENT[entity]?.name ?? entity} — ${ENT[entity]?.auth ?? ""}. The type sets the route, the checklist and the expected time at the authority.`} />
       <form action={createFile} className="grid grid-cols-3 gap-4 items-start">
         {s.entity === "ALL" ? <div className="mb-3"><label><span className="mini">Entity (group view: choose, the form reloads)</span><div className="flex gap-2 flex-wrap mt-1">{ents.map((e) => <Link key={e} href={`/proj/auth/new?entity=${e}`} className={"btn" + (e === entity ? " primary" : "")}>{ENT[e]?.name ?? e}</Link>)}</div></label><input type="hidden" name="entity" value={entity} /></div> : <input type="hidden" name="entity" value={entity} />}
         <section className="card col-span-2">

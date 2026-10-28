@@ -56,7 +56,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const changedCount = metas.filter((x) => x.changed).length;
   const { data: roundsData } = await supabaseAdmin().from("authority_rounds").select("*").eq("revision_id", rev.id).order("at");
   const rounds = (roundsData ?? []) as Round[];
-  // PRJ-01: the authority file that carries this revision's application (opened automatically when the revision leaves for the authority)
+  // PRJ-01: the CAA application that carries this revision's application (opened automatically when the revision leaves for the authority)
   const { data: afData } = await supabaseAdmin().from("authority_files").select("id,stage,portal_ref,type_code").eq("revision_id", rev.id).not("stage", "in", "(closed,standby)").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const authFile = afData as { id: string; stage: Stage; portal_ref: string | null; type_code: string } | null;
   const transitions = allowedTransitions(s, rev.step, manual.owner_role, manual.needs_signature, manual.to_tmcad_repository, rev.authority_route, internal);
@@ -229,7 +229,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               {ownerMissing && <p className="mini mt-2" style={{ color: "#8a5a00" }}>The manual is owned by the <b>{ownerPost}</b> post, which has no holder in NP management for {manual.entity} (posts there: {posts.map((p) => p.code).join(", ") || "none"}). <Link className="underline" href={`/np/over?entity=${manual.entity}`}>Name the holder</Link>, or change the owner post on the manual page.</p>}
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
               {(rev.authority_route === "approval" || rev.authority_route === "notification") && (
-                <p className="mini mt-3">Authority file: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
+                <p className="mini mt-3">CAA application: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
               )}
               {rounds.length > 0 && (<>
                 <div className="eyebrow mt-4 mb-2">Exchanges with the authority</div>
@@ -248,7 +248,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
           <section className={"card" + (cmm ? "" : " locked")}>
             <div className="ch"><span className="eyebrow">Authority return · DOC-03</span>{!cmm && <span className="lockpill">Compliance</span>}<span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
             <div className="cb">
-              <p className="mini mb-3">Application / dossier reference: {rev.authority_ref || authFile?.portal_ref ? <b className="mono">{rev.authority_ref ?? authFile?.portal_ref}</b> : <i>none yet</i>} — {authFile ? <>from the <Link className="underline" href={`/proj/auth/${authFile.id}`}>authority file</Link>, filled when the submission is recorded there</> : "filled automatically from the authority file when the submission is recorded"}.</p>
+              <p className="mini mb-3">Application / dossier reference: {rev.authority_ref || authFile?.portal_ref ? <b className="mono">{rev.authority_ref ?? authFile?.portal_ref}</b> : <i>none yet</i>} — {authFile ? <>from the <Link className="underline" href={`/proj/auth/${authFile.id}`}>CAA application</Link>, filled when the submission is recorded there</> : "filled automatically from the CAA application when the submission is recorded"}.</p>
               <form action={setReturnKind} className="flex items-center gap-2 mb-3">
                 <input type="hidden" name="revision_id" value={rev.id} />
                 <span className="mini">Expected from {auth}:</span>

@@ -19,7 +19,7 @@ body{background:#fff}
 `;
 const tc = (t: string | null) => (t === "intolerable" ? "r" : t === "tolerable" ? "y" : t === "acceptable" ? "g" : "");
 
-/** Printable risk assessment (Centrik-like export) for the authority file: set-up, participants, hazards, decision, sign-offs, MSM conformity. */
+/** Printable risk assessment (Centrik-like export) for the CAA application: set-up, participants, hazards, decision, sign-offs, MSM conformity. */
 export default async function PrintRisk({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await getSession();

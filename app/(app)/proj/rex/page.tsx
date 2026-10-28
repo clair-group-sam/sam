@@ -45,7 +45,7 @@ export default async function Rex({ searchParams }: { searchParams: Promise<{ en
             {!projects.length && <tr><td colSpan={6} className="p-5 text-slate6">No closed project yet.</td></tr>}</tbody></table>
       </section>
       <section className="card">
-        <div className="ch"><span className="eyebrow">Closed authority files</span><span className="mini">{files.length}</span></div>
+        <div className="ch"><span className="eyebrow">Closed CAA applications</span><span className="mini">{files.length}</span></div>
         <table className="tbl"><thead><tr><th>Entity</th><th>Type</th><th>File</th><th>Reference</th><th>Submitted</th><th>Decision</th><th>Rounds</th><th>Days</th><th>Lessons</th></tr></thead>
           <tbody>{files.map((f) => <tr key={f.id}><td><span className={"ent " + f.entity}>{f.entity}</span></td><td className="mono">{f.type_code}</td><td><Link className="underline" href={`/proj/auth/${f.id}`}><b>{f.title}</b></Link><div className="mini">{f.stage === "standby" ? "standby" : f.outcome ?? ""}</div></td><td className="mono">{f.portal_ref ?? "—"}</td><td className="mono">{fr(f.submitted_at)}</td><td className="mono">{fr(f.decision_at)}</td><td className="mono">{f.rounds}</td><td className="mono">{daysBetween(f.submitted_at, f.decision_at) ?? "—"}</td><td className="mini">{f.lessons ?? ""}</td></tr>)}
             {!files.length && <tr><td colSpan={9} className="p-6 text-slate6">No closed file yet.</td></tr>}</tbody></table>

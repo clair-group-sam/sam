@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ENT } from "@/lib/nav";
 
-/** Projects › Authority files (PRJ-01). One file = one application / notification / report to the authority. */
+/** Projects › CAA applications (PRJ-01). One file = one application / notification / report to the authority. */
 export type FileType = {
   code: string; family: string; name: string; entities: string[];
   routes: Record<string, { portal: string; category: string }>;
@@ -148,7 +148,7 @@ export async function syncTasks(db: SupabaseClient, f: AuthorityFile): Promise<v
 }
 
 /**
- * DOC-09 ↔ PRJ-01: the manual revision and its authority file move together. Sending a revision to the authority from the
+ * DOC-09 ↔ PRJ-01: the manual revision and its CAA application move together. Sending a revision to the authority from the
  * editor opens (or readies) its file; publishing the revision closes the authority step of the file.
  */
 export async function followRevision(db: SupabaseClient, who: { name: string; personId: string | null },
@@ -190,7 +190,7 @@ export async function followRevision(db: SupabaseClient, who: { name: string; pe
 }
 
 /**
- * FB-030 · When a project is cancelled or deleted, the authority files it opened and that never reached the authority go on standby
+ * FB-030 · When a project is cancelled or deleted, the CAA applications it opened and that never reached the authority go on standby
  * (their open tasks are superseded); files already submitted are left as they are, only detached. Returns the number put on standby.
  */
 export async function standbyProjectFiles(db: SupabaseClient, projectId: string, who: { name: string; personId: string | null }, why: string): Promise<number> {

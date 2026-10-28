@@ -9,7 +9,7 @@ export type InboxItem = { id: string; title: string; detail: string | null; due:
 
 /** What each item is, at a glance (label + colour), whatever module created it. */
 export const KIND: Record<string, [string, string]> = {
-  project: ["Project", "k-proj"], authority: ["Authority file", "k-auth"], authority_followup: ["Authority follow-up", "k-auth"],
+  project: ["Project", "k-proj"], authority: ["CAA application", "k-auth"], authority_followup: ["Authority follow-up", "k-auth"],
   reading: ["Read & acknowledge", "k-read"], certificate_validity: ["Validity", "k-cert"], finding: ["Finding", "k-comp"], action: ["Action", "k-comp"], action_verify: ["Verify action", "k-safe"], action_effectiveness: ["Action effectiveness", "k-safe"],
   check: ["Compliance check", "k-comp"], change_request: ["Change request", "k-docs"], signature: ["Signature", "k-docs"], status_review: ["Status review", "k-comp"],
   safety_report: ["Safety report", "k-safe"], safety_question: ["Safety question", "k-safe"], mitigation: ["Mitigation", "k-safe"], risk_acceptance: ["Risk acceptance", "k-safe"], risk_review: ["Risk review", "k-safe"], risk_intolerable: ["Intolerable risk", "k-comp"],

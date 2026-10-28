@@ -23,7 +23,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   if (!loaded) notFound();
   const { project: p, phases, deps, files: taskFiles } = loaded;
   if (!s.group && !s.entities.includes(p.entity)) notFound();
-  // ready = no open dependency: S.A.M. opens by itself the drafts and authority files those tasks call for
+  // ready = no open dependency: S.A.M. opens by itself the drafts and CAA applications those tasks call for
   const proj0 = projectDates(loaded.tasks, deps, p.started_at);
   const ready0 = new Set(loaded.tasks.filter((t) => t.status === "todo" && !proj0.get(t.id)?.openDeps.length).map((t) => t.id));
   const links = await resolveLinks(db, p, loaded.tasks, { ready: ready0, who: { personId: s.person?.id ?? null, name: s.name } });

@@ -119,7 +119,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
       .filter((f) => s.role === "cmm" || f.owner_person === s.person?.id || (f.owner_role && posts.has(basePost(f.owner_role))));
     if (mine.length) {
       const { data: ev } = await db.from("authority_file_events").select("file_id,at,kind,note").in("file_id", mine.map((f) => f.id)).gte("at", sinceIso).in("kind", ["stage", "submitted", "remarks", "reply", "decision"]).order("at", { ascending: false }).limit(20);
-      // one line per authority file, its overnight steps together
+      // one line per CAA application, its overnight steps together
       const perFile = new Map<string, { at: string; notes: string[] }>();
       for (const e of (ev ?? []) as { file_id: string; at: string; kind: string; note: string | null }[]) {
         const f = mine.find((x) => x.id === e.file_id)!;
@@ -129,7 +129,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
       }
       for (const [fid, g] of perFile) {
         const f = mine.find((x) => x.id === fid)!;
-        moved.push({ at: g.at, l: { kind: "authority", label: "Authority file", cls: "k-auth", title: f.title, note: (g.notes.length > 1 ? `${g.notes.length} steps: ` : "") + g.notes.join(" → "), entity: f.entity, link: `/proj/auth/${f.id}` } });
+        moved.push({ at: g.at, l: { kind: "authority", label: "CAA application", cls: "k-auth", title: f.title, note: (g.notes.length > 1 ? `${g.notes.length} steps: ` : "") + g.notes.join(" → "), entity: f.entity, link: `/proj/auth/${f.id}` } });
       }
     }
     const { data: certs } = await db.from("certificates").select("id,entity,title,uploaded_at").in("entity", scope).gte("uploaded_at", sinceIso).limit(10);
@@ -182,7 +182,7 @@ export async function synthesise(s: Session, r: Omit<Recap, "synthesis">): Promi
   } catch { return fallback(); }
 }
 
-/** S.A.M. objects a meeting subject may name (manual codes, projects, authority files of the person's scope). */
+/** S.A.M. objects a meeting subject may name (manual codes, projects, CAA applications of the person's scope). */
 async function targetsOf(s: Session): Promise<SamTarget[]> {
   const db = supabaseAdmin();
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
@@ -193,7 +193,7 @@ async function targetsOf(s: Session): Promise<SamTarget[]> {
   ]);
   return [
     ...((p.data ?? []) as { id: string; title: string }[]).map((x) => ({ label: "Project · " + x.title, link: `/proj/boards/${x.id}`, match: x.title })),
-    ...((a.data ?? []) as { id: string; title: string }[]).map((x) => ({ label: "Authority file · " + x.title, link: `/proj/auth/${x.id}`, match: x.title })),
+    ...((a.data ?? []) as { id: string; title: string }[]).map((x) => ({ label: "CAA application · " + x.title, link: `/proj/auth/${x.id}`, match: x.title })),
     ...((m.data ?? []) as { id: string; code: string; title: string; entity: string }[]).flatMap((x) => [{ label: `${x.entity} ${x.code}`, link: `/docs/manual/${x.id}`, match: x.code }]),
   ].sort((x, y) => y.match.length - x.match.length);
 }

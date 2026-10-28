@@ -2,7 +2,7 @@ import { ENT } from "@/lib/nav";
 import SwitchEntity from "@/components/SwitchEntity";
 
 /**
- * Whose object is this? Shown at the top of a manual, a project, an authority file… (several entities share codes).
+ * Whose object is this? Shown at the top of a manual, a project, a CAA application… (several entities share codes).
  * When the working entity differs, says so and offers to switch — never switches by itself.
  */
 export default function EntityBand({ entity, current, multi, what = "manual" }: { entity: string; current: string; multi: boolean; what?: string }) {

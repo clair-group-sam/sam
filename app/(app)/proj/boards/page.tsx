@@ -45,8 +45,8 @@ export default async function Projects({ searchParams }: { searchParams: Promise
   const superadmin = s.roles.includes("SUPERADMIN");
   return (
     <>
-      <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks — aircraft addition or removal, nominated person change, new approval… The manuals, authority files and certificates it needs are the real objects of S.A.M., linked to their task."
-        right={<><Link href="/proj/auth" className="btn">Authority files</Link><Link href="/proj/boards/new" className="btn primary">+ New project</Link></>} />
+      <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks — aircraft addition or removal, nominated person change, new approval… The manuals, CAA applications and certificates it needs are the real objects of S.A.M., linked to their task."
+        right={<><Link href="/proj/auth" className="btn">CAA applications</Link><Link href="/proj/boards/new" className="btn primary">+ New project</Link></>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open projects" value={open.length} hint={testOpen ? `+ ${testOpen} test` : undefined} />
         <Metric label="Tasks late" value={open.reduce((n, r) => n + r.late, 0)} tone={open.some((r) => r.late) ? "red" : undefined} hint="due date passed, or started and over its duration" />

@@ -147,12 +147,12 @@ export async function deleteTask(formData: FormData) {
   paths(p.id);
 }
 
-/** Opens now the authority file a task calls for (S.A.M. does it by itself once the task's dependencies are done). */
+/** Opens now the CAA application a task calls for (S.A.M. does it by itself once the task's dependencies are done). */
 export async function openFileForTask(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
   const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) return;
   const f = await openFileForProjectTask(db, { personId: s.person?.id ?? null, name: s.name }, p, task, "Opened from the project");
-  if (!f) throw new Error(`Could not open an authority file of type ${task.link_ref}`);
+  if (!f) throw new Error(`Could not open a CAA application of type ${task.link_ref}`);
   await audit(db, s, p, "task_file_opened", { task: task.title, file: f.id });
   paths(p.id); revalidatePath(`/proj/auth/${f.id}`);
   redirect(`/proj/auth/${f.id}`);
@@ -170,7 +170,7 @@ export async function startDraftForTask(formData: FormData) {
   redirect(`/docs/editor/${d.id}`);
 }
 
-/** Binds a task to an authority file that already exists (opened from the editor or by hand). */
+/** Binds a task to a CAA application that already exists (opened from the editor or by hand). */
 export async function bindFileToTask(formData: FormData) {
   const { db, p, cmm, owner } = await guard(str(formData, "id"));
   if (!cmm && !owner) throw new Error("Not allowed");

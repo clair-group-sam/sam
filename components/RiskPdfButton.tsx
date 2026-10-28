@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-/** Download the risk assessment as a PDF (for the authority file or the archive). */
+/** Download the risk assessment as a PDF (for the CAA application or the archive). */
 export function PdfButton({ id }: { id: string }) {
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const go = async () => {

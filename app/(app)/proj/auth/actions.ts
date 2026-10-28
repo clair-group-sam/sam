@@ -203,7 +203,7 @@ export async function removeAttachment(formData: FormData) {
   paths(id);
 }
 
-/** Super admin only: delete an authority file that never left the house (draft / compliance / ready, no portal reference). Attachments go with it. */
+/** Super admin only: delete a CAA application that never left the house (draft / compliance / ready, no portal reference). Attachments go with it. */
 export async function deleteFile(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f } = await guard(id);

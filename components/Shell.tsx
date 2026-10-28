@@ -130,7 +130,7 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   const canCreateFile = session.role !== "user";
   const CREATE: { label: string; href?: string; hint: string }[] = [
     { label: "Project", href: canCreateFile ? "/proj/boards/new" : undefined, hint: "aircraft addition, NP change, new approval… blank or from a template" },
-    { label: "Authority file", href: canCreateFile ? "/proj/auth/new" : undefined, hint: "application, notification, report to the authority" },
+    { label: "CAA application", href: canCreateFile ? "/proj/auth/new" : undefined, hint: "application, notification, report to the authority" },
     { label: "Manual or internal document", href: "/docs/new", hint: "a new manual in the library" },
     { label: "To-do", href: "/home/todo", hint: "personal reminder" },
     { label: "Finding", hint: "Compliance — step 6" },

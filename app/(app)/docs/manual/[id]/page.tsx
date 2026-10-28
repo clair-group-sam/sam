@@ -52,7 +52,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const published = revs.filter((r) => r.step === "published" || r.step === "repository").sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
   const workings = revs.filter((r) => r.step !== "published" && r.step !== "repository").sort((a, b) => STEPS.indexOf(b.step) - STEPS.indexOf(a.step));
   const working = workings[0] ?? null;
-  // PRJ-01: authority files linked to the revisions in progress
+  // PRJ-01: CAA applications linked to the revisions in progress
   const { data: afRows } = workings.length ? await supabaseAdmin().from("authority_files").select("id,revision_id,stage,portal_ref").in("revision_id", workings.map((r) => r.id)).not("stage", "in", "(closed,standby)") : { data: [] };
   const authFiles = new Map(((afRows ?? []) as { id: string; revision_id: string; stage: string; portal_ref: string | null }[]).map((a) => [a.revision_id, a]));
   const editing = workings.find((r) => r.step === "draft" || r.step === "approved_np") ?? null;
@@ -195,7 +195,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         </div>
       )}
       {current && !(current.step === "published" || current.step === "repository") && s.role !== "user" && (
-        <div className="mini mb-2">Authority file: {authFiles.get(current.id) ? <Link className="underline" href={`/proj/auth/${authFiles.get(current.id)!.id}`}>{authFiles.get(current.id)!.portal_ref ?? "open"} · {authFiles.get(current.id)!.stage}</Link> : <>none yet{(isCmm(s) || ownsManual(s, manual.owner_role)) && <> · <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${current.id}`}>open one</Link></>}</>}</div>
+        <div className="mini mb-2">CAA application: {authFiles.get(current.id) ? <Link className="underline" href={`/proj/auth/${authFiles.get(current.id)!.id}`}>{authFiles.get(current.id)!.portal_ref ?? "open"} · {authFiles.get(current.id)!.stage}</Link> : <>none yet{(isCmm(s) || ownsManual(s, manual.owner_role)) && <> · <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${current.id}`}>open one</Link></>}</>}</div>
       )}
       {current && !(current.step === "published" || current.step === "repository") && (
         <div className="steps mb-5">

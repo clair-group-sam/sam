@@ -17,7 +17,7 @@ export type TaskFile = { id: string; task_id: string; project_id: string; name: 
 export const STATUS_LABEL: Record<TaskStatus, string> = { todo: "To do", in_progress: "In progress", waiting: "Waiting", blocked: "Blocked", done: "Done", not_needed: "Not needed" };
 export const STATUS_TONE: Record<TaskStatus, string> = { todo: "", in_progress: "amber", waiting: "", blocked: "red", done: "green", not_needed: "" };
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = { open: "Open", on_hold: "On hold", closed: "Closed", cancelled: "Cancelled" };
-export const LINK_LABEL: Record<LinkKind, string> = { manual: "Manual revision", authority_file: "Authority file", certificate: "Certificate", moc: "MOC / risk assessment" };
+export const LINK_LABEL: Record<LinkKind, string> = { manual: "Manual revision", authority_file: "CAA application", certificate: "Certificate", moc: "MOC / risk assessment" };
 export const PIVOT_LABEL: Record<string, string> = { aircraft_type: "Aircraft type", aircraft_reg: "Registration", np_post_code: "Nominated post" };
 export const OPEN: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked"];
 /** FB-003 · a conditional line of a template ("If the aircraft leaves the French AOC…", "Only if a simulator is used"). */
@@ -97,7 +97,7 @@ export function projectedEnd(tasks: Task[], proj: Map<string, Projection>): stri
 }
 
 export type Who = { personId: string | null; name: string };
-/** Opens the authority file a task calls for — type from the task, aircraft / post from the project — and binds it. */
+/** Opens the CAA application a task calls for — type from the task, aircraft / post from the project — and binds it. */
 export async function openFileForProjectTask(db: SupabaseClient, who: Who, p: Project, task: Task, origin: string): Promise<AuthorityFile | null> {
   if (task.link_kind !== "authority_file" || task.link_id) return null;
   const { data: ty } = await db.from("authority_file_types").select("*").eq("code", task.link_ref ?? "").maybeSingle();
@@ -127,7 +127,7 @@ export type LiveLink = { label: string; href: string; state: string; tone: strin
 export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[], auto?: { ready: Set<string>; who: Who }): Promise<Map<string, LiveLink>> {
   const out = new Map<string, LiveLink>();
   const automate = !!auto && p.status === "open";
-  // S.A.M. opens by itself what a ready task calls for: the draft of the manual, the authority file with its checklist
+  // S.A.M. opens by itself what a ready task calls for: the draft of the manual, the CAA application with its checklist
   if (automate) {
     for (const t of tasks) {
       if (t.status !== "todo" || !auto!.ready.has(t.id)) continue;
@@ -165,7 +165,7 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
     const files = (fs ?? []) as { id: string; title: string; stage: string; portal_ref: string | null; type_code: string }[];
     for (const t of fileTasks) {
       const f = files.find((x) => x.id === t.link_id);
-      if (!f) { out.set(t.id, { label: `${t.link_ref ?? "authority file"} — not opened yet`, href: "", state: "open the file", tone: "" }); continue; }
+      if (!f) { out.set(t.id, { label: `${t.link_ref ?? "CAA application"} — not opened yet`, href: "", state: "open the file", tone: "" }); continue; }
       const done = ["approved", "published", "closed"].includes(f.stage);
       out.set(t.id, { label: `${f.type_code} · ${f.portal_ref ?? f.title}`, href: `/proj/auth/${f.id}`, state: f.stage, tone: done ? "green" : f.stage === "remarks" ? "red" : "amber" });
     }

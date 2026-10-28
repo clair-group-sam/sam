@@ -137,7 +137,7 @@ export async function moveStep(formData: FormData) {
     await audit(db, s.person?.id ?? null, manual.entity, rev.id, "update_notice", { recipients: n.recipients, emailed: n.emailed, email: n.emailStatus });
   }
   await audit(db, s.person?.id ?? null, manual.entity, rev.id, `step_${to}`, { code: manual.code, rev: rev.rev, from: rev.step, note });
-  // PRJ-01: the authority file of the revision follows (opened when the revision leaves for the authority, closed out at publication)
+  // PRJ-01: the CAA application of the revision follows (opened when the revision leaves for the authority, closed out at publication)
   if (to === "with_civil_aviation" || to === "published") { await followRevision(db, { name: s.name, personId: s.person?.id ?? null }, rev, manual, to); revalidatePath("/proj/auth"); revalidatePath("/home/tasks"); }
   revalidatePath(`/docs/editor/${rev.id}`); revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/drafts"); revalidatePath("/docs/lib");
   if (to === "published" || to === "repository") redirect(`/docs/manual/${manual.id}?rev=${rev.id}`);

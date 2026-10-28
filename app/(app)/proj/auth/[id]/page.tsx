@@ -42,7 +42,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
   return (
     <>
       <EntityBand entity={f.entity} current={s.entity} multi={s.group || s.entities.length > 1} what="file" />
-      <PageHeader eyebrow={`Projects · Authority files · ${f.type_code}`} title={f.title}
+      <PageHeader eyebrow={`Projects · CAA applications · ${f.type_code}`} title={f.title}
         sub={`${ENT[f.entity]?.name ?? f.entity} · ${type?.name ?? f.type_code} · ${f.portal ?? f.authority ?? ""}${f.category ? ` · ${CATEGORY_LABEL[f.category] ?? f.category}` : ""}`}
         right={<><span className={"pill " + STAGE_TONE[f.stage]} style={{ alignSelf: "center" }}>{STAGE_LABEL[f.stage]}</span><Link href="/proj/auth" className="btn">All files</Link></>} />
 

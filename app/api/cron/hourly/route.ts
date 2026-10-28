@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addDays, today } from "@/lib/authority";
 import { alertRoles } from "@/lib/cert";
 import { morningDigest, notifyTasks, sweepTeams, type TaskRow } from "@/lib/teams";
-// Daily (Hobby plan): authority files past their target date get a follow-up task for Compliance (PRJ-01 §6.2);
+// Daily (Hobby plan): CAA applications past their target date get a follow-up task for Compliance (PRJ-01 §6.2);
 // step 4 will add 90/30/7-day certificate alerts, MOR 72 h clock (SAF-01), reading reminders.
 export async function GET(req: NextRequest) {
   if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) return new Response("forbidden", { status: 403 });

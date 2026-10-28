@@ -6,7 +6,7 @@ import { PageHeader, Metric } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { AT_AUTHORITY, OPEN_STAGES, STAGE_LABEL, STAGE_TONE, daysAtAuthority, fr, nextAction, today, type AuthorityFile, type FileItem, type FileType, type Stage } from "@/lib/authority";
 
-/** Projects › Authority files: every application, notification and report to the authority, by stage. */
+/** Projects › CAA applications: every application, notification and report to the authority, by stage. */
 export default async function AuthorityFiles({ searchParams }: { searchParams: Promise<{ entity?: string; stage?: string; type?: string; q?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
@@ -41,7 +41,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader eyebrow="Projects · Authority files" title="Authority files" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC — one file per change, from the trigger to the close-out."
+      <PageHeader eyebrow="Projects · CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC — one file per change, from the trigger to the close-out."
         right={<Link href="/proj/auth/new" className="btn primary">+ New file</Link>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
