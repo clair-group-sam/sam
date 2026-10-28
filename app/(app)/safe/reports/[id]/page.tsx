@@ -8,6 +8,7 @@ import { ENT } from "@/lib/nav";
 import { ERC_BARRIERS, ERC_OUTCOMES, STATUS, ercTone, ercValue, isSafetyDesk, morClock, seesReporter } from "@/lib/safety";
 import { createAssessment, dismissMatch, linkReport, suggestForReport } from "../../risk/actions";
 import type { Suggestion } from "@/lib/risk-match";
+import { ACTION_STATUS } from "@/lib/actions-shared";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
 
 export const maxDuration = 60;
@@ -39,6 +40,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     db.from("risk_matches").select("suggestions,ran_at").eq("subject_kind", "report").eq("subject_id", id).maybeSingle(),
   ]);
   const sugg = ((mt as { suggestions: Suggestion[] } | null)?.suggestions ?? []);
+  const { data: acts } = await db.from("actions").select("id,number,title,status,due,owner_role").eq("report_id", id).order("created_at");
+  const actions = (acts ?? []) as { id: string; number: string; title: string; status: string; due: string | null; owner_role: string | null }[];
   const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
   const who = rep.data as { display_name: string; email: string; job_title: string | null } | null;
@@ -139,7 +142,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               <div className="ch"><span className="eyebrow">Suggestions</span></div>
               <div className="cb">
                 {a?.questions?.length ? <><div className="eyebrow mb-1">Questions for the reporter</div><ul className="mini mb-3">{a.questions.map((q, i) => <li key={i}>· {q}</li>)}</ul></> : null}
-                {a?.suggested_actions?.length ? <><div className="eyebrow mb-1">Actions to consider</div><ul className="mini">{a.suggested_actions.map((q, i) => <li key={i}>· {q}</li>)}</ul></> : null}
+                {a?.suggested_actions?.length ? <><div className="eyebrow mb-1">Actions to consider</div><ul className="mini">{a.suggested_actions.map((q, i) => <li key={i} className="flex gap-2 items-start mb-1"><span className="flex-1">· {q}</span>{isSafetyDesk(s) && (actions.some((x) => x.title === q) ? <span className="mini">✓ raised</span> : <Link className="btn" href={`/safe/actions/new?entity=${r.entity}&report=${r.id}&title=${encodeURIComponent(q)}`}>Raise</Link>)}</li>)}</ul></> : null}
               </div>
             </section>
           ) : null}
@@ -163,6 +166,15 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                 <input name="name" className="inp" defaultValue={`HZ - ${a?.primary_hazard ?? r.headline_en ?? r.headline}`.slice(0, 160)} required />
                 <input type="hidden" name="hazard_title" value={(a?.primary_hazard ?? r.headline_en ?? r.headline).slice(0, 200)} />
                 <div className="flex justify-end"><button className="btn">New hazard log entry from this report</button></div></form>
+            </div>
+          </section>
+
+          <section className="card mb-4">
+            <div className="ch"><span className="eyebrow">Actions</span><span className="mini">{actions.length}</span></div>
+            <div className="cb grid gap-1">
+              {actions.map((x) => <div key={x.id} className="flex gap-2 items-center"><Link className="underline mono" href={`/safe/actions/${x.id}`}>{x.number}</Link><span className="flex-1">{x.title}</span><span className={"pill " + (ACTION_STATUS[x.status]?.[1] ?? "")}>{ACTION_STATUS[x.status]?.[0]}</span></div>)}
+              {!actions.length && <p className="mini">No action raised for this report.</p>}
+              {isSafetyDesk(s) && <Link className="btn mt-1" style={{ justifySelf: "start" }} href={`/safe/actions/new?entity=${r.entity}&report=${r.id}`}>+ Raise an action</Link>}
             </div>
           </section>
 

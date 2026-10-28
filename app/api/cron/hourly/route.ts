@@ -64,5 +64,14 @@ export async function GET(req: NextRequest) {
     ti++;
   }
   jobs.risk_intolerable = ti;
+  // 4 · safety actions: effectiveness check due (date set at closure) → one task for the safety desk
+  const { data: eff } = await db.from("actions").select("id,entity,number,title,effectiveness_due").eq("status", "verified").is("effectiveness", null).lte("effectiveness_due", t0);
+  let te = 0;
+  for (const a of (eff ?? []) as { id: string; entity: string; number: string; title: string; effectiveness_due: string }[]) {
+    if (await openTask("action_effectiveness", a.id)) continue;
+    await db.from("tasks").insert({ entity: a.entity, kind: "action_effectiveness", title: `Effectiveness of ${a.number} — ${a.title}`.slice(0, 200), detail: "Did the action remove or reduce the problem? Effective, or not effective → follow-up action.", due: a.effectiveness_due, owner_role: "SM", status: "open", link: `/safe/actions/${a.id}`, ref_id: a.id });
+    te++;
+  }
+  jobs.action_effectiveness = te;
   return Response.json({ ran: new Date().toISOString(), jobs });
 }

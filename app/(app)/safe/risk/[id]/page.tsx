@@ -8,7 +8,7 @@ import { RiskMatrix, RiskPill } from "@/components/RiskMatrix";
 import { addMitigation, doneMitigation, keepHazard, discardHazard, reviewedNoChange, updateHazard } from "../actions";
 
 type H = { id: string; entity: string; ref: string; title: string; description: string | null; consequence: string | null; main_impact: string | null; source: string; report_id: string | null; assessment_id: string | null; proposed: boolean; owner_role: string | null; status: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; review_date: string | null; needs_review: boolean; log_hazard_id: string | null; local_only: boolean };
-type M = { id: string; text: string; existing: boolean; owner_role: string | null; due: string | null; done_at: string | null };
+type M = { id: string; text: string; existing: boolean; owner_role: string | null; due: string | null; done_at: string | null; action_id: string | null };
 type E = { id: number; at: string; kind: string; note: string | null };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -22,7 +22,7 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
   const h = data as H | null;
   if (!h || !s.entities.includes(h.entity)) notFound();
   const [{ data: ms }, { data: ev }, { data: ra }, { data: reps }] = await Promise.all([
-    db.from("hazard_mitigations").select("id,text,existing,owner_role,due,done_at").eq("hazard_id", id).order("created_at"),
+    db.from("hazard_mitigations").select("id,text,existing,owner_role,due,done_at,action_id,actions!hazard_mitigations_action_id_fkey(number,status)").eq("hazard_id", id).order("created_at"),
     db.from("risk_events").select("id,at,kind,note").eq("hazard_id", id).order("at"),
     h.assessment_id ? db.from("risk_assessments").select("id,number,name,kind,status").eq("id", h.assessment_id).maybeSingle() : Promise.resolve({ data: null }),
     db.from("hazard_reports").select("report_id,linked_at,reports(headline,headline_en,received_at)").eq("hazard_id", id),
@@ -74,7 +74,8 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
               <table className="tbl mb-3"><tbody>{mit.map((x) => (
                 <tr key={x.id}><td style={{ width: 120 }}><span className={"kind " + (x.existing || x.done_at ? "k-read" : x.due && x.due < today ? "k-comp" : "k-cert")}>{x.existing ? "Current" : x.done_at ? "Done" : x.due && x.due < today ? "Overdue" : "Planned"}</span></td>
                   <td>{x.text}<div className="mini">{x.owner_role ?? ""}{x.due ? ` · by ${x.due}` : ""}{x.done_at ? ` · done ${x.done_at.slice(0, 10)}` : ""}</div></td>
-                  <td style={{ width: 90 }} className="text-right">{!x.existing && !x.done_at && mayEditRisk(s) && <form action={doneMitigation}><input type="hidden" name="id" value={x.id} /><button className="btn">Done</button></form>}</td></tr>))}
+                  <td style={{ width: 190 }} className="text-right">{!x.existing && (x.action_id ? <Link className="underline mono mini" href={`/safe/actions/${x.action_id}`}>{(x as M & { actions?: { number: string } | null }).actions?.number ?? "action"}</Link>
+                    : !x.done_at && mayEditRisk(s) && <span className="flex gap-1 justify-end"><Link className="btn" title="Follow it as a safety action: owner, due date, evidence, verification" href={`/safe/actions/new?entity=${h.entity}&hazard=${h.id}&mitigation=${x.id}&title=${encodeURIComponent(x.text.slice(0, 280))}${x.owner_role ? `&owner_role=${encodeURIComponent(x.owner_role)}` : ""}`}>→ Action</Link><form action={doneMitigation}><input type="hidden" name="id" value={x.id} /><button className="btn">Done</button></form></span>)}</td></tr>))}
                 {!mit.length && <tr><td className="mini p-3">No mitigation listed yet.</td></tr>}</tbody></table>
               {edit && (
                 <form action={addMitigation} className="grid gap-2" style={{ gridTemplateColumns: "1fr 130px 90px 140px auto" }}><input type="hidden" name="hazard_id" value={h.id} />
