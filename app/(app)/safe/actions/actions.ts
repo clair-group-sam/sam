@@ -31,7 +31,7 @@ export async function createAction(fd: FormData) {
   const number = await nextActionNumber(db(), entity);
   const mitigation = str(fd, "mitigation_id");
   const row = { entity, number, module: "safety", kind: str(fd, "kind") ?? "corrective", title: title.slice(0, 300), description: str(fd, "description"), owner_role: str(fd, "owner_role")?.toUpperCase() ?? null, owner_person: str(fd, "owner_person"),
-    due: str(fd, "due"), source_kind: str(fd, "source_kind") ?? "other", report_id: str(fd, "report_id"), hazard_id: str(fd, "hazard_id"), mitigation_id: mitigation, assessment_id: str(fd, "assessment_id"), spi_id: str(fd, "spi_id"), created_by: s.person?.id ?? null };
+    due: str(fd, "due"), source_kind: str(fd, "source_kind") ?? "other", report_id: str(fd, "report_id"), hazard_id: str(fd, "hazard_id"), mitigation_id: mitigation, assessment_id: str(fd, "assessment_id"), spi_id: str(fd, "spi_id"), committee_id: str(fd, "committee_id"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("safety_actions").insert(row).select("*").single();
   if (error || !data) throw new Error(error?.message ?? "Action not created.");
   const a = data as Action;
@@ -42,7 +42,7 @@ export async function createAction(fd: FormData) {
   }
   if (a.report_id) await db().from("report_events").insert({ report_id: a.report_id, kind: "action", actor: s.person?.id ?? null, note: `Action ${a.number} raised — ${a.title}` });
   await log(a.id, "created", s.person?.id ?? null, `${a.number} raised by ${s.name}`);
-  touch(a); if (row.spi_id) revalidatePath(`/safe/over/spi/${row.spi_id}`);
+  touch(a); if (row.spi_id) revalidatePath(`/safe/over/spi/${row.spi_id}`); if (row.committee_id) revalidatePath(`/safe/comm/${row.committee_id}`);
   if (str(fd, "stay")) return;
   redirect(`/safe/actions/${a.id}`);
 }

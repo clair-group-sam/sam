@@ -28,6 +28,8 @@ export const METRICS: Record<string, { label: string; kind: "count" | "ratio" | 
   new_hazards: { label: "New hazards in the hazard log", kind: "count", how: "hazards of the hazard log, dated by the first safety report linked to them (identified through reporting), else by their log entry" },
   ra_count: { label: "Risk assessments", kind: "count", how: "risk assessments conducted (not cancelled)" },
   moc_count: { label: "Management of change files", kind: "count", how: "MOC files opened (not cancelled)" },
+  meetings: { label: "Safety meetings held (SRB / SAG)", kind: "count", how: "Safety Review Boards and Safety Action Groups held (Safety › Committees)" },
+  meetings_srb: { label: "Review boards held (SRB / CODIR)", kind: "count", how: "Safety Review Boards / CODIR reviews held (Safety › Committees)" },
   actions_late: { label: "Safety actions overdue", kind: "snapshot", how: "safety actions open past their due date at month end" },
 };
 

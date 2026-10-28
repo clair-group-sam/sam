@@ -25,6 +25,7 @@ export async function computedMetrics(entity: string, months: string[]): Promise
     db.from("risk_assessments").select("id,kind,status,conducted_on,start_date,created_at,source").eq("entity", entity).limit(3000),
     db.from("safety_actions").select("due,status,created_at,done_at,verified_at").eq("entity", entity).eq("module", "safety").limit(5000),
   ]);
+  const { data: meets } = await db.from("committees").select("kind,status,planned_on,starts_at").eq("entity", entity).in("status", ["held", "closed"]).limit(2000);
   const reps: Rep[] = ((rr ?? []) as unknown as (Omit<Rep, "a"> & { report_analysis: Rep["a"] | Rep["a"][] })[])
     .map((r) => ({ ...r, a: Array.isArray(r.report_analysis) ? r.report_analysis[0] ?? null : r.report_analysis }))
     .filter((r) => !/^\s*test\b/i.test(r.headline));
@@ -90,6 +91,10 @@ export async function computedMetrics(entity: string, months: string[]): Promise
     if (h.proposed) continue; // identified through reporting = its first linked report; else the date of the log entry
     const when = firstReport.get(h.id) ?? (h.source_ref ? raById.get(h.assessment_id)?.conducted_on ?? null : h.created_at);
     if (when) inc("new_hazards", idx.get(ym(when)));
+  }
+  for (const c of (meets ?? []) as { kind: string; planned_on: string | null; starts_at: string | null }[]) {
+    const when = c.starts_at ?? c.planned_on; if (!when) continue; const i = idx.get(ym(when));
+    inc("meetings", i); if (c.kind === "srb") inc("meetings_srb", i);
   }
   for (const [k, v] of Object.entries(ratio)) out[k] = months.map((_, i) => (v.den[i] ? { num: v.num[i], den: v.den[i], src: "sam" as const } : null));
   return out;
