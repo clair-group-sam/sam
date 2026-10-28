@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
-import { STATUS, kindName, mayRun, packFor, type Committee } from "@/lib/committees";
+import { STATUS, entitiesLabel, isJoint, kindName, mayRun, packFor, type Committee } from "@/lib/committees";
 import { ackMinutes, cancelCommittee, draftMinutes, issueMinutes, markHeld, preparePack, saveAttendees, saveItem, saveMinutes, updateCommittee } from "../actions";
 
 const hm = (iso: string | null) => (iso ? iso.slice(11, 16) : "");
@@ -16,7 +16,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
   if (!s) redirect("/login");
   const { id } = await params; const db = supabaseAdmin();
   const { data } = await db.from("committees").select("*").eq("id", id).maybeSingle();
-  const c = data as Committee | null; if (!c || !s.entities.includes(c.entity)) notFound();
+  const c = data as Committee | null; if (!c || !(c.entities?.length ? c.entities : [c.entity]).some((e) => s.entities.includes(e))) notFound();
   const [{ data: acts }, { data: ev }, { data: myTask }, { data: sags }, { data: parent }] = await Promise.all([
     db.from("safety_actions").select("id,number,title,status,due,owner_role,owner_person").eq("committee_id", c.id).order("created_at"),
     db.from("committee_events").select("at,kind,note").eq("committee_id", c.id).order("at", { ascending: false }).limit(30),
@@ -30,7 +30,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
   const step = c.status === "planned" ? 1 : c.status === "held" ? 2 : 3;
   return (
     <>
-      <PageHeader eyebrow={`Safety · Committees · ${c.entity}`} title={`${c.number} — ${c.title}`} sub={`${kindName(c.entity, c.kind)} · ${c.planned_on ?? "date to set"}${c.starts_at ? ` ${hm(c.starts_at)}${c.ends_at ? `–${hm(c.ends_at)}` : ""} UTC` : ""}${c.location ? ` · ${c.location}` : ""}`}
+      <PageHeader eyebrow={`Safety · Committees · ${entitiesLabel(c)}`} title={`${c.number} — ${c.title}`} sub={`${isJoint(c) ? `Joint meeting ${entitiesLabel(c)} · ` : ""}${kindName(c.entity, c.kind)} · ${c.planned_on ?? "date to set"}${c.starts_at ? ` ${hm(c.starts_at)}${c.ends_at ? `–${hm(c.ends_at)}` : ""} UTC` : ""}${c.location ? ` · ${c.location}` : ""}`}
         tag={<span className="flex gap-2 flex-wrap"><span className={"pill " + (STATUS[c.status]?.[1] ?? "")}>{STATUS[c.status]?.[0]}</span>{c.source !== "sam" && <span className="pill">from {c.source === "centrik" ? "Centrik" : "SharePoint"}{c.source_ref ? ` ${c.source_ref}` : ""}</span>}{(parent as { id: string; number: string } | null) && <Link className="pill" href={`/safe/comm/${(parent as { id: string }).id}`}>reports to {(parent as { number: string }).number}</Link>}</span>}
         right={<><Link href="/safe/comm" className="btn">← Committees</Link>{["held", "closed"].includes(c.status) && <a className="btn" href={`/print/committee/${c.id}`} target="_blank" rel="noreferrer">Minutes PDF</a>}</>} />
 

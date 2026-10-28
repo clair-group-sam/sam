@@ -3,7 +3,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENT } from "@/lib/nav";
 import PrintAuto from "@/components/PrintAuto";
-import { kindName, packFor, type Committee } from "@/lib/committees";
+import { isJoint, kindName, packFor, type Committee } from "@/lib/committees";
 
 export const dynamic = "force-dynamic";
 const CSS = `
@@ -24,7 +24,7 @@ export default async function PrintCommittee({ params, searchParams }: { params:
   const s = await getSession(); if (!s) redirect("/login");
   const db = supabaseAdmin();
   const { data } = await db.from("committees").select("*").eq("id", id).maybeSingle();
-  const c = data as Committee | null; if (!c || !s.entities.includes(c.entity)) notFound();
+  const c = data as Committee | null; if (!c || !(c.entities?.length ? c.entities : [c.entity]).some((e) => s.entities.includes(e))) notFound();
   const { data: acts } = await db.from("safety_actions").select("number,title,owner_role,due,status").eq("committee_id", c.id).order("created_at");
   const A = (acts ?? []) as { number: string; title: string; owner_role: string | null; due: string | null; status: string }[];
   const chair = c.attendees.find((a) => /\bAM\b/.test(a.role ?? ""));
@@ -32,7 +32,7 @@ export default async function PrintCommittee({ params, searchParams }: { params:
     <div className="mn" style={{ maxWidth: 800, margin: "0 auto", padding: 20 }}>
       <style>{CSS}</style>
       <PrintAuto fileName={`${c.entity} ${c.number} minutes`} auto={sp.auto === "1"} />
-      <div className="top"><div><div className="ent">{ENT[c.entity]?.name ?? c.entity}</div><h1>{c.number} — {c.title}</h1><div className="mini">{kindName(c.entity, c.kind)} · Minutes{c.status !== "closed" ? " — DRAFT, not issued" : ` issued ${c.closed_at?.slice(0, 10)}`}</div></div><div className="mini" style={{ textAlign: "right" }}>MSM §{c.kind === "sag" ? "4.6" : c.entity === "ASF" ? "4.2" : "4.5"}<br />Record kept 5 years (MSM §1.6.5)</div></div>
+      <div className="top"><div><div className="ent">{(c.entities?.length ? c.entities : [c.entity]).map((e) => ENT[e]?.name ?? e).join(" · ")}</div><h1>{c.number} — {c.title}</h1><div className="mini">{isJoint(c) ? "Joint meeting · " : ""}{kindName(c.entity, c.kind)} · Minutes{c.status !== "closed" ? " — DRAFT, not issued" : ` issued ${c.closed_at?.slice(0, 10)}`}</div></div><div className="mini" style={{ textAlign: "right" }}>MSM §{c.kind === "sag" ? "4.6" : c.entity === "ASF" ? "4.2" : "4.5"}<br />Record kept 5 years (MSM §1.6.5)</div></div>
       <table className="kv"><tbody>
         <tr><td>Date</td><td>{c.planned_on}{c.starts_at ? ` · ${c.starts_at.slice(11, 16)}${c.ends_at ? `–${c.ends_at.slice(11, 16)}` : ""} UTC` : ""}</td></tr>
         <tr><td>Location</td><td>{c.location ?? "—"}</td></tr>

@@ -25,7 +25,7 @@ export async function computedMetrics(entity: string, months: string[]): Promise
     db.from("risk_assessments").select("id,kind,status,conducted_on,start_date,created_at,source").eq("entity", entity).limit(3000),
     db.from("safety_actions").select("due,status,created_at,done_at,verified_at").eq("entity", entity).eq("module", "safety").limit(5000),
   ]);
-  const { data: meets } = await db.from("committees").select("kind,status,planned_on,starts_at").eq("entity", entity).in("status", ["held", "closed"]).limit(2000);
+  const { data: meets } = await db.from("committees").select("kind,status,planned_on,starts_at").contains("entities", [entity]).in("status", ["held", "closed"]).limit(2000);
   const reps: Rep[] = ((rr ?? []) as unknown as (Omit<Rep, "a"> & { report_analysis: Rep["a"] | Rep["a"][] })[])
     .map((r) => ({ ...r, a: Array.isArray(r.report_analysis) ? r.report_analysis[0] ?? null : r.report_analysis }))
     .filter((r) => !/^\s*test\b/i.test(r.headline));

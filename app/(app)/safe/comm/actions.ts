@@ -23,11 +23,12 @@ export async function planCommittee(fd: FormData) {
   const entity = str(fd, "entity"); const s = await desk(entity);
   const kind = str(fd, "kind") === "sag" ? "sag" : "srb"; const on = str(fd, "planned_on"); if (!on) throw new Error("Give the date.");
   const topic = str(fd, "topic"); if (kind === "sag" && !topic) throw new Error("A SAG has a topic.");
+  const also = fd.getAll("also").map(String).filter((e) => e !== entity && s.entities.includes(e)); const ents = [entity!, ...also];
   const number = await nextNumber(entity!, kind, on);
   const time = str(fd, "time");
   const row = { entity, kind, number, title: str(fd, "title") ?? (kind === "sag" ? `${kindName(entity!, kind)} — ${topic}` : `${kindName(entity!, kind)} ${number.split(" ")[1]}`), topic,
     status: "planned", planned_on: on, starts_at: time ? new Date(`${on}T${time}:00Z`).toISOString() : null, location: str(fd, "location"),
-    attendees: await defaultAttendees(entity!, kind), agenda: agendaFor(entity!, kind, topic), parent_id: str(fd, "parent_id"), created_by: s.person?.id ?? null };
+    entities: ents, attendees: (await Promise.all(ents.map((e) => defaultAttendees(e, kind)))).flat().filter((a, i, l) => l.findIndex((b) => b.name.toLowerCase() === a.name.toLowerCase()) === i), agenda: agendaFor(entity!, kind, topic), parent_id: str(fd, "parent_id"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("committees").insert(row).select("id").single();
   if (error || !data) throw new Error(error?.message ?? "Not created.");
   const id = (data as { id: string }).id;

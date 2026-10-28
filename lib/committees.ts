@@ -8,12 +8,15 @@ import type { Session } from "@/lib/session";
 
 export type Attendee = { name: string; role: string | null; person_id: string | null; present: boolean | null; note?: string | null };
 export type Item = { key: string; title: string; ref?: string | null; notes?: string | null; decision?: string | null };
-export type Committee = { id: string; entity: string; kind: "srb" | "sag" | "other"; number: string; title: string; topic: string | null; status: string; planned_on: string | null; starts_at: string | null; ends_at: string | null; location: string | null; attendees: Attendee[]; agenda: Item[]; pack: Pack | null; pack_at: string | null; minutes: string | null; minutes_model: string | null; parent_id: string | null; closed_at: string | null; source: string; source_ref: string | null; source_url: string | null; created_at: string };
+export type Committee = { id: string; entity: string; entities: string[]; kind: "srb" | "sag" | "other"; number: string; title: string; topic: string | null; status: string; planned_on: string | null; starts_at: string | null; ends_at: string | null; location: string | null; attendees: Attendee[]; agenda: Item[]; pack: Pack | null; pack_at: string | null; minutes: string | null; minutes_model: string | null; parent_id: string | null; closed_at: string | null; source: string; source_ref: string | null; source_url: string | null; created_at: string };
 
 export const STATUS: Record<string, [string, string]> = { planned: ["Planned", "blue"], held: ["Held — minutes to issue", "amber"], closed: ["Minutes issued", "green"], cancelled: ["Cancelled", ""] };
 /** Safety desk organises (SM / CMM / FSO); the AM chairs the SRB. */
 export const mayRun = (s: Session) => isSafetyDesk(s);
 export const kindName = (entity: string, kind: string) => kind === "other" ? "Safety meeting" : kind === "sag" ? "Safety Action Group" : entity === "ASF" ? "Compliance & safety review committee (CODIR)" : "Safety Review Board";
+/** "AJD + ASJ" for a joint meeting. */
+export const entitiesLabel = (c: { entity: string; entities?: string[] | null }) => (c.entities?.length ? c.entities : [c.entity]).join(" + ");
+export const isJoint = (c: { entities?: string[] | null }) => (c.entities?.length ?? 0) > 1;
 export const kindShort = (entity: string, kind: string) => kind === "other" ? "MTG" : kind === "sag" ? "SAG" : entity === "ASF" ? "CODIR" : "SRB";
 
 /** Minimum frequency of the review board (MSM): AJD / ASJ ≥ 2 per calendar year (§4.5) · ASF ≥ 1 per quarter (§4.2). */
@@ -109,7 +112,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
   const db = supabaseAdmin(); const e = c.entity;
   const until = (c.starts_at ?? (c.planned_on ? `${c.planned_on}T23:59:59Z` : new Date().toISOString()));
   const year = Number(until.slice(0, 4));
-  const { data: prev } = await db.from("committees").select("starts_at,planned_on").eq("entity", e).eq("kind", c.kind).in("status", ["held", "closed"]).neq("id", c.id).lt("planned_on", until.slice(0, 10)).order("planned_on", { ascending: false }).limit(1);
+  const { data: prev } = await db.from("committees").select("starts_at,planned_on").contains("entities", [e]).eq("kind", c.kind).in("status", ["held", "closed"]).neq("id", c.id).lt("planned_on", until.slice(0, 10)).order("planned_on", { ascending: false }).limit(1);
   const p0 = ((prev ?? []) as { starts_at: string | null; planned_on: string | null }[])[0];
   const since = p0 ? (p0.starts_at ?? `${p0.planned_on}T00:00:00Z`) : `${year}-01-01T00:00:00Z`;
   const [board, { data: rr }, { data: ra }, { data: acts }, { data: fnd }, { data: sags }] = await Promise.all([
@@ -118,7 +121,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
     db.from("risk_assessments").select("id,kind,number,name,status,moc_status,created_at,start_date,conducted_on").eq("entity", e).limit(3000),
     db.from("safety_actions").select("number,title,status,due,owner_role,done_at,verified_at,created_at").eq("entity", e).eq("module", "safety").limit(5000),
     db.from("findings").select("phase,due").eq("entity", e).limit(3000),
-    c.kind === "srb" ? db.from("committees").select("id,number,title,starts_at,planned_on,status").eq("entity", e).eq("kind", "sag").in("status", ["held", "closed"]).gte("planned_on", since.slice(0, 10)).lte("planned_on", until.slice(0, 10)) : Promise.resolve({ data: [] }),
+    c.kind === "srb" ? db.from("committees").select("id,number,title,starts_at,planned_on,status").contains("entities", [e]).eq("kind", "sag").in("status", ["held", "closed"]).gte("planned_on", since.slice(0, 10)).lte("planned_on", until.slice(0, 10)) : Promise.resolve({ data: [] }),
   ]);
   type Rr = { id: string; headline: string; received_at: string; status: string; report_type: string | null; source_erc: number | null; closed_at: string | null; report_analysis: { mor_status: string | null; erc_value: number | null } | { mor_status: string | null; erc_value: number | null }[] | null };
   const R = ((rr ?? []) as unknown as Rr[]).filter((r) => !/^\s*test\b/i.test(r.headline)).map((r) => ({ ...r, a: Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis }));

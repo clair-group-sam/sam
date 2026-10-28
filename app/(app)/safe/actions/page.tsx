@@ -17,7 +17,15 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
   const db = supabaseAdmin();
   const { data } = await db.from("safety_actions").select("*").in("entity", scope).eq("module", "safety").order("created_at", { ascending: false }).limit(1000);
-  const all = (data ?? []) as Action[];
+  // actions decided in a joint meeting held for this entity, owned by the other entity: shown here too (same record for each auditor)
+  const { data: joint } = await db.from("committees").select("id").overlaps("entities", scope).not("entity", "in", `(${scope.join(",")})`).limit(500);
+  const jIds = ((joint ?? []) as { id: string }[]).map((x) => x.id);
+  const { data: jActs } = jIds.length ? await db.from("safety_actions").select("*").in("committee_id", jIds).limit(1000) : { data: [] };
+  const { data: jMine } = await db.from("committees").select("id").overlaps("entities", scope).limit(1000);
+  const myC = ((jMine ?? []) as { id: string }[]).map((x) => x.id);
+  const { data: jOut } = myC.length ? await db.from("safety_actions").select("*").in("committee_id", myC).not("entity", "in", `(${scope.join(",")})`).limit(1000) : { data: [] };
+  const seenA = new Set<string>();
+  const all = ([...(data ?? []), ...(jActs ?? []), ...(jOut ?? [])] as Action[]).filter((a) => !seenA.has(a.id) && !!seenA.add(a.id));
   const ids = [...new Set(all.map((a) => a.owner_person).filter(Boolean) as string[])];
   const { data: ppl } = ids.length ? await db.from("people").select("id,display_name").in("id", ids) : { data: [] };
   const nameOf = new Map(((ppl ?? []) as { id: string; display_name: string }[]).map((p) => [p.id, p.display_name]));
@@ -55,7 +63,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
           <tbody>
             {rows.map((a) => (
               <tr key={a.id}>
-                <td className="mono"><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link>{scope.length > 1 && <div><span className={"ent " + a.entity}>{a.entity}</span></div>}</td>
+                <td className="mono"><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link>{(scope.length > 1 || !scope.includes(a.entity)) && <div><span className={"ent " + a.entity}>{a.entity}</span>{!scope.includes(a.entity) && <span className="mini"> joint meeting</span>}</div>}</td>
                 <td><Link href={`/safe/actions/${a.id}`}><b>{a.title}</b></Link><div className="mini">{ACTION_KINDS[a.kind]} · {ACTION_SOURCES[a.source_kind]}{a.report_id ? ` ${a.report_id}` : ""}</div></td>
                 <td className="mini">{a.owner_person ? nameOf.get(a.owner_person) ?? "—" : <span className="mono">{a.owner_role ?? "—"}</span>}</td>
                 <td className={"mono" + (isLate(a, today) ? " red" : "")}>{a.due ?? "—"}</td>

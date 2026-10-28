@@ -8,7 +8,7 @@ export const maxDuration = 300;
 /**
  * Committees history: POST {source:"centrik", meetings:[…]} by a Compliance session (same origin — collected read-only in Centrik › Safety Meeting).
  * Each meeting becomes a held committee with its minutes issued (the Centrik description), the participants found in it, and its Centrik actions
- * as safety actions (closed = verified, open = owner's Inbox task). "ASJ/AJD - …" meetings are recorded in both entities. Re-importing updates.
+ * as safety actions (closed = verified, open = owner's Inbox task). "ASJ/AJD - …" is ONE joint meeting, held for both entities (each auditor sees the same record). Re-importing updates.
  */
 type Act = { id: string; status: string; title: string; owner?: string; due?: string; completed?: string };
 type Mtg = { caseId: string; no: string; title: string; description?: string; event_date?: string; event_time?: string; submitted_by?: string; closed_on?: string; actions?: Act[] };
@@ -41,17 +41,17 @@ export async function POST(req: NextRequest) {
   const pid = (n: string | null) => (n ? byName.get(norm(n)) ?? null : null);
   let nm = 0, na = 0; const errors: string[] = [];
   for (const m of body.meetings) {
-    for (const entity of entitiesOf(m.title)) {
+    const ents = entitiesOf(m.title); const entity = ents[0]; { // one record per meeting, held for every entity named (joint meeting)
       try {
-        if (!s.entities.includes(entity)) throw new Error(`${entity} out of scope`);
+        if (!ents.every((e) => s.entities.includes(e))) throw new Error(`${ents.join("/")} out of scope`);
         const kind = kindOf(m.title); const on = centrikDate(m.event_date) ?? centrikDate(m.closed_on);
         const time = /^\d{1,2}:\d{2}/.test(m.event_time ?? "") ? m.event_time!.slice(0, 5).padStart(5, "0") : null;
         const att = attendeesOf(m.description ?? "").map((a) => ({ ...a, person_id: pid(a.name) }));
-        const number = `CTK-${m.no}${entitiesOf(m.title).length > 1 ? `-${entity}` : ""}`;
-        const row = { entity, kind, number, title: m.title.replace(/^\s*[A-Z/ ]+?\s*-\s*/, "").trim() || m.title, topic: kind === "sag" ? m.title.replace(/^.*?SAG\s*-\s*/i, "").trim() : null,
+        const number = `CTK-${m.no}`;
+        const row = { entity, entities: ents, kind, number, title: m.title.replace(/^\s*[A-Z/ ]+?\s*-\s*/, "").trim() || m.title, topic: kind === "sag" ? m.title.replace(/^.*?SAG\s*-\s*/i, "").trim() : null,
           status: "closed", planned_on: on, starts_at: on && time ? `${on}T${time}:00Z` : null, location: null, attendees: att, agenda: agendaFor(entity, kind === "other" ? "sag" : kind).map((x) => ({ ...x, notes: null })),
           minutes: (m.description ?? "").replace(/\*\*/g, "").trim() || null, closed_at: centrikDate(m.closed_on) ? `${centrikDate(m.closed_on)}T12:00:00Z` : on ? `${on}T18:00:00Z` : null,
-          source: "centrik", source_ref: `${m.caseId}${entitiesOf(m.title).length > 1 ? `:${entity}` : ""}`, updated_at: new Date().toISOString() };
+          source: "centrik", source_ref: m.caseId, updated_at: new Date().toISOString() };
         if (kind === "other") row.agenda = [];
         const { data: ex } = await db.from("committees").select("id").eq("source", "centrik").eq("source_ref", row.source_ref).maybeSingle();
         let id: string;
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
           }
           na++;
         }
-      } catch (e) { errors.push(`${m.no} ${entity}: ${(e as Error).message}`); }
+      } catch (e) { errors.push(`${m.no}: ${(e as Error).message}`); }
     }
   }
   return NextResponse.json({ ok: true, meetings: nm, actions: na, errors });
