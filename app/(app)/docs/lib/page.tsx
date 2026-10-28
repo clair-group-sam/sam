@@ -81,7 +81,9 @@ export default async function Library({ searchParams }: { searchParams: Promise<
     type Row = { ref: string; title: string | null; body_text: string; revision_id: string; revisions: { manual_id: string; step: string; manuals: { code: string; title: string; entity: string } } };
     const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !/^(or|and|et|ou)$/.test(w)).map((w) => w.replace(/^[-"]+|"+$/g, ""));
     const byM = new Map<string, Group>();
+    const currentRev = new Map(rows.map((r) => [r.manual.id, r.current?.id ?? null])); // only the text in force: the current published revision
     for (const h of (data ?? []) as unknown as Row[]) {
+      const cr = currentRev.get(h.revisions.manual_id); if (cr && h.revision_id !== cr) continue;
       const m = h.revisions.manuals; const low = h.body_text.toLowerCase();
       const i = Math.max(0, Math.min(...words.map((w) => { const k = low.indexOf(w); return k < 0 ? Infinity : k; })));
       const snippet = h.body_text.slice(Math.max(0, (Number.isFinite(i) ? i : 0) - 80), (Number.isFinite(i) ? i : 0) + 170).replace(/\s+/g, " ");
