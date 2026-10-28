@@ -132,7 +132,7 @@ export async function checkEffectiveness(fd: FormData) {
   let follow: string | null = null;
   if (verdict === "not_effective") {
     const number = await nextActionNumber(db(), a.entity);
-    const { data } = await db().from("safety_actions").insert({ entity: a.entity, number, module: a.module, kind: a.kind, title: `Follow-up of ${a.number} — ${a.title}`.slice(0, 300), description: note, owner_role: a.owner_role, owner_person: a.owner_person, source_kind: a.source_kind, report_id: a.report_id, hazard_id: a.hazard_id, assessment_id: a.assessment_id, created_by: s.person?.id ?? null }).select("*").single();
+    const { data } = await db().from("safety_actions").insert({ entity: a.entity, number, module: a.module, kind: a.kind, title: `Follow-up of ${a.number} — ${a.title}`.slice(0, 300), description: note, owner_role: a.owner_role, owner_person: a.owner_person, due: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10), source_kind: a.source_kind, report_id: a.report_id, hazard_id: a.hazard_id, assessment_id: a.assessment_id, created_by: s.person?.id ?? null }).select("*").single();
     const f = data as Action; follow = f.id; await ownerTask(f); await log(f.id, "created", s.person?.id ?? null, `Opened because ${a.number} was not effective — ${note}`);
     if (a.hazard_id) await db().from("hazards").update({ needs_review: true }).eq("id", a.hazard_id);
   }
