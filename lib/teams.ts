@@ -94,9 +94,13 @@ export async function members(ref: ConvRef): Promise<{ id: string; aadObjectId?:
 
 /* ---------- conversation references ---------- */
 export type TeamsConv = { person_id: string; teams_user_id: string | null; aad_object_id: string | null; conversation_id: string; service_url: string; tenant_id: string | null };
+/** Personal chats are "a:…" or "19:…@unq.gbl.spaces"; group chats end with @thread.v2, channels with @thread.tacv2 (+ ";messageid=…"). */
+export const isPersonalConversation = (id: string) => !/@thread\.(v2|tacv2|skype)/i.test(id);
 export async function conversationOf(db: SupabaseClient, personId: string): Promise<TeamsConv | null> {
   const { data } = await db.from("teams_conversations").select("*").eq("person_id", personId).maybeSingle();
-  return (data as TeamsConv | null) ?? null;
+  const c = (data as TeamsConv | null) ?? null;
+  if (c && !isPersonalConversation(c.conversation_id)) { await db.from("teams_conversations").delete().eq("person_id", personId); return null; } // a group chat slipped in: forget it
+  return c;
 }
 /** Person for a Teams user: by Entra object id, else by the e-mail the conversation members carry (and the oid is then kept). */
 export async function personFor(db: SupabaseClient, from: { id?: string; aadObjectId?: string }, ref: ConvRef, tenantId?: string, installedBy = "user"): Promise<{ id: string; display_name: string; roles: string[]; email: string | null } | null> {
@@ -110,7 +114,8 @@ export async function personFor(db: SupabaseClient, from: { id?: string; aadObje
     if (mail) { const { data } = await db.from("people").select("id,display_name,roles,email").ilike("email", mail).maybeSingle(); p = (data as P | null) ?? null; }
     if (p && from.aadObjectId) await db.from("people").update({ entra_oid: from.aadObjectId }).eq("id", p.id).is("entra_oid", null);
   }
-  if (p) await db.from("teams_conversations").upsert({ person_id: p.id, teams_user_id: from.id ?? null, aad_object_id: from.aadObjectId ?? null, conversation_id: ref.conversation_id, service_url: ref.service_url, tenant_id: tenantId ?? null, installed_by: installedBy, updated_at: new Date().toISOString() }, { onConflict: "person_id" });
+  // only a PERSONAL chat is kept as the person's conversation (a group chat or a channel must never receive their cards)
+  if (p && isPersonalConversation(ref.conversation_id)) await db.from("teams_conversations").upsert({ person_id: p.id, teams_user_id: from.id ?? null, aad_object_id: from.aadObjectId ?? null, conversation_id: ref.conversation_id, service_url: ref.service_url, tenant_id: tenantId ?? null, installed_by: installedBy, updated_at: new Date().toISOString() }, { onConflict: "person_id" });
   return p;
 }
 /** Opens the personal chat with the bot for a person who never opened it: installs the S.A.M. app for them through Graph
