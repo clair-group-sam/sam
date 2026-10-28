@@ -168,13 +168,26 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
 }
 
 /* ---------- cards ---------- */
-export type TaskRow = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null; teams?: { conversation_id: string; service_url: string; activity_id: string } | null; answer?: string | null; answered_via?: string | null };
-const KIND_LABEL: Record<string, string> = { authority: "Authority file", authority_followup: "Authority follow-up", reading: "Read & acknowledge", certificate_validity: "Validity", finding: "Finding", action: "Action", signature: "Signature", project: "Project", risk_acceptance: "Risk acceptance", risk_review: "Risk review", status_review: "Status review" };
+export type TaskRow = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null; created_at?: string; teams?: { conversation_id: string; service_url: string; activity_id: string } | null; answer?: string | null; answered_via?: string | null; answered_at?: string | null; teams_notified_at?: string | null };
+const KIND_LABEL: Record<string, string> = { authority: "Authority file", authority_followup: "Authority follow-up", reading: "Read & acknowledge", certificate_validity: "Validity", finding: "Finding", action: "Action", action_verify: "Verify an action", action_effectiveness: "Effectiveness", mitigation: "Mitigation", signature: "Signature", project: "Project", risk_acceptance: "Risk acceptance", risk_review: "Risk review", risk_intolerable: "Intolerable risk", safety_report: "Safety report", safety_question: "Question on your report", status_review: "Status review" };
+/** Kinds that can be answered from the card. The others need the app (a manual to read, evidence to attach, a decision to record, a signature). */
+export const ANSWERABLE_KINDS = new Set(["action", "action_verify", "mitigation", "authority", "authority_followup", "project", "finding", "status_review"]);
+const NEEDS_APP: Record<string, string> = { reading: "Open the manual in S.A.M. and acknowledge it there.", certificate_validity: "Drop the renewed document in S.A.M.", safety_report: "Acknowledge and classify the report in S.A.M.", safety_question: "Answer in S.A.M. (My reports).", risk_acceptance: "Record the decision in S.A.M.", risk_review: "Reassess the hazard in S.A.M.", risk_intolerable: "Decide in S.A.M.", action_effectiveness: "Record the effectiveness in S.A.M.", signature: "Sign in S.A.M." };
 const fr = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "");
+const todayISO = () => new Date().toISOString().slice(0, 10);
 export function origin(): string { return (process.env.SAM_ORIGIN ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://sam-jet-sigma.vercel.app")).replace(/\/$/, ""); }
+const hhmmUTC = (iso?: string | null) => { const d = iso ? new Date(iso) : new Date(); return `${fr(d.toISOString())} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`; };
+export type CardState = { answered: "done" | "not_yet" | "closed" | "superseded"; by: string; at: string; comment?: string | null };
+/** The final state of a task, as shown on its cards: answered from Teams, done in the app, or superseded. */
+export function stateOf(t: TaskRow, by?: string | null): CardState | undefined {
+  if (t.status === "open") return undefined;
+  if (t.answered_via === "teams") return { answered: t.answer != null && t.status === "open" ? "not_yet" : "done", by: by ?? "via Teams", at: hhmmUTC(t.answered_at), comment: t.answer };
+  if (t.status === "done") return { answered: "closed", by: by ?? "in S.A.M.", at: hhmmUTC(t.answered_at), comment: t.answer };
+  return { answered: "superseded", by: t.status, at: hhmmUTC() };
+}
 
 /** The card of one task: what it is, when, buttons Done / Not yet (+ comment) / Open in S.A.M. Once answered, the same card shows the answer and no button. */
-export function taskCard(t: TaskRow, state?: { answered: "done" | "not_yet"; by: string; at: string; comment?: string | null }): unknown {
+export function taskCard(t: TaskRow, state?: CardState): unknown {
   const kind = KIND_LABEL[t.kind] ?? t.kind.replace(/_/g, " ");
   const url = t.link ? `${origin()}${t.link}` : origin();
   const body: unknown[] = [
@@ -183,18 +196,37 @@ export function taskCard(t: TaskRow, state?: { answered: "done" | "not_yet"; by:
   ];
   if (t.detail) body.push({ type: "TextBlock", text: t.detail, wrap: true, spacing: "Small" });
   const facts: { title: string; value: string }[] = [];
-  if (t.due) facts.push({ title: "Due", value: fr(t.due) });
+  if (t.due) facts.push({ title: "Due", value: fr(t.due) + (t.due < todayISO() ? " — overdue" : "") });
   if (t.owner_role && !t.owner_person) facts.push({ title: "For", value: t.owner_role });
   if (facts.length) body.push({ type: "FactSet", facts, spacing: "Small" });
   const actions: unknown[] = [];
   if (state) {
-    body.push({ type: "TextBlock", text: `${state.answered === "done" ? "✓ Done" : "Not yet"} — ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" ? "Good" : "Attention", weight: "Bolder", spacing: "Medium" });
-  } else {
+    const label = state.answered === "done" ? "✓ Done" : state.answered === "not_yet" ? "Not yet" : state.answered === "closed" ? "✓ Done" : "No longer needed";
+    body.push({ type: "TextBlock", text: `${label} — ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" || state.answered === "closed" ? "Good" : state.answered === "not_yet" ? "Attention" : "Default", weight: "Bolder", spacing: "Medium" });
+  } else if (ANSWERABLE_KINDS.has(t.kind)) {
     body.push({ type: "Input.Text", id: "comment", placeholder: "Comment (optional — required for Not yet)", isMultiline: true, spacing: "Medium" });
     actions.push({ type: "Action.Execute", title: "Done", verb: "task_done", data: { taskId: t.id }, style: "positive" }, { type: "Action.Execute", title: "Not yet", verb: "task_not_yet", data: { taskId: t.id } });
+  } else {
+    body.push({ type: "TextBlock", text: NEEDS_APP[t.kind] ?? "Answer in S.A.M.", wrap: true, isSubtle: true, spacing: "Medium" });
   }
   actions.push({ type: "Action.OpenUrl", title: "Open in S.A.M.", url });
   return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions, msteams: { width: "Full" } };
+}
+/** One card listing several tasks (new batch, or the morning digest): title, due, entity — and the Inbox. */
+export function listCard(title: string, intro: string, tasks: TaskRow[], link = "/home/tasks"): unknown {
+  const t0 = todayISO();
+  const rows = tasks.slice(0, 10).map((t) => ({ type: "ColumnSet", spacing: "Small", columns: [
+    { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: `**${t.title}**`, wrap: true }, { type: "TextBlock", text: `${t.entity} · ${KIND_LABEL[t.kind] ?? t.kind.replace(/_/g, " ")}`, size: "Small", isSubtle: true, spacing: "None" }] },
+    { type: "Column", width: "auto", items: [{ type: "TextBlock", text: t.due ? fr(t.due) : "", size: "Small", color: t.due && t.due < t0 ? "Attention" : "Default", weight: t.due && t.due < t0 ? "Bolder" : "Default" }] },
+  ] }));
+  const body: unknown[] = [
+    { type: "TextBlock", text: "S.A.M.", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: title, size: "Medium", weight: "Bolder", wrap: true },
+    { type: "TextBlock", text: intro, wrap: true },
+    ...rows,
+  ];
+  if (tasks.length > 10) body.push({ type: "TextBlock", text: `… and ${tasks.length - 10} more in your Inbox.`, isSubtle: true, wrap: true });
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions: [{ type: "Action.OpenUrl", title: "Open my Inbox", url: `${origin()}${link}` }], msteams: { width: "Full" } };
 }
 export function infoCard(title: string, text: string, link?: string): unknown {
   return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body: [{ type: "TextBlock", text: "S.A.M.", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" }, { type: "TextBlock", text: title, size: "Medium", weight: "Bolder", wrap: true }, { type: "TextBlock", text, wrap: true }], actions: link ? [{ type: "Action.OpenUrl", title: "Open in S.A.M.", url: `${origin()}${link}` }] : [] };
@@ -202,36 +234,99 @@ export function infoCard(title: string, text: string, link?: string): unknown {
 
 /* ---------- who gets a task ---------- */
 type Person = { id: string; display_name: string; roles: string[]; email: string | null; entities: string[]; is_group_function: boolean };
+const isFor = (p: Person, t: Pick<TaskRow, "owner_person" | "owner_role" | "entity">) => t.owner_person ? p.id === t.owner_person : !!t.owner_role && (p.is_group_function || p.entities.includes(t.entity)) && p.roles.some((r) => basePost(r) === basePost(t.owner_role!));
 /** People a task is addressed to: the named person, or the holders (and deputies) of the post in the task's entity. */
 export async function recipientsOf(db: SupabaseClient, t: Pick<TaskRow, "owner_person" | "owner_role" | "entity">): Promise<Person[]> {
   if (t.owner_person) { const { data } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").eq("id", t.owner_person).maybeSingle(); return data ? [data as Person] : []; }
   if (!t.owner_role) return [];
   const { data } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").limit(500);
-  const post = basePost(t.owner_role);
-  return ((data ?? []) as Person[]).filter((p) => (p.is_group_function || p.entities.includes(t.entity)) && p.roles.some((r) => basePost(r) === post));
+  return ((data ?? []) as Person[]).filter((p) => isFor(p, t));
 }
+type CardRow = { id: number; task_id: string; person_id: string; conversation_id: string; service_url: string; activity_id: string; card_kind: string; updated_at: string | null };
+const BATCH_ABOVE = 4; // more new tasks than this for one person at once → one list card instead of one card each
 
-/** Sends the card of each task to its recipients (best effort, never throws); the first delivery is kept on the task for later updates. */
+/** Sends the cards of new tasks to their recipients (best effort, never throws). Each delivery is recorded in teams_cards; every task is marked notified. */
 export async function notifyTasks(db: SupabaseClient, tasks: TaskRow[]): Promise<number> {
-  if (!teamsConfigured()) return 0;
+  if (!teamsConfigured() || !tasks.length) return 0;
   let n = 0;
-  for (const t of tasks) {
-    try {
-      const people = await recipientsOf(db, t);
-      let first: { conversation_id: string; service_url: string; activity_id: string } | null = null;
-      for (const p of people) {
-        const conv = await ensureConversation(db, p);
-        if (!conv) continue;
-        const r = await sendCard(conv, taskCard(t), t.title);
-        if (r.ok && r.id) { n++; if (!first) first = { conversation_id: conv.conversation_id, service_url: conv.service_url, activity_id: r.id }; }
+  try {
+    const { data } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").limit(500);
+    const people = (data ?? []) as Person[];
+    const perPerson = new Map<string, TaskRow[]>();
+    for (const t of tasks) for (const p of people) if (isFor(p, t)) perPerson.set(p.id, [...(perPerson.get(p.id) ?? []), t]);
+    for (const [pid, mine] of perPerson) {
+      const p = people.find((x) => x.id === pid)!;
+      const conv = await ensureConversation(db, p);
+      if (!conv) continue;
+      const rows: Omit<CardRow, "id" | "updated_at">[] = [];
+      if (mine.length > BATCH_ABOVE) {
+        const r = await sendCard(conv, listCard(`${mine.length} new items for you`, "Answer each one from your Inbox.", mine), `${mine.length} new items`);
+        if (r.ok && r.id) { n++; for (const t of mine) rows.push({ task_id: t.id, person_id: pid, conversation_id: conv.conversation_id, service_url: conv.service_url, activity_id: r.id, card_kind: "batch" }); }
+      } else {
+        for (const t of mine) { const r = await sendCard(conv, taskCard(t), t.title); if (r.ok && r.id) { n++; rows.push({ task_id: t.id, person_id: pid, conversation_id: conv.conversation_id, service_url: conv.service_url, activity_id: r.id, card_kind: "task" }); } }
       }
-      if (first) await db.from("tasks").update({ teams: first }).eq("id", t.id);
-    } catch { /* Teams is a channel, never a blocker */ }
-  }
+      if (rows.length) await db.from("teams_cards").upsert(rows, { onConflict: "task_id,person_id", ignoreDuplicates: true });
+    }
+  } catch { /* Teams is a channel, never a blocker */ }
+  await db.from("tasks").update({ teams_notified_at: new Date().toISOString() }).in("id", tasks.map((t) => t.id));
   return n;
 }
 /** Convenience for callers that just inserted rows: fetch what was inserted and notify. */
 export async function notifyTasksByRef(db: SupabaseClient, refId: string): Promise<void> {
-  const { data } = await db.from("tasks").select("*").eq("ref_id", refId).eq("status", "open").is("teams", null);
+  const { data } = await db.from("tasks").select("*").eq("ref_id", refId).eq("status", "open").is("teams_notified_at", null);
   if (data?.length) await notifyTasks(db, data as TaskRow[]);
+}
+/** Refreshes every card of a task with its final state (all recipients), except the one being answered right now (Teams replaces it itself). */
+export async function refreshCards(db: SupabaseClient, t: TaskRow, state: CardState | undefined, exceptConversation?: string): Promise<void> {
+  const { data } = await db.from("teams_cards").select("*").eq("task_id", t.id).is("updated_at", null);
+  for (const c of (data ?? []) as CardRow[]) {
+    if (c.card_kind === "task" && c.conversation_id !== exceptConversation) await updateCard(c, c.activity_id, taskCard(t, state), t.title);
+    await db.from("teams_cards").update({ updated_at: new Date().toISOString() }).eq("id", c.id);
+  }
+}
+
+/* ---------- the sweep: one entry point for every task created anywhere ---------- */
+let lastSweep = 0;
+/** Notifies the open tasks nobody told Teams about yet, and refreshes the cards of tasks closed from the app. Cheap, idempotent, throttled per instance. */
+export async function sweepTeams(db: SupabaseClient, force = false): Promise<{ notified: number; refreshed: number }> {
+  const out = { notified: 0, refreshed: 0 };
+  if (!teamsConfigured()) return out;
+  if (!force && Date.now() - lastSweep < 45_000) return out;
+  lastSweep = Date.now();
+  try {
+    const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    const { data: fresh } = await db.from("tasks").select("*").eq("status", "open").is("teams_notified_at", null).gt("created_at", since).order("created_at").limit(60);
+    if (fresh?.length) out.notified = await notifyTasks(db, fresh as TaskRow[]);
+    const { data: stale } = await db.from("teams_cards").select("task_id, tasks!inner(*)").is("updated_at", null).neq("tasks.status", "open").limit(40);
+    const seen = new Set<string>();
+    for (const row of (stale ?? []) as unknown as { task_id: string; tasks: TaskRow }[]) {
+      if (seen.has(row.task_id)) continue; seen.add(row.task_id);
+      await refreshCards(db, row.tasks, stateOf(row.tasks)); out.refreshed++;
+    }
+  } catch { /* never a blocker */ }
+  return out;
+}
+
+/* ---------- morning digest ---------- */
+/** Once a day, one card per person with a Teams conversation: what is overdue and what is due within 7 days. Nothing when the Inbox is clear. */
+export async function morningDigest(db: SupabaseClient): Promise<number> {
+  if (!teamsConfigured()) return 0;
+  const t0 = todayISO();
+  const { data: convs } = await db.from("teams_conversations").select("*, digest_sent_on").limit(500);
+  const { data: ppl } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").limit(500);
+  const { data: open } = await db.from("tasks").select("*").eq("status", "open").order("due", { ascending: true, nullsFirst: false }).limit(2000);
+  const people = (ppl ?? []) as Person[]; const tasks = (open ?? []) as TaskRow[];
+  const horizon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  let n = 0;
+  for (const c of (convs ?? []) as (TeamsConv & { digest_sent_on: string | null })[]) {
+    if (c.digest_sent_on === t0) continue;
+    const p = people.find((x) => x.id === c.person_id); if (!p) continue;
+    const mine = tasks.filter((t) => isFor(p, t));
+    const overdue = mine.filter((t) => t.due && t.due < t0); const week = mine.filter((t) => t.due && t.due >= t0 && t.due <= horizon);
+    if (!overdue.length && !week.length) continue;
+    const title = `${overdue.length ? `${overdue.length} overdue` : ""}${overdue.length && week.length ? " · " : ""}${week.length ? `${week.length} due this week` : ""}`;
+    const r = await sendCard(c, listCard(`Good morning ${p.display_name.split(" ")[0]} — ${title}`, `${mine.length} item${mine.length > 1 ? "s" : ""} in your Inbox in all.`, [...overdue, ...week]), "Your day in S.A.M.");
+    if (r.ok) { n++; await db.from("teams_conversations").update({ digest_sent_on: t0 }).eq("person_id", c.person_id); }
+  }
+  return n;
 }

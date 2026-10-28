@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { centrikDate, centrikPerson, commaName } from "@/lib/centrik";
+import { sweepTeams } from "@/lib/teams";
 
 export const maxDuration = 300;
 /**
@@ -81,5 +82,6 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) { errors.push(`${c.no}: ${e instanceof Error ? e.message : String(e)}`); }
   }
+  await sweepTeams(db, true); // TMS-02 · cards for the actions just imported
   return NextResponse.json({ ok: true, reports: nr, actions: na, hazard_links: nh, errors });
 }

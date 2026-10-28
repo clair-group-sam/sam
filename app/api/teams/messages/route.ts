@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
-import { infoCard, personFor, sendCard, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
+import { ANSWERABLE_KINDS, infoCard, personFor, refreshCards, sendCard, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
 import { syncTasks, type AuthorityFile } from "@/lib/authority";
 
 // TMS-01 · the bot's messaging endpoint (Azure Bot → here). Three kinds of activity: the person opens the bot (install),
@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
       if (!task) return msgResponse("This task no longer exists.");
       const mine = task.owner_person ? task.owner_person === p.id : task.owner_role ? p.roles.map(basePost).includes(basePost(task.owner_role)) : true;
       if (!mine) return msgResponse("This task is not addressed to you.");
-      if (task.status !== "open") return cardResponse(taskCard(task, { answered: task.answer === "not yet" ? "not_yet" : "done", by: p.display_name, at: hhmm(), comment: task.answer }));
+      if (task.status !== "open") return cardResponse(taskCard(task, stateOf(task)));
+      if (!ANSWERABLE_KINDS.has(task.kind)) return msgResponse("This one is answered in S.A.M. (open it from the card).");
       if (verb === "task_not_yet" && !comment) return msgResponse("A short comment is needed with “Not yet” (what is missing, or when).");
       await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: comment || null, meta: { title: task.title } });
       if (verb === "task_done") {
@@ -72,7 +73,9 @@ export async function POST(req: NextRequest) {
         await journal(db, task, p.display_name, `Not yet (via Teams): ${comment}`);
       }
       await db.from("audit_log").insert({ actor: p.id, entity: task.entity, object_type: "task", object_id: task.id, action: verb, after: { via: "teams", comment } });
-      return cardResponse(taskCard(task, { answered: verb === "task_done" ? "done" : "not_yet", by: p.display_name, at: hhmm(), comment: comment || null }));
+      const state = { answered: verb === "task_done" ? "done" as const : "not_yet" as const, by: p.display_name, at: hhmm(), comment: comment || null };
+      if (verb === "task_done") await refreshCards(db, { ...task, status: "done", answered_via: "teams", answer: comment || null }, state, ref.conversation_id);
+      return cardResponse(taskCard(task, state));
     }
     return msgResponse("Unknown action.");
   }
@@ -90,7 +93,10 @@ export async function POST(req: NextRequest) {
     const mine = ((all ?? []) as TaskRow[]).filter((t) => t.owner_person ? t.owner_person === p.id : t.owner_role ? posts.has(basePost(t.owner_role)) : false).slice(0, 5);
     if (!mine.length) { await sendCard(ref, infoCard("Nothing waiting for you", "Your Inbox is empty. I will write here as soon as something needs you.", "/home/tasks")); return json({}); }
     await sendCard(ref, infoCard(`${mine.length} item${mine.length > 1 ? "s" : ""} waiting for you`, "Answer with the buttons, or open S.A.M.", "/home/tasks"));
-    for (const t of mine) { const r = await sendCard(ref, taskCard(t), t.title); if (r.ok && r.id && !t.teams) await db.from("tasks").update({ teams: { conversation_id: ref.conversation_id, service_url: ref.service_url, activity_id: r.id } }).eq("id", t.id); }
+    for (const t of mine) {
+      const r = await sendCard(ref, taskCard(t), t.title);
+      if (r.ok && r.id) await db.from("teams_cards").upsert({ task_id: t.id, person_id: p.id, conversation_id: ref.conversation_id, service_url: ref.service_url, activity_id: r.id, card_kind: "task", updated_at: null }, { onConflict: "task_id,person_id" });
+    }
     return json({});
   }
   return json({});
