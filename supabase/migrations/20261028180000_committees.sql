@@ -5,7 +5,7 @@
 create table if not exists committees (
   id uuid primary key default gen_random_uuid(),
   entity entity_code not null references entities(code),
-  kind text not null check (kind in ('srb','sag')),
+  kind text not null check (kind in ('srb','sag','other')),  -- other = another safety meeting (ERP drill, briefing…)
   number text not null,                        -- SRB 2026-S2 · SAG 2026-03 · CODIR 2026-Q4
   title text not null,
   topic text,                                  -- SAG: the topic (recurring findings, FDM trend, event, function…)

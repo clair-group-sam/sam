@@ -8,13 +8,13 @@ import type { Session } from "@/lib/session";
 
 export type Attendee = { name: string; role: string | null; person_id: string | null; present: boolean | null; note?: string | null };
 export type Item = { key: string; title: string; ref?: string | null; notes?: string | null; decision?: string | null };
-export type Committee = { id: string; entity: string; kind: "srb" | "sag"; number: string; title: string; topic: string | null; status: string; planned_on: string | null; starts_at: string | null; ends_at: string | null; location: string | null; attendees: Attendee[]; agenda: Item[]; pack: Pack | null; pack_at: string | null; minutes: string | null; minutes_model: string | null; parent_id: string | null; closed_at: string | null; source: string; source_ref: string | null; source_url: string | null; created_at: string };
+export type Committee = { id: string; entity: string; kind: "srb" | "sag" | "other"; number: string; title: string; topic: string | null; status: string; planned_on: string | null; starts_at: string | null; ends_at: string | null; location: string | null; attendees: Attendee[]; agenda: Item[]; pack: Pack | null; pack_at: string | null; minutes: string | null; minutes_model: string | null; parent_id: string | null; closed_at: string | null; source: string; source_ref: string | null; source_url: string | null; created_at: string };
 
 export const STATUS: Record<string, [string, string]> = { planned: ["Planned", "blue"], held: ["Held — minutes to issue", "amber"], closed: ["Minutes issued", "green"], cancelled: ["Cancelled", ""] };
 /** Safety desk organises (SM / CMM / FSO); the AM chairs the SRB. */
 export const mayRun = (s: Session) => isSafetyDesk(s);
-export const kindName = (entity: string, kind: string) => kind === "sag" ? "Safety Action Group" : entity === "ASF" ? "Compliance & safety review committee (CODIR)" : "Safety Review Board";
-export const kindShort = (entity: string, kind: string) => kind === "sag" ? "SAG" : entity === "ASF" ? "CODIR" : "SRB";
+export const kindName = (entity: string, kind: string) => kind === "other" ? "Safety meeting" : kind === "sag" ? "Safety Action Group" : entity === "ASF" ? "Compliance & safety review committee (CODIR)" : "Safety Review Board";
+export const kindShort = (entity: string, kind: string) => kind === "other" ? "MTG" : kind === "sag" ? "SAG" : entity === "ASF" ? "CODIR" : "SRB";
 
 /** Minimum frequency of the review board (MSM): AJD / ASJ ≥ 2 per calendar year (§4.5) · ASF ≥ 1 per quarter (§4.2). */
 export const CADENCE: Record<string, { perYear: number; label: string; ref: string }> = {
