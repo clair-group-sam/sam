@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   for (const c of body.cases) {
     try {
       if (!["AJD", "ASJ", "ASF", "TEC"].includes(c.entity) || !s.entities.includes(c.entity)) throw new Error(`entity ${c.entity} out of scope`);
-      const id = `CTK-${c.no}`;
+      const id = `${source === "flightlogger" ? "FL" : "CTK"}-${c.no}`; const tool = source === "flightlogger" ? "FlightLogger" : "Centrik";
       const closed = /closed/i.test(c.case_phase ?? "") || !!c.closed_on;
       const received = centrikDate(c.submitted_on) ?? (c.event_date ? `${centrikDate(c.event_date)}T12:00:00Z` : new Date().toISOString());
       const mandatory = /confirmed mor/i.test(c.confirmed_mor ?? "") || (/mandatory/i.test(c.reported_mor ?? "") && !/voluntary/i.test(c.confirmed_mor ?? ""));
@@ -36,17 +36,23 @@ export async function POST(req: NextRequest) {
         flight_ref: c.callsign && c.callsign !== "-" ? c.callsign : null, phase: c.phase && c.phase !== "-" ? c.phase : null, headline: c.title.slice(0, 300), narrative: c.description || c.title, location: c.location && c.location !== "-" ? c.location : null,
         anonymous: !c.submitted_by, reporter_person: pid(reporter), reporter_name: reporter, status: closed ? "closed" : c.case_phase && /investig|act|monitor/i.test(c.case_phase) ? "investigation" : "classified",
         closed_at: closed ? (centrikDate(c.closed_on) ? `${centrikDate(c.closed_on)}T12:00:00Z` : received) : null, acknowledged_at: received, classified_at: received,
-        mor_filed_at: mandatory ? received : null, mor_ref: mandatory ? "filed outside S.A.M. (Centrik)" : null,
+        mor_filed_at: mandatory ? received : null, mor_ref: mandatory ? `filed outside S.A.M. (${tool})` : null,
         source, source_ref: c.caseId, external_no: c.no, report_type: c.type?.split(" - ")[0] ?? null, source_erc: Number(c.erc) || null, occurrence_class: c.occurrence_class ?? null, risk_category: c.risk_category ?? null, event_type: c.event_type ?? null,
         investigation: c.investigation ?? null, findings: c.findings ?? null, closed_by_name: centrikPerson(c.closed_by)[0], hazard_label: c.hazard_link ?? null };
       const { error } = await db.from("reports").upsert(row, { onConflict: "id" }); if (error) throw new Error(error.message);
-      await db.from("report_analysis").upsert({ report_id: id, mor_status: mandatory ? "mandatory" : "voluntary", mor_basis: `As classified in Centrik: ${c.confirmed_mor || c.reported_mor || "—"}`, confirmed_at: received, summary: null, ran_at: received }, { onConflict: "report_id" });
+      await db.from("report_analysis").upsert({ report_id: id, mor_status: mandatory ? "mandatory" : "voluntary", mor_basis: `As classified in ${tool}: ${c.confirmed_mor || c.reported_mor || "not stated"}`, confirmed_at: received, summary: null, ran_at: received }, { onConflict: "report_id" });
       const { count } = await db.from("report_events").select("id", { count: "exact", head: true }).eq("report_id", id).eq("kind", "imported");
       if (!count) {
-        await db.from("report_events").insert({ report_id: id, kind: "imported", at: received, note: `Imported from Centrik — report ${c.no}${c.type ? ` (${c.type})` : ""}, received ${c.submitted_on ?? "—"}` });
-        if (closed) await db.from("report_events").insert({ report_id: id, kind: "closed", at: row.closed_at, note: `Closed in Centrik${row.closed_by_name ? ` by ${row.closed_by_name}` : ""}` });
+        await db.from("report_events").insert({ report_id: id, kind: "imported", at: received, note: `Imported from ${tool} — report ${c.no}${c.type ? ` (${c.type})` : ""}, received ${c.submitted_on ?? "—"}` });
+        if (closed) await db.from("report_events").insert({ report_id: id, kind: "closed", at: row.closed_at, note: `Closed in ${tool}${row.closed_by_name ? ` by ${row.closed_by_name}` : ""}` });
       }
       nr++;
+      // FlightLogger: the report's headline id is quoted in the ASF hazard log entries ("FL headlines 7410 (8), 7186 (1)")
+      const fl = /FL headline (\d+)/.exec(c.hazard_link ?? "");
+      if (fl) {
+        const { data: hz } = await db.from("hazards").select("id,risk_assessments!inner(kind)").eq("entity", c.entity).eq("risk_assessments.kind", "hazard_log").or(`description.ilike.%${fl[1]}%,title.ilike.%${fl[1]}%`).limit(3);
+        for (const h of (hz ?? []) as { id: string }[]) { await db.from("hazard_reports").upsert({ hazard_id: h.id, report_id: id }); nh++; }
+      }
       // the risk register link: "HZ - Bird and wildlife hazard (HZ OPS-14) → Bird Strikes During Flight"
       const m = /\((HZ[^)]+)\)\s*(?:→\s*(.+))?$/.exec(c.hazard_link ?? "");
       if (m) {
