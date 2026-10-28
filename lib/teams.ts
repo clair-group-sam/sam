@@ -120,7 +120,11 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
     const u = encodeURIComponent(person.email);
     const appId = TEAMS_APP_ID;
     const inst = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps`, { method: "POST", headers: H, body: JSON.stringify({ "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}` }) });
-    if (!inst.ok && inst.status !== 409) return fail("install", inst, await inst.text());
+    if (!inst.ok && inst.status !== 409) {
+      // which application permissions the token actually carries (Entra consent is visible here, not in the portal)
+      let roles = "?"; try { roles = (JSON.parse(Buffer.from(t.split(".")[1], "base64url").toString()) as { roles?: string[] }).roles?.join(", ") || "none"; } catch { /* keep ? */ }
+      return fail(`install (token roles: ${roles})`, inst, await inst.text());
+    }
     const lr = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps?$expand=teamsApp&$filter=teamsApp/id eq '${appId}'`, { headers: H });
     if (!lr.ok) return fail("list", lr, await lr.text());
     const list = (await lr.json()) as { value?: { id: string }[] };
