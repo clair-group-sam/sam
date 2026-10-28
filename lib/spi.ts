@@ -29,7 +29,14 @@ export async function computedMetrics(entity: string, months: string[]): Promise
     .map((r) => ({ ...r, a: Array.isArray(r.report_analysis) ? r.report_analysis[0] ?? null : r.report_analysis }))
     .filter((r) => !/^\s*test\b/i.test(r.headline));
   const logIds = ((ra ?? []) as { id: string; kind: string }[]).filter((x) => x.kind === "hazard_log").map((x) => x.id);
-  const { data: hz } = logIds.length ? await db.from("hazards").select("created_at,assessment_id,source_ref,proposed").in("assessment_id", logIds).limit(5000) : { data: [] };
+  const { data: hz } = logIds.length ? await db.from("hazards").select("id,created_at,assessment_id,source_ref,proposed").in("assessment_id", logIds).limit(5000) : { data: [] };
+  const hzIds = ((hz ?? []) as { id: string }[]).map((h) => h.id);
+  const { data: links } = hzIds.length ? await db.from("hazard_reports").select("hazard_id,reports(received_at)").in("hazard_id", hzIds).limit(10000) : { data: [] };
+  const firstReport = new Map<string, string>();
+  for (const l of (links ?? []) as unknown as { hazard_id: string; reports: { received_at: string } | { received_at: string }[] | null }[]) {
+    const r = Array.isArray(l.reports) ? l.reports[0] : l.reports; if (!r) continue;
+    const was = firstReport.get(l.hazard_id); if (!was || r.received_at < was) firstReport.set(l.hazard_id, r.received_at);
+  }
   const raById = new Map(((ra ?? []) as { id: string; conducted_on: string | null }[]).map((x) => [x.id, x]));
 
   const idx = new Map(months.map((m, i) => [m, i]));
@@ -53,9 +60,9 @@ export async function computedMetrics(entity: string, months: string[]): Promise
       if (isAcc) inc("acc", i); if (isSi) inc("si", i); if (isAcc || isSi) inc("acc_si", i);
       if (t === "HAZ" || /hazard report/i.test(t)) inc("type_haz", i);
       if (t === "DGR") inc("type_dgr", i);
-      if (t === "FAT" || /fatigue/.test(tx)) inc("type_fat", i);
+      if (t === "FAT" || /fatigue/i.test(r.headline)) inc("type_fat", i);
       if (/bird|wildlife/.test(tx)) inc("kw_bird", i);
-      if (/tcas/.test(tx)) inc("kw_tcas", i);
+      if (/tcas\s*-?\s*ra\b|resolution advisory/.test(tx)) inc("kw_tcas", i);
       if (/laser/.test(tx)) inc("kw_laser", i);
       rat("anon_pct", i, r.anonymous);
       rat("dexres_pct", i, t === "DEX" || t === "RES");
@@ -79,9 +86,9 @@ export async function computedMetrics(entity: string, months: string[]): Promise
     const d = x.kind === "moc" ? x.start_date ?? x.conducted_on : x.conducted_on; const when = d ?? (x.source === "sam" ? x.created_at : null);
     if (when) inc(x.kind === "moc" ? "moc_count" : "ra_count", idx.get(ym(when)));
   }
-  for (const h of (hz ?? []) as { created_at: string; assessment_id: string; source_ref: string | null; proposed: boolean }[]) {
-    if (h.proposed) continue;
-    const when = h.source_ref ? raById.get(h.assessment_id)?.conducted_on ?? null : h.created_at;
+  for (const h of (hz ?? []) as { id: string; created_at: string; assessment_id: string; source_ref: string | null; proposed: boolean }[]) {
+    if (h.proposed) continue; // identified through reporting = its first linked report; else the date of the log entry
+    const when = firstReport.get(h.id) ?? (h.source_ref ? raById.get(h.assessment_id)?.conducted_on ?? null : h.created_at);
     if (when) inc("new_hazards", idx.get(ym(when)));
   }
   for (const [k, v] of Object.entries(ratio)) out[k] = months.map((_, i) => (v.den[i] ? { num: v.num[i], den: v.den[i], src: "sam" as const } : null));
@@ -125,7 +132,9 @@ export async function spiBoard(entity: string, year: number, opts: { includeProp
     const quarter = valueOver(d, cells.slice(qs, qe), act.slice(qs, qe));
     const quarterT = d.period === "year" ? proRata(d, t, 3 * (q + 1), 12) : d.period === "quarter" ? proRata(d, t, qe - qs, 3) : d.basis === "count" && aggOf(d) === "sum" && t?.target != null ? { ...t, target: t.target * (qe - qs), alert: t.alert == null ? null : t.alert * (qe - qs) } : t;
     const ytd = valueOver(d, cells.slice(0, months.length), act.slice(0, months.length));
-    const ytdTarget = d.basis !== "count" || aggOf(d) !== "sum" ? t : d.period === "year" ? proRata(d, t, months.length, 12) : t?.target == null ? t : { ...t, target: t.target * (d.period === "quarter" ? months.length / 3 : months.length), alert: t.alert == null ? null : t.alert * (d.period === "quarter" ? months.length / 3 : months.length) };
+    const withData = cells.slice(0, months.length).filter(Boolean).length; // a count set per month / quarter is expected for the months that have data
+    const f = d.period === "quarter" ? withData / 3 : withData;
+    const ytdTarget = d.basis !== "count" || aggOf(d) !== "sum" ? t : d.period === "year" ? proRata(d, t, months.length, 12) : t?.target == null ? t : { ...t, target: Math.round(t.target * f * 10) / 10, alert: t.alert == null ? null : Math.round(t.alert * f * 10) / 10 };
     const lastTwo = monthVerdicts.slice(0, months.length).filter((v) => v != null).slice(-2);
     return { ...d, t, cells, monthVerdicts, quarter, quarterVerdict: judge(quarter, d.direction, quarterT), ytd, ytdVerdict: judge(ytd, d.direction, ytdTarget), ytdTarget, offTwice: lastTwo.length === 2 && lastTwo.every((v) => v === "improve" || v === "far") };
   });

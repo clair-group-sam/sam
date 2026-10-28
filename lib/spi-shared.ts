@@ -14,9 +14,9 @@ export const METRICS: Record<string, { label: string; kind: "count" | "ratio" | 
   acc_si: { label: "Accidents and serious incidents", kind: "count", how: "reports whose occurrence class is an accident or a serious incident" },
   type_haz: { label: "Hazard reports (HAZ)", kind: "count", how: "reports of type HAZ / hazard report" },
   type_dgr: { label: "Dangerous goods reports (DGR)", kind: "count", how: "reports of type DGR" },
-  type_fat: { label: "Fatigue reports", kind: "count", how: "reports of type FAT / fatigue" },
+  type_fat: { label: "Fatigue reports", kind: "count", how: "reports of type FAT, or whose title mentions fatigue" },
   kw_bird: { label: "Birdstrike / wildlife", kind: "count", how: "reports mentioning a bird strike or wildlife (title, type, event type, category)" },
-  kw_tcas: { label: "TCAS RA", kind: "count", how: "reports mentioning a TCAS RA (title, type, event type, category)" },
+  kw_tcas: { label: "TCAS RA", kind: "count", how: "reports mentioning a TCAS RA / resolution advisory (title, type, event type, category)" },
   kw_laser: { label: "Laser attacks", kind: "count", how: "reports mentioning a laser (title, type, event type, category)" },
   anon_pct: { label: "Anonymous reports", kind: "ratio", how: "anonymous reports ÷ reports received" },
   dexres_pct: { label: "DEX + RES reports", kind: "ratio", how: "reports of type DEX or RES ÷ reports received" },
@@ -25,7 +25,7 @@ export const METRICS: Record<string, { label: string; kind: "count" | "ratio" | 
   mor_72h: { label: "MOR filed within 72 h", kind: "ratio", how: "MOR filed within 72 h of receipt in S.A.M. ÷ MOR received in S.A.M. (history: entered values)" },
   closed90_pct: { label: "Reports closed in ≤ 90 days", kind: "ratio", how: "reports closed in the month within 90 days of receipt ÷ reports closed in the month" },
   open90: { label: "Reports open > 90 days", kind: "snapshot", how: "reports still open at month end and received more than 90 days before" },
-  new_hazards: { label: "New hazards in the hazard log", kind: "count", how: "hazards added to the hazard log (date of the entry)" },
+  new_hazards: { label: "New hazards in the hazard log", kind: "count", how: "hazards of the hazard log, dated by the first safety report linked to them (identified through reporting), else by their log entry" },
   ra_count: { label: "Risk assessments", kind: "count", how: "risk assessments conducted (not cancelled)" },
   moc_count: { label: "Management of change files", kind: "count", how: "MOC files opened (not cancelled)" },
   actions_late: { label: "Safety actions overdue", kind: "snapshot", how: "safety actions open past their due date at month end" },
@@ -70,11 +70,11 @@ export function valueOver(d: Pick<SpiDef, "agg" | "basis" | "metric">, cells: Ce
     return pct.length ? pct.reduce((t, x) => t + x, 0) / pct.length : null;
   }
   const b = BASIS[d.basis];
-  const sum = have.reduce((t, [c]) => t + c!.num, 0);
-  if (!b.den) return sum;
-  const hours = have.reduce((t, [, i]) => t + (activity[i] ?? 0), 0);
+  if (!b.den) return have.reduce((t, [c]) => t + c!.num, 0);
+  const rated = have.filter(([, i]) => (activity[i] ?? 0) > 0); // a rate only over the months whose activity is entered
+  const hours = rated.reduce((t, [, i]) => t + (activity[i] ?? 0), 0);
   if (!hours) return null; // no activity entered: no rate
-  return (sum * b.per) / hours;
+  return (rated.reduce((t, [c]) => t + c!.num, 0) * b.per) / hours;
 }
 
 export type Verdict = "ok" | "improve" | "far" | "none" | "nodata";

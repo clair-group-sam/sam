@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENT } from "@/lib/nav";
 import { PageHeader, Metric } from "@/components/Page";
 import { MonthBars, MonthCells, monthShort } from "@/components/SpiCharts";
-import { AREA, BASIS, METRICS, VERDICT, computedMetrics, fmt, mayEditSpi, spiBoard, targetText, type Board, type SpiRow } from "@/lib/spi";
+import { AREA, BASIS, METRICS, VERDICT, computedMetrics, fmt, mayEditSpi, spiBoard, targetText, type SpiRow } from "@/lib/spi";
 import { draftCommentary, saveCommentary } from "./actions";
 
 type Sp = { y?: string; all?: string };
@@ -110,7 +110,7 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
 }
 
 function SpiLineRow({ r, labels }: { r: SpiRow; labels: string[] }) {
-  const vals = r.cells.map((c) => !c ? null : r.basis === "percent" ? (c.den != null ? (c.den ? fmt((c.num / c.den) * 100, "percent") : null) : fmt(c.num, "percent")) : fmt(c.num, r.basis === "score" ? "score" : "count"));
+  const vals = r.cells.map((c) => !c ? null : r.basis === "percent" ? (c.den != null ? (c.den ? String(Math.round((c.num / c.den) * 100)) : null) : String(Math.round(c.num))) : fmt(c.num, r.basis === "score" ? "score" : "count"));
   const v = VERDICT[r.ytdVerdict]; const src = r.metric ? `S.A.M. · ${METRICS[r.metric]?.label ?? r.metric}` : "entered monthly";
   return (
     <tr className={r.status === "proposed" ? "proposed" : ""}>
@@ -125,23 +125,25 @@ function SpiLineRow({ r, labels }: { r: SpiRow; labels: string[] }) {
 }
 
 async function GroupView({ ents, year, yearLinks }: { ents: string[]; year: number; yearLinks: React.ReactNode }) {
-  const boards: [string, Board][] = await Promise.all(ents.map(async (e) => [e, await spiBoard(e, year)] as [string, Board]));
-  const pick = (b: Board, metric: string) => b.rows.find((r) => r.metric === metric);
-  const KEYS: [string, string][] = [["reports", "Reports"], ["mor", "MOR"], ["significant", "ERC ≥ 100"], ["acc_si", "Acc. + serious inc."], ["open90", "Open > 90 d"]];
+  const now = new Date(); const upTo = year < now.getUTCFullYear() ? `${year}-12` : now.toISOString().slice(0, 7);
+  const months = Array.from({ length: Number(upTo.slice(5)) }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const data = await Promise.all(ents.map(async (e) => ({ e, b: await spiBoard(e, year), c: await computedMetrics(e, months) })));
+  const sum = (c: Record<string, ({ num: number } | null)[]>, k: string) => c[k].reduce((t, x) => t + (x?.num ?? 0), 0);
   return (
     <>
-      <PageHeader eyebrow="Safety · Safety assurance" title="Overview — Group view" sub="Safety performance of every entity in your scope. Pick an entity in the top bar to work on its SPIs." right={yearLinks} />
+      <PageHeader eyebrow="Safety · Safety assurance" title="Overview — Group view" sub={`Safety performance ${year} of every entity in your scope (to ${monthShort(upTo)}). Pick an entity in the top bar to work on its SPIs.`} right={yearLinks} />
       <section className="card">
         <table className="tbl">
-          <thead><tr><th>Entity</th><th>Reports rate (YTD)</th>{KEYS.slice(1).map(([, l]) => <th key={l}>{l}</th>)}<th>SPIs {year}</th></tr></thead>
-          <tbody>{boards.map(([e, b]) => {
-            const rr = pick(b, "reports"); const act = b.rows.filter((r) => r.status === "active");
-            const cnt = (m: string) => { const r = pick(b, m) ?? pick(b, m === "acc_si" ? "acc" : m); return r ? fmt(r.ytd, r.basis === "count" ? "count" : r.basis) + (BASIS[r.basis].den ? " " + BASIS[r.basis].short : "") : "—"; };
+          <thead><tr><th>Entity</th><th>Reports</th><th>Reporting rate</th><th>MOR</th><th>ERC ≥ 100</th><th>Acc. + serious inc.</th><th>Open &gt; 90 d</th><th>Actions overdue</th><th>SPIs</th></tr></thead>
+          <tbody>{data.map(({ e, b, c }) => {
+            const rr = b.rows.find((r) => r.metric === "reports"); const act = b.rows.filter((r) => r.status === "active");
             return (
               <tr key={e}>
                 <td><span className={"ent " + e}>{e}</span> <b>{ENT[e]?.name ?? e}</b></td>
-                <td className="mono">{rr ? `${fmt(rr.ytd, rr.basis)} ${BASIS[rr.basis].short}` : "—"}{rr?.t?.target != null && <span className={"pill ml-1 " + VERDICT[rr.ytdVerdict][1]}>{targetText(rr, rr.t)}</span>}</td>
-                {KEYS.slice(1).map(([m]) => <td key={m} className="mono">{cnt(m)}</td>)}
+                <td className="mono">{sum(c, "reports")}</td>
+                <td className="mono">{rr && rr.ytd != null ? <>{fmt(rr.ytd, rr.basis)} {BASIS[rr.basis].short} <span className={"pill " + VERDICT[rr.ytdVerdict][1]}>{targetText(rr, rr.t)}</span></> : <span className="mini">{rr ? "hours not entered" : "—"}</span>}</td>
+                <td className="mono">{sum(c, "mor")}</td><td className="mono">{sum(c, "significant")}</td><td className="mono">{sum(c, "acc_si")}</td>
+                <td className="mono">{c.open90[c.open90.length - 1]?.num ?? 0}</td><td className="mono">{c.actions_late[c.actions_late.length - 1]?.num ?? 0}</td>
                 <td>{act.length ? <span className="flex gap-1 flex-wrap"><span className="pill green">{act.filter((r) => r.ytdVerdict === "ok").length}</span><span className="pill amber">{act.filter((r) => r.ytdVerdict === "improve").length}</span><span className="pill red">{act.filter((r) => r.ytdVerdict === "far").length}</span></span> : <span className="mini">{b.rows.length ? `${b.rows.length} proposed` : "no SPI set"}</span>}</td>
               </tr>);
           })}</tbody>
