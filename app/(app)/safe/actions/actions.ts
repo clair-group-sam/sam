@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isOwner, mayManageActions, mayVerifyActions, nextActionNumber, type Action } from "@/lib/actions";
+import { completeAction, verifyActionCore } from "@/lib/actions-core";
 
 const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
@@ -97,30 +98,12 @@ export async function markDone(fd: FormData) {
   if (!["open", "in_progress"].includes(a.status)) return;
   const note = str(fd, "done_note"); if (!note) throw new Error("Say what was done.");
   const got = await storeEvidence(s, a, fd);
-  const { count } = await db().from("safety_action_evidence").select("id", { count: "exact", head: true }).eq("action_id", a.id);
-  if (!count) throw new Error("Add the evidence (a file, the name of a document kept on the server, or a note describing it).");
-  await db().from("safety_actions").update({ status: "done", done_at: new Date().toISOString(), done_by: s.person?.id ?? null, done_note: note, updated_at: new Date().toISOString() }).eq("id", a.id);
-  await closeTasks(a.id, ["action"]);
-  await db().from("tasks").insert({ entity: a.entity, kind: "action_verify", title: `Verify ${a.number} — ${a.title}`.slice(0, 200), detail: `Done by ${s.name}: ${note}`.slice(0, 500), owner_role: "SM", status: "open", link: `/safe/actions/${a.id}`, ref_id: a.id });
-  await log(a.id, "done", s.person?.id ?? null, `Done by ${s.name} — ${note}${got ? ` (evidence: ${got})` : ""}`); touch(a);
+  await completeAction(db(), { personId: s.person?.id ?? null, name: s.name }, a, note + (got ? ` (evidence: ${got})` : ""), null, "app"); touch(a);
 }
 /** Safety desk: accept (closed, with a date to check effectiveness) or send back to the owner. */
 export async function verifyAction(fd: FormData) {
   const a = await load(String(fd.get("id"))); const s = await me(a.entity, mayVerifyActions, "Verification is made by the safety desk (SM / CMM).");
-  if (a.status !== "done") return;
-  const note = str(fd, "verified_note");
-  if (fd.get("verdict") === "back") {
-    if (!note) throw new Error("Say what is missing.");
-    await db().from("safety_actions").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("id", a.id);
-    await closeTasks(a.id, ["action_verify"]); await ownerTask({ ...a, title: `${a.title} — completion requested` });
-    await log(a.id, "sent_back", s.person?.id ?? null, `Sent back to the owner by ${s.name} — ${note}`); return touch(a);
-  }
-  const eff = str(fd, "effectiveness_due");
-  await db().from("safety_actions").update({ status: "verified", verified_at: new Date().toISOString(), verified_by: s.person?.id ?? null, verified_note: note, effectiveness_due: eff, updated_at: new Date().toISOString() }).eq("id", a.id);
-  await closeTasks(a.id, ["action_verify"]);
-  if (a.mitigation_id) await db().from("hazard_mitigations").update({ done_at: new Date().toISOString() }).eq("id", a.mitigation_id).is("done_at", null);
-  if (a.report_id) await db().from("report_events").insert({ report_id: a.report_id, kind: "action", actor: s.person?.id ?? null, note: `Action ${a.number} verified and closed` });
-  await log(a.id, "verified", s.person?.id ?? null, `Verified and closed by ${s.name}${note ? ` — ${note}` : ""}${eff ? `; effectiveness to check on ${eff}` : ""}`); touch(a);
+  await verifyActionCore(db(), { personId: s.person?.id ?? null, name: s.name }, a, fd.get("verdict") === "back" ? "back" : "accept", str(fd, "verified_note"), str(fd, "effectiveness_due"), "app"); touch(a);
 }
 /** Effectiveness check (on the date set at closure): effective, or not effective → a follow-up action is opened. */
 export async function checkEffectiveness(fd: FormData) {

@@ -173,7 +173,7 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
 }
 
 /* ---------- cards ---------- */
-export type TaskRow = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null; created_at?: string; teams?: { conversation_id: string; service_url: string; activity_id: string } | null; answer?: string | null; answered_via?: string | null; answered_at?: string | null; teams_notified_at?: string | null };
+export type TaskRow = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null; ref_id?: string | null; created_at?: string; teams?: { conversation_id: string; service_url: string; activity_id: string } | null; answer?: string | null; answered_via?: string | null; answered_at?: string | null; teams_notified_at?: string | null };
 const KIND_LABEL: Record<string, string> = { authority: "CAA application", authority_followup: "Authority follow-up", reading: "Read & acknowledge", certificate_validity: "Validity", finding: "Finding", action: "Action", action_verify: "Verify an action", action_effectiveness: "Effectiveness", mitigation: "Mitigation", signature: "Signature", project: "Project", risk_acceptance: "Risk acceptance", risk_review: "Risk review", risk_intolerable: "Intolerable risk", safety_report: "Safety report", safety_question: "Question on your report", status_review: "Status review" };
 /** Kinds that can be answered from the card. The others need the app (a manual to read, evidence to attach, a decision to record, a signature). */
 export const ANSWERABLE_KINDS = new Set(["action", "action_verify", "mitigation", "authority", "authority_followup", "project", "finding", "status_review"]);
@@ -192,7 +192,8 @@ export function stateOf(t: TaskRow, by?: string | null): CardState | undefined {
 }
 
 /** The card of one task: what it is, when, buttons Done / Not yet (+ comment) / Open in S.A.M. Once answered, the same card shows the answer and no button. */
-export function taskCard(t: TaskRow, state?: CardState): unknown {
+export type CardOpts = { actions?: unknown[]; hint?: string; doneTitle?: string; commentHint?: string };
+export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): unknown {
   const kind = KIND_LABEL[t.kind] ?? t.kind.replace(/_/g, " ");
   const url = t.link ? `${origin()}${t.link}` : origin();
   const body: unknown[] = [
@@ -208,14 +209,42 @@ export function taskCard(t: TaskRow, state?: CardState): unknown {
   if (state) {
     const label = state.answered === "done" ? "✓ Done" : state.answered === "not_yet" ? "Not yet" : state.answered === "closed" ? "✓ Done" : "No longer needed";
     body.push({ type: "TextBlock", text: `${label} — ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" || state.answered === "closed" ? "Good" : state.answered === "not_yet" ? "Attention" : "Default", weight: "Bolder", spacing: "Medium" });
+  } else if (opts.actions) {
+    if (opts.hint) body.push({ type: "TextBlock", text: opts.hint, wrap: true, isSubtle: true, spacing: "Medium" });
+    body.push({ type: "Input.Text", id: "comment", placeholder: opts.commentHint ?? "Comment", isMultiline: true, spacing: "Small" });
+    actions.push(...opts.actions);
   } else if (ANSWERABLE_KINDS.has(t.kind)) {
-    body.push({ type: "Input.Text", id: "comment", placeholder: "Comment (optional — required for Not yet)", isMultiline: true, spacing: "Medium" });
-    actions.push({ type: "Action.Execute", title: "Done", verb: "task_done", data: { taskId: t.id }, style: "positive" }, { type: "Action.Execute", title: "Not yet", verb: "task_not_yet", data: { taskId: t.id } });
+    body.push({ type: "Input.Text", id: "comment", placeholder: opts.commentHint ?? "Comment (optional — required for Not yet)", isMultiline: true, spacing: "Medium" });
+    actions.push({ type: "Action.Execute", title: opts.doneTitle ?? "Done", verb: "task_done", data: { taskId: t.id }, style: "positive" }, { type: "Action.Execute", title: "Not yet", verb: "task_not_yet", data: { taskId: t.id } });
   } else {
     body.push({ type: "TextBlock", text: NEEDS_APP[t.kind] ?? "Answer in S.A.M.", wrap: true, isSubtle: true, spacing: "Medium" });
   }
   actions.push({ type: "Action.OpenUrl", title: "Open in S.A.M.", url });
   return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions, msteams: { width: "Full" } };
+}
+/** The card of a task with the buttons its kind calls for: stage moves for Compliance on an authority file, accept / send back on a verification,
+ *  Done with the evidence note on a safety action, plain Done / Not yet otherwise. */
+export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState): Promise<unknown> {
+  if (state) return taskCard(t, state);
+  try {
+    if (t.kind === "authority" && t.ref_id) {
+      const { movesFrom } = await import("@/lib/authority");
+      const { data: f } = await db.from("authority_files").select("id,stage,type_code,owner_role,owner_person").eq("id", t.ref_id).maybeSingle();
+      const file = f as { id: string; stage: string; type_code: string } | null;
+      if (file && file.stage !== "draft") {
+        const { data: ty } = await db.from("authority_file_types").select("needs_signature").eq("code", file.type_code).maybeSingle();
+        // Compliance moves from the card — except the submission itself (COM-03: Submit stays a deliberate act with its reference) and standby
+        const moves = movesFrom(file.stage as never, !!(ty as { needs_signature?: boolean } | null)?.needs_signature).filter((m) => m.by === "cmm" && m.to !== "standby" && !(m.to === "submitted" && file.stage === "ready")).slice(0, 3);
+        if (moves.length) return taskCard(t, undefined, { hint: `Stage: ${file.stage}. Compliance only.`, commentHint: "Note (required for the moves marked *)", actions: moves.map((m) => ({ type: "Action.Execute", title: `${m.label}${m.needsNote ? " *" : ""}`, verb: "file_move", style: m.primary ? "positive" : undefined, data: { taskId: t.id, fileId: file.id, to: m.to } })) });
+      }
+      return taskCard(t);
+    }
+    if (t.kind === "action_verify") return taskCard(t, undefined, { hint: "Safety desk: accept the completion (closed; effectiveness checked later) or send it back to the owner with what is missing.", commentHint: "Note (required to send back)", actions: [
+      { type: "Action.Execute", title: "Accept & close", verb: "action_verify", style: "positive", data: { taskId: t.id, verdict: "accept" } },
+      { type: "Action.Execute", title: "Send back", verb: "action_verify", data: { taskId: t.id, verdict: "back" } }] });
+    if (t.kind === "action") return taskCard(t, undefined, { doneTitle: "Done — with this note as evidence", commentHint: "What was done, and where the evidence is (required for Done)" });
+  } catch { /* fall through to the plain card */ }
+  return taskCard(t);
 }
 /** One card listing several tasks (new batch, or the morning digest): title, due, entity — and the Inbox. */
 export function listCard(title: string, intro: string, tasks: TaskRow[], link = "/home/tasks"): unknown {
@@ -268,7 +297,7 @@ export async function notifyTasks(db: SupabaseClient, tasks: TaskRow[]): Promise
         const r = await sendCard(conv, listCard(`${mine.length} new items for you`, "Answer each one from your Inbox.", mine), `${mine.length} new items`);
         if (r.ok && r.id) { n++; for (const t of mine) rows.push({ task_id: t.id, person_id: pid, conversation_id: conv.conversation_id, service_url: conv.service_url, activity_id: r.id, card_kind: "batch" }); }
       } else {
-        for (const t of mine) { const r = await sendCard(conv, taskCard(t), t.title); if (r.ok && r.id) { n++; rows.push({ task_id: t.id, person_id: pid, conversation_id: conv.conversation_id, service_url: conv.service_url, activity_id: r.id, card_kind: "task" }); } }
+        for (const t of mine) { const r = await sendCard(conv, await cardFor(db, t), t.title); if (r.ok && r.id) { n++; rows.push({ task_id: t.id, person_id: pid, conversation_id: conv.conversation_id, service_url: conv.service_url, activity_id: r.id, card_kind: "task" }); } }
       }
       if (rows.length) await db.from("teams_cards").upsert(rows, { onConflict: "task_id,person_id", ignoreDuplicates: true });
     }

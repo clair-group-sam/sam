@@ -1,7 +1,10 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
-import { ANSWERABLE_KINDS, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
+import { ANSWERABLE_KINDS, cardFor, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
+import { applyMove } from "@/lib/authority-moves";
+import { completeAction, verifyActionCore } from "@/lib/actions-core";
+import type { Action } from "@/lib/actions";
 import { syncTasks, type AuthorityFile } from "@/lib/authority";
 import { after } from "next/server";
 import { createFromCard, createdCard, discardedCard, draftCard, draftReport, readThread, threadRefOf } from "@/lib/teams-draft";
@@ -68,7 +71,14 @@ export async function POST(req: NextRequest) {
       if (!ANSWERABLE_KINDS.has(task.kind)) return msgResponse("This one is answered in S.A.M. (open it from the card).");
       if (verb === "task_not_yet" && !comment) return msgResponse("A short comment is needed with “Not yet” (what is missing, or when).");
       await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: comment || null, meta: { title: task.title } });
-      if (verb === "task_done") {
+      if (verb === "task_done" && task.kind === "action" && (task as { ref_id?: string | null }).ref_id) {
+        // a safety action: same rule as the app — the note is the evidence, the SM verification opens
+        if (!comment) return msgResponse("Say what was done and where the evidence is — the note is kept as evidence.");
+        const { data: ad } = await db.from("safety_actions").select("*").eq("id", (task as { ref_id?: string }).ref_id!).maybeSingle();
+        if (!ad) return msgResponse("The action no longer exists.");
+        try { await completeAction(db, { personId: p.id, name: p.display_name }, ad as Action, comment, comment, "teams"); } catch (e) { return msgResponse(e instanceof Error ? e.message : "Refused"); }
+        await db.from("tasks").update({ answered_via: "teams", answered_at: now(), answer: comment }).eq("id", task.id);
+      } else if (verb === "task_done") {
         await db.from("tasks").update({ status: "done", answered_via: "teams", answered_at: now(), answer: comment || null }).eq("id", task.id);
         await journal(db, task, p.display_name, `Done via Teams${comment ? `: ${comment}` : ""}`);
         await handoverIfDraft(db, task, p);
@@ -80,6 +90,38 @@ export async function POST(req: NextRequest) {
       const state = { answered: verb === "task_done" ? "done" as const : "not_yet" as const, by: p.display_name, at: hhmm(), comment: comment || null };
       if (verb === "task_done") await refreshCards(db, { ...task, status: "done", answered_via: "teams", answer: comment || null }, state, ref.conversation_id);
       return cardResponse(taskCard(task, state));
+    }
+    if (verb === "file_move" || verb === "action_verify") {
+      const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();
+      const task = t as (TaskRow & { ref_id?: string | null }) | null;
+      if (!task) return msgResponse("This task no longer exists.");
+      if (task.status !== "open") return cardResponse(taskCard(task, stateOf(task)));
+      const posts = p.roles.map(basePost);
+      const cmm = posts.includes("CMM") || posts.includes("SUPERADMIN");
+      try {
+        if (verb === "file_move") {
+          if (!cmm) return msgResponse("Stage moves are made by Compliance.");
+          const { data: fd } = await db.from("authority_files").select("*").eq("id", String(data.fileId ?? "")).maybeSingle();
+          if (!fd) return msgResponse("The file no longer exists.");
+          const f = fd as AuthorityFile;
+          await applyMove(db, { personId: p.id, name: p.display_name, cmm, owner: true }, f, String(data.to) as AuthorityFile["stage"], { note: comment || null }, "teams");
+          await db.from("tasks").update({ answered_via: "teams", answered_at: now(), answer: comment || null }).eq("id", task.id);
+          await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: `${f.stage} → ${data.to}${comment ? `: ${comment}` : ""}`, meta: { file: f.id } });
+          const state = { answered: "done" as const, by: p.display_name, at: hhmm(), comment: `${f.stage} → ${data.to}${comment ? ` · ${comment}` : ""}` };
+          await refreshCards(db, { ...task, status: "done" }, state, ref.conversation_id);
+          return cardResponse(taskCard(task, state));
+        }
+        if (!(cmm || posts.includes("SM") || posts.includes("FSO"))) return msgResponse("Verification is made by the safety desk (SM / CMM).");
+        const { data: ad } = await db.from("safety_actions").select("*").eq("id", task.ref_id ?? "").maybeSingle();
+        if (!ad) return msgResponse("The action no longer exists.");
+        const verdict = data.verdict === "back" ? "back" : "accept";
+        await verifyActionCore(db, { personId: p.id, name: p.display_name }, ad as Action, verdict, comment || null, null, "teams");
+        await db.from("tasks").update({ answered_via: "teams", answered_at: now(), answer: comment || null }).eq("id", task.id);
+        await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: `${verdict}${comment ? `: ${comment}` : ""}`, meta: { action: task.ref_id } });
+        const state = { answered: verdict === "accept" ? "done" as const : "not_yet" as const, by: p.display_name, at: hhmm(), comment: verdict === "accept" ? `Accepted and closed${comment ? ` · ${comment}` : ""}` : `Sent back · ${comment}` };
+        await refreshCards(db, { ...task, status: "done" }, state, ref.conversation_id);
+        return cardResponse(taskCard(task, state));
+      } catch (e) { return msgResponse(e instanceof Error ? e.message : "Refused"); }
     }
     if (verb === "report_discard") return cardResponse(discardedCard(p.display_name));
     if (verb === "report_create") {
@@ -130,7 +172,7 @@ export async function POST(req: NextRequest) {
     if (!mine.length) { await sendCard(ref, infoCard("Nothing waiting for you", "Your Inbox is empty. I will write here as soon as something needs you.", "/home/tasks")); return json({}); }
     await sendCard(ref, infoCard(`${mine.length} item${mine.length > 1 ? "s" : ""} waiting for you`, "Answer with the buttons, or open S.A.M.", "/home/tasks"));
     for (const t of mine) {
-      const r = await sendCard(ref, taskCard(t), t.title);
+      const r = await sendCard(ref, await cardFor(db, t), t.title);
       if (r.ok && r.id) await db.from("teams_cards").upsert({ task_id: t.id, person_id: p.id, conversation_id: ref.conversation_id, service_url: ref.service_url, activity_id: r.id, card_kind: "task", updated_at: null }, { onConflict: "task_id,person_id" });
     }
     return json({});

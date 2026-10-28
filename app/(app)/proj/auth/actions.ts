@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isCmm } from "@/lib/revisions";
-import { addDays, movesFrom, recordRound, routeFor, syncTasks, today, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
+import { addDays, recordRound, routeFor, syncTasks, today, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
+import { applyMove } from "@/lib/authority-moves";
 
 type Db = ReturnType<typeof supabaseAdmin>;
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -103,41 +104,11 @@ export async function addItem(formData: FormData) {
 
 /** Stage move (PRJ-01 lifecycle). "Ready" needs every required item done; "Submitted" needs the portal reference. */
 export async function moveStage(formData: FormData) {
-  const id = str(formData, "id"); const to = str(formData, "to") as Stage; const note = opt(formData, "note");
+  const id = str(formData, "id"); const to = str(formData, "to") as Stage;
   const { s, db, f, cmm, owner } = await guard(id);
-  const { data: t } = await db.from("authority_file_types").select("needs_signature").eq("code", f.type_code).maybeSingle();
-  const move = movesFrom(f.stage, !!(t as { needs_signature?: boolean } | null)?.needs_signature).find((m) => m.to === to);
-  if (!move) throw new Error("Move not allowed from this stage");
-  if (!(move.by === "cmm" ? cmm : cmm || owner)) throw new Error("Not allowed for your role");
-  if (move.needsNote && !note) throw new Error("A note is required for this move");
-  if (move.needsAllRequired) {
-    const { count } = await db.from("authority_file_items").select("id", { count: "exact", head: true }).eq("file_id", id).eq("required", true).eq("done", false);
-    if (count) throw new Error(`${count} required item(s) of the checklist are not done.`);
-  }
-  const patch: Record<string, unknown> = { stage: to, updated_at: new Date().toISOString() };
-  if (to === "submitted" && f.stage === "ready") {
-    const ref = opt(formData, "portal_ref"); if (!ref) throw new Error("The portal reference is required (application / dossier number)");
-    const at = opt(formData, "submitted_at") ?? today();
-    patch.portal_ref = ref; patch.portal_url = opt(formData, "portal_url") ?? f.portal_url; patch.submitted_at = at;
-    const { data: ty } = await db.from("authority_file_types").select("target_days").eq("code", f.type_code).maybeSingle();
-    patch.target_date = opt(formData, "target_date") ?? addDays(at, (ty as { target_days?: number } | null)?.target_days ?? 20);
-  }
-  if (to === "remarks") patch.rounds = (f.rounds ?? 0) + 1;
-  if (to === "approved") { patch.decision_at = opt(formData, "decision_at") ?? today(); patch.outcome = opt(formData, "outcome") ?? (f.category === "notification" || f.category === "communication" ? "acknowledged" : "approved"); if (str(formData, "fee")) patch.fee = Number(str(formData, "fee")); }
-  if (to === "closed") patch.closed_at = today();
-  if (to === "draft" && f.stage === "standby") patch.closed_at = null;
-  await db.from("authority_files").update(patch).eq("id", id);
-  const kind = to === "submitted" && f.stage === "ready" ? "submitted" : to === "remarks" ? "remarks" : to === "submitted" ? "reply" : to === "approved" ? "decision" : "stage";
-  await event(db, s, id, kind, note ?? `${f.stage} → ${to}`, { from: f.stage, to, ...patch });
-  await audit(db, s, f, `authority_file_${to}`, { from: f.stage, note });
-  // every exchange is a round of the same application (DOC-09), on the file and on its manual revision when there is one
-  if (kind === "submitted" || kind === "remarks" || kind === "reply" || kind === "decision") {
-    const at = kind === "submitted" ? String(patch.submitted_at) : kind === "decision" ? String(patch.decision_at) : today();
-    await recordRound(db, f, { at, direction: kind === "submitted" || kind === "reply" ? "sent" : "received", who: s.name, note: note ?? (kind === "submitted" ? `Application ${patch.portal_ref ?? f.portal_ref ?? ""} submitted` : kind === "decision" ? `Decision: ${patch.outcome}` : `Authority remarks (round ${patch.rounds ?? f.rounds})`) });
-    if (kind === "submitted" && f.revision_id) await db.from("revisions").update({ authority_ref: patch.portal_ref }).eq("id", f.revision_id).is("authority_ref", null);
-  }
-  const { data: fresh } = await db.from("authority_files").select("*").eq("id", id).maybeSingle();
-  await syncTasks(db, fresh as AuthorityFile);
+  await applyMove(db, { personId: s.person?.id ?? null, name: s.name, cmm, owner }, f, to, {
+    note: opt(formData, "note"), portal_ref: opt(formData, "portal_ref"), portal_url: opt(formData, "portal_url"), submitted_at: opt(formData, "submitted_at"), target_date: opt(formData, "target_date"),
+    decision_at: opt(formData, "decision_at"), outcome: opt(formData, "outcome"), fee: str(formData, "fee") ? Number(str(formData, "fee")) : null }, "app");
   paths(id);
 }
 
