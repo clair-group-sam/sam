@@ -25,9 +25,13 @@ const hhmm = () => { const d = new Date(); return `${d.toISOString().slice(0, 10
 export async function POST(req: NextRequest) {
   if (!teamsConfigured()) return new Response("teams not configured", { status: 503 });
   const jwt = await verifyBotJwt(req.headers.get("authorization"));
-  if (!jwt.ok) return new Response(`unauthorized: ${jwt.reason}`, { status: 401 });
-  const a = (await req.json()) as Activity;
   const db = supabaseAdmin();
+  if (!jwt.ok) {
+    // keep a trace of what was refused (type of activity, reason) — the only visibility we have without the platform logs
+    if (jwt.reason !== "no token") { const a0 = (await req.json().catch(() => ({}))) as Partial<Activity>; await db.from("teams_inbound").insert({ kind: "rejected", text: jwt.reason ?? null, meta: { type: a0.type, conversation: a0.conversation?.id } }); }
+    return new Response(`unauthorized: ${jwt.reason}`, { status: 401 });
+  }
+  const a = (await req.json()) as Activity;
   const ref = { conversation_id: a.conversation.id, service_url: a.serviceUrl };
   const personal = (a.conversation.conversationType ?? "personal") === "personal";
 

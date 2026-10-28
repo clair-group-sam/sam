@@ -34,16 +34,23 @@ const graphToken = () => clientToken("https://graph.microsoft.com/.default");
 
 /* ---------- incoming JWT (Bot Framework → our endpoint) ---------- */
 type Jwk = { kid: string; kty: string; n: string; e: string; x5c?: string[] };
-let jwks: { keys: Jwk[]; at: number } | null = null;
-async function keys(): Promise<Jwk[]> {
-  if (jwks && Date.now() - jwks.at < 12 * 3600_000) return jwks.keys;
-  const cfg = (await (await fetch("https://login.botframework.com/v1/.well-known/openidconfiguration")).json()) as { jwks_uri: string };
+// Two possible issuers: the Bot Framework service (multi-tenant bots) or Entra ID of our tenant (Single Tenant bots, which is what IT created).
+const ISSUERS: Record<string, string> = {
+  "https://api.botframework.com": "https://login.botframework.com/v1/.well-known/openidconfiguration",
+  [`https://login.microsoftonline.com/${TENANT_ID}/v2.0`]: `https://login.microsoftonline.com/${TENANT_ID}/v2.0/.well-known/openid-configuration`,
+  [`https://sts.windows.net/${TENANT_ID}/`]: `https://login.microsoftonline.com/${TENANT_ID}/.well-known/openid-configuration`,
+};
+const jwksByIssuer = new Map<string, { keys: Jwk[]; at: number }>();
+async function keys(issuer: string, fresh = false): Promise<Jwk[]> {
+  const have = jwksByIssuer.get(issuer);
+  if (!fresh && have && Date.now() - have.at < 12 * 3600_000) return have.keys;
+  const cfg = (await (await fetch(ISSUERS[issuer])).json()) as { jwks_uri: string };
   const j = (await (await fetch(cfg.jwks_uri)).json()) as { keys: Jwk[] };
-  jwks = { keys: j.keys, at: Date.now() };
+  jwksByIssuer.set(issuer, { keys: j.keys, at: Date.now() });
   return j.keys;
 }
 const b64 = (s: string) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-/** True when the Authorization header is a valid Bot Framework token for this bot (issuer, audience = our app id, not expired, signature). */
+/** True when the Authorization header is a valid token for this bot: known issuer, audience = our app id, not expired, signature. */
 export async function verifyBotJwt(authorization: string | null): Promise<{ ok: boolean; reason?: string }> {
   try {
     const t = (authorization ?? "").replace(/^Bearer\s+/i, "").trim();
@@ -52,11 +59,11 @@ export async function verifyBotJwt(authorization: string | null): Promise<{ ok: 
     const header = JSON.parse(b64(h).toString("utf8")) as { alg: string; kid: string };
     const payload = JSON.parse(b64(p).toString("utf8")) as { iss: string; aud: string; exp: number; serviceurl?: string };
     if (header.alg !== "RS256") return { ok: false, reason: "alg" };
-    if (payload.iss !== "https://api.botframework.com") return { ok: false, reason: "issuer" };
-    if (payload.aud !== CLIENT_ID) return { ok: false, reason: "audience" };
+    if (!ISSUERS[payload.iss]) return { ok: false, reason: `issuer ${payload.iss}` };
+    if (payload.aud !== CLIENT_ID && payload.aud !== `api://${CLIENT_ID}`) return { ok: false, reason: "audience" };
     if (payload.exp * 1000 < Date.now() - 5 * 60_000) return { ok: false, reason: "expired" };
-    let k = (await keys()).find((x) => x.kid === header.kid);
-    if (!k) { jwks = null; k = (await keys()).find((x) => x.kid === header.kid); }
+    let k = (await keys(payload.iss)).find((x) => x.kid === header.kid);
+    if (!k) k = (await keys(payload.iss, true)).find((x) => x.kid === header.kid);
     if (!k) return { ok: false, reason: "key" };
     const pub = createPublicKey({ key: { kty: k.kty, n: k.n, e: k.e }, format: "jwk" });
     const good = cryptoVerify("RSA-SHA256", Buffer.from(`${h}.${p}`), pub, b64(sig));
