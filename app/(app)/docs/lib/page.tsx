@@ -86,8 +86,10 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       const i = Math.max(0, Math.min(...words.map((w) => { const k = low.indexOf(w); return k < 0 ? Infinity : k; })));
       const snippet = h.body_text.slice(Math.max(0, (Number.isFinite(i) ? i : 0) - 80), (Number.isFinite(i) ? i : 0) + 170).replace(/\s+/g, " ");
       if (!byM.has(h.revisions.manual_id)) byM.set(h.revisions.manual_id, { manual_id: h.revisions.manual_id, entity: m.entity, code: m.code, title: m.title, titleMatch: false, hits: [] });
-      const g = byM.get(h.revisions.manual_id)!; const dup = g.hits.find((x) => x.snippet === snippet);
-      if (dup) dup.also.push(h.ref); else g.hits.push({ manual_id: h.revisions.manual_id, entity: m.entity, code: m.code, title: m.title, ref: h.ref, stitle: h.title, snippet, also: [] });
+      const g = byM.get(h.revisions.manual_id)!;
+      if (g.hits.some((x) => x.ref === h.ref)) continue; // the same chapter in another published revision of the manual
+      const dup = g.hits.find((x) => x.snippet === snippet);
+      if (dup) { if (!dup.also.includes(h.ref)) dup.also.push(h.ref); } else g.hits.push({ manual_id: h.revisions.manual_id, entity: m.entity, code: m.code, title: m.title, ref: h.ref, stitle: h.title, snippet, also: [] });
     }
     // manuals whose code or title matches come first, even without a passage
     const ql = q.toLowerCase();
