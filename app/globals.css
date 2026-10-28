@@ -627,3 +627,18 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .srch-m ul{margin:0;padding:0 12px 10px 34px;list-style:none;border-top:1px solid var(--line)}
 .srch-m li{padding:8px 0;border-bottom:1px dashed var(--line)}.srch-m li:last-child{border-bottom:0}
 .srch-m li a:hover b{text-decoration:underline}
+
+/* SAF-04 safety performance */
+.spitbl td{vertical-align:middle}
+.spitbl tr.grp td{background:var(--blue05);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--slate6);padding:8px 16px}
+.spitbl tr.proposed td:first-child{border-left:3px solid var(--amber)}
+.spicells{display:grid;grid-template-columns:repeat(12,1fr);gap:2px}
+.spicell{height:22px;min-width:20px;border:1px solid var(--line);border-radius:4px;font:600 10px "IBM Plex Mono",monospace;display:flex;align-items:center;justify-content:center;color:var(--navy);background:#fff;overflow:hidden}
+.spicell.empty{background:repeating-linear-gradient(45deg,#fff,#fff 3px,var(--blue05) 3px,var(--blue05) 6px)}
+.banner{background:var(--amber-s);border-top:1px solid var(--line);font-size:13px}
+.lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:6px}.lg.ln{height:2px;background:var(--cyan6)}
+.ov-today a .metric{transition:transform .12s,box-shadow .12s}.ov-today a:hover .metric{transform:translateY(-1px);box-shadow:0 6px 18px rgba(13,42,63,.09)}
+.dgrid th,.dgrid td{padding:6px 6px}.dgrid td:first-child,.dgrid th:first-child{padding-left:16px}
+.dcell{width:68px;text-align:center}.dcell .inp{margin-top:0;width:62px;padding:4px 5px;text-align:right}.dcell .inp.den{margin-top:2px;opacity:.85}
+.dcell.imp .inp{background:var(--blue05)}
+.yseg{display:inline-flex;gap:0}.yseg .btn{border-radius:0}.yseg .btn:first-child{border-radius:8px 0 0 8px}.yseg .btn:last-child{border-radius:0 8px 8px 0}
