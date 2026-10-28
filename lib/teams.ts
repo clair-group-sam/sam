@@ -104,27 +104,36 @@ export async function personFor(db: SupabaseClient, from: { id?: string; aadObje
   if (p) await db.from("teams_conversations").upsert({ person_id: p.id, teams_user_id: from.id ?? null, aad_object_id: from.aadObjectId ?? null, conversation_id: ref.conversation_id, service_url: ref.service_url, tenant_id: tenantId ?? null, installed_by: installedBy, updated_at: new Date().toISOString() }, { onConflict: "person_id" });
   return p;
 }
-/** Opens the personal chat with the bot for a person who never opened it: installs the S.A.M. app for them through Graph (TeamsAppInstallation.ReadWriteForUser.All). */
+/** Opens the personal chat with the bot for a person who never opened it: installs the S.A.M. app for them through Graph
+ *  (TeamsAppInstallation.ReadWriteSelfForUser.All). `lastInstallError` keeps the reason of the last failure for Settings › Integrations. */
+export let lastInstallError: string | null = null;
 export async function ensureConversation(db: SupabaseClient, person: { id: string; email: string | null }): Promise<TeamsConv | null> {
   const have = await conversationOf(db, person.id);
   if (have) return have;
-  if (!teamsInstallConfigured() || !person.email) return null;
+  lastInstallError = null;
+  if (!teamsInstallConfigured()) { lastInstallError = "TEAMS_APP_ID / GRAPH_CLIENT_SECRET missing"; return null; }
+  if (!person.email) { lastInstallError = "the person has no e-mail in S.A.M."; return null; }
+  const fail = (step: string, r: Response, body: string) => { lastInstallError = `${step}: HTTP ${r.status} ${body.slice(0, 300)}`; return null; };
   try {
     const t = await graphToken();
     const H = { authorization: `Bearer ${t}`, "content-type": "application/json" };
     const u = encodeURIComponent(person.email);
     const appId = TEAMS_APP_ID;
     const inst = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps`, { method: "POST", headers: H, body: JSON.stringify({ "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}` }) });
-    if (!inst.ok && inst.status !== 409) return null;
-    const list = (await (await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps?$expand=teamsApp&$filter=teamsApp/id eq '${appId}'`, { headers: H })).json()) as { value?: { id: string }[] };
+    if (!inst.ok && inst.status !== 409) return fail("install", inst, await inst.text());
+    const lr = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps?$expand=teamsApp&$filter=teamsApp/id eq '${appId}'`, { headers: H });
+    if (!lr.ok) return fail("list", lr, await lr.text());
+    const list = (await lr.json()) as { value?: { id: string }[] };
     const instId = list.value?.[0]?.id;
-    if (!instId) return null;
-    const chat = (await (await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps/${instId}/chat`, { headers: H })).json()) as { id?: string };
-    if (!chat.id) return null;
+    if (!instId) { lastInstallError = `list: app ${appId} not installed for ${person.email} (empty result)`; return null; }
+    const cr = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps/${instId}/chat`, { headers: H });
+    if (!cr.ok) return fail("chat", cr, await cr.text());
+    const chat = (await cr.json()) as { id?: string };
+    if (!chat.id) { lastInstallError = "chat: no id in the answer"; return null; }
     const row: TeamsConv = { person_id: person.id, teams_user_id: null, aad_object_id: null, conversation_id: chat.id, service_url: SERVICE_URL, tenant_id: TENANT_ID };
     await db.from("teams_conversations").upsert({ ...row, installed_by: "graph", updated_at: new Date().toISOString() }, { onConflict: "person_id" });
     return row;
-  } catch { return null; }
+  } catch (e) { lastInstallError = `exception: ${e instanceof Error ? e.message : String(e)}`; return null; }
 }
 
 /* ---------- cards ---------- */

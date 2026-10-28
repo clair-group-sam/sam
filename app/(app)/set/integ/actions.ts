@@ -85,12 +85,13 @@ async function importOfficialPdf(input: ImportInput): Promise<ImportResult> {
 export async function teamsTestCard(): Promise<void> {
   const s = await getSession();
   if (!s?.person) return;
-  const { ensureConversation, sendCard, infoCard, teamsConfigured } = await import("@/lib/teams");
+  const teams = await import("@/lib/teams");
+  const { ensureConversation, sendCard, infoCard, teamsConfigured } = teams;
   const db = supabaseAdmin();
   let status = "not configured";
   if (teamsConfigured()) {
     const conv = await ensureConversation(db, { id: s.person.id, email: s.person.email });
-    if (!conv) status = "no conversation: open the S.A.M. bot once in Teams (or set TEAMS_APP_ID for automatic installation)";
+    if (!conv) status = `no conversation — ${teams.lastInstallError ?? "unknown reason"}. Fallback: open the S.A.M. app once in Teams and write “tasks”.`;
     else { const r = await sendCard(conv, infoCard("Test card", `Sent from Settings › Integrations by ${s.name}. If you read this, S.A.M. can write to you in Teams.`, "/home/tasks"), "S.A.M. test card"); status = r.ok ? "sent" : `failed: ${r.error}`; }
   }
   await db.from("audit_log").insert({ actor: s.person.id, entity: null, object_type: "teams", object_id: s.person.id, action: "teams_test_card", after: { status } });
