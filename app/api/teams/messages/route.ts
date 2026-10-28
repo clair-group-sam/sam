@@ -101,7 +101,9 @@ export async function POST(req: NextRequest) {
     await db.from("teams_inbound").insert({ person_id: p?.id ?? null, aad_object_id: a.from.aadObjectId ?? null, kind: "message", text, meta: { conversation: a.conversation.id, type: a.conversation.conversationType ?? "personal" } });
     if (!p) { await sendCard(ref, infoCard("Not attached yet", "Your Teams account is not attached to a person in S.A.M. — ask the Compliance department, then write to me again.")); return json({}); }
     if (!personal) {
-      // TMS-03 · @S.A.M. in a chat or a channel: draft a safety report from the thread, as an editable card in the same thread
+      // TMS-03 · @S.A.M. in a chat or a channel: only when mentioned (with RSC the bot receives every message of the chat — the rest is ignored).
+      const mentioned = (a.entities ?? []).some((e) => e.type === "mention" && e.mentioned?.id && a.recipient?.id && e.mentioned.id === a.recipient.id);
+      if (!mentioned) return json({});
       const tref = threadRefOf(a);
       if (!tref) { await sendCard(ref, infoCard("Not here", "I can draft from a group chat or a channel conversation where S.A.M. has been added.")); return json({}); }
       let thread; try { thread = await readThread(tref); } catch (e) {
@@ -113,7 +115,11 @@ export async function POST(req: NextRequest) {
       if (!entities.length) { await sendCard(ref, infoCard("No entity", "Your S.A.M. profile has no entity: ask the Compliance department.")); return json({}); }
       try {
         const d = await draftReport(db, p.id, entities, thread, text);
-        await sendCard(ref, draftCard(d, entities, tref, p.display_name), "Safety report — draft");
+        if (!d.occurrence) { await sendText(ref, `${p.display_name.split(" ")[0]}, I read the thread but found no safety occurrence to report${d.reason ? ` — ${d.reason}` : ""}. Describe the event in the conversation (or in our personal chat) and mention me again.`); return json({}); }
+        // the draft goes to the person's personal chat (a safety report is the reporter's business); the thread only gets a one-liner
+        const priv = await ensureConversation(db, { id: p.id, email: p.email });
+        if (priv) { await sendCard(priv, draftCard(d, entities, tref, p.display_name), "Safety report — draft"); await sendText(ref, `${p.display_name.split(" ")[0]}, I sent you the draft privately — check it in our chat and create it in S.A.M. from there.`); }
+        else await sendCard(ref, draftCard(d, entities, tref, p.display_name), "Safety report — draft");
       } catch (e) { await sendCard(ref, infoCard("Draft failed", e instanceof Error ? e.message.slice(0, 200) : "Unknown error")); }
       return json({});
     }
