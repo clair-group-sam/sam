@@ -9,7 +9,9 @@ import { basePost } from "@/lib/session";
 
 export const SERVICE_URL = (process.env.TEAMS_SERVICE_URL ?? "https://smba.trafficmanager.net/emea/").replace(/\/?$/, "/");
 export const teamsConfigured = () => !!process.env.GRAPH_CLIENT_SECRET;
-export const teamsInstallConfigured = () => teamsConfigured() && !!process.env.TEAMS_APP_ID;
+/** Catalog id of the S.A.M. app in the Clair Group tenant (published by IT on 28/10/2026); TEAMS_APP_ID overrides it. Not a secret. */
+export const TEAMS_APP_ID = process.env.TEAMS_APP_ID?.trim() || "a8d6b7eb-5ad8-4f65-ae1a-5fe8b7c0f1b3";
+export const teamsInstallConfigured = () => teamsConfigured() && !!TEAMS_APP_ID;
 
 /* ---------- tokens ---------- */
 let botTok: { v: string; exp: number } | null = null;
@@ -111,7 +113,7 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
     const t = await graphToken();
     const H = { authorization: `Bearer ${t}`, "content-type": "application/json" };
     const u = encodeURIComponent(person.email);
-    const appId = process.env.TEAMS_APP_ID!;
+    const appId = TEAMS_APP_ID;
     const inst = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps`, { method: "POST", headers: H, body: JSON.stringify({ "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}` }) });
     if (!inst.ok && inst.status !== 409) return null;
     const list = (await (await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps?$expand=teamsApp&$filter=teamsApp/id eq '${appId}'`, { headers: H })).json()) as { value?: { id: string }[] };
