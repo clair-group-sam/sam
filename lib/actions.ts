@@ -15,7 +15,7 @@ export const isOwner = (s: Session, a: Pick<Action, "owner_person" | "owner_role
 
 export async function nextActionNumber(db: SupabaseClient, entity: string): Promise<string> {
   const y = new Date().getFullYear();
-  const { data } = await db.from("actions").select("number").eq("entity", entity).like("number", `ACT-${entity}-${y}-%`);
+  const { data } = await db.from("safety_actions").select("number").eq("entity", entity).like("number", `ACT-${entity}-${y}-%`);
   const n = ((data ?? []) as { number: string }[]).map((r) => Number(r.number.split("-").pop())).filter(Number.isFinite);
   return `ACT-${entity}-${y}-${String((n.length ? Math.max(...n) : 0) + 1).padStart(3, "0")}`;
 }

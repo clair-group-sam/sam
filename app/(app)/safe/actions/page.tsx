@@ -16,7 +16,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
   const sp = await searchParams;
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
   const db = supabaseAdmin();
-  const { data } = await db.from("actions").select("*").in("entity", scope).eq("module", "safety").order("created_at", { ascending: false }).limit(1000);
+  const { data } = await db.from("safety_actions").select("*").in("entity", scope).eq("module", "safety").order("created_at", { ascending: false }).limit(1000);
   const all = (data ?? []) as Action[];
   const ids = [...new Set(all.map((a) => a.owner_person).filter(Boolean) as string[])];
   const { data: ppl } = ids.length ? await db.from("people").select("id,display_name").in("id", ids) : { data: [] };

@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   }
   jobs.risk_intolerable = ti;
   // 4 · safety actions: effectiveness check due (date set at closure) → one task for the safety desk
-  const { data: eff } = await db.from("actions").select("id,entity,number,title,effectiveness_due").eq("status", "verified").is("effectiveness", null).lte("effectiveness_due", t0);
+  const { data: eff } = await db.from("safety_actions").select("id,entity,number,title,effectiveness_due").eq("status", "verified").is("effectiveness", null).lte("effectiveness_due", t0);
   let te = 0;
   for (const a of (eff ?? []) as { id: string; entity: string; number: string; title: string; effectiveness_due: string }[]) {
     if (await openTask("action_effectiveness", a.id)) continue;

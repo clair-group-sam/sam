@@ -22,7 +22,7 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
   const h = data as H | null;
   if (!h || !s.entities.includes(h.entity)) notFound();
   const [{ data: ms }, { data: ev }, { data: ra }, { data: reps }] = await Promise.all([
-    db.from("hazard_mitigations").select("id,text,existing,owner_role,due,done_at,action_id,actions!hazard_mitigations_action_id_fkey(number,status)").eq("hazard_id", id).order("created_at"),
+    db.from("hazard_mitigations").select("id,text,existing,owner_role,due,done_at,action_id,safety_actions!hazard_mitigations_action_id_fkey(number,status)").eq("hazard_id", id).order("created_at"),
     db.from("risk_events").select("id,at,kind,note").eq("hazard_id", id).order("at"),
     h.assessment_id ? db.from("risk_assessments").select("id,number,name,kind,status").eq("id", h.assessment_id).maybeSingle() : Promise.resolve({ data: null }),
     db.from("hazard_reports").select("report_id,linked_at,reports(headline,headline_en,received_at)").eq("hazard_id", id),
@@ -74,7 +74,7 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
               <table className="tbl mb-3"><tbody>{mit.map((x) => (
                 <tr key={x.id}><td style={{ width: 120 }}><span className={"kind " + (x.existing || x.done_at ? "k-read" : x.due && x.due < today ? "k-comp" : "k-cert")}>{x.existing ? "Current" : x.done_at ? "Done" : x.due && x.due < today ? "Overdue" : "Planned"}</span></td>
                   <td>{x.text}<div className="mini">{x.owner_role ?? ""}{x.due ? ` · by ${x.due}` : ""}{x.done_at ? ` · done ${x.done_at.slice(0, 10)}` : ""}</div></td>
-                  <td style={{ width: 190 }} className="text-right">{!x.existing && (x.action_id ? <Link className="underline mono mini" href={`/safe/actions/${x.action_id}`}>{(x as M & { actions?: { number: string } | null }).actions?.number ?? "action"}</Link>
+                  <td style={{ width: 190 }} className="text-right">{!x.existing && (x.action_id ? <Link className="underline mono mini" href={`/safe/actions/${x.action_id}`}>{(x as M & { safety_actions?: { number: string } | null }).safety_actions?.number ?? "action"}</Link>
                     : !x.done_at && mayEditRisk(s) && <span className="flex gap-1 justify-end"><Link className="btn" title="Follow it as a safety action: owner, due date, evidence, verification" href={`/safe/actions/new?entity=${h.entity}&hazard=${h.id}&mitigation=${x.id}&title=${encodeURIComponent(x.text.slice(0, 280))}${x.owner_role ? `&owner_role=${encodeURIComponent(x.owner_role)}` : ""}`}>→ Action</Link><form action={doneMitigation}><input type="hidden" name="id" value={x.id} /><button className="btn">Done</button></form></span>)}</td></tr>))}
                 {!mit.length && <tr><td className="mini p-3">No mitigation listed yet.</td></tr>}</tbody></table>
               {edit && (

@@ -40,7 +40,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     db.from("risk_matches").select("suggestions,ran_at").eq("subject_kind", "report").eq("subject_id", id).maybeSingle(),
   ]);
   const sugg = ((mt as { suggestions: Suggestion[] } | null)?.suggestions ?? []);
-  const { data: acts } = await db.from("actions").select("id,number,title,status,due,owner_role").eq("report_id", id).order("created_at");
+  const { data: acts } = await db.from("safety_actions").select("id,number,title,status,due,owner_role").eq("report_id", id).order("created_at");
   const actions = (acts ?? []) as { id: string; number: string; title: string; status: string; due: string | null; owner_role: string | null }[];
   const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];

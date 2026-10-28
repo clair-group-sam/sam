@@ -17,16 +17,16 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
   const s = await getSession();
   if (!s) redirect("/login");
   const db = supabaseAdmin();
-  const { data } = await db.from("actions").select("*").eq("id", id).maybeSingle();
+  const { data } = await db.from("safety_actions").select("*").eq("id", id).maybeSingle();
   const a = data as Action | null;
   if (!a || !s.entities.includes(a.entity)) notFound();
   const [{ data: ev }, { data: jr }, { data: ppl }, { data: hz }, { data: ra }, { data: fu }] = await Promise.all([
-    db.from("action_evidence").select("*").eq("action_id", id).order("added_at"),
-    db.from("action_events").select("id,at,kind,note").eq("action_id", id).order("at"),
+    db.from("safety_action_evidence").select("*").eq("action_id", id).order("added_at"),
+    db.from("safety_action_events").select("id,at,kind,note").eq("action_id", id).order("at"),
     db.from("people").select("id,display_name").contains("entities", [a.entity]).order("display_name").limit(400),
     a.hazard_id ? db.from("hazards").select("id,ref,title").eq("id", a.hazard_id).maybeSingle() : Promise.resolve({ data: null }),
     a.assessment_id ? db.from("risk_assessments").select("id,number,name").eq("id", a.assessment_id).maybeSingle() : Promise.resolve({ data: null }),
-    a.follow_up_id ? db.from("actions").select("id,number").eq("id", a.follow_up_id).maybeSingle() : Promise.resolve({ data: null }),
+    a.follow_up_id ? db.from("safety_actions").select("id,number").eq("id", a.follow_up_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const evidence = (ev ?? []) as Ev[]; const journal = (jr ?? []) as J[]; const people = (ppl ?? []) as { id: string; display_name: string }[];
   const nameOf = new Map(people.map((p) => [p.id, p.display_name]));
