@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
-import { ANSWERABLE_KINDS, infoCard, personFor, refreshCards, sendCard, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
+import { ANSWERABLE_KINDS, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
 import { syncTasks, type AuthorityFile } from "@/lib/authority";
 import { after } from "next/server";
 import { createFromCard, createdCard, discardedCard, draftCard, draftReport, readThread, threadRefOf } from "@/lib/teams-draft";
