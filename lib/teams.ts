@@ -138,13 +138,25 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
     const list = (await lr.json()) as { value?: { id: string }[] };
     const instId = list.value?.[0]?.id;
     if (!instId) { lastInstallError = `list: app ${appId} not installed for ${person.email} (empty result)`; return null; }
+    // The chat id: either Graph gives it (needs a ReadWriteSelfForUser-class role, which the AndConsent variant does not carry for this
+    // endpoint), or the bot has just received the conversationUpdate that Teams sends on installation and stored it — poll for it.
     const cr = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps/${instId}/chat`, { headers: H });
-    if (!cr.ok) return fail("chat", cr, await cr.text());
-    const chat = (await cr.json()) as { id?: string };
-    if (!chat.id) { lastInstallError = "chat: no id in the answer"; return null; }
-    const row: TeamsConv = { person_id: person.id, teams_user_id: null, aad_object_id: null, conversation_id: chat.id, service_url: SERVICE_URL, tenant_id: TENANT_ID };
-    await db.from("teams_conversations").upsert({ ...row, installed_by: "graph", updated_at: new Date().toISOString() }, { onConflict: "person_id" });
-    return row;
+    if (cr.ok) {
+      const chat = (await cr.json()) as { id?: string };
+      if (chat.id) {
+        const row: TeamsConv = { person_id: person.id, teams_user_id: null, aad_object_id: null, conversation_id: chat.id, service_url: SERVICE_URL, tenant_id: TENANT_ID };
+        await db.from("teams_conversations").upsert({ ...row, installed_by: "graph", updated_at: new Date().toISOString() }, { onConflict: "person_id" });
+        return row;
+      }
+    }
+    const chatErr = cr.ok ? "chat: no id in the answer" : `chat: HTTP ${cr.status} ${(await cr.text()).slice(0, 200)}`;
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const got = await conversationOf(db, person.id);
+      if (got) return got;
+    }
+    lastInstallError = `${inst.status === 409 ? "app already installed" : "app installed"}, but the bot received no conversationUpdate within 12 s (${chatErr}). Open the S.A.M. app once in Teams, or retry.`;
+    return null;
   } catch (e) { lastInstallError = `exception: ${e instanceof Error ? e.message : String(e)}`; return null; }
 }
 
