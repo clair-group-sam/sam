@@ -11,6 +11,8 @@ export const SERVICE_URL = (process.env.TEAMS_SERVICE_URL ?? "https://smba.traff
 export const teamsConfigured = () => !!process.env.GRAPH_CLIENT_SECRET;
 /** Catalog id of the S.A.M. app in the Clair Group tenant (published by IT on 28/10/2026); TEAMS_APP_ID overrides it. Not a secret. */
 export const TEAMS_APP_ID = process.env.TEAMS_APP_ID?.trim() || "a8d6b7eb-5ad8-4f65-ae1a-5fe8b7c0f1b3";
+/** RSC permissions declared in teams/manifest.json — keep both in sync. */
+export const RSC_PERMISSIONS = ["ChannelMessage.Read.Group", "ChatMessage.Read.Chat"] as const;
 export const teamsInstallConfigured = () => teamsConfigured() && !!TEAMS_APP_ID;
 
 /* ---------- tokens ---------- */
@@ -105,7 +107,7 @@ export async function personFor(db: SupabaseClient, from: { id?: string; aadObje
   return p;
 }
 /** Opens the personal chat with the bot for a person who never opened it: installs the S.A.M. app for them through Graph
- *  (TeamsAppInstallation.ReadWriteSelfForUser.All). `lastInstallError` keeps the reason of the last failure for Settings › Integrations. */
+ *  (TeamsAppInstallation.ReadWriteAndConsentSelfForUser.All, because the manifest declares RSC permissions). `lastInstallError` keeps the reason of the last failure for Settings › Integrations. */
 export let lastInstallError: string | null = null;
 export async function ensureConversation(db: SupabaseClient, person: { id: string; email: string | null }): Promise<TeamsConv | null> {
   const have = await conversationOf(db, person.id);
@@ -119,7 +121,13 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
     const H = { authorization: `Bearer ${t}`, "content-type": "application/json" };
     const u = encodeURIComponent(person.email);
     const appId = TEAMS_APP_ID;
-    const inst = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps`, { method: "POST", headers: H, body: JSON.stringify({ "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}` }) });
+    // The manifest declares RSC permissions (ChannelMessage.Read.Group, ChatMessage.Read.Chat — iteration 2), so Graph requires
+    // the caller to consent to them at install time: permission TeamsAppInstallation.ReadWriteAndConsentSelfForUser.All + consentedPermissionSet.
+    const body = {
+      "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}`,
+      consentedPermissionSet: { resourceSpecificPermissions: RSC_PERMISSIONS.map((permissionValue) => ({ permissionValue, permissionType: "application" })) },
+    };
+    const inst = await fetch(`https://graph.microsoft.com/v1.0/users/${u}/teamwork/installedApps`, { method: "POST", headers: H, body: JSON.stringify(body) });
     if (!inst.ok && inst.status !== 409) {
       // which application permissions the token actually carries (Entra consent is visible here, not in the portal)
       let roles = "?"; try { roles = (JSON.parse(Buffer.from(t.split(".")[1], "base64url").toString()) as { roles?: string[] }).roles?.join(", ") || "none"; } catch { /* keep ? */ }
