@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nextReportId } from "@/lib/safety";
+import { REPORTS_ELSEWHERE } from "@/lib/entity-codes";
 
 export type NewReport = { entity: string; headline: string; narrative: string; event_date: string; event_time_utc: string; aircraft: string; flight_ref: string; phase: string; location: string; contributing: string; anonymous: boolean; language: string; precisions: Record<string, string> };
 
 /** Stores a safety report exactly as the app does (id YYYY-NNN, received event, SM Inbox item with the 72 h clock). Shared by the app form and the Teams bot. */
 export async function createReport(db: SupabaseClient, r: NewReport, reporterId: string | null, opts: { source?: "app" | "teams"; note?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const ext = REPORTS_ELSEWHERE[r.entity]; if (ext) return { ok: false, error: `Reports for this entity are sent in ${ext.tool}: ${ext.url}` };
   if (r.narrative.trim().length < 10 || !r.headline.trim()) return { ok: false, error: "Write what happened and a one-line title." };
   const { data: ids } = await db.from("reports").select("id").like("id", `${new Date().getUTCFullYear()}-%`);
   const complements = Object.fromEntries(Object.entries(r.precisions ?? {}).filter(([, v]) => v && String(v).trim()));

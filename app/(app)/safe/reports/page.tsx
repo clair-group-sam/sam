@@ -1,4 +1,6 @@
 import Link from "next/link";
+import FlSync from "@/components/FlSync";
+import { REPORTS_ELSEWHERE } from "@/lib/entity-codes";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -6,7 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader, Metric } from "@/components/Page";
 import { STATUS, ercTone, isSafetyDesk, morClock } from "@/lib/safety";
 
-type Row = { source?: string; external_no?: string | null; report_type?: string | null; source_erc?: number | null; id: string; entity: string; headline: string; headline_en: string | null; received_at: string; status: string; aircraft: string | null; anonymous: boolean; mor_filed_at: string | null; report_analysis: { erc_value: number | null; mor_status: string | null; confirmed_at: string | null; adrep: string[] } | { erc_value: number | null; mor_status: string | null; confirmed_at: string | null; adrep: string[] }[] | null };
+type Row = { source?: string; history?: boolean | null; external_no?: string | null; report_type?: string | null; source_erc?: number | null; id: string; entity: string; headline: string; headline_en: string | null; received_at: string; status: string; aircraft: string | null; anonymous: boolean; mor_filed_at: string | null; report_analysis: { erc_value: number | null; mor_status: string | null; confirmed_at: string | null; adrep: string[] } | { erc_value: number | null; mor_status: string | null; confirmed_at: string | null; adrep: string[] }[] | null };
 
 /** Safety › Reports (SM / FSO / Compliance): every report of the scope, MOR clocks first. */
 export default async function Reports({ searchParams }: { searchParams: Promise<{ st?: string }> }) {
@@ -15,8 +17,8 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   if (!isSafetyDesk(s)) redirect("/safe/mine");
   const { st } = await searchParams;
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
-  const { data } = await supabaseAdmin().from("reports").select("id,entity,headline,headline_en,received_at,status,aircraft,anonymous,mor_filed_at,source,external_no,report_type,source_erc,report_analysis(erc_value,mor_status,confirmed_at,adrep)").in("entity", scope).order("received_at", { ascending: false }).limit(300);
-  const all = ((data ?? []) as unknown as Row[]).map((r) => { const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis; return { ...r, a, clock: morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), (r.source ?? "sam") !== "sam") }; });
+  const { data } = await supabaseAdmin().from("reports").select("id,entity,headline,headline_en,received_at,status,aircraft,anonymous,mor_filed_at,source,history,external_no,report_type,source_erc,report_analysis(erc_value,mor_status,confirmed_at,adrep)").in("entity", scope).order("received_at", { ascending: false }).limit(300);
+  const all = ((data ?? []) as unknown as Row[]).map((r) => { const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis; return { ...r, a, clock: morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), !!r.history) }; });
   const open = all.filter((r) => r.status !== "closed");
   const clocks = open.filter((r) => r.clock.state === "running" || r.clock.state === "late");
   const rows = st === "closed" ? all.filter((r) => r.status === "closed") : st === "all" ? all : open;
@@ -24,6 +26,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   return (
     <>
       <PageHeader eyebrow="Safety · Reports" title="Safety reports" sub="MOR clocks first · the 72 h run from receipt in S.A.M." right={<Link href="/safe/new" className="btn">+ New report</Link>} />
+      {scope.filter((e) => REPORTS_ELSEWHERE[e]).map((e) => <FlSync key={e} url={REPORTS_ELSEWHERE[e].url} />)}
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open" value={open.length} />
         <Metric label="MOR clocks running" value={clocks.length} tone={clocks.some((r) => r.clock.state === "late" || r.clock.left <= 24) ? "red" : clocks.length ? "amber" : undefined} hint="decide mandatory / voluntary" />

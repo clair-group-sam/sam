@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         anonymous: !c.submitted_by, reporter_person: pid(reporter), reporter_name: reporter, status: closed ? "closed" : c.case_phase && /investig|act|monitor/i.test(c.case_phase) ? "investigation" : "classified",
         closed_at: closed ? (centrikDate(c.closed_on) ? `${centrikDate(c.closed_on)}T12:00:00Z` : received) : null, acknowledged_at: received, classified_at: received,
         mor_filed_at: mandatory ? received : null, mor_ref: mandatory ? `filed outside S.A.M. (${tool})` : null,
-        source, source_ref: c.caseId, external_no: c.no, report_type: c.type?.split(" - ")[0] ?? null, source_erc: Number(c.erc) || null, occurrence_class: c.occurrence_class ?? null, risk_category: c.risk_category ?? null, event_type: c.event_type ?? null,
+        source, history: true, source_ref: c.caseId, external_no: c.no, report_type: c.type?.split(" - ")[0] ?? null, source_erc: Number(c.erc) || null, occurrence_class: c.occurrence_class ?? null, risk_category: c.risk_category ?? null, event_type: c.event_type ?? null,
         investigation: c.investigation ?? null, findings: c.findings ?? null, closed_by_name: centrikPerson(c.closed_by)[0], hazard_label: c.hazard_link ?? null };
       const { error } = await db.from("reports").upsert(row, { onConflict: "id" }); if (error) throw new Error(error.message);
       await db.from("report_analysis").upsert({ report_id: id, mor_status: mandatory ? "mandatory" : "voluntary", mor_basis: `As classified in ${tool}: ${c.confirmed_mor || c.reported_mor || "not stated"}`, confirmed_at: received, summary: null, ran_at: received }, { onConflict: "report_id" });

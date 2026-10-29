@@ -27,7 +27,7 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
   const db = supabaseAdmin(); const e = s.entity; const now = Date.now(); const today = new Date().toISOString().slice(0, 10);
   const [board, { data: open }, { data: acts }, { data: hz }, { data: notes }] = await Promise.all([
     spiBoard(e, year),
-    db.from("reports").select("id,received_at,status,mor_filed_at,source,headline,report_analysis(mor_status,confirmed_at)").eq("entity", e).neq("status", "closed").limit(1000),
+    db.from("reports").select("id,received_at,status,mor_filed_at,source,history,headline,report_analysis(mor_status,confirmed_at)").eq("entity", e).neq("status", "closed").limit(1000),
     db.from("safety_actions").select("status,due").eq("entity", e).eq("module", "safety").in("status", ["open", "in_progress", "done"]).limit(2000),
     db.from("hazards").select("needs_review,review_date,status,assessment_id,risk_assessments!inner(kind,status)").eq("entity", e).eq("risk_assessments.kind", "hazard_log").neq("status", "closed").limit(3000),
     db.from("spi_notes").select("id,year,quarter,text,model,created_at,created_by").eq("entity", e).eq("year", year).order("created_at", { ascending: false }).limit(1),
@@ -36,7 +36,7 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
   const reps = ((open ?? []) as unknown as R[]).filter((r) => !/^\s*test\b/i.test(r.headline)).map((r) => ({ ...r, a: Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis }));
   const toAck = reps.filter((r) => r.status === "received").length;
   // FB-041 · same clock as the Reports page: a proposed (unconfirmed) "voluntary" does not stop the 72 h
-  const withClock = reps.map((r) => ({ ...r, clock: morClock(r.received_at, r.mor_filed_at, r.a?.confirmed_at ? r.a.mor_status : null, now, (r.source ?? "sam") !== "sam") }));
+  const withClock = reps.map((r) => ({ ...r, clock: morClock(r.received_at, r.mor_filed_at, r.a?.confirmed_at ? r.a.mor_status : null, now, !!(r as { history?: boolean | null }).history) }));
   const clocks = withClock.filter((r) => r.clock.state === "running" || r.clock.state === "late");
   const late = clocks.filter((r) => r.clock.state === "late").length;
   const old = reps.filter((r) => now - new Date(r.received_at).getTime() > 90 * 864e5).length;
