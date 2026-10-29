@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isCmm } from "@/lib/revisions";
-import { addDays, recordRound, routeFor, syncTasks, today, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
+import { recordRound, syncTasks, today, type AuthorityFile, type Stage } from "@/lib/authority";
 import { applyMove } from "@/lib/authority-moves";
+import { createAuthorityFile } from "@/lib/authority-create";
 
 type Db = ReturnType<typeof supabaseAdmin>;
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -37,28 +38,9 @@ export async function createFile(formData: FormData) {
   if (!s) throw new Error("Not signed in");
   const entity = str(formData, "entity");
   if (!s.group && !s.entities.includes(entity)) throw new Error("Out of scope");
-  const db = supabaseAdmin();
-  const { data: t } = await db.from("authority_file_types").select("*").eq("code", str(formData, "type_code")).maybeSingle();
-  if (!t) throw new Error("Unknown type");
-  const type = t as FileType;
-  const route = routeFor(type, entity);
-  const triggered = opt(formData, "triggered_at") ?? today();
-  const row = {
-    entity, type_code: type.code, title: str(formData, "title") || type.name, stage: "draft",
-    category: route.category, authority: route.authority, portal: route.portal,
-    owner_role: opt(formData, "owner_role") ?? type.default_owner_role, owner_person: null,
-    trigger_kind: opt(formData, "trigger_kind"), trigger_note: opt(formData, "trigger_note"),
-    revision_id: opt(formData, "revision_id"), finding_ref: opt(formData, "finding_ref"), aircraft_reg: opt(formData, "aircraft_reg"), np_post_code: opt(formData, "np_post_code"), moc_ref: opt(formData, "moc_ref"),
-    triggered_at: triggered, target_date: opt(formData, "target_date") ?? addDays(triggered, type.target_days + 14),
-    created_by: s.person?.id ?? null,
-  };
-  const { data: created, error } = await db.from("authority_files").insert(row).select("*").single();
-  if (error || !created) throw new Error(error?.message ?? "Could not create the file");
-  const f = created as AuthorityFile;
-  if (type.checklist?.length) await db.from("authority_file_items").insert(type.checklist.map((c, i) => ({ file_id: f.id, ord: i + 1, key: c.key, label: c.label, role: c.role ?? null, required: c.required !== false })));
-  await event(db, s, f.id, "created", `File opened from type ${type.code}`, { type: type.code, portal: route.portal });
-  await audit(db, s, f, "authority_file_created", row);
-  await syncTasks(db, f);
+  const f = await createAuthorityFile(supabaseAdmin(), { personId: s.person?.id ?? null, name: s.name }, {
+    entity, type_code: str(formData, "type_code"), title: opt(formData, "title"), owner_role: opt(formData, "owner_role"), trigger_kind: opt(formData, "trigger_kind"), trigger_note: opt(formData, "trigger_note"),
+    triggered_at: opt(formData, "triggered_at"), target_date: opt(formData, "target_date"), revision_id: opt(formData, "revision_id"), finding_ref: opt(formData, "finding_ref"), aircraft_reg: opt(formData, "aircraft_reg"), np_post_code: opt(formData, "np_post_code"), moc_ref: opt(formData, "moc_ref") }, "app");
   paths(f.id);
   redirect(`/proj/auth/${f.id}`);
 }

@@ -7,7 +7,7 @@ import { completeAction, verifyActionCore } from "@/lib/actions-core";
 import type { Action } from "@/lib/actions";
 import { syncTasks, type AuthorityFile } from "@/lib/authority";
 import { after } from "next/server";
-import { createFromCard, createdCard, discardedCard, draftCard, draftReport, readThread, threadRefOf } from "@/lib/teams-draft";
+import { authorityCard, classifyIntent, createAuthorityFromCard, createFromCard, createMocFromCard, createdCard, discardedCard, draftAuthority, draftCard, draftMoc, draftReport, mocCard, openedCard, readThread, threadRefOf } from "@/lib/teams-draft";
 import { runAnalysis } from "@/lib/safety-analysis";
 import { attachCard, attachFile, attachableTasks, attachedCard, discardFile, saveIncomingFiles } from "@/lib/teams-files";
 
@@ -160,6 +160,16 @@ export async function POST(req: NextRequest) {
       return cardResponse(attachedCard(res.file, res.where, res.link));
     }
     if (verb === "report_discard") return cardResponse(discardedCard(p.display_name));
+    if (verb === "authority_create" || verb === "moc_create") {
+      const { data: pe } = await db.from("people").select("entities").eq("id", p.id).maybeSingle();
+      const person = { id: p.id, display_name: p.display_name, entities: ((pe as { entities?: string[] } | null)?.entities ?? []) };
+      const res = verb === "authority_create" ? await createAuthorityFromCard(db, person, data as Record<string, unknown>) : await createMocFromCard(db, person, data as Record<string, unknown>);
+      await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, text: res.ok ? res.id : res.error, meta: { conversation: a.conversation.id } });
+      if (!res.ok) return msgResponse(`Not created: ${res.error}`);
+      return verb === "authority_create"
+        ? cardResponse(openedCard("Authority file", (res as { title: string }).title, p.display_name, `/proj/auth/${res.id}`))
+        : cardResponse(openedCard("Management of change", `${(res as { number: string }).number} — ${(res as { name: string }).name}`, p.display_name, `/safe/risk/a/${res.id}`));
+    }
     if (verb === "report_create") {
       const { data: pe } = await db.from("people").select("entities").eq("id", p.id).maybeSingle();
       const res = await createFromCard(db, { id: p.id, display_name: p.display_name, entities: ((pe as { entities?: string[] } | null)?.entities ?? []) }, data as Record<string, unknown>);
@@ -192,12 +202,20 @@ export async function POST(req: NextRequest) {
       const entities = ((pe as { entities?: string[] } | null)?.entities ?? []);
       if (!entities.length) { await sendCard(ref, infoCard("No entity", "Your S.A.M. profile has no entity: ask the Compliance department.")); return json({}); }
       try {
-        const d = await draftReport(db, p.id, entities, thread, text);
-        if (!d.occurrence) { await sendText(ref, `${p.display_name.split(" ")[0]}, I read the thread but found no safety occurrence to report${d.reason ? ` — ${d.reason}` : ""}. Describe the event in the conversation (or in our personal chat) and mention me again.`); return json({}); }
-        // the draft goes to the person's personal chat (a safety report is the reporter's business); the thread only gets a one-liner
+        // TMS-07 · what to open: a safety report (default), an authority file, or a MOC
+        const { intent } = await classifyIntent(db, p.id, text, thread);
+        let card: unknown; let what: string;
+        if (intent === "authority") { const { d, types } = await draftAuthority(db, p.id, entities, thread, text); card = authorityCard(d, entities, types, tref, p.display_name); what = "Authority file — draft"; }
+        else if (intent === "moc") { const d = await draftMoc(db, p.id, entities, thread, text); card = mocCard(d, entities, tref, p.display_name); what = "Management of change — draft"; }
+        else {
+          const d = await draftReport(db, p.id, entities, thread, text);
+          if (!d.occurrence) { await sendText(ref, `${p.display_name.split(" ")[0]}, I read the thread but found no safety occurrence to report${d.reason ? ` — ${d.reason}` : ""}. Tell me what to open (a report, an authority file, a MOC) or describe the event, and mention me again.`); return json({}); }
+          card = draftCard(d, entities, tref, p.display_name); what = "Safety report — draft";
+        }
+        // the draft goes to the person's personal chat; the thread only gets a one-liner
         const priv = await ensureConversation(db, { id: p.id, email: p.email });
-        if (priv) { await sendCard(priv, draftCard(d, entities, tref, p.display_name), "Safety report — draft"); await sendText(ref, `${p.display_name.split(" ")[0]}, I sent you the draft privately — check it in our chat and create it in S.A.M. from there.`); }
-        else await sendCard(ref, draftCard(d, entities, tref, p.display_name), "Safety report — draft");
+        if (priv) { await sendCard(priv, card, what); await sendText(ref, `${p.display_name.split(" ")[0]}, I sent you the draft privately (${what.replace(" — draft", "").toLowerCase()}) — check it in our chat and open it in S.A.M. from there.`); }
+        else await sendCard(ref, card, what);
       } catch (e) { await sendCard(ref, infoCard("Draft failed", e instanceof Error ? e.message.slice(0, 200) : "Unknown error")); }
       return json({});
     }

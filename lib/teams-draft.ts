@@ -5,6 +5,9 @@ import { callClaude } from "@/lib/ai";
 import { PHASES } from "@/lib/safety-shared";
 import { createReport, type NewReport } from "@/lib/safety-create";
 import { graphToken, origin } from "@/lib/teams";
+import { DOMAINS, MOC_CATEGORIES } from "@/lib/risk-shared";
+import { createAuthorityFile } from "@/lib/authority-create";
+import { createMoc } from "@/lib/moc-create";
 
 export type ThreadRef = { kind: "chat" | "channel"; chatId?: string; teamId?: string; channelId?: string; rootId?: string };
 export type ThreadMsg = { from: string; at: string; text: string };
@@ -106,4 +109,117 @@ export async function createFromCard(db: SupabaseClient, person: { id: string; d
     precisions: { source: "Teams conversation", ...(transcript ? { teams_thread: transcript } : {}) } };
   const res = await createReport(db, r, person.id, { source: "teams", note: `Received — created from a Teams conversation by ${person.display_name}` });
   return res.ok ? { ok: true, id: res.id, headline: r.headline } : res;
+}
+
+/* ---------- intent: what the person wants from the thread ---------- */
+export type Intent = "report" | "authority" | "moc";
+/** Picks the object to draft from the instruction (and the thread when the instruction is silent). Cheap call, no draft yet. */
+export async function classifyIntent(db: SupabaseClient, personId: string, instruction: string, thread: ThreadMsg[]): Promise<{ intent: Intent; reason: string }> {
+  const quick = instruction.toLowerCase();
+  if (/\b(moc|management of change|changement|change request)\b/.test(quick)) return { intent: "moc", reason: "instruction" };
+  if (/\b(authority file|dossier|application|tm-?cad|meteor|osac|dsac|submission|soumission|notification)\b/.test(quick)) return { intent: "authority", reason: "instruction" };
+  if (/\b(report|occurrence|rapport|incident|event|événement|evenement)\b/.test(quick)) return { intent: "report", reason: "instruction" };
+  try {
+    const { text } = await callClaude({ agent: "safety", personId, entity: null, maxTokens: 120,
+      system: `Classify what an aviation compliance/safety colleague wants S.A.M. to open from a Teams conversation. "report" = a safety occurrence report (something happened: bird strike, TCAS, technical event, ground incident…). "authority" = an application / notification file to the authority (manual revision, aircraft addition, nominated person, approval…). "moc" = a management-of-change assessment (organisational, fleet, base, procedure or equipment change to assess). Answer ONLY JSON {"intent":"report|authority|moc","reason":"short"}.`,
+      user: `Instruction: ${instruction || "(none)"}\n\nLast messages:\n${thread.slice(-12).map((m) => `${m.from}: ${m.text}`).join("\n").slice(0, 4000)}` });
+    const j = JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] ?? "{}") as { intent?: string; reason?: string };
+    return { intent: (["report", "authority", "moc"].includes(j.intent ?? "") ? j.intent : "report") as Intent, reason: j.reason ?? "" };
+  } catch { return { intent: "report", reason: "default" }; }
+}
+
+/* ---------- authority file from a thread ---------- */
+export type AuthorityDraft = { entity: string; type_code: string; title: string; owner_role: string; trigger_note: string; aircraft_reg: string; missing: string[] };
+type TypeRow = { code: string; name: string; entities: string[]; default_owner_role: string | null; active: boolean };
+export async function draftAuthority(db: SupabaseClient, personId: string, entities: string[], thread: ThreadMsg[], instruction: string): Promise<{ d: AuthorityDraft; types: TypeRow[] }> {
+  const { data } = await db.from("authority_file_types").select("code,name,entities,default_owner_role,active").eq("active", true).order("ord");
+  const types = ((data ?? []) as TypeRow[]).filter((t) => t.entities.some((e) => entities.includes(e)));
+  const transcript = thread.map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 10000);
+  const { text } = await callClaude({ agent: "file", personId, entity: entities[0] ?? null, maxTokens: 800,
+    system: `You open an authority application file for an aviation operator from a Teams conversation. Pick the type from the catalogue (code → name → entities): ${types.map((t) => `${t.code}: ${t.name} [${t.entities.join("/")}]`).join("; ")}. Entities of the person: ${entities.join(", ")}. Title = one factual line naming the object (manual + issue/rev, aircraft registration, post…). trigger_note = 2-3 lines on what triggers the application, facts from the conversation only. Never invent a registration, a revision number or a date — list what is missing. Answer ONLY JSON {"entity":"…","type_code":"…","title":"…","owner_role":"post code or empty","trigger_note":"…","aircraft_reg":"… or empty","missing":["…"]}`,
+    user: `Instruction: ${instruction || "(none — an authority file from this conversation)"}\n\nConversation:\n${transcript}` });
+  const j = JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] ?? "{}") as Partial<AuthorityDraft>;
+  const str = (v: unknown, n = 500) => (typeof v === "string" ? v.slice(0, n) : "");
+  const entity = entities.includes(str(j.entity)) ? str(j.entity) : entities[0] ?? "";
+  const type = types.find((t) => t.code === str(j.type_code) && t.entities.includes(entity)) ?? types.find((t) => t.entities.includes(entity));
+  return { d: { entity, type_code: type?.code ?? "", title: str(j.title, 200), owner_role: str(j.owner_role, 10) || type?.default_owner_role || "", trigger_note: str(j.trigger_note, 1500), aircraft_reg: str(j.aircraft_reg, 10), missing: Array.isArray(j.missing) ? j.missing.map(String).slice(0, 6) : [] }, types };
+}
+export function authorityCard(d: AuthorityDraft, entities: string[], types: TypeRow[], ref: ThreadRef, by: string): unknown {
+  const body: unknown[] = [
+    { type: "TextBlock", text: "S.A.M. · Authority file — draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: `Drafted from this conversation for ${by}. The file opens in Draft with the checklist of its type; nothing is sent to the authority.`, wrap: true, isSubtle: true },
+    { type: "Input.ChoiceSet", id: "entity", label: "Entity", value: d.entity, choices: entities.map((e) => ({ title: e, value: e })), style: "compact" },
+    { type: "Input.ChoiceSet", id: "type_code", label: "Type of application", value: d.type_code, choices: types.map((t) => ({ title: `${t.code} — ${t.name.slice(0, 70)} [${t.entities.join("/")}]`, value: t.code })), style: "compact" },
+    { type: "Input.Text", id: "title", label: "Title", value: d.title, maxLength: 200 },
+    { type: "ColumnSet", columns: [
+      { type: "Column", width: "stretch", items: [{ type: "Input.Text", id: "owner_role", label: "Owner post", value: d.owner_role, maxLength: 10 }] },
+      { type: "Column", width: "stretch", items: [{ type: "Input.Text", id: "aircraft_reg", label: "Aircraft (if any)", value: d.aircraft_reg, maxLength: 10 }] },
+    ] },
+    { type: "Input.Text", id: "trigger_note", label: "What triggers it", value: d.trigger_note, isMultiline: true, maxLength: 1500 },
+  ];
+  if (d.missing.length) body.push({ type: "TextBlock", text: `Still missing: ${d.missing.join(", ")}.`, wrap: true, color: "Attention", spacing: "Small" });
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions: [
+    { type: "Action.Execute", title: "Open the file in S.A.M.", verb: "authority_create", style: "positive", data: { ref } },
+    { type: "Action.Execute", title: "Discard", verb: "report_discard", data: {} }], msteams: { width: "Full" } };
+}
+export async function createAuthorityFromCard(db: SupabaseClient, person: { id: string; display_name: string; entities: string[] }, data: Record<string, unknown>): Promise<{ ok: true; id: string; title: string } | { ok: false; error: string }> {
+  const g = (k: string, n = 2000) => (typeof data[k] === "string" ? (data[k] as string).trim().slice(0, n) : "");
+  const entity = g("entity", 3);
+  if (!person.entities.includes(entity)) return { ok: false, error: "Entity outside your scope." };
+  try {
+    const f = await createAuthorityFile(db, { personId: person.id, name: person.display_name }, { entity, type_code: g("type_code", 12), title: g("title", 200) || null, owner_role: g("owner_role", 10) || null, trigger_kind: "other", trigger_note: g("trigger_note", 1500) || null, aircraft_reg: g("aircraft_reg", 10).toUpperCase() || null }, "teams");
+    return { ok: true, id: f.id, title: f.title };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Not created" }; }
+}
+
+/* ---------- MOC from a thread ---------- */
+export type MocDraft = { entity: string; name: string; description: string; domain: string; category: string; change_type: string; start_date: string; reason: string; requestor: string; missing: string[] };
+export async function draftMoc(db: SupabaseClient, personId: string, entities: string[], thread: ThreadMsg[], instruction: string): Promise<MocDraft> {
+  const transcript = thread.map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 10000);
+  const { text } = await callClaude({ agent: "safety", personId, entity: entities[0] ?? null, maxTokens: 900,
+    system: `You open a management-of-change (MOC) assessment for an aviation operator from a Teams conversation (ICAO Annex 19 / MSM: describe the change, its reason, who asks for it, when it starts; the hazards are identified afterwards in the assessment). Entities: ${entities.join(", ")}. Domains: ${DOMAINS.join(" | ")}. Categories: ${Object.entries(MOC_CATEGORIES).map(([k, v]) => `${k}=${v}`).join(", ")}. change_type: permanent | temporary. Facts only, in the language of the conversation; never invent dates or names — list what is missing. Answer ONLY JSON {"entity":"…","name":"one line naming the change","description":"what changes, scope","domain":"…","category":"key","change_type":"permanent|temporary","start_date":"YYYY-MM-DD or empty","reason":"why","requestor":"who asks (post or name) or empty","missing":["…"]}`,
+    user: `Instruction: ${instruction || "(none — a MOC from this conversation)"}\n\nConversation:\n${transcript}` });
+  const j = JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] ?? "{}") as Partial<MocDraft>;
+  const str = (v: unknown, n = 1500) => (typeof v === "string" ? v.slice(0, n) : "");
+  return { entity: entities.includes(str(j.entity)) ? str(j.entity) : entities[0] ?? "", name: str(j.name, 200), description: str(j.description), domain: DOMAINS.includes(str(j.domain)) ? str(j.domain) : "", category: MOC_CATEGORIES[str(j.category, 20)] ? str(j.category, 20) : "other", change_type: str(j.change_type, 10) === "temporary" ? "temporary" : "permanent", start_date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.start_date)) ? str(j.start_date) : "", reason: str(j.reason), requestor: str(j.requestor, 120), missing: Array.isArray(j.missing) ? j.missing.map(String).slice(0, 6) : [] };
+}
+export function mocCard(d: MocDraft, entities: string[], ref: ThreadRef, by: string): unknown {
+  const body: unknown[] = [
+    { type: "TextBlock", text: "S.A.M. · Management of change — draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: `Drafted from this conversation for ${by}. The MOC opens at the “assessment” step for the SM; hazards and decision follow in S.A.M.`, wrap: true, isSubtle: true },
+    { type: "Input.ChoiceSet", id: "entity", label: "Entity", value: d.entity, choices: entities.map((e) => ({ title: e, value: e })), style: "compact" },
+    { type: "Input.Text", id: "name", label: "Change (one line)", value: d.name, maxLength: 200 },
+    { type: "Input.Text", id: "description", label: "What changes", value: d.description, isMultiline: true, maxLength: 1500 },
+    { type: "ColumnSet", columns: [
+      { type: "Column", width: "stretch", items: [{ type: "Input.ChoiceSet", id: "domain", label: "Domain", value: d.domain || undefined, choices: DOMAINS.map((x) => ({ title: x, value: x })), style: "compact" }] },
+      { type: "Column", width: "stretch", items: [{ type: "Input.ChoiceSet", id: "category", label: "Category", value: d.category, choices: Object.entries(MOC_CATEGORIES).map(([k, v]) => ({ title: v, value: k })), style: "compact" }] },
+    ] },
+    { type: "ColumnSet", columns: [
+      { type: "Column", width: "stretch", items: [{ type: "Input.ChoiceSet", id: "change_type", label: "Permanent / temporary", value: d.change_type, choices: [{ title: "permanent", value: "permanent" }, { title: "temporary", value: "temporary" }], style: "compact" }] },
+      { type: "Column", width: "stretch", items: [{ type: "Input.Date", id: "start_date", label: "Starts on", value: d.start_date || undefined }] },
+    ] },
+    { type: "Input.Text", id: "reason", label: "Why", value: d.reason, isMultiline: true, maxLength: 1500 },
+    { type: "Input.Text", id: "requestor", label: "Requested by", value: d.requestor, maxLength: 120 },
+  ];
+  if (d.missing.length) body.push({ type: "TextBlock", text: `Still missing: ${d.missing.join(", ")}.`, wrap: true, color: "Attention", spacing: "Small" });
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions: [
+    { type: "Action.Execute", title: "Open the MOC in S.A.M.", verb: "moc_create", style: "positive", data: { ref } },
+    { type: "Action.Execute", title: "Discard", verb: "report_discard", data: {} }], msteams: { width: "Full" } };
+}
+export async function createMocFromCard(db: SupabaseClient, person: { id: string; display_name: string; entities: string[] }, data: Record<string, unknown>): Promise<{ ok: true; id: string; number: string; name: string } | { ok: false; error: string }> {
+  const g = (k: string, n = 1500) => (typeof data[k] === "string" ? (data[k] as string).trim().slice(0, n) : "");
+  const entity = g("entity", 3);
+  if (!person.entities.includes(entity)) return { ok: false, error: "Entity outside your scope." };
+  try {
+    const r = await createMoc(db, { personId: person.id, name: person.display_name }, { entity, name: g("name", 200), description: g("description") || null, domain: g("domain", 40) || null, category: g("category", 20) || null, change_type: g("change_type", 10) || null, start_date: g("start_date", 10) || null, reason: g("reason") || null, requestor: g("requestor", 120) || null }, "teams");
+    return { ok: true, id: r.id, number: r.number, name: g("name", 200) };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Not created" }; }
+}
+/** Generic "created" card for an authority file or a MOC. */
+export function openedCard(kind: "Authority file" | "Management of change", title: string, by: string, link: string): unknown {
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body: [
+    { type: "TextBlock", text: `S.A.M. · ${kind}`, size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: title, size: "Medium", weight: "Bolder", wrap: true },
+    { type: "TextBlock", text: `Opened by ${by} from the conversation. Continue in S.A.M.`, wrap: true },
+  ], actions: [{ type: "Action.OpenUrl", title: "Open in S.A.M.", url: `${origin()}${link}` }], msteams: { width: "Full" } };
 }
