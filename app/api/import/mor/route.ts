@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
       if (used.has(x.id)) continue;
       // the date kept in S.A.M. may be the date of the report (after the occurrence): up to 30 days after with the same number, 20 days on the headline
       const lag = (new Date(x.d).getTime() - new Date(d).getTime()) / 864e5; const dd = Math.abs(lag);
-      if (pass === 1) { if (no && lag >= -3 && lag <= 30 && (x.external_no ?? "").replace(/^0+/, "") === no) return { r: x, how: "number + date" }; continue; }
+      if (pass === 1) { // same number: report kept up to 90 days after the occurrence, or same day and month (a year typed wrong in ECCAIRS)
+        if (no && (x.external_no ?? "").replace(/^0+/, "") === no && ((lag >= -3 && lag <= 90) || x.d.slice(5) === d.slice(5))) return { r: x, how: lag >= -3 && lag <= 90 ? "number + date" : "number + day (year differs in ECCAIRS)" };
+        continue; }
       if (lag < -3 || lag > 20) continue;
       const reg = r.reg && x.aircraft && r.reg.replace(/[^A-Z0-9]/gi, "").toUpperCase() === x.aircraft.replace(/[^A-Z0-9]/gi, "").toUpperCase() ? 0.3 : 0;
       const sc = sim(r.headline, x.headline) + reg - dd * 0.02;
