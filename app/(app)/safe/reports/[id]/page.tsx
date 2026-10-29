@@ -45,7 +45,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
   const who = rep.data as { display_name: string; email: string; job_title: string | null } | null;
-  const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null);
+  const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), ((r as { source?: string | null }).source ?? "sam") !== "sam");
   const erc = a?.erc_value ?? ercValue(a?.erc_outcome, a?.erc_barriers);
   const translated = r.narrative_en && r.language && r.language !== "en";
   const closed = r.status === "closed";

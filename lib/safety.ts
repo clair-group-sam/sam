@@ -20,9 +20,11 @@ export const STATUS: Record<string, [string, string]> = {
 };
 
 export const MOR_HOURS = 72;
-export function morClock(receivedAt: string, filedAt: string | null, status: string | null, now = Date.now()) {
+export function morClock(receivedAt: string, filedAt: string | null, status: string | null, now = Date.now(), imported = false) {
   const deadline = new Date(new Date(receivedAt).getTime() + MOR_HOURS * 3600e3);
-  if (filedAt) return { state: "filed" as const, deadline, left: 0, label: "MOR filed" };
+  if (filedAt) return { state: "filed" as const, deadline, left: 0, label: imported ? "Sent to ECCAIRS" : "MOR filed" };
+  // a report imported from FlightLogger / Centrik: mirrored as it is there — sent to ECCAIRS or not, no clock
+  if (imported && status !== "voluntary") return { state: "not_sent" as const, deadline, left: 0, label: "Not sent to ECCAIRS" };
   if (status === "voluntary") return { state: "not_reportable" as const, deadline, left: 0, label: "not a mandatory occurrence" };
   const left = Math.round((deadline.getTime() - now) / 3600e3);
   return { state: left < 0 ? ("late" as const) : ("running" as const), deadline, left, label: left < 0 ? `${-left} h past the 72 h` : `${left} h left` };

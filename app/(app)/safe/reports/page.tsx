@@ -15,7 +15,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const { st } = await searchParams;
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
   const { data } = await supabaseAdmin().from("reports").select("id,entity,headline,headline_en,received_at,status,aircraft,anonymous,mor_filed_at,source,external_no,report_type,source_erc,report_analysis(erc_value,mor_status,confirmed_at,adrep)").in("entity", scope).order("received_at", { ascending: false }).limit(300);
-  const all = ((data ?? []) as unknown as Row[]).map((r) => { const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis; return { ...r, a, clock: morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null) }; });
+  const all = ((data ?? []) as unknown as Row[]).map((r) => { const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis; return { ...r, a, clock: morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), (r.source ?? "sam") !== "sam") }; });
   const open = all.filter((r) => r.status !== "closed");
   const clocks = open.filter((r) => r.clock.state === "running" || r.clock.state === "late");
   const rows = st === "closed" ? all.filter((r) => r.status === "closed") : st === "all" ? all : open;
