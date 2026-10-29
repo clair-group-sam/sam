@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { morClock } from "@/lib/safety";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENT } from "@/lib/nav";
 import { PageHeader, Metric } from "@/components/Page";
@@ -34,8 +35,10 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
   type R = { id: string; received_at: string; status: string; mor_filed_at: string | null; source: string | null; headline: string; report_analysis: { mor_status: string | null; confirmed_at: string | null } | { mor_status: string | null; confirmed_at: string | null }[] | null };
   const reps = ((open ?? []) as unknown as R[]).filter((r) => !/^\s*test\b/i.test(r.headline)).map((r) => ({ ...r, a: Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis }));
   const toAck = reps.filter((r) => r.status === "received").length;
-  const clocks = reps.filter((r) => !r.mor_filed_at && (r.source ?? "sam") === "sam" && r.a?.mor_status !== "voluntary");
-  const late = clocks.filter((r) => now - new Date(r.received_at).getTime() > 72 * 3600e3).length;
+  // FB-041 · same clock as the Reports page: a proposed (unconfirmed) "voluntary" does not stop the 72 h
+  const withClock = reps.map((r) => ({ ...r, clock: morClock(r.received_at, r.mor_filed_at, r.a?.confirmed_at ? r.a.mor_status : null, now, (r.source ?? "sam") !== "sam") }));
+  const clocks = withClock.filter((r) => r.clock.state === "running" || r.clock.state === "late");
+  const late = clocks.filter((r) => r.clock.state === "late").length;
   const old = reps.filter((r) => now - new Date(r.received_at).getTime() > 90 * 864e5).length;
   const A = (acts ?? []) as { status: string; due: string | null }[];
   const actLate = A.filter((a) => a.status !== "done" && a.due && a.due < today).length;
@@ -52,7 +55,8 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
   const reportT = board.rows.find((r) => r.metric === "reports")?.t?.target ?? null;
 
   const rows = board.rows; const active = rows.filter((r) => r.status === "active"); const proposed = rows.filter((r) => r.status === "proposed");
-  const count = (v: string) => active.filter((r) => r.ytdVerdict === v).length;
+  const count = (v: string) => rows.filter((r) => r.ytdVerdict === v).length; // FB-042 · proposed SPIs count too (the banner says they are not confirmed)
+  void active;
   const needsHours = rows.some((r) => BASIS[r.basis].den) && !board.activity[rows.some((r) => BASIS[r.basis].den === "fh") && !rows.some((r) => BASIS[r.basis].den === "bh") ? "fh" : "bh"].some((v) => v != null);
   const groups = [...new Set(rows.map((r) => r.objective ?? "Other"))];
   const note = ((notes ?? []) as { id: string; quarter: number | null; text: string; model: string | null; created_at: string }[])[0];
@@ -82,7 +86,7 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
         <div className="ch"><span className="eyebrow">Safety performance indicators {year}</span>
           <span className="mini">data up to {monthShort(board.upTo)} · Q{board.quarter}</span>
           <span className="ml-auto flex gap-2"><span className="pill green">{count("ok")} on target</span><span className="pill amber">{count("improve")} to improve</span><span className="pill red">{count("far")} far off</span><span className="pill">{count("nodata") + count("none")} no data / target</span></span></div>
-        {proposed.length > 0 && <div className="cb banner">{proposed.length} SPIs are <b>proposed</b> (taken from the ASJ set, same MSM family) — {edit ? <Link className="underline" href={`/safe/over/set?y=${year}`}>review and confirm the set</Link> : "the safety desk confirms them at the SRB"}.</div>}
+        {proposed.length > 0 && <div className="cb banner">{proposed.length} SPIs are <b>proposed</b> (taken from the ASJ set, same MSM family) and counted above as such — {edit ? <Link className="underline" href={`/safe/over/set?y=${year}`}>review and confirm the set</Link> : "the safety desk confirms them at the SRB"}.</div>}
         {needsHours && <div className="cb banner">No activity hours entered for {year} — the rates per 1000 BH / 100 FH stay empty.{edit && <> <Link className="underline" href={`/safe/over/data?y=${year}`}>Enter the hours</Link>.</>}</div>}
         {!rows.length && <div className="cb mini">No SPI defined for this entity yet.{edit && <> <Link className="underline" href={`/safe/over/set?y=${year}`}>Define the SPI set</Link>.</>}</div>}
         {rows.length > 0 && <table className="tbl spitbl">

@@ -70,7 +70,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                 <tr><td className="mini">Phase · where</td><td>{r.phase ?? "—"} {r.location ? "· " + r.location : ""}</td></tr>
               </tbody></table>
               <div className="narr">{translated ? r.narrative_en : r.narrative}</div>
-              {Object.keys(r.complements ?? {}).length > 0 && <><div className="eyebrow mt-4 mb-1">Precisions given before sending</div><ul className="mini">{Object.entries(r.complements).map(([k, v]) => <li key={k}><b>{k.replace(/_/g, " ")}:</b> {v}</li>)}</ul></>}
+              {Object.keys(r.complements ?? {}).length > 0 && <><div className="eyebrow mt-4 mb-1">Precisions given before sending</div><ul className="mini">{Object.entries(r.complements).filter(([k]) => k !== "teams_thread" && k !== "teams_messages").map(([k, v]) => <li key={k}><b>{k.replace(/_/g, " ")}:</b> {v}</li>)}</ul>
+                {(r.complements.teams_messages || r.complements.teams_thread) && <details className="mini mt-1"><summary style={{ cursor: "pointer" }}>Teams messages the report was drafted from</summary><pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{r.complements.teams_messages ?? r.complements.teams_thread}</pre></details>}</>}
               {r.contributing && <><div className="eyebrow mt-4 mb-1">Contributing factors in the reporter&apos;s view</div><p>{r.contributing}</p></>}
               {translated && <details className="mt-4"><summary className="mini underline cursor-pointer">Original text ({r.language})</summary><div className="narr mt-2">{r.narrative}</div></details>}
             </div>

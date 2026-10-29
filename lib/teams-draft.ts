@@ -46,10 +46,27 @@ export async function readThread(ref: ThreadRef): Promise<ThreadMsg[]> {
   return out.sort((x, y) => x.at.localeCompare(y.at)).slice(-40);
 }
 
+/**
+ * FB-039 · Only the part of the conversation that tells the event goes to the assistant and into the report: the burst of
+ * messages ending with the mention of S.A.M. (consecutive messages less than `gapMin` apart), without the bot's own lines and
+ * without one-word test messages. A group chat carries weeks of unrelated talk; none of it belongs to a safety report.
+ */
+export function eventBurst(thread: ThreadMsg[], gapMin = 180, max = 15): ThreadMsg[] {
+  const msgs = thread.filter((m) => !/sam[-\s]?teams[-\s]?bot|clairgroup-sam/i.test(m.from) && !/^\s*(test|ok|yes|no|thanks?|merci)\W*$/i.test(m.text));
+  if (!msgs.length) return [];
+  const out: ThreadMsg[] = [msgs[msgs.length - 1]];
+  for (let i = msgs.length - 2; i >= 0 && out.length < max; i--) {
+    const gap = (new Date(out[0].at).getTime() - new Date(msgs[i].at).getTime()) / 60000;
+    if (gap > gapMin) break;
+    out.unshift(msgs[i]);
+  }
+  return out;
+}
+
 export type Draft = { occurrence: boolean; reason: string; entity: string; headline: string; narrative: string; event_date: string; event_time_utc: string; aircraft: string; flight_ref: string; phase: string; location: string; language: string; missing: string[] };
 /** Claude reads the thread and drafts the report: facts only, in the language of the thread, with what is still missing. */
 export async function draftReport(db: SupabaseClient, personId: string, entities: string[], thread: ThreadMsg[], instruction: string): Promise<Draft> {
-  const transcript = thread.map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 12000);
+  const transcript = eventBurst(thread).map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 12000);
   const { text } = await callClaude({ agent: "safety", personId, entity: entities[0] ?? null, maxTokens: 1500,
     system: `You draft a safety (occurrence) report for an aviation operator from a Teams conversation. Facts only, in chronological order, in the language of the conversation; never guess causes, blame or human factors; never invent a date, a registration or a flight number — leave the field empty and list it in "missing". If the conversation describes NO safety occurrence (administrative talk, tests, chit-chat), answer {"occurrence":false,"reason":"one short line"} and nothing else. The headline is one factual line (what, where). Entities: ${entities.join(", ")} (pick the one the conversation is about, else the first). Phases: ${PHASES.join(" | ")}. Answer ONLY JSON: {"occurrence":true,"entity":"…","headline":"…","narrative":"…","event_date":"YYYY-MM-DD or empty","event_time_utc":"HH:MM or empty","aircraft":"registration or empty","flight_ref":"…","phase":"one of the phases or empty","location":"…","language":"fr|en|…","missing":["…"]}`,
     user: `Instruction from the person who mentioned S.A.M.: ${instruction || "(none — a safety report from this conversation)"}\n\nConversation:\n${transcript}` });
@@ -104,9 +121,10 @@ export async function createFromCard(db: SupabaseClient, person: { id: string; d
   if (!person.entities.includes(entity)) return { ok: false, error: "Entity outside your scope." };
   const ref = data.ref as ThreadRef | undefined;
   let transcript = "";
-  try { if (ref) transcript = (await readThread(ref)).map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 20000); } catch { /* context only */ }
+  // FB-039 · only the messages that tell the event are kept with the report (the rest of the chat is nobody's business)
+  try { if (ref) transcript = eventBurst(await readThread(ref)).map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 6000); } catch { /* context only */ }
   const r: NewReport = { entity, headline: g("headline", 200), narrative: g("narrative", 6000), event_date: g("event_date", 10), event_time_utc: g("event_time_utc", 5), aircraft: g("aircraft", 12), flight_ref: g("flight_ref", 40), phase: g("phase", 40), location: g("location", 120), contributing: "", anonymous: false, language: g("language", 5),
-    precisions: { source: "Teams conversation", ...(transcript ? { teams_thread: transcript } : {}) } };
+    precisions: { source: "Teams conversation", ...(transcript ? { teams_messages: transcript } : {}) } };
   const res = await createReport(db, r, person.id, { source: "teams", note: `Received — created from a Teams conversation by ${person.display_name}` });
   return res.ok ? { ok: true, id: res.id, headline: r.headline } : res;
 }
@@ -134,7 +152,7 @@ type TypeRow = { code: string; name: string; entities: string[]; default_owner_r
 export async function draftAuthority(db: SupabaseClient, personId: string, entities: string[], thread: ThreadMsg[], instruction: string): Promise<{ d: AuthorityDraft; types: TypeRow[] }> {
   const { data } = await db.from("authority_file_types").select("code,name,entities,default_owner_role,active").eq("active", true).order("ord");
   const types = ((data ?? []) as TypeRow[]).filter((t) => t.entities.some((e) => entities.includes(e)));
-  const transcript = thread.map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 10000);
+  const transcript = eventBurst(thread).map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 10000);
   const { text } = await callClaude({ agent: "file", personId, entity: entities[0] ?? null, maxTokens: 800,
     system: `You open an authority application file for an aviation operator from a Teams conversation. Pick the type from the catalogue (code → name → entities): ${types.map((t) => `${t.code}: ${t.name} [${t.entities.join("/")}]`).join("; ")}. Entities of the person: ${entities.join(", ")}. Title = one factual line naming the object (manual + issue/rev, aircraft registration, post…). trigger_note = 2-3 lines on what triggers the application, facts from the conversation only. Never invent a registration, a revision number or a date — list what is missing. Answer ONLY JSON {"entity":"…","type_code":"…","title":"…","owner_role":"post code or empty","trigger_note":"…","aircraft_reg":"… or empty","missing":["…"]}`,
     user: `Instruction: ${instruction || "(none — an authority file from this conversation)"}\n\nConversation:\n${transcript}` });
@@ -175,7 +193,7 @@ export async function createAuthorityFromCard(db: SupabaseClient, person: { id: 
 /* ---------- MOC from a thread ---------- */
 export type MocDraft = { entity: string; name: string; description: string; domain: string; category: string; change_type: string; start_date: string; reason: string; requestor: string; missing: string[] };
 export async function draftMoc(db: SupabaseClient, personId: string, entities: string[], thread: ThreadMsg[], instruction: string): Promise<MocDraft> {
-  const transcript = thread.map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 10000);
+  const transcript = eventBurst(thread).map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 10000);
   const { text } = await callClaude({ agent: "safety", personId, entity: entities[0] ?? null, maxTokens: 900,
     system: `You open a management-of-change (MOC) assessment for an aviation operator from a Teams conversation (ICAO Annex 19 / MSM: describe the change, its reason, who asks for it, when it starts; the hazards are identified afterwards in the assessment). Entities: ${entities.join(", ")}. Domains: ${DOMAINS.join(" | ")}. Categories: ${Object.entries(MOC_CATEGORIES).map(([k, v]) => `${k}=${v}`).join(", ")}. change_type: permanent | temporary. Facts only, in the language of the conversation; never invent dates or names — list what is missing. Answer ONLY JSON {"entity":"…","name":"one line naming the change","description":"what changes, scope","domain":"…","category":"key","change_type":"permanent|temporary","start_date":"YYYY-MM-DD or empty","reason":"why","requestor":"who asks (post or name) or empty","missing":["…"]}`,
     user: `Instruction: ${instruction || "(none — a MOC from this conversation)"}\n\nConversation:\n${transcript}` });

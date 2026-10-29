@@ -12,7 +12,7 @@ export function MonthBars({ months, stacks, line, height = 170 }: { months: stri
   const ly = (v: number) => T + (H - T - B) * (1 - v / lmax);
   const ticks = [0, Math.round(max / 2), max];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={stacks.map((s) => s.label).join(", ")}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: Math.round(height * 1.6), display: "block" }} role="img" aria-label={stacks.map((s) => s.label).join(", ")}>{/* FB-043 · never taller than ~1.6× its design height, whatever the screen width */}
       {ticks.map((t) => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--line)" /><text x={L - 6} y={y(t) + 4} fontSize="10" textAnchor="end" fill="var(--slate5)">{t}</text></g>)}
       {months.map((m, i) => {
         let acc = 0; const x = L + i * step + (step - bw) / 2;
@@ -27,7 +27,7 @@ export function MonthBars({ months, stacks, line, height = 170 }: { months: stri
         {line.target != null && <line x1={L} x2={W - R} y1={ly(line.target)} y2={ly(line.target)} stroke={line.color} strokeDasharray="4 4" opacity=".6" />}
         <polyline fill="none" stroke={line.color} strokeWidth="2" points={line.values.map((v, i) => (v == null ? null : `${L + i * step + step / 2},${ly(v)}`)).filter(Boolean).join(" ")} />
         {line.values.map((v, i) => v == null ? null : <circle key={i} cx={L + i * step + step / 2} cy={ly(v)} r="2.6" fill={line.color}><title>{`${monthShort(months[i])} — ${line.label}: ${v.toFixed(1)}`}</title></circle>)}
-        <text x={W - R + 4} y={T + 8} fontSize="9.5" fill={line.color}>{line.label}</text>
+        {/* FB-043 · the line label lives in the card legend; inside the chart it was clipped at the right edge */}
       </>}
     </svg>
   );
