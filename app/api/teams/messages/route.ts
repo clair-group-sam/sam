@@ -9,6 +9,7 @@ import { syncTasks, type AuthorityFile } from "@/lib/authority";
 import { after } from "next/server";
 import { createFromCard, createdCard, discardedCard, draftCard, draftReport, readThread, threadRefOf } from "@/lib/teams-draft";
 import { runAnalysis } from "@/lib/safety-analysis";
+import { attachCard, attachFile, attachableTasks, attachedCard, discardFile, saveIncomingFiles } from "@/lib/teams-files";
 
 // TMS-01 · the bot's messaging endpoint (Azure Bot → here). Three kinds of activity: the person opens the bot (install),
 // writes to it, or presses a button on a card (Universal Action). Every answer is written in S.A.M. "via Teams".
@@ -19,6 +20,7 @@ type Activity = {
   from: { id: string; name?: string; aadObjectId?: string }; recipient?: { id: string };
   conversation: { id: string; conversationType?: string; tenantId?: string };
   membersAdded?: { id: string; aadObjectId?: string }[];
+  attachments?: { contentType: string; contentUrl?: string; name?: string; content?: { downloadUrl?: string; fileType?: string; uniqueId?: string } }[];
   replyToId?: string; channelData?: { team?: { id?: string; aadGroupId?: string; name?: string }; channel?: { id?: string; name?: string } };
   value?: { action?: { verb?: string; data?: Record<string, string>; type?: string }; comment?: string } & Record<string, unknown>;
   entities?: { type: string; mentioned?: { id: string } }[];
@@ -123,6 +125,14 @@ export async function POST(req: NextRequest) {
         return cardResponse(taskCard(task, state));
       } catch (e) { return msgResponse(e instanceof Error ? e.message : "Refused"); }
     }
+    if (verb === "file_attach" || verb === "file_discard") {
+      const fileId = String(data.fileId ?? "");
+      if (verb === "file_discard") { await discardFile(db, p.id, fileId); return cardResponse(infoCard("Discarded", "The file was not kept.")); }
+      const res = await attachFile(db, p, fileId, String(data.taskId ?? ""), String(data.note ?? ""));
+      await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: res.ok ? String(data.taskId) : null, text: res.ok ? res.file.name : res.error, meta: { file: fileId } });
+      if (!res.ok) return msgResponse(res.error);
+      return cardResponse(attachedCard(res.file, res.where, res.link));
+    }
     if (verb === "report_discard") return cardResponse(discardedCard(p.display_name));
     if (verb === "report_create") {
       const { data: pe } = await db.from("people").select("entities").eq("id", p.id).maybeSingle();
@@ -163,6 +173,16 @@ export async function POST(req: NextRequest) {
         if (priv) { await sendCard(priv, draftCard(d, entities, tref, p.display_name), "Safety report — draft"); await sendText(ref, `${p.display_name.split(" ")[0]}, I sent you the draft privately — check it in our chat and create it in S.A.M. from there.`); }
         else await sendCard(ref, draftCard(d, entities, tref, p.display_name), "Safety report — draft");
       } catch (e) { await sendCard(ref, infoCard("Draft failed", e instanceof Error ? e.message.slice(0, 200) : "Unknown error")); }
+      return json({});
+    }
+    // TMS-05 · files sent in the personal chat: kept, then "which item is this the evidence of?"
+    const files = (a.attachments ?? []).filter((x) => x.contentType === "application/vnd.microsoft.teams.file.download.info" || /^image\//.test(x.contentType));
+    if (files.length) {
+      const { files: saved, errors } = await saveIncomingFiles(db, p.id, files, text);
+      const tasks = saved.length ? await attachableTasks(db, p) : [];
+      if (saved.length && !tasks.length) { for (const f of saved) await discardFile(db, p.id, f.id); await sendCard(ref, infoCard("Nothing to attach it to", "You have no open safety action or authority file in S.A.M. Add the document from the app once the item exists.", "/home/tasks")); }
+      for (const f of saved) if (tasks.length) await sendCard(ref, attachCard(f, tasks), `Evidence: ${f.name}`);
+      if (errors.length) await sendCard(ref, infoCard("Not kept", errors.join("\n")));
       return json({});
     }
     // personal chat: list what waits for the person, as cards (up to 5), whatever the text says
