@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import AutoRefresh from "@/components/AutoRefresh";
 import { ENT } from "@/lib/nav";
+import { INV_LEVEL, INV_STATUS } from "@/lib/investigations-shared";
+import { openInvestigation } from "@/app/(app)/safe/inv/actions";
 import { ERC_BARRIERS, ERC_OUTCOMES, STATUS, ercTone, ercValue, isSafetyDesk, morClock, seesReporter } from "@/lib/safety";
 import { createAssessment, dismissMatch, linkReport, suggestForReport } from "../../risk/actions";
 import type { Suggestion } from "@/lib/risk-match";
@@ -41,6 +43,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   ]);
   const sugg = ((mt as { suggestions: Suggestion[] } | null)?.suggestions ?? []);
   const { data: acts } = await db.from("safety_actions").select("id,number,title,status,due,owner_role").eq("report_id", id).order("created_at");
+  const { data: iv } = await db.from("investigations").select("id,number,status,lead_name,due").eq("report_id", id).order("created_at");
+  const invs = (iv ?? []) as { id: string; number: string; status: string; lead_name: string | null; due: string | null }[];
   const actions = (acts ?? []) as { id: string; number: string; title: string; status: string; due: string | null; owner_role: string | null }[];
   const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
@@ -198,10 +202,19 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             </div>
           </section>
 
+          <section className="card mb-4">
+            <div className="ch"><span className="eyebrow">Investigation</span><span className="mini">{invs.length}</span></div>
+            <div className="cb grid gap-1">
+              {invs.map((x) => <div key={x.id} className="flex gap-2 items-center"><Link className="underline mono" href={`/safe/inv/${x.id}`}>{x.number}</Link><span className="flex-1">{x.lead_name ?? ""}{x.due ? ` · due ${x.due}` : ""}</span><span className={"pill " + (INV_STATUS[x.status]?.[1] ?? "")}>{INV_STATUS[x.status]?.[0] ?? x.status}</span></div>)}
+              {!invs.length && <p className="mini">{(r as { investigation?: string | null }).investigation ? "Investigation recorded in the source tool (above)." : "No internal investigation."}</p>}
+              {!closed && !invs.some((x) => !["closed", "cancelled"].includes(x.status)) && <form action={openInvestigation} className="flex gap-2 mt-1"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} />
+                <select name="level" className="inp" defaultValue="standard" style={{ marginTop: 0, width: 230 }}>{Object.entries(INV_LEVEL).map(([k, [l, d]]) => <option key={k} value={k}>{l} · {d} d</option>)}</select><button className="btn">Open an investigation</button></form>}
+            </div>
+          </section>
+
           <section className="card">
             <div className="ch"><span className="eyebrow">Report status</span></div>
             <div className="cb flex gap-2">
-              {r.status !== "investigation" && !closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="investigation" /><button className="btn">Open an investigation</button></form>}
               {!closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="closed" /><button className="btn" disabled={clock.state === "running" || clock.state === "late"} title={clock.state === "running" || clock.state === "late" ? "Decide on the MOR first" : ""}>Close the report</button></form>}
               {closed && <span className="mini">Closed.</span>}
             </div>
