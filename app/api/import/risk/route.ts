@@ -1,4 +1,5 @@
 import { NextResponse, after, type NextRequest } from "next/server";
+import { normEntity } from "@/lib/entity-codes";
 import { matchPending } from "@/lib/risk-match";
 import { createHash } from "crypto";
 import { getSession } from "@/lib/session";
@@ -46,8 +47,8 @@ export async function POST(req: NextRequest) {
     actor = s.person?.id ?? null;
   }
   const body = (await req.json().catch(() => null)) as { entity?: string; source?: string; assessments?: InA[] } | null;
-  const entity = body?.entity ?? ""; const source = body?.source ?? "";
-  if (!["ASF", "ASJ", "AJD", "TEC"].includes(entity) || !["centrik", "flightlogger", "excel", "word"].includes(source) || !Array.isArray(body?.assessments)) return NextResponse.json({ error: "entity, source and assessments[] expected" }, { status: 400, headers });
+  const entity = normEntity(body?.entity ?? "") ?? ""; const source = body?.source ?? "";
+  if (!["ASFFR", "ASJFR", "ASJMT", "ASTFR"].includes(entity) || !["centrik", "flightlogger", "excel", "word"].includes(source) || !Array.isArray(body?.assessments)) return NextResponse.json({ error: "entity, source and assessments[] expected" }, { status: 400, headers });
   const okL = (x?: number) => (x && x >= 1 && x <= 5 ? Math.round(x) : null); const okS = (x?: string) => (x && /^[A-E]$/.test(x) ? x : null);
   const d = (x?: string) => (x && /^\d{4}-\d{2}-\d{2}/.test(x) ? x.slice(0, 10) : null);
   let na = 0, nh = 0; const errors: string[] = [];

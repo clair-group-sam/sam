@@ -32,7 +32,7 @@ export default async function PrintCommittee({ params, searchParams }: { params:
     <div className="mn" style={{ maxWidth: 800, margin: "0 auto", padding: 20 }}>
       <style>{CSS}</style>
       <PrintAuto fileName={`${c.entity} ${c.number} minutes`} auto={sp.auto === "1"} />
-      <div className="top"><div><div className="ent">{(c.entities?.length ? c.entities : [c.entity]).map((e) => ENT[e]?.name ?? e).join(" · ")}</div><h1>{c.number} — {c.title}</h1><div className="mini">{isJoint(c) ? "Joint meeting · " : ""}{kindName(c.entity, c.kind)} · Minutes{c.status !== "closed" ? " — DRAFT, not issued" : ` issued ${c.closed_at?.slice(0, 10)}`}</div></div><div className="mini" style={{ textAlign: "right" }}>MSM §{c.kind === "sag" ? "4.6" : c.entity === "ASF" ? "4.2" : "4.5"}<br />Record kept 5 years (MSM §1.6.5)</div></div>
+      <div className="top"><div><div className="ent">{(c.entities?.length ? c.entities : [c.entity]).map((e) => ENT[e]?.name ?? e).join(" · ")}</div><h1>{c.number} — {c.title}</h1><div className="mini">{isJoint(c) ? "Joint meeting · " : ""}{kindName(c.entity, c.kind)} · Minutes{c.status !== "closed" ? " — DRAFT, not issued" : ` issued ${c.closed_at?.slice(0, 10)}`}</div></div><div className="mini" style={{ textAlign: "right" }}>MSM §{c.kind === "sag" ? "4.6" : c.entity === "ASFFR" ? "4.2" : "4.5"}<br />Record kept 5 years (MSM §1.6.5)</div></div>
       <table className="kv"><tbody>
         <tr><td>Date</td><td>{c.planned_on}{c.starts_at ? ` · ${c.starts_at.slice(11, 16)}${c.ends_at ? `–${c.ends_at.slice(11, 16)}` : ""} UTC` : ""}</td></tr>
         <tr><td>Location</td><td>{c.location ?? "—"}</td></tr>

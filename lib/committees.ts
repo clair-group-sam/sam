@@ -13,21 +13,21 @@ export type Committee = { id: string; entity: string; entities: string[]; kind: 
 export const STATUS: Record<string, [string, string]> = { planned: ["Planned", "blue"], held: ["Held — minutes to issue", "amber"], closed: ["Minutes issued", "green"], cancelled: ["Cancelled", ""] };
 /** Safety desk organises (SM / CMM / FSO); the AM chairs the SRB. */
 export const mayRun = (s: Session) => isSafetyDesk(s);
-export const kindName = (entity: string, kind: string) => kind === "other" ? "Safety meeting" : kind === "sag" ? "Safety Action Group" : entity === "ASF" ? "Compliance & safety review committee (CODIR)" : "Safety Review Board";
-/** "AJD + ASJ" for a joint meeting. */
+export const kindName = (entity: string, kind: string) => kind === "other" ? "Safety meeting" : kind === "sag" ? "Safety Action Group" : entity === "ASFFR" ? "Compliance & safety review committee (CODIR)" : "Safety Review Board";
+/** "ASJMT + ASJFR" for a joint meeting. */
 export const entitiesLabel = (c: { entity: string; entities?: string[] | null }) => (c.entities?.length ? c.entities : [c.entity]).join(" + ");
 export const isJoint = (c: { entities?: string[] | null }) => (c.entities?.length ?? 0) > 1;
-export const kindShort = (entity: string, kind: string) => kind === "other" ? "MTG" : kind === "sag" ? "SAG" : entity === "ASF" ? "CODIR" : "SRB";
+export const kindShort = (entity: string, kind: string) => kind === "other" ? "MTG" : kind === "sag" ? "SAG" : entity === "ASFFR" ? "CODIR" : "SRB";
 
-/** Minimum frequency of the review board (MSM): AJD / ASJ ≥ 2 per calendar year (§4.5) · ASF ≥ 1 per quarter (§4.2). */
+/** Minimum frequency of the review board (MSM): ASJMT / ASJFR ≥ 2 per calendar year (§4.5) · ASFFR ≥ 1 per quarter (§4.2). */
 export const CADENCE: Record<string, { perYear: number; label: string; ref: string }> = {
-  AJD: { perYear: 2, label: "at least twice per calendar year, at regular intervals", ref: "MSM §4.5" },
-  ASJ: { perYear: 2, label: "at least twice per calendar year, at regular intervals", ref: "MSM §4.5" },
-  ASF: { perYear: 4, label: "at least once per quarter, within the CODIR", ref: "MSM §4.2" },
-  TEC: { perYear: 1, label: "at least once a year (management review)", ref: "MOE" },
+  ASJMT: { perYear: 2, label: "at least twice per calendar year, at regular intervals", ref: "MSM §4.5" },
+  ASJFR: { perYear: 2, label: "at least twice per calendar year, at regular intervals", ref: "MSM §4.5" },
+  ASFFR: { perYear: 4, label: "at least once per quarter, within the CODIR", ref: "MSM §4.2" },
+  ASTFR: { perYear: 1, label: "at least once a year (management review)", ref: "MOE" },
 };
 
-/** Standing agenda — AJD / ASJ MSM §4.5 (+ §2.6: the compliance review committee is held during the SRB), ASF MSM §4.2. */
+/** Standing agenda — ASJMT / ASJFR MSM §4.5 (+ §2.6: the compliance review committee is held during the SRB), ASFFR MSM §4.2. */
 export function agendaFor(entity: string, kind: string, topic?: string | null): Item[] {
   if (kind === "sag") return [
     { key: "topic", title: `Topic — ${topic ?? "to define"}`, ref: "MSM §4.6" },
@@ -36,7 +36,7 @@ export function agendaFor(entity: string, kind: string, topic?: string | null): 
     { key: "new_actions", title: "New actions to mitigate, manage or prevent (owner, due date)" },
     { key: "to_srb", title: "Outputs to report to the next SRB" },
   ];
-  if (entity === "ASF") return [
+  if (entity === "ASFFR") return [
     { key: "spi", title: "KPI / SPI against their targets (ENR-CM-06)", ref: "MSM §4.2" },
     { key: "findings", title: "Internal and authority findings, corrective actions", ref: "MSM §2.6" },
     { key: "audits", title: "Audit programme — done, ongoing, coming", ref: "MSM §2.6" },
@@ -88,7 +88,7 @@ export async function defaultAttendees(entity: string, kind: string): Promise<At
 
 export async function nextNumber(entity: string, kind: string, on: string): Promise<string> {
   const y = on.slice(0, 4); const m = Number(on.slice(5, 7)); const short = kindShort(entity, kind);
-  const base = kind === "sag" ? null : entity === "ASF" ? `${short} ${y}-Q${Math.ceil(m / 3)}` : `${short} ${y}-S${m <= 6 ? 1 : 2}`;
+  const base = kind === "sag" ? null : entity === "ASFFR" ? `${short} ${y}-Q${Math.ceil(m / 3)}` : `${short} ${y}-S${m <= 6 ? 1 : 2}`;
   const { data } = await supabaseAdmin().from("committees").select("number").eq("entity", entity).like("number", `${short} ${y}-%`);
   const used = new Set(((data ?? []) as { number: string }[]).map((x) => x.number));
   if (base && !used.has(base)) return base;

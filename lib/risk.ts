@@ -7,9 +7,9 @@ export * from "@/lib/risk-shared";
 
 /** Hazards and assessments are written by the safety desk, the nominated persons and the AM. */
 export const mayEditRisk = (s: Session) => isSafetyDesk(s) || s.role === "np" || s.role === "am";
-/** Validation (electronic sign-off) by the most relevant nominated person, his/her deputy, or the SM (AJD/ASJ MSM §3.4, §3.5.3). */
+/** Validation (electronic sign-off) by the most relevant nominated person, his/her deputy, or the SM (ASJMT/ASJFR MSM §3.4, §3.5.3). */
 export const mayValidate = (s: Session) => isSafetyDesk(s) || s.role === "np";
-/** The Accountable Manager keeps the final say (AJD MSM §3.5.3, ASF MSM §3.4): he does not sign every assessment, but decides on a red residual risk
+/** The Accountable Manager keeps the final say (ASJMT MSM §3.5.3, ASFFR MSM §3.4): he does not sign every assessment, but decides on a red residual risk
  *  (forced approval or stop) and may overrule any scoring / sign-off by opening a new version. Green / yellow are accepted by the NP / SM sign-off. */
 export const mayAccept = (s: Session) => s.roles.map(basePost).some((p) => p === "AM" || p === "SUPERADMIN");
 export const mayApproveMoc = mayValidate;

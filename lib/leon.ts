@@ -1,4 +1,4 @@
-// Leon (AJD + ASJ, one Leon account): read-only GraphQL API. Key = refresh token (Leon › Settings › API keys), server side only.
+// Leon (ASJMT + ASJFR, one Leon account): read-only GraphQL API. Key = refresh token (Leon › Settings › API keys), server side only.
 // https://apidoc.leonsoftware.com/authentication/ApiKey/ — POST /access_token/refresh/ → access token (30 min), then Bearer on /api/graphql/.
 let cached: { token: string; until: number } | null = null;
 
@@ -36,5 +36,5 @@ export async function leonType(name: string) {
   return { name: t.name, kind: t.kind, fields: (t.fields ?? t.inputFields ?? []).map((f) => `${f.name}: ${tn(f.type as never)}${f.type.kind === "LIST" || f.type.ofType?.kind === "LIST" ? "[]" : ""}`) };
 }
 
-/** AJD = Maltese register (9H-), ASJ = French register (F-). */
-export const entityOfRegistration = (reg: string | null | undefined) => (!reg ? null : /^9H/i.test(reg.replace(/\s/g, "")) ? "AJD" : /^F/i.test(reg.replace(/\s/g, "")) ? "ASJ" : null);
+/** ASJMT = Maltese register (9H-), ASJFR = French register (F-). */
+export const entityOfRegistration = (reg: string | null | undefined) => (!reg ? null : /^9H/i.test(reg.replace(/\s/g, "")) ? "ASJMT" : /^F/i.test(reg.replace(/\s/g, "")) ? "ASJFR" : null);

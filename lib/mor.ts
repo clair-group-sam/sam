@@ -1,9 +1,9 @@
 // SAF-06 MOR / ECCAIRS — who receives the MOR, deadlines (376/2014 art. 4(8) and 13(4)).
 export const AUTHORITY: Record<string, { name: string; account: string; route: string }> = {
-  AJD: { name: "TM-CAD (Malta)", account: "ECCAIRS 2 — Astonjet Ltd organisation (TM-CAD)", route: "ECCAIRS 2 (TM-CAD moved from Centrik to E2, 2026)" },
-  ASJ: { name: "DGAC (DSAC)", account: "ECCAIRS 2 — SAS_ASTONJET", route: "ECCAIRS 2" },
-  ASF: { name: "DGAC (DSAC)", account: "ECCAIRS 2 — ASTONFLY", route: "ECCAIRS 2" },
-  TEC: { name: "DGAC (DSAC)", account: "—", route: "ECCAIRS 2" },
+  ASJMT: { name: "TM-CAD (Malta)", account: "ECCAIRS 2 — Astonjet Ltd organisation (TM-CAD)", route: "ECCAIRS 2 (TM-CAD moved from Centrik to E2, 2026)" },
+  ASJFR: { name: "DGAC (DSAC)", account: "ECCAIRS 2 — SAS_ASTONJET", route: "ECCAIRS 2" },
+  ASFFR: { name: "DGAC (DSAC)", account: "ECCAIRS 2 — ASTONFLY", route: "ECCAIRS 2" },
+  ASTFR: { name: "DGAC (DSAC)", account: "—", route: "ECCAIRS 2" },
 };
 const DAY = 864e5;
 export const due72 = (received: string) => new Date(new Date(received).getTime() + 72 * 3600e3);

@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { normEntity } from "@/lib/entity-codes";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ENTS4, homeFor, type RoleKey } from "@/lib/nav";
@@ -53,7 +54,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const entities = group ? ENTS4 : (person?.entities ?? []);
   const name = person?.display_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "";
   const store = await cookies();
-  const wanted = store.get("sam_ent")?.value;
+  const wanted = (() => { const v = store.get("sam_ent")?.value; return v && v !== "ALL" ? normEntity(v) : v; })(); // old cookies (AJD…) still work
   let entity = group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL");
   if (wanted && (wanted === "ALL" ? group : entities.includes(wanted))) entity = wanted;
   return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, home: homeFor(role) };

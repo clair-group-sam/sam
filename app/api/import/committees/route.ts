@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { normEntity } from "@/lib/entity-codes";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { centrikDate, commaName } from "@/lib/centrik";
@@ -8,12 +9,12 @@ export const maxDuration = 300;
 /**
  * Committees history: POST {source:"centrik", meetings:[…]} by a Compliance session (same origin — collected read-only in Centrik › Safety Meeting).
  * Each meeting becomes a held committee with its minutes issued (the Centrik description), the participants found in it, and its Centrik actions
- * as safety actions (closed = verified, open = owner's Inbox task). "ASJ/AJD - …" is ONE joint meeting, held for both entities (each auditor sees the same record). Re-importing updates.
+ * as safety actions (closed = verified, open = owner's Inbox task). "ASJ/AJD - …" (Centrik titles, old codes) is ONE joint meeting, held for both entities (each auditor sees the same record). Re-importing updates.
  */
 type Act = { id: string; status: string; title: string; owner?: string; due?: string; completed?: string };
 type Mtg = { caseId: string; no: string; title: string; description?: string; event_date?: string; event_time?: string; submitted_by?: string; closed_on?: string; actions?: Act[] };
 
-const entitiesOf = (t: string) => { const m = t.match(/^\s*([A-Z/ ]+?)\s*-/); const codes = (m?.[1] ?? "").split("/").map((x) => x.trim()).filter((x) => ["AJD", "ASJ", "ASF", "TEC"].includes(x)); return codes.length ? codes : ["AJD"]; };
+const entitiesOf = (t: string) => { const m = t.match(/^\s*([A-Z/ ]+?)\s*-/); const codes = (m?.[1] ?? "").split("/").map((x) => normEntity(x.trim())).filter((x) => ["ASJMT", "ASJFR", "ASFFR", "ASTFR"].includes(x)); return codes.length ? codes : ["ASJMT"]; };
 const kindOf = (t: string) => (/\bSRB\b|safety review board/i.test(t) ? "srb" : /\bSAG\b|safety action group/i.test(t) ? "sag" : "other");
 function attendeesOf(desc: string): Attendee[] {
   const lines = desc.replace(/\r/g, "").split("\n"); const out: Attendee[] = []; let on = false;

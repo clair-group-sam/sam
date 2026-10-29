@@ -61,9 +61,9 @@ a{color:inherit;text-decoration:none}
 /* entity chips */
 .ent{display:inline-flex;align-items:center;border:0;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.08em;background:var(--blue1);color:var(--navy);cursor:default;font-family:"IBM Plex Mono",monospace}
 button.ent{cursor:pointer;background:transparent;color:var(--slate6)}
-.ent.on,.ent.AJD{background:#e5f5fc;color:#006c9c}.ent.ASJ{background:#edf7e8;color:#3a7a1b}.ent.ASF{background:#fff6d9;color:#7a5a00}.ent.TEC{background:#fdede7;color:#b43a0f}.ent.ALL{background:#f5e8f3;color:#7d166d}
+.ent.on,.ent.ASJMT{background:#e5f5fc;color:#006c9c}.ent.ASJFR{background:#edf7e8;color:#3a7a1b}.ent.ASFFR{background:#fff6d9;color:#7a5a00}.ent.ASTFR{background:#fdede7;color:#b43a0f}.ent.ALL{background:#f5e8f3;color:#7d166d}
 button.ent:not(.on){background:transparent;color:var(--slate6)}
-button.ent.on.AJD{background:#e5f5fc;color:#006c9c}button.ent.on.ASJ{background:#edf7e8;color:#3a7a1b}button.ent.on.ASF{background:#fff6d9;color:#7a5a00}button.ent.on.TEC{background:#fdede7;color:#b43a0f}button.ent.on.ALL{background:#f5e8f3;color:#7d166d}
+button.ent.on.ASJMT{background:#e5f5fc;color:#006c9c}button.ent.on.ASJFR{background:#edf7e8;color:#3a7a1b}button.ent.on.ASFFR{background:#fff6d9;color:#7a5a00}button.ent.on.ASTFR{background:#fdede7;color:#b43a0f}button.ent.on.ALL{background:#f5e8f3;color:#7d166d}
 
 /* cards, metrics, tables */
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);overflow:hidden}
@@ -407,10 +407,10 @@ body:has(.pm){background:#e9eef2}
 .entband span{color:var(--slate5);font-size:12px}
 .entband em{font-style:normal;font-weight:700;color:#9a3412;margin-left:auto}
 .entband em.mute{font-weight:500;color:var(--slate5)}
-.entband.AJD{border-left-color:#006c9c;background:#eef8fd}.entband.AJD b{color:#006c9c}
-.entband.ASJ{border-left-color:#3a7a1b;background:#f1f8ee}.entband.ASJ b{color:#3a7a1b}
-.entband.ASF{border-left-color:#b08300;background:#fffaea}.entband.ASF b{color:#7a5a00}
-.entband.TEC{border-left-color:#b43a0f;background:#fdf2ee}.entband.TEC b{color:#b43a0f}
+.entband.ASJMT{border-left-color:#006c9c;background:#eef8fd}.entband.ASJMT b{color:#006c9c}
+.entband.ASJFR{border-left-color:#3a7a1b;background:#f1f8ee}.entband.ASJFR b{color:#3a7a1b}
+.entband.ASFFR{border-left-color:#b08300;background:#fffaea}.entband.ASFFR b{color:#7a5a00}
+.entband.ASTFR{border-left-color:#b43a0f;background:#fdf2ee}.entband.ASTFR b{color:#b43a0f}
 /* library shortcuts and comparison grid */
 .shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
 .shortcuts .card .row{display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid #eef2f5;font-size:13px}
@@ -570,7 +570,7 @@ tr.cf-free td{color:#8a98a6}
 details.more[open]{z-index:40}
 
 /* the working entity, always visible top-left; a coloured rule under the bar says where you are */
-/* Top bar = the working entity (UX-04): the whole bar in its colour (AJD blue, ASJ green, ASF gold, TEC rust, group purple).
+/* Top bar = the working entity (UX-04): the whole bar in its colour (ASJMT blue, ASJFR green, ASFFR gold, ASTFR rust, group purple).
    Left: who you work for (code badge, name, qualification · authority) and a one-click switch; centre: search; right: Create, ERP, you.
    No breadcrumb here — the page header already says where you are. */
 .topbar{height:60px;gap:16px;color:#fff;border-bottom:0;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--entc,#0b2a4a) 25%,transparent);

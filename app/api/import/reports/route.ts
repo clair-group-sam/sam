@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { normEntity } from "@/lib/entity-codes";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { centrikDate, centrikPerson, commaName } from "@/lib/centrik";
@@ -27,7 +28,8 @@ export async function POST(req: NextRequest) {
   let nr = 0, na = 0, nh = 0; const errors: string[] = [];
   for (const c of body.cases) {
     try {
-      if (!["AJD", "ASJ", "ASF", "TEC"].includes(c.entity) || !s.entities.includes(c.entity)) throw new Error(`entity ${c.entity} out of scope`);
+      c.entity = normEntity(c.entity); // collectors still write the old codes (AJD / ASJ / ASF)
+      if (!["ASJMT", "ASJFR", "ASFFR", "ASTFR"].includes(c.entity) || !s.entities.includes(c.entity)) throw new Error(`entity ${c.entity} out of scope`);
       const id = `${source === "flightlogger" ? "FL" : "CTK"}-${c.no}`; const tool = source === "flightlogger" ? "FlightLogger" : "Centrik";
       const closed = /closed/i.test(c.case_phase ?? "") || !!c.closed_on;
       const received = centrikDate(c.submitted_on) ?? (c.event_date ? `${centrikDate(c.event_date)}T12:00:00Z` : new Date().toISOString());
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
         if (closed) await db.from("report_events").insert({ report_id: id, kind: "closed", at: row.closed_at, note: `Closed in ${tool}${row.closed_by_name ? ` by ${row.closed_by_name}` : ""}` });
       }
       nr++;
-      // FlightLogger: the report's headline id is quoted in the ASF hazard log entries ("FL headlines 7410 (8), 7186 (1)")
+      // FlightLogger: the report's headline id is quoted in the ASFFR hazard log entries ("FL headlines 7410 (8), 7186 (1)")
       const fl = /FL headline (\d+)/.exec(c.hazard_link ?? "");
       if (fl) {
         const { data: hz } = await db.from("hazards").select("id,risk_assessments!inner(kind)").eq("entity", c.entity).eq("risk_assessments.kind", "hazard_log").or(`description.ilike.%${fl[1]}%,title.ilike.%${fl[1]}%`).limit(3);

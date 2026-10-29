@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChartSnapshot } from "@/lib/orgchart";
 
 export type NpPost = { id: string; entity: string; code: string; title: string; parent_code: string | null; ord: number; holder_name: string | null; deputy_name: string | null; status: string; since: string | null; regulatory: string | null };
-export const DEPUTY_LABEL: Record<string, string> = { TEC: "Adjoint & Suppléant", ASF: "Suppléant", ASJ: "Suppléant", AJD: "Deputy" };
+export const DEPUTY_LABEL: Record<string, string> = { ASTFR: "Adjoint & Suppléant", ASFFR: "Suppléant", ASJFR: "Suppléant", ASJMT: "Deputy" };
 
 export async function postsOf(db: SupabaseClient, entity: string): Promise<NpPost[]> {
   const { data } = await db.from("np_posts").select("id,entity,code,title,parent_code,ord,holder_name,deputy_name,status,since,regulatory").eq("entity", entity).order("ord").order("code");

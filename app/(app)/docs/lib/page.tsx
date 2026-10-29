@@ -109,7 +109,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   }
   const scope = s.entity === "ALL" ? "all entities" : `${ENT[s.entity]?.name} (${s.entity})`;
   const famColor = (name: string) => FAMILY_COLORS[name.trim()[0]] ?? "#5b7183";
-  const ENT_COLOR: Record<string, string> = { AJD: "#006c9c", ASJ: "#3a7a1b", ASF: "#b08300", TEC: "#b43a0f" };
+  const ENT_COLOR: Record<string, string> = { ASJMT: "#006c9c", ASJFR: "#3a7a1b", ASFFR: "#b08300", ASTFR: "#b43a0f" };
 
   // certificates of each entity, as "1. Certificates" with their folders, inside the entity (or at the top for one entity)
   let cq2 = supabaseAdmin().from("certificates").select("entity,folder,valid_until").is("archived_at", null);

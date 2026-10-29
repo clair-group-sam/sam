@@ -36,7 +36,7 @@ export default async function Integrations() {
         <div className="ch"><span className="eyebrow">Web Manuals → S.A.M. import bridge</span><span className="mini">read-only on the Web Manuals side · nothing is published there</span></div>
         <div className="cb">
           <p className="mb-3">Export a manual revision from Web Manuals with the S.A.M. export script (pages, images, table of contents), then drop the file here. Images go to the private storage; chapters replace the revision content; pages revised in that revision are flagged for “What changed”.</p>
-          {cmm ? <WmImport manuals={manuals} entities={s.group ? ["ASF", "ASJ", "AJD", "TEC"] : s.entities} /> : <p className="mini">Compliance department only.</p>}
+          {cmm ? <WmImport manuals={manuals} entities={s.group ? ["ASFFR", "ASJFR", "ASJMT", "ASTFR"] : s.entities} /> : <p className="mini">Compliance department only.</p>}
         </div>
       </section>
       <section className="card mt-4">

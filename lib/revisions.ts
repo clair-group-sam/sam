@@ -60,6 +60,6 @@ export const RETURN_LABEL: Record<ReturnKind, string> = {
 };
 export function expectedReturn(entity: string, code: string, route: string | null | undefined): ReturnKind {
   if (route !== "approval") return "none";
-  if (entity === "AJD") return /CAME|AMP|MOE|CAMO/i.test(code) ? "approval_lep" : "consolidated"; // TM-CAD Airworthiness vs Flight Ops
-  return "none"; // DSAC (ASF, ASJ) and OSAC (TEC) send nothing to integrate — an approval letter can still be added
+  if (entity === "ASJMT") return /CAME|AMP|MOE|CAMO/i.test(code) ? "approval_lep" : "consolidated"; // TM-CAD Airworthiness vs Flight Ops
+  return "none"; // DSAC (ASFFR, ASJFR) and OSAC (ASTFR) send nothing to integrate — an approval letter can still be added
 }

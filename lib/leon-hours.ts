@@ -1,4 +1,4 @@
-// SPI denominators from Leon: block hours, flight hours and flights per month, per entity (9H- = AJD, F- = ASJ), from the journey log.
+// SPI denominators from Leon: block hours, flight hours and flights per month, per entity (9H- = ASJMT, F- = ASJFR), from the journey log.
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { entityOfRegistration, leonGql } from "@/lib/leon";
 

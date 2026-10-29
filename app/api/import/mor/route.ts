@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { normEntity } from "@/lib/entity-codes";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
   const s = await getSession();
   if (!s || s.role !== "cmm") return NextResponse.json({ error: "Reserved to Compliance." }, { status: 403 });
   const b = (await req.json().catch(() => null)) as { entity?: string; dry?: boolean; rows?: Row[] } | null;
+  if (b?.entity) b.entity = normEntity(b.entity);
   if (!b?.entity || !s.entities.includes(b.entity) || !b.rows?.length) return NextResponse.json({ error: "entity and rows[] expected" }, { status: 400 });
   const db = supabaseAdmin();
   const { data } = await db.from("reports").select("id,source,external_no,event_date,received_at,headline,aircraft,mor_ref,mor_filed_at,report_analysis(mor_status)").eq("entity", b.entity).limit(5000);

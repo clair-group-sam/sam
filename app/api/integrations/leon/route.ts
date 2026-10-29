@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ configured: true, ok: true, queries: q?.fields.filter((f) => /flight|journey|aircraft|acft|log/i.test(f)) });
   } catch (e) { return NextResponse.json({ configured: true, error: (e as Error).message }, { status: 502 }); }
 }
-/** POST {from:"2025-01", to:"2026-10", dry?, overwrite?}: monthly block / flight hours and flights from the journey log → SPI activity (AJD, ASJ). */
+/** POST {from:"2025-01", to:"2026-10", dry?, overwrite?}: monthly block / flight hours and flights from the journey log → SPI activity (ASJMT, ASJFR). */
 export async function POST(req: NextRequest) {
   const s = await getSession();
   if (!s || s.role !== "cmm") return NextResponse.json({ error: "Reserved to Compliance." }, { status: 403 });

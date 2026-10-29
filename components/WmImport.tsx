@@ -10,7 +10,7 @@ type Props = { manuals: ManualRow[]; entities: string[] };
 export default function WmImport({ manuals, entities }: Props) {
   const [bundle, setBundle] = useState<WmBundle | null>(null);
   const [fileName, setFileName] = useState("");
-  const [entity, setEntity] = useState(entities[0] ?? "TEC");
+  const [entity, setEntity] = useState(entities[0] ?? "ASTFR");
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
   const [path, setPath] = useState("");
@@ -47,7 +47,7 @@ export default function WmImport({ manuals, entities }: Props) {
       const guess = /_([A-Z]{3})_([A-Z0-9-]+)_/.exec(f.name);
       if (guess) { if (entities.includes(guess[1])) setEntity(guess[1]); setCode(guess[2]); }
       setTitle(b.manual.name);
-      if (b.kind === "file") { setIssuer(entity === "TEC" ? "OSAC" : entity === "AJD" ? "TM-CAD" : "DSAC"); }
+      if (b.kind === "file") { setIssuer(entity === "ASTFR" ? "OSAC" : entity === "ASJMT" ? "TM-CAD" : "DSAC"); }
       const known = manuals.find((m) => m.code === (guess?.[2] ?? "") && m.entity === (guess?.[1] ?? ""));
       if (known) setPath(known.path ?? "");
     } catch { say("Could not read the file."); }

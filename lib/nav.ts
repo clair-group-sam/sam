@@ -10,14 +10,14 @@ export const RAIL_BOTTOM = ["users","admin","ref","set"];
 export const VERBS = {"mods":{"docs":"Read","safe":"Report","comm":"Messages","erp":"Emergency","home":"Home"},"subs":{"docs/lib":"My manuals","safe/new":"Report an event","safe/mine":"My reports","comm/camp":"Messages to read","erp/plans":"Emergency plans","erp/contacts":"Who to call","erp/activate":"Activate the ERP","home/mine":"My space"}};
 
 export const ENT: Record<string, { name: string; qual: string; auth: string }> = {
-  ASF: { name: "Astonfly", qual: "Flight school · ATO + FSTD", auth: "DSAC" },
-  ASJ: { name: "Astonjet", qual: "Air operator · AOC France", auth: "DSAC" },
-  AJD: { name: "Astonjet Ltd", qual: "Air operator + CAMO · Malta", auth: "TM-CAD" },
-  TEC: { name: "Astontec", qual: "Maintenance · Part-CAE", auth: "OSAC" },
+  ASFFR: { name: "Astonfly", qual: "Flight school · ATO + FSTD", auth: "DSAC" },
+  ASJFR: { name: "Astonjet", qual: "Air operator · AOC France", auth: "DSAC" },
+  ASJMT: { name: "Astonjet Ltd", qual: "Air operator + CAMO · Malta", auth: "TM-CAD" },
+  ASTFR: { name: "Astontec", qual: "Maintenance · Part-CAE", auth: "OSAC" },
 };
-export const ENTS4 = ["AJD", "ASJ", "ASF", "TEC"];
+export const ENTS4 = ["ASJMT", "ASJFR", "ASFFR", "ASTFR"];
 /** One colour per entity, used by the pills, the top-bar block and the rule under it; purple = group view. */
-export const ENT_COLOR: Record<string, string> = { AJD: "#006c9c", ASJ: "#3a7a1b", ASF: "#b8860b", TEC: "#b43a0f", ALL: "#7d166d" };
+export const ENT_COLOR: Record<string, string> = { ASJMT: "#006c9c", ASJFR: "#3a7a1b", ASFFR: "#b8860b", ASTFR: "#b43a0f", ALL: "#7d166d" };
 
 export function roleModules(role: RoleKey): Module[] {
   const R = ROLES[role];
