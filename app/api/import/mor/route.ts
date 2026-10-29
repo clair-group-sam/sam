@@ -6,7 +6,7 @@ export const maxDuration = 300;
 /**
  * MOR status from ECCAIRS 2 (step 5): POST {entity, dry?, rows:[{e2id, no, date:"14-Oct-2026", headline, status, reg, created:"15-Oct-2026", sent}]}
  * read (read-only) in the organisation's ECCAIRS 2 report list by a Compliance session. Each row is matched to a report of the entity:
- * its source number (FlightLogger / Centrik number = "Report identification - custom") and the occurrence date (± 3 days), else the date and
+ * its source number (FlightLogger / Centrik number = "Report identification - custom") and the date (the report up to 30 days after the occurrence), else the date and
  * the headline. A matched report becomes a mandatory occurrence filed in ECCAIRS (reference, date the report was created in ECCAIRS).
  */
 type Row = { e2id: string; no?: string; date: string; headline: string; status?: string; reg?: string; created?: string; sent?: boolean };
@@ -33,10 +33,12 @@ export async function POST(req: NextRequest) {
     let best: { r: (typeof reps)[number]; sc: number } | null = null;
     for (const x of reps) {
       if (used.has(x.id)) continue;
-      const dd = days(d, x.d); if (dd > 3) continue;
-      if (pass === 1) { if (no && (x.external_no ?? "").replace(/^0+/, "") === no) return { r: x, how: "number + date" }; continue; }
+      // the date kept in S.A.M. may be the date of the report (after the occurrence): up to 30 days after with the same number, 20 days on the headline
+      const lag = (new Date(x.d).getTime() - new Date(d).getTime()) / 864e5; const dd = Math.abs(lag);
+      if (pass === 1) { if (no && lag >= -3 && lag <= 30 && (x.external_no ?? "").replace(/^0+/, "") === no) return { r: x, how: "number + date" }; continue; }
+      if (lag < -3 || lag > 20) continue;
       const reg = r.reg && x.aircraft && r.reg.replace(/[^A-Z0-9]/gi, "").toUpperCase() === x.aircraft.replace(/[^A-Z0-9]/gi, "").toUpperCase() ? 0.3 : 0;
-      const sc = sim(r.headline, x.headline) + reg - dd * 0.1;
+      const sc = sim(r.headline, x.headline) + reg - dd * 0.02;
       if (sc >= 0.5 && (!best || sc > best.sc)) best = { r: x, sc };
     }
     return best ? { r: best.r, how: "date + headline" } : null;
