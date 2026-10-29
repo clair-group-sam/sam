@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   for (const r of rows) if (!plan.some((p) => p.row.e2id === r.e2id)) unmatched.push(`${r.e2id} ${r.no ?? ""} ${r.date} ${r.headline}`);
   for (const p of plan) {
     matched.push({ e2id: p.row.e2id, report: p.rep.id, how: p.how });
-    if (b.dry) continue;
+    if (b.dry || p.rep.mor_ref === `ECCAIRS ${p.row.e2id}`) continue; // already recorded: nothing written twice
     const filed = iso(p.row.created) ?? iso(p.row.date)!;
     await db.from("reports").update({ mor_ref: `ECCAIRS ${p.row.e2id}`, mor_filed_at: p.rep.mor_filed_at ?? `${filed}T12:00:00Z` }).eq("id", p.rep.id);
     await db.from("report_analysis").upsert({ report_id: p.rep.id, mor_status: "mandatory", mor_basis: "Sent to ECCAIRS 2 (record in the ECCAIRS report list of the organisation)", confirmed_at: new Date().toISOString(), confirmed_by: s.person?.id ?? null }, { onConflict: "report_id" });
