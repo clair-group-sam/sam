@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -36,7 +37,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td className="mono"><Link href={`/safe/reports/${r.id}`} className="underline">{r.id}</Link></td>
+                <td className="mono"><Link href={`/safe/reports/${r.id}`} className="underline">{r.id}</Link><SourceMark source={r.source} id={r.external_no} /></td>
                 <td><span className={"ent " + r.entity}>{r.entity}</span></td>
                 <td><Link href={`/safe/reports/${r.id}`}><b>{r.headline_en || r.headline}</b></Link><div className="mini">{new Date(r.received_at).toLocaleString("en-GB", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}{r.source && r.source !== "sam" ? ` · ${r.source === "flightlogger" ? "FlightLogger" : "Centrik"} ${r.external_no ?? ""}${r.report_type ? " " + r.report_type : ""}` : ""}{r.aircraft ? " · " + r.aircraft : ""}{r.anonymous ? " · anonymous" : ""}{r.a?.adrep?.length ? " · " + r.a.adrep.join(", ") : ""}</div></td>
                 <td><span className={"pill " + (STATUS[r.status]?.[1] ?? "")}>{STATUS[r.status]?.[0] ?? r.status}</span></td>

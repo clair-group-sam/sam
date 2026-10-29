@@ -648,3 +648,7 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .agitem{border-top:1px solid var(--line)}.agitem:first-of-type{border-top:0}
 .pack{margin:6px 0 0 0;padding:8px 12px;background:var(--blue05);border-radius:8px;list-style:none}.pack li{padding:1px 0}
 .att{padding:4px 0;border-bottom:1px dashed var(--line)}
+
+/* imported (not created in S.A.M.) */
+.srcmark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:4px;border-radius:4px;color:var(--slate5);background:var(--blue05);border:1px solid var(--line);vertical-align:-2px;cursor:help}
+.srcmark:hover{color:var(--navy);border-color:var(--slate3)}

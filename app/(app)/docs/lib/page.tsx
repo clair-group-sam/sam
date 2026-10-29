@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -41,6 +42,10 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   const ents = [...new Set(rows.map((r) => r.manual.entity))];
   const several = s.entity === "ALL" && ents.length > 1;
   const tree = buildTree(rows, several);
+  // manuals brought from Web Manuals (a revision imported from WM): marked as imported
+  const mIds = rows.map((r) => r.manual.id);
+  const { data: wmRevs } = mIds.length ? await supabaseAdmin().from("revisions").select("manual_id").in("manual_id", mIds).not("source", "is", null).limit(5000) : { data: [] };
+  const fromWm = new Set(((wmRevs ?? []) as { manual_id: string }[]).map((r) => r.manual_id));
   const entOfFolder = (f: string) => (several ? /\(([A-Z]{3})\)$/.exec(f.split(" › ")[0])?.[1] ?? null : null);
   const sbc = await supabaseServer();
   let cq = sbc.from("certificates").select("id", { count: "exact", head: true });
@@ -204,7 +209,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
               {inFolder.map(({ manual, current, workings }) => (
                 <tr key={manual.id}>
                   <td><span className={"ent " + manual.entity}>{manual.entity}</span></td>
-                  <td className="mono">{manual.code}</td>
+                  <td className="mono">{manual.code}{fromWm.has(manual.id) && <SourceMark source="webmanuals" />}</td>
                   <td><Link href={`/docs/manual/${manual.id}`}><b>{manual.title}</b></Link>{(manual as typeof manual & { internal?: boolean }).internal && <span className="nature ml-2">internal</span>}{isTestData(manual.code, manual.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}{!folder && <div className="mini">{manual.path}</div>}</td>
                   <td className="mini">{manual.owner_role}</td>
                   <td className="mono">{current ? `Iss ${current.issue} Rev ${current.rev}` : "—"}{current?.published_at && <div className="mini">{current.published_at}</div>}</td>

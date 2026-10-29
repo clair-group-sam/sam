@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -63,7 +64,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
           <tbody>
             {rows.map((a) => (
               <tr key={a.id}>
-                <td className="mono"><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link>{(scope.length > 1 || !scope.includes(a.entity)) && <div><span className={"ent " + a.entity}>{a.entity}</span>{!scope.includes(a.entity) && <span className="mini"> joint meeting</span>}</div>}</td>
+                <td className="mono"><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link>{/^SMS-\d+/.test(a.number) && <SourceMark source="centrik" />}{(scope.length > 1 || !scope.includes(a.entity)) && <div><span className={"ent " + a.entity}>{a.entity}</span>{!scope.includes(a.entity) && <span className="mini"> joint meeting</span>}</div>}</td>
                 <td><Link href={`/safe/actions/${a.id}`}><b>{a.title}</b></Link><div className="mini">{ACTION_KINDS[a.kind]} · {ACTION_SOURCES[a.source_kind]}{a.report_id ? ` ${a.report_id}` : ""}</div></td>
                 <td className="mini">{a.owner_person ? nameOf.get(a.owner_person) ?? "—" : <span className="mono">{a.owner_role ?? "—"}</span>}</td>
                 <td className={"mono" + (isLate(a, today) ? " red" : "")}>{a.due ?? "—"}</td>

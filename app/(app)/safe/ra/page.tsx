@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -95,9 +96,9 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
               return (
                 <tr key={a.id}>
                   {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" defaultChecked={!!a.conducted_on && a.conducted_on < old && a.status !== "validated"} title="Close — case over" /></td>}
-                  <td className="mono"><Link className="underline" href={`/safe/risk/a/${a.id}`}>{a.number}</Link></td>
+                  <td className="mono"><Link className="underline" href={`/safe/risk/a/${a.id}`}>{a.number}</Link><SourceMark source={a.source} /></td>
                   <td><span className={"ent " + a.entity}>{a.entity}</span></td>
-                  <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? ` · ${a.domain}` : ""}{a.top_risk ? " · top risk" : ""}{a.source !== "sam" ? ` · from ${a.source}` : ""}{hs.some((h) => h.needs_review) ? " · ⚠ to reassess" : ""}</div></td>
+                  <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? ` · ${a.domain}` : ""}{a.top_risk ? " · top risk" : ""}{hs.some((h) => h.needs_review) ? " · ⚠ to reassess" : ""}</div></td>
                   <td>{hs.length}<div className="mini">{hs.filter((h) => h.log_hazard_id).length} in log</div></td>
                   <td>{pre && pre[0] ? <span className={"pill " + tolTone(tolerability(pre[0], pre[1], sc))}>{riskLabel(pre[0], pre[1], sc)}</span> : <span className="mini">—</span>} → {po && po[0] ? <span className={"pill " + tolTone(tolerability(po[0], po[1], sc))}>{riskLabel(po[0], po[1], sc)}</span> : <span className="mini">—</span>}</td>
                   <td className={"mono" + (a.kind !== "moc" && a.next_due && a.next_due < today ? " red" : "")}>{a.kind === "moc" ? (a.start_date ?? "—") : (a.next_due ?? "—")}</td>
