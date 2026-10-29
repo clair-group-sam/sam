@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
-import { ANSWERABLE_KINDS, cardFor, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
+import { ANSWERABLE_KINDS, cardFor, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
 import { applyMove } from "@/lib/authority-moves";
 import { completeAction, verifyActionCore } from "@/lib/actions-core";
 import type { Action } from "@/lib/actions";
@@ -121,6 +121,32 @@ export async function POST(req: NextRequest) {
         await db.from("tasks").update({ answered_via: "teams", answered_at: now(), answer: comment || null }).eq("id", task.id);
         await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: `${verdict}${comment ? `: ${comment}` : ""}`, meta: { action: task.ref_id } });
         const state = { answered: verdict === "accept" ? "done" as const : "not_yet" as const, by: p.display_name, at: hhmm(), comment: verdict === "accept" ? `Accepted and closed${comment ? ` · ${comment}` : ""}` : `Sent back · ${comment}` };
+        await refreshCards(db, { ...task, status: "done" }, state, ref.conversation_id);
+        return cardResponse(taskCard(task, state));
+      } catch (e) { return msgResponse(e instanceof Error ? e.message : "Refused"); }
+    }
+    if (verb === "file_submit_prep" || verb === "file_submit_confirm" || verb === "file_submit_cancel") {
+      const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();
+      const task = t as (TaskRow & { ref_id?: string | null }) | null;
+      if (!task) return msgResponse("This task no longer exists.");
+      if (task.status !== "open") return cardResponse(taskCard(task, stateOf(task)));
+      if (verb === "file_submit_cancel") return cardResponse(await cardFor(db, task));
+      const posts = p.roles.map(basePost);
+      const cmm = posts.includes("CMM") || posts.includes("SUPERADMIN");
+      if (!cmm) return msgResponse("The submission is recorded by Compliance.");
+      const { data: fd } = await db.from("authority_files").select("*").eq("id", String(data.fileId ?? "")).maybeSingle();
+      if (!fd) return msgResponse("The file no longer exists.");
+      const f = fd as AuthorityFile;
+      if (f.stage !== "ready") return msgResponse(`The file is at stage “${f.stage}”, not ready to submit.`);
+      const { data: ty } = await db.from("authority_file_types").select("target_days").eq("code", f.type_code).maybeSingle();
+      const targetDays = (ty as { target_days?: number } | null)?.target_days ?? 20;
+      if (verb === "file_submit_prep") return cardResponse(submitConfirmCard(task, { id: f.id, title: f.title, authority: f.authority, portal: f.portal, portal_url: f.portal_url, target_days: targetDays }));
+      try {
+        const g = (k: string) => (typeof data[k] === "string" ? (data[k] as string).trim() : "");
+        await applyMove(db, { personId: p.id, name: p.display_name, cmm, owner: true }, f, "submitted", { note: comment || null, portal_ref: g("portal_ref"), portal_url: g("portal_url") || null, submitted_at: g("submitted_at") || null, target_date: g("target_date") || null }, "teams");
+        await db.from("tasks").update({ answered_via: "teams", answered_at: now(), answer: `submitted ${g("portal_ref")}` }).eq("id", task.id);
+        await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: `ready → submitted ${g("portal_ref")}`, meta: { file: f.id } });
+        const state = { answered: "done" as const, by: p.display_name, at: hhmm(), comment: `Submitted · ${g("portal_ref")}${comment ? ` · ${comment}` : ""}` };
         await refreshCards(db, { ...task, status: "done" }, state, ref.conversation_id);
         return cardResponse(taskCard(task, state));
       } catch (e) { return msgResponse(e instanceof Error ? e.message : "Refused"); }

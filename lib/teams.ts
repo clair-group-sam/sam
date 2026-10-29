@@ -235,7 +235,10 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
         const { data: ty } = await db.from("authority_file_types").select("needs_signature").eq("code", file.type_code).maybeSingle();
         // Compliance moves from the card — except the submission itself (COM-03: Submit stays a deliberate act with its reference) and standby
         const moves = movesFrom(file.stage as never, !!(ty as { needs_signature?: boolean } | null)?.needs_signature).filter((m) => m.by === "cmm" && m.to !== "standby" && !(m.to === "submitted" && file.stage === "ready")).slice(0, 3);
-        if (moves.length) return taskCard(t, undefined, { hint: `Stage: ${file.stage}. Compliance only.`, commentHint: "Note (required for the moves marked *)", actions: moves.map((m) => ({ type: "Action.Execute", title: `${m.label}${m.needsNote ? " *" : ""}`, verb: "file_move", style: m.primary ? "positive" : undefined, data: { taskId: t.id, fileId: file.id, to: m.to } })) });
+        const actions: unknown[] = moves.map((m) => ({ type: "Action.Execute", title: `${m.label}${m.needsNote ? " *" : ""}`, verb: "file_move", style: m.primary ? "positive" : undefined, data: { taskId: t.id, fileId: file.id, to: m.to } }));
+        // COM-03 · the submission is recorded in two steps: this button opens a confirmation card asking for the portal reference
+        if (file.stage === "ready") actions.unshift({ type: "Action.Execute", title: "Record the submission…", verb: "file_submit_prep", style: "positive", data: { taskId: t.id, fileId: file.id } });
+        if (actions.length) return taskCard(t, undefined, { hint: `Stage: ${file.stage}. Compliance only.`, commentHint: "Note (required for the moves marked *)", actions });
       }
       return taskCard(t);
     }
@@ -245,6 +248,25 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
     if (t.kind === "action") return taskCard(t, undefined, { doneTitle: "Done — with this note as evidence", commentHint: "What was done, and where the evidence is (required for Done)" });
   } catch { /* fall through to the plain card */ }
   return taskCard(t);
+}
+/** COM-03 · confirmation card before recording a submission: the reference given by the portal, the date, the target date. Nothing moves until confirmed. */
+export function submitConfirmCard(t: TaskRow, f: { id: string; title: string; authority: string | null; portal: string | null; portal_url: string | null; target_days: number }): unknown {
+  const t0 = todayISO();
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body: [
+    { type: "TextBlock", text: `${t.entity} · Record the submission`, size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: f.title, size: "Medium", weight: "Bolder", wrap: true },
+    { type: "TextBlock", text: `You submitted this file yourself on ${f.portal || f.authority || "the portal"} (S.A.M. never submits). Give the reference the portal returned; the file moves to “At the authority” and the follow-up clock starts.`, wrap: true },
+    { type: "Input.Text", id: "portal_ref", label: "Reference given by the portal (application / dossier number)", isRequired: true, errorMessage: "Required", maxLength: 80 },
+    { type: "Input.Text", id: "portal_url", label: "Link to the application (optional)", value: f.portal_url ?? "", maxLength: 300 },
+    { type: "ColumnSet", columns: [
+      { type: "Column", width: "stretch", items: [{ type: "Input.Date", id: "submitted_at", label: "Submitted on", value: t0 }] },
+      { type: "Column", width: "stretch", items: [{ type: "Input.Date", id: "target_date", label: `Expected decision (${f.target_days} days)`, value: new Date(Date.now() + f.target_days * 86_400_000).toISOString().slice(0, 10) }] },
+    ] },
+    { type: "Input.Text", id: "comment", label: "Note (optional)", maxLength: 500 },
+  ], actions: [
+    { type: "Action.Execute", title: "Confirm — it is submitted", verb: "file_submit_confirm", style: "positive", data: { taskId: t.id, fileId: f.id } },
+    { type: "Action.Execute", title: "Cancel", verb: "file_submit_cancel", data: { taskId: t.id } },
+  ], msteams: { width: "Full" } };
 }
 /** One card listing several tasks (new batch, or the morning digest): title, due, entity — and the Inbox. */
 export function listCard(title: string, intro: string, tasks: TaskRow[], link = "/home/tasks"): unknown {
