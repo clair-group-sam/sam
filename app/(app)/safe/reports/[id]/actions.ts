@@ -54,6 +54,13 @@ export async function recordMor(fd: FormData) {
   await db.from("reports").update({ mor_ref: ref, mor_filed_at: new Date().toISOString() }).eq("id", id);
   await ev(db, id, s.person?.id ?? null, "mor", `MOR filed with the authority — ${ref}`, true);
   await db.from("tasks").update({ status: "done" }).eq("kind", "safety_report").eq("link", `/safe/reports/${id}`).eq("status", "open");
+  // follow-ups to the authority (376/2014 art. 13(4)): preliminary results within 30 days, final results within 3 months
+  const { data: rr } = await db.from("reports").select("entity,headline").eq("id", id).maybeSingle(); const r0 = rr as { entity: string; headline: string } | null;
+  if (r0) { const t = Date.now(); const m3 = new Date(t); m3.setUTCMonth(m3.getUTCMonth() + 3);
+    await db.from("tasks").insert([
+      { entity: r0.entity, kind: "mor_followup", title: `${id} — 30-day report to the authority`, detail: `${r0.headline} · MOR ${ref}`, due: new Date(t + 30 * 864e5).toISOString().slice(0, 10), owner_role: "SM", status: "open", link: "/safe/mor", ref_id: id },
+      { entity: r0.entity, kind: "mor_final", title: `${id} — final report to the authority (3 months)`, detail: `${r0.headline} · MOR ${ref}`, due: m3.toISOString().slice(0, 10), owner_role: "SM", status: "open", link: "/safe/mor", ref_id: id } ]); }
+  revalidatePath("/safe/mor");
   done(id);
 }
 
