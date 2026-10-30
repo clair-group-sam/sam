@@ -1,6 +1,8 @@
 // SAF-06 MOR / ECCAIRS — who receives the MOR, deadlines (376/2014 art. 4(8) and 13(4)).
-export const AUTHORITY: Record<string, { name: string; account: string; route: string }> = {
-  ASJMT: { name: "TM-CAD (Malta)", account: "ECCAIRS 2 — Astonjet Ltd organisation (TM-CAD)", route: "ECCAIRS 2 (TM-CAD moved from Centrik to E2, 2026)" },
+export const E2_PORTAL = "https://e2.aviationreporting.eu/home";
+export const AUTHORITY: Record<string, { name: string; account: string; route: string; note?: string }> = {
+  // TM-CAD notice of 30/10/2026: occurrences with a date of event on or after 23/11/2026 go to ECCAIRS 2; reports already in Centrik stay in Centrik (follow-up and closure)
+  ASJMT: { name: "TM-CAD (Malta)", account: "ECCAIRS 2 — Astonjet Ltd organisation (TM-CAD)", route: "ECCAIRS 2 for events from 23/11/2026", note: "TM-CAD (30/10/2026): events dated 23 November 2026 or later are reported in ECCAIRS 2; reports already filed in the Centrik-based system are followed up and closed in Centrik." },
   ASJFR: { name: "DGAC (DSAC)", account: "ECCAIRS 2 — SAS_ASTONJET", route: "ECCAIRS 2" },
   ASFFR: { name: "DGAC (DSAC)", account: "ECCAIRS 2 — ASTONFLY", route: "ECCAIRS 2" },
   ASTFR: { name: "DGAC (DSAC)", account: "—", route: "ECCAIRS 2" },
