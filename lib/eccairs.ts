@@ -18,9 +18,16 @@ export const eccairsEnv = (entity: string) => { const b = process.env[`ECCAIRS_$
 
 async function token(entity: string, c: Cfg): Promise<string> {
   const k = `${entity}:${c.base}`; const hit = cache.get(k); if (hit && hit.until > Date.now() + 60e3) return hit.token;
-  const r = await proxyFetch(`${c.base}/idp/oauth2/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret, scope: "openid" }).toString() });
-  const j = (await r.json().catch(() => null)) as { access_token?: string; expires_in?: number } | null;
-  if (!r.ok || !j?.access_token) throw new Error(`ECCAIRS token refused (${r.status}) — check the M2M user and that the IP is whitelisted by EASA.`);
+  const url = `${c.base}/idp/oauth2/token`; const form = "application/x-www-form-urlencoded";
+  // v1.2: client_id / client_secret in the body (client_secret_post); some servers want them as HTTP Basic (client_secret_basic) — try both.
+  let r = await proxyFetch(url, { method: "POST", headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret, scope: "openid" }).toString() });
+  if (r.status === 401 || r.status === 400) {
+    const basic = Buffer.from(`${encodeURIComponent(c.id)}:${encodeURIComponent(c.secret)}`).toString("base64");
+    const r2 = await proxyFetch(url, { method: "POST", headers: { "content-type": form, authorization: `Basic ${basic}` }, body: new URLSearchParams({ grant_type: "client_credentials", scope: "openid" }).toString() });
+    if (r2.ok || r2.status !== 401) r = r2;
+  }
+  const raw = await r.text(); let j: { access_token?: string; expires_in?: number; error?: string; error_description?: string } | null = null; try { j = JSON.parse(raw); } catch { /* not JSON */ }
+  if (!r.ok || !j?.access_token) throw new Error(`ECCAIRS token refused (${r.status}${j?.error ? ` ${j.error}` : ""}${j?.error_description ? `: ${j.error_description}` : ""}) — check the M2M user (activated, password) and that the IP is whitelisted by EASA.`.slice(0, 300));
   cache.set(k, { token: j.access_token, until: Date.now() + (j.expires_in ?? 3600) * 1000 }); return j.access_token;
 }
 type E2 = { data?: unknown; errorDetails?: string; returnCode?: number };
