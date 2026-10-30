@@ -133,7 +133,7 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
     { label: "CAA application", href: canCreateFile ? "/proj/auth/new" : undefined, hint: "application, notification, report to the authority" },
     { label: "Manual or internal document", href: "/docs/new", hint: "a new manual in the library" },
     { label: "To-do", href: "/home/todo", hint: "personal reminder" },
-    { label: "Finding", hint: "Compliance — step 6" },
+    { label: "Finding", href: session.role === "cmm" ? "/comp/find/new" : undefined, hint: session.role === "cmm" ? "authority or internal audit finding, answered by a nominated person" : "raised by the Compliance department" },
     { label: "Action", hint: "Compliance — step 6" },
     { label: "Safety report", hint: "Safety — step 5" },
     { label: "Communication", hint: "Communication module" },

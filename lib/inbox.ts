@@ -10,7 +10,7 @@ export type InboxItem = { id: string; title: string; detail: string | null; due:
 /** What each item is, at a glance (label + colour), whatever module created it. */
 export const KIND: Record<string, [string, string]> = {
   project: ["Project", "k-proj"], authority: ["CAA application", "k-auth"], authority_followup: ["Authority follow-up", "k-auth"],
-  reading: ["Read & acknowledge", "k-read"], certificate_validity: ["Validity", "k-cert"], finding: ["Finding", "k-comp"], action: ["Action", "k-comp"], action_verify: ["Verify action", "k-safe"], action_effectiveness: ["Action effectiveness", "k-safe"],
+  reading: ["Read & acknowledge", "k-read"], certificate_validity: ["Validity", "k-cert"], finding: ["Finding", "k-comp"], finding_review: ["Finding — review", "k-comp"], finding_closure: ["Finding — closure", "k-comp"], escalation: ["Escalation", "k-comp"], action: ["Action", "k-comp"], action_verify: ["Verify action", "k-safe"], action_effectiveness: ["Action effectiveness", "k-safe"],
   check: ["Compliance check", "k-comp"], change_request: ["Change request", "k-docs"], signature: ["Signature", "k-docs"], status_review: ["Status review", "k-comp"],
   safety_report: ["Safety report", "k-safe"], safety_question: ["Safety question", "k-safe"], mitigation: ["Mitigation", "k-safe"], risk_acceptance: ["Risk acceptance", "k-safe"], risk_review: ["Risk review", "k-safe"], risk_intolerable: ["Intolerable risk", "k-comp"], committee_minutes: ["Committee minutes", "k-safe"], mor_followup: ["MOR 30-day report", "k-safe"], mor_final: ["MOR final report", "k-safe"], investigation: ["Investigation", "k-safe"], promo_read: ["Safety promotion", "k-safe"],
 };

@@ -120,7 +120,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
     db.from("reports").select("id,headline,received_at,status,report_type,source_erc,closed_at,report_analysis(mor_status,erc_value)").eq("entity", e).lte("received_at", until).limit(5000),
     db.from("risk_assessments").select("id,kind,number,name,status,moc_status,created_at,start_date,conducted_on").eq("entity", e).limit(3000),
     db.from("safety_actions").select("number,title,status,due,owner_role,done_at,verified_at,created_at").eq("entity", e).eq("module", "safety").limit(5000),
-    db.from("findings").select("phase,due").eq("entity", e).limit(3000),
+    db.from("findings").select("status,due").eq("entity", e).limit(3000),
     c.kind === "srb" ? db.from("committees").select("id,number,title,starts_at,planned_on,status").contains("entities", [e]).eq("kind", "sag").in("status", ["held", "closed"]).gte("planned_on", since.slice(0, 10)).lte("planned_on", until.slice(0, 10)) : Promise.resolve({ data: [] }),
   ]);
   type Rr = { id: string; headline: string; received_at: string; status: string; report_type: string | null; source_erc: number | null; closed_at: string | null; report_analysis: { mor_status: string | null; erc_value: number | null } | { mor_status: string | null; erc_value: number | null }[] | null };
@@ -140,7 +140,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
   const today = until.slice(0, 10);
   const openA = A.filter((a) => ["open", "in_progress"].includes(a.status));
   const lateA = openA.filter((a) => a.due && a.due < today);
-  const F = (fnd ?? []) as { phase: string; due: string | null }[]; const openF = F.filter((f) => !/closed/i.test(f.phase));
+  const F = (fnd ?? []) as { status: string; due: string | null }[]; const openF = F.filter((f) => !["closed", "cancelled"].includes(f.status));
   const S = ((sags ?? []) as { id: string; number: string; title: string; starts_at: string | null; planned_on: string | null }[]);
   const { data: sagActs } = S.length ? await db.from("safety_actions").select("committee_id").in("committee_id", S.map((x) => x.id)) : { data: [] };
   const rows = board.rows.filter((r) => r.status === "active");

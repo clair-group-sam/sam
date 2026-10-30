@@ -435,3 +435,15 @@ export async function setManualClass(formData: FormData) {
   await audit(db, s.person?.id ?? null, manual.entity, rev.id, "manual_class", { code: manual.code, internal });
   revalidatePath(`/docs/editor/${rev.id}`); revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/lib");
 }
+
+/** FND-02 · an expected manual change (from a finding) is included in this draft, deferred to a later revision, or taken out of the draft. Always the author's choice. */
+export async function decideFindingChange(formData: FormData) {
+  const s = await getSession(); if (!s) redirect("/login");
+  const revisionId = String(formData.get("rev") ?? ""), changeId = String(formData.get("change") ?? ""), what = String(formData.get("what") ?? "");
+  const db = supabaseAdmin();
+  const { data: rev } = await db.from("revisions").select("id,manual_id,step").eq("id", revisionId).maybeSingle();
+  if (!rev || (rev as { step: string }).step !== "draft") throw new Error("The draft is not editable.");
+  const patch = what === "include" ? { status: "included", revision_id: revisionId } : what === "defer" ? { status: "deferred", revision_id: null } : { status: "pending", revision_id: null };
+  await db.from("finding_changes").update(patch).eq("id", changeId).eq("manual_id", (rev as { manual_id: string }).manual_id).in("status", ["pending", "deferred", "included"]);
+  revalidatePath(`/docs/editor/${revisionId}`);
+}

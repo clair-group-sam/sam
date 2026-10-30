@@ -656,3 +656,9 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .rulerow{display:grid;grid-template-columns:1fr 90px 90px 90px 90px 90px 60px 80px;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line)}
 .rulerow .inp.n{width:70px}
 .entdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+/* FND-03 · finding sheet */
+.sentback{border-left:4px solid var(--amber)}.sentback .ch .eyebrow{color:#8a5a00}
+.review{border-left:4px solid var(--cyan)}
+.pts{margin:0;padding-left:18px;display:grid;gap:4px}.pts.chk{list-style:none;padding-left:0}.pts.chk label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.inlineedit summary{cursor:pointer}
+.card>.bar{width:auto;margin:0 16px}

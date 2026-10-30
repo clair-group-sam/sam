@@ -6,6 +6,8 @@ import { STAGE_LABEL, type Stage } from "@/lib/authority";
 import Workflow, { type StepRow } from "@/components/Workflow";
 import { postsOf } from "@/lib/np";
 import { basePost } from "@/lib/session";
+import { decideFindingChange } from "./actions";
+import { CHANGE_LABEL } from "@/lib/findings";
 import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
@@ -70,6 +72,18 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const { data: noticeData } = cmm || (internal && owner) ? await admin.from("manual_notices").select("sent_at,recipients,emailed,email_status").eq("revision_id", rev.id).order("sent_at") : { data: [] };
   const notices = (noticeData ?? []) as { sent_at: string; recipients: number; emailed: number; email_status: string | null }[];
   const broken = tab === "write" ? await checkLinks(admin, rev.id, manual.id) : [];
+  // FND-02 · expected changes from open findings on this manual: shown when the draft opens, the author chooses
+  const { data: fcData } = tab === "write" && !internal ? await admin.from("finding_changes").select("id,section_ref,expected,status,revision_id,findings!inner(id,number,title,status)").eq("manual_id", manual.id).in("status", ["pending", "deferred", "included"]).order("created_at") : { data: [] };
+  const fchanges = ((fcData ?? []) as unknown as { id: string; section_ref: string | null; expected: string; status: string; revision_id: string | null; findings: { id: string; number: string; title: string; status: string } }[]).filter((c) => !["closed", "cancelled"].includes(c.findings.status) && (c.status !== "included" || c.revision_id === rev.id));
+  const findCard = fchanges.length ? (
+    <section className="card mb-4 sentback">
+      <div className="ch"><span className="eyebrow">Corrective changes waiting for this manual</span><span className="mini">{fchanges.filter((c) => c.status === "included").length} included in this draft · {fchanges.length - fchanges.filter((c) => c.status === "included").length} waiting</span></div>
+      <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{fchanges.map((c) => (
+        <tr key={c.id}><td><Link href={`/comp/find/${c.findings.id}`} className="mono"><b>{c.findings.number}</b></Link> {c.section_ref && <span className="mono">{c.section_ref} · </span>}{c.expected}<div className="mini">{c.findings.title} · {CHANGE_LABEL[c.status] ?? c.status}</div></td>
+          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) ? <form action={decideFindingChange} className="flex gap-1 justify-end"><input type="hidden" name="rev" value={rev.id} /><input type="hidden" name="change" value={c.id} />
+            {c.status === "included" ? <button className="btn" name="what" value="undo">Take out of this draft</button> : <><button className="btn primary" name="what" value="include">Include</button>{c.status !== "deferred" && <button className="btn" name="what" value="defer">Not this time</button>}</>}</form> : <span className={"pill " + (c.status === "included" ? "green" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}</td></tr>))}</tbody></table></div>
+    </section>
+  ) : null;
   const linkCard = (
     <section className="card mb-4">
       <div className="ch"><span className="eyebrow">Links check</span><span className={"pill " + (broken.length ? "amber" : "green")}>{broken.length ? `${broken.length} to fix` : "all links resolve"}</span></div>
@@ -139,6 +153,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
         <div className="draftbar mb-4"><div><b>Rev {rev.rev} — {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
       )}
 
+      {tab === "write" && findCard}
       {tab === "write" && linkCard}
       {tab === "write" && (
         <div className="flex gap-4 items-start">
