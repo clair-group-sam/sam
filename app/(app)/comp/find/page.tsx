@@ -49,7 +49,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
                     <td>{LEVEL_LABEL[f.level] ?? f.level}</td>
                     <td>{f.owner_role ?? "person"}</td>
                     <td className={f.due && f.due < t0 && OPEN_STATUSES.includes(f.status) ? "late" : ""}>{f.due ?? "—"}</td>
-                    <td><span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>{(f.current_round > 1 || f.plan_round > 1) && <div className="mini">rounds {f.current_round} · {f.plan_round}</div>}</td>
+                    <td><span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>{f.current_round > 1 && <div className="mini">round {f.current_round}</div>}</td>
                   </tr>
                 ))}
               </tbody>

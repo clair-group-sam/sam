@@ -666,3 +666,4 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .fstep i{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:11px;background:var(--blue1);color:var(--navy)}
 .fstep.on{border-color:var(--cyan);color:var(--navy);font-weight:600}.fstep.on i{background:var(--cyan);color:#fff}.fstep.done i{background:var(--green-s);color:#1d7a3a}
 .card.stepon{border-left:4px solid var(--cyan)}.card.locked{opacity:.65}
+.samnote{border:1px dashed var(--blue2);border-radius:var(--r);padding:10px 12px;background:var(--blue05)}.samnote .eyebrow{color:var(--cyan6)}

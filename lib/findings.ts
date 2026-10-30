@@ -8,25 +8,28 @@ import { today } from "@/lib/authority";
 
 export type Finding = { id: string; entity: string; number: string; source: string; authority: string | null; audit_ref: string | null; level: string; requirement: string | null; title: string; description: string | null;
   owner_role: string | null; owner_person: string | null; notified: string | null; due: string | null; status: string; current_round: number; plan_round: number; authority_file_id: string | null;
+  draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; draft_comment: string | null; draft_step: number; rca_check: Assistant | null; plan_check: Assistant | null;
   closed_at: string | null; closed_by: string | null; closed_note: string | null; created_by: string | null; created_at: string; updated_at: string };
-export type Point = { code: string; label: string; detail: string };
+export type Point = { code: string; label: string; detail: string; part?: "rca" | "plan" };
 export type Assistant = { verdict: "complete" | "incomplete" | "off_topic"; points: Point[]; model: string; at: string };
-export type Stage = "rca" | "plan";
+export type Stage = "rca" | "plan" | "full";
 export type Round = { id: string; finding_id: string; stage: Stage; n: number; comment: string | null; root_cause: string | null; factors: string | null; immediate: string | null; answered_by: string | null; answered_at: string; via: string;
   assistant: Assistant | null; decision: "accepted" | "sent_back" | null; points: Point[] | null; decided_by: string | null; decided_at: string | null; note: string | null };
 export type Change = { id: string; finding_id: string; manual_id: string | null; manual_code: string | null; section_ref: string | null; expected: string; status: string; revision_id: string | null; verified_at: string | null; verified_by: string | null; verified_note: string | null; created_at: string };
 
-export const STATUS_LABEL: Record<string, string> = { open: "1 · Root cause expected", rca_review: "1 · Root cause to review", rca_back: "1 · Root cause to complete", plan: "2 · Action plan expected", plan_review: "2 · Action plan to review", plan_back: "2 · Action plan to complete", accepted: "3 · Plan in progress", closure_requested: "4 · Closure requested", closed: "Closed", cancelled: "Cancelled" };
-export const STATUS_TONE: Record<string, string> = { open: "amber", rca_review: "", rca_back: "amber", plan: "amber", plan_review: "", plan_back: "amber", accepted: "", closure_requested: "", closed: "green", cancelled: "" };
-/** Where the finding stands on the 4-step path. */
-export const STEP_OF: Record<string, number> = { open: 1, rca_review: 1, rca_back: 1, plan: 2, plan_review: 2, plan_back: 2, accepted: 3, closure_requested: 4, closed: 4, cancelled: 0 };
-export const STEPS_PATH = ["Root cause", "Action plan", "Plan in progress", "Closure"];
-export const NP_TURN = ["open", "rca_back", "plan", "plan_back"];
-export const CMM_TURN = ["rca_review", "plan_review", "closure_requested"];
+export const STATUS_LABEL: Record<string, string> = { open: "Analysis in progress", review: "Analysis to review", back: "Sent back — to complete", accepted: "Plan in progress", closure_requested: "Closure requested", closed: "Closed", cancelled: "Cancelled" };
+export const STATUS_TONE: Record<string, string> = { open: "amber", review: "", back: "amber", accepted: "", closure_requested: "", closed: "green", cancelled: "" };
+/** The 5-step path shown on the sheet. Steps 1-2 are the NP's writing (draft_step), 3 the review, 4 the plan, 5 the closure. */
+export const STEPS_PATH = ["Root cause", "Action plan", "Compliance review", "Plan in progress", "Closure"];
+export function stepOf(f: Pick<Finding, "status" | "draft_step">): number {
+  switch (f.status) { case "open": case "back": return Math.min(f.draft_step, 2); case "review": return 3; case "accepted": return 4; case "closure_requested": case "closed": return 5; default: return 0; }
+}
+export const NP_TURN = ["open", "back"];
+export const CMM_TURN = ["review", "closure_requested"];
 export const LEVEL_LABEL: Record<string, string> = { "1": "Level 1", "2": "Level 2", "3": "Level 3", obs: "Observation" };
 export const SOURCE_LABEL: Record<string, string> = { authority: "Authority", internal_audit: "Internal audit", inspection: "Inspection", subcontractor: "Subcontractor", other: "Other" };
 export const CHANGE_LABEL: Record<string, string> = { pending: "Waiting for a revision", included: "In a draft", deferred: "Deferred to a later revision", published: "Published — to verify", verified: "Verified", removed: "Removed" };
-export const OPEN_STATUSES = ["open", "rca_review", "rca_back", "plan", "plan_review", "plan_back", "accepted", "closure_requested"];
+export const OPEN_STATUSES = ["open", "review", "back", "accepted", "closure_requested"];
 
 export async function nextFindingNumber(db: SupabaseClient, entity: string): Promise<string> {
   const y = new Date().getFullYear();
@@ -66,6 +69,7 @@ const TRAINING_ONLY = /^(re)?(train|brief|remind|sensiti|inform|recall|formation
 export function critique(f: Finding, r: Pick<Round, "root_cause" | "factors" | "immediate">, changes: Change[], actions: Action[], stage: Stage = "rca"): Assistant {
   const pts: Point[] = [];
   if (stage === "plan") return critiquePlan(f, r, changes, actions);
+  if (stage === "full") { const a = critique(f, r, changes, actions, "rca"), b = critiquePlan(f, r, changes, actions); return { verdict: a.verdict !== "complete" ? a.verdict : b.verdict, points: [...a.points, ...b.points], model: "rules", at: a.at }; }
   const rc = (r.root_cause ?? "").trim(), fa = (r.factors ?? "").trim(), im = (r.immediate ?? "").trim();
   const rcW = words(rc), fW = words(`${f.title} ${f.description ?? ""}`);
   if (!rc) pts.push({ code: "RC_EMPTY", label: "Root cause missing", detail: "The answer does not say why the non-compliance happened." });
@@ -80,7 +84,7 @@ export function critique(f: Finding, r: Pick<Round, "root_cause" | "factors" | "
   const blocking = new Set(["RC_EMPTY", "RC_SYMPTOM", "FACTORS_NONE"]);
   const offTopic = !!rc && rcW.size >= 6 && overlap(rcW, new Set([...fW, ...words(f.requirement)])) === 0;
   const verdict: Assistant["verdict"] = offTopic ? "off_topic" : pts.some((p) => blocking.has(p.code)) ? "incomplete" : "complete";
-  return { verdict, points: pts, model: "rules", at: new Date().toISOString() };
+  return { verdict, points: pts.map((q) => ({ ...q, part: "rca" as const })), model: "rules", at: new Date().toISOString() };
 }
 /** Step 2: the plan against the accepted root cause. */
 function critiquePlan(f: Finding, r: Pick<Round, "root_cause" | "factors" | "immediate">, changes: Change[], actions: Action[]): Assistant {
@@ -98,26 +102,28 @@ function critiquePlan(f: Finding, r: Pick<Round, "root_cause" | "factors" | "imm
   if (rcW.size >= 8 && planW.size >= 8 && overlap(rcW, planW) < 0.08) pts.push({ code: "CAP_OFF_CAUSE", label: "Plan does not echo the cause", detail: "The actions share no term with the accepted root cause; check each one answers it." });
   const verdict: Assistant["verdict"] = pts.some((p) => p.code === "CAP_EMPTY") ? "incomplete" : "complete";
   void f;
-  return { verdict, points: pts, model: "rules", at: new Date().toISOString() };
+  return { verdict, points: pts.map((q) => ({ ...q, part: "plan" as const })), model: "rules", at: new Date().toISOString() };
 }
 
-const PREREAD_SYSTEM = (stage: Stage) => `You are the assistant of a Compliance Monitoring Manager (EASA AOC / ATO / CAMO). You pre-read a nominated person's answer to an audit finding. The answer comes in two steps; you read step ${stage === "rca" ? "1, the root cause analysis (root cause, contributing factors, immediate action). Do not comment on the plan, it is not written yet" : "2, the corrective action plan (expected manual changes and actions), against a root cause Compliance already accepted. Do not re-judge the root cause"}.
-Judge the ANALYSIS, never the person. Neutral, short, professional English. The output is a suggestion for the compliance manager, who decides.
-${stage === "rca" ? "Checks: is the root cause a cause (why the system allowed it) or a restatement of the symptom? Is the why-chain followed far enough (why, then why)? Is there an organisational factor (procedure, training, resources, supervision, interface, tools)? Is the cause placed on a person only? Was anything done at once to contain the non-compliance? Is the answer about this finding?" : "Checks: does each action address the accepted cause (not only training / reminders)? Is a manual or procedure change needed and planned? Does each action have an owner and a realistic date? Is anything in the cause left without an action? Is there a way to verify effectiveness?"}
-Answer ONLY with JSON: {"verdict":"complete|incomplete|off_topic","points":[{"code":"SHORT_CODE","label":"≤ 8 words","detail":"one sentence the NP can act on"}]} — at most 6 points, none if the answer is sound.`;
+const PREREAD_SYSTEM = (stage: Stage, forNp: boolean) => `You are the assistant of a Compliance Monitoring Manager (EASA AOC / ATO / CAMO). You read a nominated person's answer to an audit finding${forNp ? ", BEFORE it is sent, to help the nominated person strengthen it" : ", for the compliance manager who decides"}.
+Scope: ${stage === "rca" ? "the root cause analysis only (root cause, contributing factors, immediate action). Do not comment on the plan" : stage === "plan" ? "the corrective action plan only (expected manual changes, actions), against the root cause given. Do not re-judge the root cause" : "both the root cause analysis and the corrective action plan"}.
+Judge the ANALYSIS, never the person. Neutral, short, professional English, addressed ${forNp ? "to the author (\"you\")" : "to the compliance manager"}. Suggestions only.
+Root cause checks: a cause (why the system allowed it) or a restatement of the symptom? why-chain followed far enough? organisational factor present (procedure, training, resources, supervision, interface, tools)? cause placed on a person only? containment action? about this finding?
+Plan checks: does each action address the cause (not only training / reminders)? manual or procedure change needed and planned? owner and realistic date on each action? part of the cause left without an action? a way to verify effectiveness?
+Answer ONLY with JSON: {"verdict":"complete|incomplete|off_topic","points":[{"part":"rca|plan","code":"SHORT_CODE","label":"≤ 8 words","detail":"one sentence the author can act on"}]} — at most 6 points, none if the answer is sound.`;
 
 /** Pre-reads a round with Claude when the key is there, otherwise with the rules; always returns something. */
-export async function preRead(f: Finding, r: Round, changes: Change[], actions: Action[], stage: Stage = r.stage ?? "rca"): Promise<Assistant> {
+export async function preRead(f: Finding, r: Pick<Round, "root_cause" | "factors" | "immediate" | "comment" | "n">, changes: Change[], actions: Action[], stage: Stage, forNp = false): Promise<Assistant> {
   const rules = critique(f, r, changes, actions, stage);
   if (!process.env.ANTHROPIC_API_KEY) return rules;
   try {
     const { callClaude } = await import("@/lib/ai");
-    const user = `STEP ${stage === "rca" ? "1 — root cause" : "2 — action plan"}\nFINDING ${f.number} (${LEVEL_LABEL[f.level] ?? f.level}, ${f.requirement ?? "no reference"})\nTitle: ${f.title}\nText: ${f.description ?? "—"}\n\nROOT CAUSE ANALYSIS (round ${r.n}${stage === "plan" ? ", accepted" : ""})\nRoot cause: ${r.root_cause ?? "—"}\nContributing factors: ${r.factors ?? "—"}\nImmediate action: ${r.immediate ?? "—"}\n\nPLAN${stage === "rca" ? " (not yet written — ignore)" : r.comment ? ` — NP's note: ${r.comment}` : ""}\nExpected manual changes: ${changes.length ? changes.map((c) => `${c.manual_code ?? "?"} ${c.section_ref ?? ""}: ${c.expected}`).join(" | ") : "none"}\nActions: ${actions.length ? actions.map((a) => `${a.number} ${a.title} (owner ${a.owner_role ?? a.owner_person ?? "none"}, due ${a.due ?? "none"})`).join(" | ") : "none"}`;
-    const { text, model } = await callClaude({ agent: "check", personId: null, entity: f.entity, system: PREREAD_SYSTEM(stage), user, maxTokens: 1200 });
+    const user = `FINDING ${f.number} (${LEVEL_LABEL[f.level] ?? f.level}, ${f.requirement ?? "no reference"})\nTitle: ${f.title}\nText: ${f.description ?? "—"}\n\nROOT CAUSE ANALYSIS\nRoot cause: ${r.root_cause ?? "—"}\nContributing factors: ${r.factors ?? "—"}\nImmediate action: ${r.immediate ?? "—"}\n\nPLAN${stage === "rca" ? " (out of scope)" : r.comment ? ` — author's note: ${r.comment}` : ""}\nExpected manual changes: ${changes.length ? changes.map((c) => `${c.manual_code ?? "?"} ${c.section_ref ?? ""}: ${c.expected}`).join(" | ") : "none"}\nActions: ${actions.length ? actions.map((a) => `${a.number} ${a.title} (owner ${a.owner_role ?? a.owner_person ?? "none"}, due ${a.due ?? "none"})`).join(" | ") : "none"}`;
+    const { text, model } = await callClaude({ agent: "check", personId: null, entity: f.entity, system: PREREAD_SYSTEM(stage, forNp), user, maxTokens: 1200 });
     const m = /\{[\s\S]*\}/.exec(text); if (!m) return rules;
     const j = JSON.parse(m[0]) as { verdict?: string; points?: Point[] };
     const verdict = (["complete", "incomplete", "off_topic"].includes(j.verdict ?? "") ? j.verdict : rules.verdict) as Assistant["verdict"];
-    return { verdict, points: (j.points ?? []).slice(0, 6).map((p) => ({ code: String(p.code ?? "NOTE").slice(0, 32), label: String(p.label ?? "").slice(0, 80), detail: String(p.detail ?? "").slice(0, 300) })), model, at: new Date().toISOString() };
+    return { verdict, points: (j.points ?? []).slice(0, 6).map((p) => ({ code: String(p.code ?? "NOTE").slice(0, 32), label: String(p.label ?? "").slice(0, 80), detail: String(p.detail ?? "").slice(0, 300), part: (p.part === "plan" ? "plan" : "rca") as "rca" | "plan" })), model, at: new Date().toISOString() };
   } catch { return rules; }
 }
 
@@ -131,13 +137,9 @@ export async function syncFindingTasks(db: SupabaseClient, f: Finding, extra?: {
   const cmm = { owner_role: "CMM", owner_person: null };
   const head = `${f.number} — ${f.title}`.slice(0, 160);
   const n = extra?.points?.length;
-  const back = (what: string) => ({ kind: "finding", title: `${what} sent back — ${n ?? "some"} point${(n ?? 2) === 1 ? "" : "s"} to address · ${head}`.slice(0, 200), detail: (extra?.points ?? []).map((p) => `• ${p.label}`).join("\n") || "Compliance asked for a complement; see the finding.", ...owner, due: f.due });
-  if (f.status === "open") want.push({ kind: "finding", title: `Step 1 · root cause · ${head}`, detail: `${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? ` · ${f.requirement}` : ""}. Why did the organisation let this happen? Root cause, contributing factors, immediate action. The plan comes at step 2, once the cause is accepted.`, ...owner, due: f.due });
-  if (f.status === "rca_back") want.push(back("Root cause"));
-  if (f.status === "plan") want.push({ kind: "finding", title: `Step 2 · action plan · ${head}`, detail: "The root cause is accepted: add the expected manual changes and the actions (owner, date), then send the plan to Compliance.", ...owner, due: f.due });
-  if (f.status === "plan_back") want.push(back("Action plan"));
-  if (f.status === "rca_review") want.push({ kind: "finding_review", title: `Read the root cause · ${head}`, detail: "Step 1 answered: accept the analysis (the NP then builds the plan), or send it back with the points to address.", ...cmm, due: today() });
-  if (f.status === "plan_review") want.push({ kind: "finding_review", title: `Read the action plan · ${head}`, detail: "Step 2 answered: accept the plan (it starts), or send it back with the points to address.", ...cmm, due: today() });
+  if (f.status === "open") want.push({ kind: "finding", title: `Answer ${head}`, detail: `${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? ` · ${f.requirement}` : ""}. Root cause (why the organisation let this happen), then the corrective action plan, then send both to Compliance. S.A.M. reads each part with you before sending.`, ...owner, due: f.due });
+  if (f.status === "back") want.push({ kind: "finding", title: `Analysis sent back — ${n ?? "some"} point${(n ?? 2) === 1 ? "" : "s"} to address · ${head}`.slice(0, 200), detail: (extra?.points ?? []).map((p) => `• ${p.label}`).join("\n") || "Compliance asked for a complement; see the finding.", ...owner, due: f.due });
+  if (f.status === "review") want.push({ kind: "finding_review", title: `Read the analysis · ${head}`, detail: "Root cause and corrective action plan received: accept both (the plan starts), or send back with the points to address.", ...cmm, due: today() });
   if (f.status === "closure_requested") want.push({ kind: "finding_review", title: `Closure requested · ${head}`, detail: "The plan is reported complete: check the evidence (published changes verified, actions verified) and close, or send back.", ...cmm, due: today() });
   const keep = new Set<string>();
   for (const w of want) { const ex = openRows.find((o) => o.kind === w.kind && o.title === w.title); if (ex) keep.add(ex.id); else await db.from("tasks").insert({ entity: f.entity, status: "open", link: `/comp/find/${f.id}`, ref_id: f.id, ...w }); }
