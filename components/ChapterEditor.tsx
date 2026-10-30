@@ -14,9 +14,9 @@ import LinkPicker, { type Chap } from "@/components/LinkPicker";
 import { saveSection, revertSection, uploadImage, orgSnapshot } from "@/app/(app)/docs/editor/[rev]/actions";
 import AiPanel from "@/components/AiPanel";
 
-type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string; manualId?: string; chapters?: Chap[] };
+type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string; manualId?: string; chapters?: Chap[]; aiRequest?: string };
 
-export default function ChapterEditor({ revisionId, sectionId, refCode, title: title0, html, changed: changed0, editable: editable0, frozenBy = null, baseRevLabel = "the published revision", manualId = "", chapters = [] }: Props) {
+export default function ChapterEditor({ revisionId, sectionId, refCode, title: title0, html, changed: changed0, editable: editable0, frozenBy = null, baseRevLabel = "the published revision", manualId = "", chapters = [], aiRequest = "" }: Props) {
   const editable = editable0 && !frozenBy;
   const router = useRouter();
   const [title, setTitle] = useState(title0);
@@ -31,7 +31,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const draftKey = `sam_unsaved_${sectionId}`;
   const keepLocal = (h: string) => { try { localStorage.setItem(draftKey, JSON.stringify({ html: h, title: titleRef.current, at: new Date().toTimeString().slice(0, 5) })); } catch {} };
   const dropLocal = () => { try { localStorage.removeItem(draftKey); } catch {} };
-  const [ai, setAi] = useState(false);
+  const [ai, setAi] = useState(!!aiRequest);
   const [linking, setLinking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const baseNorm = useRef<string | null>(null);
@@ -193,7 +193,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
         <div className="edbody">
           <EditorContent editor={editor} className="reader" />
         </div>
-        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} onInserted={() => { setDirty(true); setMsg("SAM's proposal inserted — review, then save"); }} onClose={() => setAi(false)} />}
+        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} initialRequest={aiRequest} onInserted={() => { setDirty(true); setMsg("SAM's proposal inserted — review, then save"); }} onClose={() => setAi(false)} />}
       </div>
     </div>
   );

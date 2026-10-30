@@ -5,7 +5,7 @@ import { aiPropose } from "@/app/(app)/docs/editor/[rev]/actions";
 import type { AiAgent } from "@/lib/ai";
 
 type Note = { where: string; change: string; why: string };
-type Props = { editor: Editor; revisionId: string; sectionId: string; onInserted: () => void; onClose: () => void };
+type Props = { editor: Editor; revisionId: string; sectionId: string; onInserted: () => void; onClose: () => void; initialRequest?: string };
 
 /** Word-level diff (LCS) between two texts, for the proposal preview. */
 function diffWords(a: string, b: string): { t: string; k: "=" | "+" | "-" }[] {
@@ -21,9 +21,9 @@ function diffWords(a: string, b: string): { t: string; k: "=" | "+" | "-" }[] {
 }
 const textOf = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
-export default function AiPanel({ editor, revisionId, sectionId, onInserted, onClose }: Props) {
+export default function AiPanel({ editor, revisionId, sectionId, onInserted, onClose, initialRequest = "" }: Props) {
   const [agent, setAgent] = useState<AiAgent>("draft");
-  const [request, setRequest] = useState("");
+  const [request, setRequest] = useState(initialRequest);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [prop, setProp] = useState<{ html: string; notes: Note[]; model: string } | null>(null);
@@ -38,14 +38,14 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
   function insert() { if (!prop) return; editor.commands.setContent(prop.html); onInserted(); setProp(null); }
   const diff = prop ? diffWords(textOf(editor.getHTML()), textOf(prop.html)) : [];
   const added = diff.filter((d) => d.k === "+").length, removed = diff.filter((d) => d.k === "-").length;
-  const AGENTS: [AiAgent, string, string][] = [["draft", "Draft", "Integrate what you describe"], ["rewrite", "Rewrite", "Manual style, same meaning"], ["translate", "Translate", "Passages in another language → manual language"], ["check", "Check", "Consistency review, no change"]];
+  const AGENTS: [AiAgent, string, string][] = [["draft", "Draft", "Integrate what you describe"], ["rewrite", "Rewrite", "Manual style, same meaning"], ["translate", "Translate", "Passages in another language → manual language"], ["check", "Check", "Consistency review, no change"], ["explain", "Explain", "What a requirement asks, where the chapter stands"]];
 
   return (
     <aside className="aipanel">
       <div className="ch"><span className="eyebrow">🤝 Work with SAM</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
       <div className="p-3">
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
-        <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
+        <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "explain" ? "The requirement to explain (ORO.GEN.200(a)(3), CAMO.A.305…) or paste its text — default: the references cited in this chapter" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
         <div className="flex items-center gap-2 mt-2">
           <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? "SAM is working…" : "Ask SAM"}</button>
           <span className="mini">SAM proposes; nothing enters the manual until you insert it.</span>
@@ -53,7 +53,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
         {err && <div className="lockbar mt-3" style={{ margin: "12px 0 0" }}>{err}</div>}
         {prop && (
           <div className="mt-3">
-            {agent !== "check" && (<>
+            {agent !== "check" && agent !== "explain" && (<>
               <div className="flex items-center gap-2 mb-2">
                 <div className="seg"><button type="button" className={view === "diff" ? "on" : ""} onClick={() => setView("diff")}>Changes</button><button type="button" className={view === "preview" ? "on" : ""} onClick={() => setView("preview")}>Preview</button></div>
                 <span className="mini"><b style={{ color: "#1d7a3a" }}>+{added}</b> · <b style={{ color: "var(--terra)" }}>−{removed}</b> words</span>
@@ -64,11 +64,11 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
             </>)}
             {prop.notes.length > 0 && (
               <div className="mt-3">
-                <div className="eyebrow mb-1">{agent === "check" ? "Findings" : "What changed and why"}</div>
+                <div className="eyebrow mb-1">{agent === "check" ? "Findings" : agent === "explain" ? "What the requirement asks, and where the chapter stands" : "What changed and why"}</div>
                 <ul className="ainotes">{prop.notes.map((n, i) => <li key={i}><b>{n.where}</b> — {n.change}{n.why && <span className="mini"> · {n.why}</span>}</li>)}</ul>
               </div>
             )}
-            {agent !== "check" && (
+            {agent !== "check" && agent !== "explain" && (
               <div className="flex gap-2 mt-3">
                 <button type="button" className="btn primary" onClick={insert}>Insert into the chapter</button>
                 <button type="button" className="btn" onClick={() => setProp(null)}>Discard</button>

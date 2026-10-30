@@ -15,6 +15,7 @@ import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Se
 import { allowedTransitions, expectedReturn, isCmm, ownsManual, RETURN_LABEL, type ReturnKind } from "@/lib/revisions";
 import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review, setManualClass } from "./actions";
 import ReviewPanel from "@/components/ReviewPanel";
+import SummaryAssist from "@/components/SummaryAssist";
 import ChapterTools from "@/components/ChapterTools";
 import EntityBand from "@/components/EntityBand";
 import ManualClass from "@/components/ManualClass";
@@ -28,9 +29,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 type Round = { id: string; at: string; direction: string; who: string; note: string };
 type Meta = { id: string; ord: number; ref: string; title: string | null; changed: boolean; conflict: { base_html: string; base_rev: string } | null; deleted_at: string | null; base_ref: string | null; uid: string | null };
 
-export default async function Editor({ params, searchParams }: { params: Promise<{ rev: string }>; searchParams: Promise<{ tab?: string; sec?: string }> }) {
+export default async function Editor({ params, searchParams }: { params: Promise<{ rev: string }>; searchParams: Promise<{ tab?: string; sec?: string; ai?: string }> }) {
   const { rev: revId } = await params;
-  const { tab = "write", sec } = await searchParams;
+  const { tab = "write", sec, ai: aiReq } = await searchParams;
   const s = await getSession();
   if (!s) redirect("/login");
   const sb = await supabaseServer();
@@ -84,7 +85,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
       <div className="ch"><span className="eyebrow">Regulatory changes to consider in this revision</span><span className="mini">{wentries.length} open watch entr{wentries.length === 1 ? "y" : "ies"} name this manual · information, your call</span></div>
       <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{wentries.map((w) => (
         <tr key={w.id}><td><Link href={`/comp/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${w.due}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
-          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{w.revision_ids.includes(rev.id) ? <span className="pill green">Addressed in this draft</span> : editable && (owner || cmm) ? <form action={addressedInDraft}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="rev" value={rev.id} /><button className="btn" type="submit">Addressed in this draft</button></form> : null}</td></tr>))}</tbody></table></div>
+          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) && <Link className="btn" href={`/docs/editor/${rev.id}?tab=write${(w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)?.ref ? `&sec=${encodeURIComponent((w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)!.ref)}` : sec ? `&sec=${encodeURIComponent(sec)}` : ""}&ai=${encodeURIComponent(`Regulatory change ${w.number}${w.reference ? ` (${w.reference})` : ""}: ${w.title}. Integrate what this change requires in this chapter.`)}`} style={{ marginRight: 4 }}>Draft it with SAM</Link>}{w.revision_ids.includes(rev.id) ? <span className="pill green">Addressed in this draft</span> : editable && (owner || cmm) ? <form action={addressedInDraft} style={{ display: "inline" }}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="rev" value={rev.id} /><button className="btn" type="submit">Addressed in this draft</button></form> : null}</td></tr>))}</tbody></table></div>
     </section>
   ) : null;
   const findCard = fchanges.length ? (
@@ -93,7 +94,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
       <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{fchanges.map((c) => (
         <tr key={c.id}><td><Link href={`/comp/find/${c.findings.id}`} className="mono"><b>{c.findings.number}</b></Link> {c.section_ref && <span className="mono">{c.section_ref} · </span>}{c.expected}<div className="mini">{c.findings.title} · {CHANGE_LABEL[c.status] ?? c.status}</div></td>
           <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) ? <form action={decideFindingChange} className="flex gap-1 justify-end"><input type="hidden" name="rev" value={rev.id} /><input type="hidden" name="change" value={c.id} />
-            {c.status === "included" ? <button className="btn" name="what" value="undo">Take out of this draft</button> : <><button className="btn primary" name="what" value="include">Include</button>{c.status !== "deferred" && <button className="btn" name="what" value="defer">Not this time</button>}</>}</form> : <span className={"pill " + (c.status === "included" ? "green" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}</td></tr>))}</tbody></table></div>
+            {c.status === "included" ? <><Link className="btn primary" href={`/docs/editor/${rev.id}?tab=write${c.section_ref ? `&sec=${encodeURIComponent(c.section_ref)}` : sec ? `&sec=${encodeURIComponent(sec)}` : ""}&ai=${encodeURIComponent(`Corrective change for finding ${c.findings.number}: ${c.expected}`)}`}>Draft it with SAM</Link><button className="btn" name="what" value="undo">Take out of this draft</button></> : <><button className="btn primary" name="what" value="include">Include</button>{c.status !== "deferred" && <button className="btn" name="what" value="defer">Not this time</button>}</>}</form> : <span className={"pill " + (c.status === "included" ? "green" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}</td></tr>))}</tbody></table></div>
     </section>
   ) : null;
   const linkCard = (
@@ -200,7 +201,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
             {active ? (
               <>
               {editable && (cmm || owner) && <ChapterTools revisionId={rev.id} sectionId={active.id} refCode={active.ref} deleted={!!activeMeta?.deleted_at} isNew={!activeMeta?.base_ref} />}
-              <ChapterEditor key={active.id} manualId={manual.id} chapters={metas.filter((x) => !x.deleted_at && x.uid).map((x) => ({ ref: x.ref, title: x.title, uid: x.uid! }))} revisionId={rev.id} sectionId={active.id} refCode={active.ref} title={active.title ?? ""} html={active.body.html ?? ""} changed={active.changed} editable={editable && (cmm || owner) && !activeMeta?.deleted_at} frozenBy={frozen.refs.has(active.ref) ? frozen.baseRev : null} baseRevLabel={baseLabel} />
+              <ChapterEditor key={active.id} aiRequest={aiReq ?? ""} manualId={manual.id} chapters={metas.filter((x) => !x.deleted_at && x.uid).map((x) => ({ ref: x.ref, title: x.title, uid: x.uid! }))} revisionId={rev.id} sectionId={active.id} refCode={active.ref} title={active.title ?? ""} html={active.body.html ?? ""} changed={active.changed} editable={editable && (cmm || owner) && !activeMeta?.deleted_at} frozenBy={frozen.refs.has(active.ref) ? frozen.baseRev : null} baseRevLabel={baseLabel} />
               </>
             ) : <div className="cb text-slate6">No chapter.</div>}
           </section>
@@ -215,6 +216,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <input type="hidden" name="revision_id" value={rev.id} />
               <label className="block mb-3"><span className="eyebrow">What changes in Rev {rev.rev} (shown to readers in “What changed”)</span>
                 <textarea name="summary" defaultValue={rev.summary ?? ""} rows={4} className="inp" placeholder="Short summary of the revision…" /></label>
+              {rev.step === "draft" && <SummaryAssist revisionId={rev.id} />}
               <button className="btn primary" type="submit">Save</button>
             </form>
           </section>
@@ -246,6 +248,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <input type="hidden" name="revision_id" value={rev.id} />
               <label className="block mb-3"><span className="eyebrow">What changes in Rev {rev.rev} (shown to readers in “What changed”)</span>
                 <textarea name="summary" defaultValue={rev.summary ?? ""} rows={5} className="inp" placeholder="Short summary of the revision, in English…" /></label>
+              {rev.step === "draft" && <SummaryAssist revisionId={rev.id} />}
               <button className="btn primary mt-3" type="submit">Save</button>
             </form>
           </section>

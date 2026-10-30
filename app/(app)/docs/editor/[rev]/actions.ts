@@ -11,7 +11,7 @@ import { htmlToText } from "@/lib/wm-import";
 import { structureHtml, type Manual, type Revision, type Section } from "@/lib/docs";
 import { TRANSITIONS, isCmm, nextRev, ownsManual, UNDER_REVIEW, EDITING } from "@/lib/revisions";
 import { frozenRefs, openDraft } from "@/lib/revisions-server";
-import { callClaude, parseJsonBlock, userPromptFor, type AiAgent } from "@/lib/ai";
+import { callClaude, draftSummary, parseJsonBlock, userPromptFor, type AiAgent } from "@/lib/ai";
 import { stripHtml } from "@/lib/docs";
 import { blockOf, parentOf, renumber, type Ch } from "@/lib/chapters";
 import { randomUUID } from "crypto";
@@ -446,4 +446,21 @@ export async function decideFindingChange(formData: FormData) {
   const patch = what === "include" ? { status: "included", revision_id: revisionId } : what === "defer" ? { status: "deferred", revision_id: null } : { status: "pending", revision_id: null };
   await db.from("finding_changes").update(patch).eq("id", changeId).eq("manual_id", (rev as { manual_id: string }).manual_id).in("status", ["pending", "deferred", "included"]);
   revalidatePath(`/docs/editor/${revisionId}`);
+}
+
+/** AI · drafts the revision summary from the changed chapters (text of the base revision vs the draft). The author edits and saves. */
+export async function aiSummary(input: { revisionId: string; reason?: string }): Promise<{ ok: true; summary: string; model: string; changed: number } | { ok: false; error: string }> {
+  try {
+    const { s, db, rev, manual, may } = await guard(input.revisionId);
+    if (!may) return { ok: false, error: "Not allowed." };
+    const { data: cur } = await db.from("revision_sections").select("ref,title,body_text,changed,deleted_at").eq("revision_id", rev.id).order("ord");
+    const base = (rev as { based_on?: string | null }).based_on;
+    const { data: old } = base ? await db.from("revision_sections").select("ref,body_text").eq("revision_id", base) : { data: [] };
+    const before = new Map(((old ?? []) as { ref: string; body_text: string }[]).map((x) => [x.ref, x.body_text]));
+    const changes = ((cur ?? []) as { ref: string; title: string | null; body_text: string; changed: boolean; deleted_at: string | null }[]).filter((x) => x.changed || x.deleted_at || (base && !before.has(x.ref)))
+      .map((x) => ({ ref: x.ref, title: x.title ?? "", before: before.get(x.ref) ?? "", after: x.deleted_at ? "" : x.body_text }));
+    if (!changes.length) return { ok: false, error: "No chapter is marked as changed yet." };
+    const r = await draftSummary({ personId: s.person?.id ?? null, entity: manual.entity, manual: manual.title, rev: rev.rev, reason: input.reason, changes });
+    return { ok: true, summary: r.summary, model: r.model, changed: changes.length };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 }

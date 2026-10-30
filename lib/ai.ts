@@ -1,7 +1,7 @@
 // Server-side Claude calls (AI-01). The key lives in Vercel only; every call is logged in ai_usage.
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "route" | "file" | "coffee" | "safety";
+export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "explain" | "summary" | "route" | "file" | "coffee" | "safety";
 const HEADERS = (key: string) => ({ "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" });
 let modelCache: { id: string; at: number } | null = null;
 /** Lists the models available to the group's key (ids + display names). */
@@ -65,6 +65,17 @@ export function userPromptFor(agent: AiAgent, ctx: { manual: string; entity: str
     case "rewrite": return head + `Rewrite the passages the nominated person typed quickly so they read like the rest of the manual (style, terminology, formatting), without changing their meaning. ${ctx.request ? "Focus: " + ctx.request : ""} Return the full chapter.`;
     case "translate": return head + `Translate into the manual's language (${ctx.request.trim() || "the language of the rest of the chapter"}) every passage written in another language, in the manual's style; keep the other passages unchanged. Return the full chapter.`;
     case "check": return head + `Do not rewrite. Review this chapter for internal consistency (posts, references to other chapters, delays, contradictions, missing cross-references, terminology) ${ctx.request ? "with attention to: " + ctx.request : ""}. Return the chapter html UNCHANGED and put every finding in "notes" (where / change = the issue / why = suggestion).`;
+    case "explain": return head + `Do not rewrite. The nominated person asks what a requirement means for this chapter: "${ctx.request.trim() || "the regulatory references cited in this chapter"}". Explain, in plain professional English, what the requirement (EASA / national rule, AMC/GM) actually asks for, how this chapter answers it today and where it falls short or is silent. Return the chapter html UNCHANGED and put the explanation in the notes: one note per point, where = the requirement or sub-chapter, change = what it requires, why = how the chapter stands against it. No invented references: cite only what the request or the chapter names.`;
     default: return head + ctx.request;
   }
+}
+
+const SUMMARY_SYSTEM = `You write the revision summary of an aviation organisation's manual for its readers (crews, instructors, staff): what changed in this revision, in plain English, so that they know what to read and what they must now do differently. 3 to 8 short bullet-like sentences, one per change, chapter reference first ("5.2 — …"). No marketing, no judgement, nothing invented: only what the differences show. Mention the reason only when the author gives it. Answer ONLY with JSON: {"summary":"text with line breaks"}.`;
+/** Drafts the "What changed" summary of a revision from the chapters that changed (old vs new text). */
+export async function draftSummary(opts: { personId: string | null; entity: string; manual: string; rev: string; reason?: string | null; changes: { ref: string; title: string; before: string; after: string }[] }): Promise<{ summary: string; model: string }> {
+  const parts = opts.changes.slice(0, 25).map((c) => `CHAPTER ${c.ref} — ${c.title}\nBEFORE: ${c.before.slice(0, 2500) || "(new chapter)"}\nAFTER: ${c.after.slice(0, 2500) || "(chapter removed)"}`).join("\n\n");
+  const user = `Manual: ${opts.manual} (${opts.entity}), revision ${opts.rev}.${opts.reason ? ` Reason given by the author: ${opts.reason}` : ""}\n\n${parts}`;
+  const { text, model } = await callClaude({ agent: "summary", personId: opts.personId, entity: opts.entity, system: SUMMARY_SYSTEM, user, maxTokens: 1500 });
+  const m = /\{[\s\S]*\}/.exec(text); if (!m) throw new Error("No summary returned.");
+  return { summary: String((JSON.parse(m[0]) as { summary?: string }).summary ?? "").trim(), model };
 }
