@@ -15,7 +15,7 @@ export async function importWmBundle(input: ImportInput): Promise<ImportResult> 
   if (!s || !(s.roles.includes("CMM") || s.roles.includes("SUPERADMIN"))) return { ok: false, error: "Compliance department only." };
   if (!s.group && !s.entities.includes(input.entity)) return { ok: false, error: "Entity out of your scope." };
   const b = input.bundle;
-  if (b.format !== "sam-wm-export/1") return { ok: false, error: "Not a S.A.M. Web Manuals export." };
+  if (b.format !== "sam-wm-export/1" && b.format !== "sam-wm-export/2") return { ok: false, error: "Not a S.A.M. Web Manuals export." };
   if (b.kind === "file") return importCertificate(input);
   if (b.kind === "pdf") return importOfficialPdf(input);
   if (!b.pages?.length) return { ok: false, error: "Empty export." };
@@ -35,7 +35,7 @@ export async function importWmBundle(input: ImportInput): Promise<ImportResult> 
   // FB-029 · one revision per (manual, issue, rev): if duplicates already exist, the import updates the most recent one and never adds a third
   const { data: r0 } = await db.from("revisions").select("id").eq("manual_id", manualId).eq("rev", rev).eq("issue", issue).order("published_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
   let revisionId = r0?.id as string | undefined;
-  const source = { system: "webmanuals", manualId: b.manual.wmId, revisionId: b.manual.revisionId, pdfURL: b.manual.pdfURL ?? null, revisionDate: b.manual.revisionDate ?? null, importedAt: new Date().toISOString(), by: s.email };
+  const source = { system: "webmanuals", manualId: b.manual.wmId, revisionId: b.manual.revisionId, pdfURL: b.manual.pdfURL ?? null, revisionDate: b.manual.revisionDate ?? null, importedAt: new Date().toISOString(), by: s.email, composite: b.manual.composite ?? false, categoryId: b.manual.categoryId ?? null, parts: b.manual.parts ?? null };
   if (!revisionId) {
     const { data: r1, error } = await db.from("revisions").insert({ manual_id: manualId, issue, rev, step: "published", authority_route: null, summary: `Imported from Web Manuals · revision date ${b.manual.revisionDate ?? "?"}`, published_at: published, source }).select("id").single();
     if (error || !r1) return { ok: false, error: error?.message ?? "revision not created" };
@@ -48,7 +48,7 @@ export async function importWmBundle(input: ImportInput): Promise<ImportResult> 
   const sections = buildSections(b, (id) => `${base}/${id}.${input.imageExt[id] ?? "png"}`);
   await db.from("revision_sections").delete().eq("revision_id", revisionId);
   const rows = sections.map((x) => { const st = structureHtml(x.html, `s${x.ord}`, x.ref); return { revision_id: revisionId, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { html: st.html, text: x.text, pages: x.pages, page_revs: x.pageRevs, page_ids: x.pageIds, uid: createHash("md5").update(`${manualId}:${x.ref}`).digest("hex"), headings: st.headings, structured: true } }; });
-  for (let i = 0; i < rows.length; i += 20) { const { error } = await db.from("revision_sections").insert(rows.slice(i, i + 20)); if (error) return { ok: false, error: error.message }; }
+  for (let i = 0; i < rows.length; i += 60) { const { error } = await db.from("revision_sections").insert(rows.slice(i, i + 60)); if (error) return { ok: false, error: error.message }; }
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: input.entity, object_type: "revision", object_id: revisionId, action: "import_webmanuals", after: { code: input.code, rev, sections: rows.length, images: Object.keys(b.images ?? {}).length } });
   revalidatePath("/docs/lib");
   return { ok: true, manualId, revisionId, sections: rows.length, changed: sections.filter((x) => x.changed).length };

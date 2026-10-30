@@ -3,7 +3,7 @@ export type WmPage = { id: number; number: string; name: string; isChapter?: boo
 export type WmToc = { chapter: string; pageId: number; pageNumber: string; title: string; parentChapter: string | null };
 export type WmBundle = {
   format: string; kind?: "pages" | "pdf" | "file";
-  manual: { wmId: number; name: string; type?: string; revisionId: number; issue?: string; rev?: string; revisionDate?: string; publishedDate?: string; pdfURL?: string };
+  manual: { wmId: number; name: string; type?: string; revisionId: number; issue?: string; rev?: string; revisionDate?: string; publishedDate?: string; pdfURL?: string; composite?: boolean; categoryId?: number; parts?: { wmId: number; name: string; rev?: string; revisionDate?: string; pages?: number }[] };
   toc: WmToc[]; pages: WmPage[]; images?: Record<string, { name: string; type: string; size: number; b64?: string }>;
   file?: { name: string; type: string; size: number; b64?: string };
 };
@@ -48,7 +48,12 @@ export function htmlToText(h: string): string {
 export function buildSections(bundle: WmBundle, imgSrc: (id: string) => string): BuiltSection[] {
   const rev = bundle.manual.rev ?? "";
   const chapters: { ref: string; title: string }[] = [];
-  for (const t of bundle.toc) { if (/^[A-Za-z0-9]+\.\d+$/.test(t.chapter) && !chapters.some((c) => c.ref === t.chapter)) chapters.push({ ref: t.chapter, title: decode(t.title) }); }
+  // WM-02 · a composite manual (one WM document per chapter, A.8.1.0, B.3.2…): the top entries of each document's TOC are the chapters
+  const composite = !!bundle.manual.composite;
+  for (const t of bundle.toc) {
+    const top = composite ? t.parentChapter === null && /^[A-Za-z0-9.]+$/.test(t.chapter) : /^[A-Za-z0-9]+\.\d+$/.test(t.chapter);
+    if (top && !chapters.some((c) => c.ref === t.chapter)) chapters.push({ ref: t.chapter, title: decode(t.title) });
+  }
   // one stream with page markers
   const stream = bundle.pages.map((p) => `<!--pg:${p.number || "cover"}:${pageRevision(p.html) ?? ""}:${p.id ?? ""}-->` + pageContent(p.html)).join("\n");
   // split points: headings whose section number equals a chapter ref
@@ -83,7 +88,7 @@ export function buildSections(bundle: WmBundle, imgSrc: (id: string) => string):
     const body = p.html.replace(/<!--pg:([^:]*):([^:>]*)(?::(\d*))?-->/g, (_m, num: string, r: string, id?: string) => { lastPage = num; lastRev = r; lastId = id ?? ""; pages.push(num); pageRevs.push(r); pageIds.push(id ?? ""); return ""; });
     if (!pages.length && lastPage) { pages.push(lastPage); pageRevs.push(lastRev); pageIds.push(lastId); }
     const html = cleanHtml(body, imgSrc);
-    return { ord, ref: p.ref, title: p.title, html, text: htmlToText(html), pages, pageRevs, pageIds, changed: html.includes('class="revbar"') || (usePageRevs && !!rev && pageRevs.includes(rev)) };
+    return { ord, ref: p.ref, title: p.title, html, text: htmlToText(html), pages, pageRevs, pageIds, changed: html.includes('class="revbar"') || (!composite && usePageRevs && !!rev && pageRevs.includes(rev)) };
   });
 }
 export function imageExt(name: string, type: string): string {
