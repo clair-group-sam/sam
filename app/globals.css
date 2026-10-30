@@ -652,3 +652,7 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 /* imported (not created in S.A.M.) */
 .srcmark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:4px;border-radius:4px;color:var(--slate5);background:var(--blue05);border:1px solid var(--line);vertical-align:-2px;cursor:help}
 .srcmark:hover{color:var(--navy);border-color:var(--slate3)}
+/* SOC-02 · notification rules grid + dashboard entity dot */
+.rulerow{display:grid;grid-template-columns:1fr 90px 90px 90px 90px 90px 60px 80px;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line)}
+.rulerow .inp.n{width:70px}
+.entdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
