@@ -1,4 +1,6 @@
-// ECCAIRS 2 M2M API (EASA "E2 API Guide for Organisations" v1.1, 01/09/2025 — received from TM-CAD on 30/03/2026).
+// ECCAIRS 2 M2M API (EASA "E2 API Guide for Organisations" v1.2 — received from E2 Support on 30/10/2026; v1.1 from TM-CAD on 30/03/2026).
+// Base URLs: sandbox / UAT https://api.uat.aviationreporting.eu (portal e2.uat.aviationreporting.eu) · production https://api.aviationreporting.eu.
+// v1.2: login on the Spring Boot 3 authorization server (same endpoint) · new usermgmt/autofilled-attributes.
 // OAuth 2.1 client credentials: POST {BASE}/idp/oauth2/token (client_id = M2M user, client_secret = its password) → Bearer, 1 h.
 // The calling IP must be whitelisted by EASA: calls go through the fixed-IP proxy (lib/proxy-fetch, FIXIE_URL). Phases: sandbox → UAT (regulator checks) → production, one M2M user each.
 // Methods used by S.A.M.: occurrences/create (taxonomy-code JSON) · occurrences/edit · occurrences/change-status ·
@@ -7,12 +9,12 @@ import { proxyFetch } from "@/lib/proxy-fetch";
 type Cfg = { base: string; id: string; secret: string };
 const cache = new Map<string, { token: string; until: number }>();
 
-/** Per entity: ECCAIRS_BASE_URL (sandbox / UAT / production) + ECCAIRS_<ENT>_CLIENT_ID / ECCAIRS_<ENT>_CLIENT_SECRET. */
+/** Per entity: ECCAIRS_<ENT>_BASE_URL / _CLIENT_ID / _CLIENT_SECRET; else the shared ECCAIRS_BASE_URL / ECCAIRS_CLIENT_ID / ECCAIRS_CLIENT_SECRET (the EASA sandbox organisation, one M2M user for the group). */
 export function eccairsConfig(entity: string): Cfg | null {
-  const base = process.env[`ECCAIRS_${entity}_BASE_URL`] ?? process.env.ECCAIRS_BASE_URL; const id = process.env[`ECCAIRS_${entity}_CLIENT_ID`]; const secret = process.env[`ECCAIRS_${entity}_CLIENT_SECRET`];
+  const base = process.env[`ECCAIRS_${entity}_BASE_URL`] ?? process.env.ECCAIRS_BASE_URL; const id = process.env[`ECCAIRS_${entity}_CLIENT_ID`] ?? process.env.ECCAIRS_CLIENT_ID; const secret = process.env[`ECCAIRS_${entity}_CLIENT_SECRET`] ?? process.env.ECCAIRS_CLIENT_SECRET;
   return base && id && secret ? { base: base.replace(/\/$/, ""), id, secret } : null;
 }
-export const eccairsEnv = (entity: string) => { const b = process.env[`ECCAIRS_${entity}_BASE_URL`] ?? process.env.ECCAIRS_BASE_URL ?? ""; return /sandbox/i.test(b) ? "sandbox" : /uat|test/i.test(b) ? "UAT" : b ? "production" : null; };
+export const eccairsEnv = (entity: string) => { const b = process.env[`ECCAIRS_${entity}_BASE_URL`] ?? process.env.ECCAIRS_BASE_URL ?? ""; return /sandbox/i.test(b) || (/uat/i.test(b) && !process.env[`ECCAIRS_${entity}_CLIENT_ID`]) ? "sandbox" : /uat|test/i.test(b) ? "UAT" : b ? "production" : null; };
 
 async function token(entity: string, c: Cfg): Promise<string> {
   const k = `${entity}:${c.base}`; const hit = cache.get(k); if (hit && hit.until > Date.now() + 60e3) return hit.token;
@@ -42,3 +44,8 @@ export async function listReports(entity: string, status = ["DRAFT", "SENT", "PR
 }
 /** Selected attributes of one report, e.g. ["24.ATTRIBUTES.452"] (report identification), as taxonomy codes. */
 export const reportFields = (entity: string, e2Id: string, fields: string[]) => e2(entity, `/occurrences/fields/${encodeURIComponent(e2Id)}`, { method: "POST", body: fields });
+
+/** v1.2 · the autofilled attributes of the organisation (connection check without touching any report). */
+export const autofilledAttributes = (entity: string) => e2(entity, "/usermgmt/autofilled-attributes?taxonomyReferenceId=1");
+/** The released taxonomy of the authority (ECCAIRS Aviation 5.1.0.0 in the general case). */
+export const taxonomyVersion = (entity: string) => e2(entity, "/taxonomy-service/released-taxonomy");
