@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isSafetyDesk } from "@/lib/safety";
-import { FL_ENTITY, flConfigured, syncFlightLogger, upsertFlReports, type FlReport } from "@/lib/flightlogger-sms";
+import { FL_ENTITY, flConfigured, probeFlReport, syncFlightLogger, upsertFlReports, type FlReport } from "@/lib/flightlogger-sms";
 
 export const maxDuration = 60;
 /**
@@ -16,8 +16,10 @@ async function desk() {
   return s;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!(await desk())) return NextResponse.json({ error: "Safety desk only." }, { status: 403 });
+  const probe = req.nextUrl.searchParams.get("probe");
+  if (probe) { try { return NextResponse.json(await probeFlReport(probe)); } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 502 }); } }
   const db = supabaseAdmin();
   const { data } = await db.from("reports").select("synced_at").eq("source", "flightlogger").eq("entity", FL_ENTITY).not("synced_at", "is", null).order("synced_at", { ascending: false }).limit(1);
   const { count } = await db.from("reports").select("id", { count: "exact", head: true }).eq("source", "flightlogger").eq("entity", FL_ENTITY);

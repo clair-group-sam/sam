@@ -25,7 +25,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   rows.sort((x, y) => Number(y.clock.state === "running" || y.clock.state === "late") - Number(x.clock.state === "running" || x.clock.state === "late") || y.received_at.localeCompare(x.received_at));
   return (
     <>
-      <PageHeader eyebrow="Safety · Reports" title="Safety reports" sub="MOR clocks first · the 72 h run from receipt in S.A.M." right={<Link href="/safe/new" className="btn">+ New report</Link>} />
+      <PageHeader eyebrow="Safety · Reports" title="Safety reports" sub="MOR clocks first · the 72 h run from receipt (in FlightLogger for Astonfly, in S.A.M. otherwise)" right={<Link href="/safe/new" className="btn">+ New report</Link>} />
       {scope.filter((e) => REPORTS_ELSEWHERE[e]).map((e) => <FlSync key={e} url={REPORTS_ELSEWHERE[e].url} />)}
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open" value={open.length} />

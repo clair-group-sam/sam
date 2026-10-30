@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { centrikDate } from "@/lib/centrik";
 
-export type FlReport = { flId: string; no: string; kind?: string; type?: string; date?: string; aircraft?: string; headline: string; risk?: string; status?: string | null; narrative?: string; reporter?: string };
+export type FlReport = { flId: string; no: string; kind?: string; type?: string; date?: string; receivedAt?: string; aircraft?: string; headline: string; risk?: string; status?: string | null; narrative?: string; reporter?: string };
 export const FL_ENTITY = "ASFFR";
 const BASE = () => (process.env.FLIGHTLOGGER_BASE ?? "https://astonfly.flightlogger.net/a/astonfly").replace(/\/$/, "");
 export const flConfigured = () => !!process.env.FLIGHTLOGGER_USER && !!process.env.FLIGHTLOGGER_PASSWORD;
@@ -53,6 +53,29 @@ export function parseReportList(html: string): { rows: FlReport[]; next: string 
   return { rows, next: nx ?? null };
 }
 
+/** When the report was received in FlightLogger (its creation / submission time on the report page) — the 72 h run from there (376/2014 art. 4(8)). */
+export function receivedAtOf(html: string): string | null {
+  const t = text(html);
+  const m = /(created|submitted|reported|received|filed|sent)(?: at| on| date)?[^0-9]{0,40}(\d{2})[./-](\d{2})[./-](\d{4})[ ,T]*(\d{2}):(\d{2})/i.exec(t)
+    ?? /(created|submitted|reported|received|filed|sent)(?: at| on| date)?[^0-9]{0,40}(\d{4})-(\d{2})-(\d{2})[ ,T]*(\d{2}):(\d{2})/i.exec(t);
+  if (!m) return null;
+  const [d, mo, y] = m[2].length === 4 ? [m[4], m[3], m[2]] : [m[2], m[3], m[4]];
+  return `${y}-${mo}-${d}T${m[5]}:${m[6]}:00Z`;
+}
+
+/** Desk diagnostic: the labels next to the dates on one report page (no content) — to check which one is the receipt time. */
+export async function probeFlReport(no: string): Promise<{ no: string; found: string | null; dates: string[] }> {
+  const jar = await signIn(); const base = BASE(); const origin = new URL(base).origin;
+  const list = await fetch(`${base}/sms/reports?show_closed=1&per_page=100`, { headers: { cookie: jar.header, "user-agent": UA }, redirect: "manual" });
+  const row = parseReportList(await list.text()).rows.find((r) => r.no === no);
+  if (!row?.kind) return { no, found: null, dates: ["report not on the first list page"] };
+  const r = await fetch(`${origin}${new URL(base).pathname}/sms/${row.kind}/${row.flId}/edit`, { headers: { cookie: jar.header, "user-agent": UA }, redirect: "manual" });
+  const h = r.status === 200 ? await r.text() : "";
+  const t = text(h);
+  const dates = [...t.matchAll(/(.{0,40}?)(\d{2}[./-]\d{2}[./-]\d{4}(?:[ ,T]*\d{2}:\d{2})?|\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)/g)].map((m) => `${m[1].replace(/[^A-Za-z ()/:-]/g, "").trim().slice(-40)} → ${m[2]}`).slice(0, 25);
+  return { no, found: receivedAtOf(h), dates: r.status === 200 ? dates : [`page status ${r.status}`] };
+}
+
 /** Reads every report (open and closed). The narrative is read for the reports S.A.M. still lacks it for (new ones first), when the account may open them. */
 export async function fetchFlReports(opts: { needNarrative?: (no: string) => Promise<boolean> | boolean; max?: number } = {}): Promise<FlReport[]> {
   if (!flConfigured()) throw new Error("FlightLogger account not configured (FLIGHTLOGGER_USER / FLIGHTLOGGER_PASSWORD in Vercel).");
@@ -71,6 +94,7 @@ export async function fetchFlReports(opts: { needNarrative?: (no: string) => Pro
     const r = await get(`${base}/sms/${x.kind}/${x.flId}/edit`); if (r.status !== 200) continue;
     const h = await r.text(); const ta = [...h.matchAll(/<textarea[^>]*>([\s\S]*?)<\/textarea>/gi)].map((m) => text(m[1])).filter((t) => t.length > 10);
     if (ta.length) x.narrative = ta.join("\n\n");
+    x.receivedAt = receivedAtOf(h) ?? undefined;
   }
   return list;
 }
@@ -79,8 +103,8 @@ export async function fetchFlReports(opts: { needNarrative?: (no: string) => Pro
 export async function upsertFlReports(db: SupabaseClient, reports: FlReport[], opts: { dry?: boolean; by: string; narrativesKnown?: boolean }) {
   const now = new Date().toISOString();
   const ids = reports.map((r) => `FL-${String(r.no).trim()}`);
-  const have = new Map<string, { source_status: string | null; narrative: string; headline: string }>();
-  for (let k = 0; k < ids.length; k += 200) { const { data } = await db.from("reports").select("id,source_status,narrative,headline").in("id", ids.slice(k, k + 200)); for (const x of (data ?? []) as { id: string; source_status: string | null; narrative: string; headline: string }[]) have.set(x.id, x); }
+  const have = new Map<string, { source_status: string | null; narrative: string; headline: string; history: boolean }>();
+  for (let k = 0; k < ids.length; k += 200) { const { data } = await db.from("reports").select("id,source_status,narrative,headline,history").in("id", ids.slice(k, k + 200)); for (const x of (data ?? []) as { id: string; source_status: string | null; narrative: string; headline: string; history: boolean }[]) have.set(x.id, x); }
   const created: string[] = []; const changed: string[] = []; const errors: string[] = [];
   for (const r of reports) {
     const id = `FL-${String(r.no).trim()}`;
@@ -89,18 +113,19 @@ export async function upsertFlReports(db: SupabaseClient, reports: FlReport[], o
       const h = have.get(id);
       if (h) {
         if ((r.status ?? null) !== h.source_status) changed.push(id);
-        if (!opts.dry) await db.from("reports").update({ source_status: r.status ?? null, synced_at: now, ...(r.narrative && h.narrative === h.headline ? { narrative: r.narrative } : {}) }).eq("id", id);
+        if (!opts.dry) await db.from("reports").update({ source_status: r.status ?? null, synced_at: now, ...(r.narrative && h.narrative === h.headline ? { narrative: r.narrative } : {}), ...(r.receivedAt && !h.history ? { received_at: r.receivedAt } : {}) }).eq("id", id);
         continue;
       }
       created.push(id); if (opts.dry) continue;
-      const d = centrikDate(r.date) ?? now; const received = d.length > 10 ? d : `${d}T12:00:00Z`;
-      const { error } = await db.from("reports").insert({ id, entity: FL_ENTITY, received_at: received, event_date: received.slice(0, 10), aircraft: r.aircraft?.trim() || null,
+      const d = centrikDate(r.date) ?? now; const listed = d.length > 10 ? d : `${d}T12:00:00Z`;
+      const received = r.receivedAt ?? listed; // receipt in FlightLogger (report page), else the list date
+      const { error } = await db.from("reports").insert({ id, entity: FL_ENTITY, received_at: received, event_date: listed.slice(0, 10), aircraft: r.aircraft?.trim() || null,
         headline: r.headline.trim().slice(0, 300), narrative: r.narrative?.trim() || r.headline.trim(), status: "received", anonymous: false, reporter_name: r.reporter?.trim() || null,
         source: "flightlogger", history: false, source_ref: r.flId, external_no: String(r.no).trim(), report_type: r.type ?? null, source_status: r.status ?? null, synced_at: now });
       if (error) throw new Error(error.message);
-      await db.from("report_events").insert({ report_id: id, kind: "received", at: received, note: `Reported in FlightLogger — ${r.type ?? "report"} ${r.no}; retrieved in S.A.M. on ${now.slice(0, 10)} (${opts.by})` });
+      await db.from("report_events").insert({ report_id: id, kind: "received", at: received, note: `Received in FlightLogger ${received.slice(0, 16).replace("T", " ")} UTC${r.receivedAt ? "" : " (list date)"} — ${r.type ?? "report"} ${r.no}; retrieved in S.A.M. on ${now.slice(0, 10)} (${opts.by})` });
       const due = new Date(Date.parse(received) + 72 * 3600e3).toISOString().slice(0, 10);
-      await db.from("tasks").insert({ entity: FL_ENTITY, kind: "safety_report", title: `Safety report ${id} — ${r.headline.trim().slice(0, 120)}`, detail: "New report from FlightLogger: acknowledge, classify and decide on the MOR within 72 h of receipt.", due, owner_role: "SM", status: "open", link: `/safe/reports/${id}` });
+      await db.from("tasks").insert({ entity: FL_ENTITY, kind: "safety_report", title: `Safety report ${id} — ${r.headline.trim().slice(0, 120)}`, detail: "New report from FlightLogger: acknowledge, classify and decide on the MOR within 72 h of its receipt in FlightLogger.", due, owner_role: "SM", status: "open", link: `/safe/reports/${id}` });
     } catch (e) { errors.push(`${r.no}: ${e instanceof Error ? e.message : String(e)}`); }
   }
   return { read: reports.length, created, status_changed: changed, errors };
