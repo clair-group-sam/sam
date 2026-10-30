@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { loadFinding, nextFindingNumber, preRead, syncFindingTasks, type Finding, type Point } from "@/lib/findings";
+import { loadFinding, nextFindingNumber, preRead, syncFindingTasks, type Finding, type Point, type Round, type Stage } from "@/lib/findings";
 import { createAuthorityFile } from "@/lib/authority-create";
 
 const db = () => supabaseAdmin();
@@ -43,29 +43,48 @@ export async function updateFinding(fd: FormData) {
   await log(f, "finding_updated", s.person?.id ?? null, patch); touch(f.id);
 }
 
-/** The NP answers (or completes after a send-back): a new round, pre-read by S.A.M. for Compliance. */
+/** Step 1 — the NP sends the root cause analysis (or completes it after a send-back): a new round, pre-read by S.A.M. for Compliance. */
 export async function answerFinding(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
   if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
-  if (!["open", "sent_back"].includes(x.f.status)) throw new Error("This finding is not waiting for an answer.");
+  if (!["open", "rca_back"].includes(x.f.status)) throw new Error("This finding is not waiting for the root cause.");
   const n = x.f.current_round + 1;
-  const row = { finding_id: x.f.id, n, root_cause: str(fd, "root_cause"), factors: str(fd, "factors"), immediate: str(fd, "immediate"), answered_by: s.person?.id ?? null, via: "app" };
+  const row = { finding_id: x.f.id, stage: "rca", n, root_cause: str(fd, "root_cause"), factors: str(fd, "factors"), immediate: str(fd, "immediate"), answered_by: s.person?.id ?? null, via: "app" };
   if (!row.root_cause) throw new Error("Write the root cause.");
   const { data, error } = await db().from("finding_rounds").insert(row).select("*").single();
   if (error || !data) throw new Error(error?.message ?? "Answer not saved.");
-  const r = data as import("@/lib/findings").Round;
-  const assistant = await preRead(x.f, r, x.changes, x.actions);
+  const r = data as Round;
+  const assistant = await preRead(x.f, r, x.changes, x.actions, "rca");
   await db().from("finding_rounds").update({ assistant }).eq("id", r.id);
-  await db().from("findings").update({ status: "answered", current_round: n, updated_at: new Date().toISOString() }).eq("id", x.f.id);
+  await db().from("findings").update({ status: "rca_review", current_round: n, updated_at: new Date().toISOString() }).eq("id", x.f.id);
   const { f } = await load(x.f.id); await syncFindingTasks(db(), f);
-  await log(f, "finding_answered", s.person?.id ?? null, { round: n, verdict: assistant.verdict, points: assistant.points.length }); touch(f.id);
+  await log(f, "finding_rca_sent", s.person?.id ?? null, { round: n, verdict: assistant.verdict, points: assistant.points.length }); touch(f.id);
 }
 
-/** Compliance reads the answer: accept (plan starts) or send back with the points to address (ticked among S.A.M.'s suggestions + free note). */
+/** Step 2 — the NP sends the corrective action plan (manual changes + actions already attached), pre-read against the accepted root cause. */
+export async function sendPlan(fd: FormData) {
+  const x = await load(String(fd.get("id"))); const s = await me();
+  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
+  if (!["plan", "plan_back"].includes(x.f.status)) throw new Error("This finding is not waiting for the plan.");
+  if (!x.changes.length && !x.actions.length) throw new Error("Add at least one expected manual change or one action before sending the plan.");
+  const rca = x.rounds.filter((r) => r.stage === "rca").find((r) => r.n === x.f.current_round);
+  const n = x.f.plan_round + 1;
+  const row = { finding_id: x.f.id, stage: "plan", n, root_cause: rca?.root_cause ?? null, factors: rca?.factors ?? null, immediate: rca?.immediate ?? null, comment: str(fd, "comment"), answered_by: s.person?.id ?? null, via: "app" };
+  const { data, error } = await db().from("finding_rounds").insert(row).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Plan not sent.");
+  const r = data as Round;
+  const assistant = await preRead(x.f, r, x.changes, x.actions, "plan");
+  await db().from("finding_rounds").update({ assistant }).eq("id", r.id);
+  await db().from("findings").update({ status: "plan_review", plan_round: n, updated_at: new Date().toISOString() }).eq("id", x.f.id);
+  const { f } = await load(x.f.id); await syncFindingTasks(db(), f);
+  await log(f, "finding_plan_sent", s.person?.id ?? null, { round: n, verdict: assistant.verdict, points: assistant.points.length, changes: x.changes.length, actions: x.actions.length }); touch(f.id);
+}
+
+/** Compliance reads step 1 or step 2: accept (next step opens) or send back with the points to address (ticked among S.A.M.'s suggestions + free note). */
 export async function reviewAnswer(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
-  if (x.f.status !== "answered") throw new Error("Nothing to review.");
-  const r = x.rounds.find((q) => q.n === x.f.current_round); if (!r) throw new Error("Round not found");
+  const stage: Stage = x.f.status === "rca_review" ? "rca" : x.f.status === "plan_review" ? "plan" : (() => { throw new Error("Nothing to review."); })();
+  const r = x.rounds.find((q) => q.stage === stage && q.n === (stage === "rca" ? x.f.current_round : x.f.plan_round)); if (!r) throw new Error("Round not found");
   const decision = str(fd, "decision") === "accept" ? "accepted" : "sent_back";
   const picked = fd.getAll("point").map(String);
   const points: Point[] = (r.assistant?.points ?? []).filter((p) => picked.includes(p.code));
@@ -73,15 +92,17 @@ export async function reviewAnswer(fd: FormData) {
   if (note) points.push({ code: "NOTE", label: note.slice(0, 80), detail: note });
   if (decision === "sent_back" && !points.length) throw new Error("Say what is to be completed: tick at least one point or write a note.");
   await db().from("finding_rounds").update({ decision, points: decision === "sent_back" ? points : null, decided_by: s.person?.id ?? null, decided_at: new Date().toISOString(), note }).eq("id", r.id);
-  await db().from("findings").update({ status: decision === "accepted" ? "accepted" : "sent_back", updated_at: new Date().toISOString() }).eq("id", x.f.id);
+  const next = decision === "accepted" ? (stage === "rca" ? "plan" : "accepted") : (stage === "rca" ? "rca_back" : "plan_back");
+  await db().from("findings").update({ status: next, updated_at: new Date().toISOString() }).eq("id", x.f.id);
   const { f } = await load(x.f.id); await syncFindingTasks(db(), f, { points });
-  await log(f, decision === "accepted" ? "finding_answer_accepted" : "finding_answer_sent_back", s.person?.id ?? null, { round: r.n, points }); touch(f.id);
+  await log(f, `finding_${stage}_${decision}`, s.person?.id ?? null, { round: r.n, points }); touch(f.id);
 }
 
 /* ---------- the plan ---------- */
 export async function addChange(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
   if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
+  if (["open", "rca_review", "rca_back"].includes(x.f.status) && !isCompliance(s)) throw new Error("The plan opens at step 2, once the root cause is accepted.");
   const expected = str(fd, "expected"); if (!expected) throw new Error("Say what must change in the manual.");
   const manual = str(fd, "manual_id");
   let code = str(fd, "manual_code");

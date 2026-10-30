@@ -662,3 +662,7 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .pts{margin:0;padding-left:18px;display:grid;gap:4px}.pts.chk{list-style:none;padding-left:0}.pts.chk label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
 .inlineedit summary{cursor:pointer}
 .card>.bar{width:auto;margin:0 16px}
+.fsteps{display:flex;gap:6px}.fstep{flex:1;display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--r);background:#fff;border:1px solid var(--line);font-size:12.5px;color:var(--slate6)}
+.fstep i{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:11px;background:var(--blue1);color:var(--navy)}
+.fstep.on{border-color:var(--cyan);color:var(--navy);font-weight:600}.fstep.on i{background:var(--cyan);color:#fff}.fstep.done i{background:var(--green-s);color:#1d7a3a}
+.card.stepon{border-left:4px solid var(--cyan)}.card.locked{opacity:.65}
