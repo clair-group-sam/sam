@@ -5,6 +5,7 @@ import { alertRoles } from "@/lib/cert";
 import { morningDigest, notifyTasks, sweepTeams, type TaskRow } from "@/lib/teams";
 import { runEscalations } from "@/lib/escalation";
 import { sweepFindings } from "@/lib/findings";
+import { sweepWatch } from "@/lib/watch";
 // Daily (Hobby plan): CAA applications past their target date get a follow-up task for Compliance (PRJ-01 §6.2);
 // step 4 will add 90/30/7-day certificate alerts, MOR 72 h clock (SAF-01), reading reminders.
 export async function GET(req: NextRequest) {
@@ -77,6 +78,8 @@ export async function GET(req: NextRequest) {
   jobs.action_effectiveness = te;
   // FND-01 · findings whose plan is complete → closure proposed to the NP
   jobs.finding_closures = await sweepFindings(db);
+  // REG-01 · watch streams past their cadence → task for the owner
+  jobs.watch_checks = await sweepWatch(db);
   // SOC-02 · one reminder / escalation ladder for every open item past its due date (Settings › Notification rules)
   const esc = await runEscalations(db);
   for (const [k, v] of Object.entries(esc)) jobs[`escalation_${k}`] = v;

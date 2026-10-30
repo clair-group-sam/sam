@@ -7,6 +7,7 @@ import Workflow, { type StepRow } from "@/components/Workflow";
 import { postsOf } from "@/lib/np";
 import { basePost } from "@/lib/session";
 import { decideFindingChange } from "./actions";
+import { addressedInDraft } from "@/app/(app)/comp/watch/actions";
 import { CHANGE_LABEL } from "@/lib/findings";
 import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
@@ -75,6 +76,17 @@ export default async function Editor({ params, searchParams }: { params: Promise
   // FND-02 · expected changes from open findings on this manual: shown when the draft opens, the author chooses
   const { data: fcData } = tab === "write" && !internal ? await admin.from("finding_changes").select("id,section_ref,expected,status,revision_id,findings!inner(id,number,title,status)").eq("manual_id", manual.id).in("status", ["pending", "deferred", "included"]).order("created_at") : { data: [] };
   const fchanges = ((fcData ?? []) as unknown as { id: string; section_ref: string | null; expected: string; status: string; revision_id: string | null; findings: { id: string; number: string; title: string; status: string } }[]).filter((c) => !["closed", "cancelled"].includes(c.findings.status) && (c.status !== "included" || c.revision_id === rev.id));
+  // REG-01 · open regulatory watch entries that name this manual: shown to the author, information only
+  const { data: weData } = tab === "write" && !internal ? await admin.from("watch_entries").select("id,number,title,reference,url,applicability,task,due,revision_ids,assistant").eq("entity", manual.entity).in("status", ["open", "in_progress"]).contains("manual_ids", [manual.id]).order("due", { ascending: true, nullsFirst: false }) : { data: [] };
+  const wentries = (weData ?? []) as { id: string; number: string; title: string; reference: string | null; url: string | null; applicability: string; task: string | null; due: string | null; revision_ids: string[]; assistant: { chapters?: { manual: string; ref: string; why: string }[] } | null }[];
+  const watchCard = wentries.length ? (
+    <section className="card mb-4 samcard">
+      <div className="ch"><span className="eyebrow">Regulatory changes to consider in this revision</span><span className="mini">{wentries.length} open watch entr{wentries.length === 1 ? "y" : "ies"} name this manual · information, your call</span></div>
+      <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{wentries.map((w) => (
+        <tr key={w.id}><td><Link href={`/comp/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${w.due}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
+          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{w.revision_ids.includes(rev.id) ? <span className="pill green">Addressed in this draft</span> : editable && (owner || cmm) ? <form action={addressedInDraft}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="rev" value={rev.id} /><button className="btn" type="submit">Addressed in this draft</button></form> : null}</td></tr>))}</tbody></table></div>
+    </section>
+  ) : null;
   const findCard = fchanges.length ? (
     <section className="card mb-4 sentback">
       <div className="ch"><span className="eyebrow">Corrective changes waiting for this manual</span><span className="mini">{fchanges.filter((c) => c.status === "included").length} included in this draft · {fchanges.length - fchanges.filter((c) => c.status === "included").length} waiting</span></div>
@@ -154,6 +166,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
       )}
 
       {tab === "write" && findCard}
+      {tab === "write" && watchCard}
       {tab === "write" && linkCard}
       {tab === "write" && (
         <div className="flex gap-4 items-start">

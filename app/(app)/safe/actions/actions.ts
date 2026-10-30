@@ -31,8 +31,8 @@ export async function createAction(fd: FormData) {
   if (!str(fd, "owner_role") && !str(fd, "owner_person")) throw new Error("Name the owner (a post or a person).");
   const number = await nextActionNumber(db(), entity);
   const mitigation = str(fd, "mitigation_id");
-  const finding = str(fd, "finding_id");
-  const row = { entity, number, module: finding ? "compliance" : "safety", finding_id: finding, kind: str(fd, "kind") ?? "corrective", title: title.slice(0, 300), description: str(fd, "description"), owner_role: str(fd, "owner_role")?.toUpperCase() ?? null, owner_person: str(fd, "owner_person"),
+  const finding = str(fd, "finding_id"); const watch = str(fd, "watch_entry_id");
+  const row = { entity, number, module: finding || watch ? "compliance" : "safety", finding_id: finding, watch_entry_id: watch, kind: str(fd, "kind") ?? "corrective", title: title.slice(0, 300), description: str(fd, "description"), owner_role: str(fd, "owner_role")?.toUpperCase() ?? null, owner_person: str(fd, "owner_person"),
     due: str(fd, "due"), source_kind: str(fd, "source_kind") ?? "other", report_id: str(fd, "report_id"), hazard_id: str(fd, "hazard_id"), mitigation_id: mitigation, assessment_id: str(fd, "assessment_id"), spi_id: str(fd, "spi_id"), committee_id: str(fd, "committee_id"), investigation_id: str(fd, "investigation_id"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("safety_actions").insert(row).select("*").single();
   if (error || !data) throw new Error(error?.message ?? "Action not created.");
@@ -46,6 +46,7 @@ export async function createAction(fd: FormData) {
   await log(a.id, "created", s.person?.id ?? null, `${a.number} raised by ${s.name}`);
   touch(a); if (row.spi_id) revalidatePath(`/safe/over/spi/${row.spi_id}`); if (row.committee_id) revalidatePath(`/safe/comm/${row.committee_id}`); if (row.investigation_id) revalidatePath(`/safe/inv/${row.investigation_id}`);
   if (finding) { revalidatePath(`/comp/find/${finding}`); return; }
+  if (watch) { revalidatePath(`/comp/watch/${watch}`); return; }
   if (str(fd, "stay")) return;
   redirect(`/safe/actions/${a.id}`);
 }

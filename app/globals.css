@@ -667,3 +667,7 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .fstep.on{border-color:var(--cyan);color:var(--navy);font-weight:600}.fstep.on i{background:var(--cyan);color:#fff}.fstep.done i{background:var(--green-s);color:#1d7a3a}
 .card.stepon{border-left:4px solid var(--cyan)}.card.locked{opacity:.65}
 .samnote{border:1px dashed var(--blue2);border-radius:var(--r);padding:10px 12px;background:var(--blue05)}.samnote .eyebrow{color:var(--cyan6)}
+/* REG-01 · regulatory watch */
+.wtopic{display:block;color:inherit}.wtopic:hover{box-shadow:0 2px 10px rgba(13,42,63,.1)}.wtopic.late{border-left:4px solid var(--amber)}
+.tbl tr.fresh td{background:var(--green-s)}
+.samcard{border-left:4px solid var(--cyan6)}
