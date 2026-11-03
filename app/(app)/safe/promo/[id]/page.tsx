@@ -42,7 +42,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
         <div>
           {edit ? <section className="card mb-5"><div className="ch"><span className="eyebrow">Draft</span>
               <form action={draftPromotion} className="ml-auto"><Hid /><button className="btn">{p.draft_model ? "Draft again" : "Draft the text"}</button></form></div>
-            <form action={savePromotion} className="cb grid grid-cols-3 gap-2"><Hid /><input type="hidden" name="ack_flag" value="1" /><input type="hidden" name="anon_flag" value="1" />
+            <form key={`${p.draft_model ?? ""}:${(p.body ?? "").length}:${(p.summary ?? "").length}`} action={savePromotion} className="cb grid grid-cols-3 gap-2"><Hid /><input type="hidden" name="ack_flag" value="1" /><input type="hidden" name="anon_flag" value="1" />
               <label className="col-span-3"><span className="mini">Title</span><input name="title" className="inp" defaultValue={p.title} /></label>
               <label className="col-span-3"><span className="mini">Summary (one line, shown in the Inbox)</span><input name="summary" className="inp" defaultValue={p.summary ?? ""} /></label>
               <label className="col-span-3"><span className="mini">{p.kind === "survey" ? "Introduction" : "Text"}{p.report_id ? ` · from report ${p.report_id}` : ""} — de-identified: no names, registrations, flight numbers</span><textarea name="body" className="inp" rows={12} defaultValue={p.body ?? ""} /></label>

@@ -83,7 +83,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
 
           <section className="card mb-5"><div className="ch"><span className="eyebrow">4 · Conclusions &amp; report</span>
             {edit && <form action={draftInvReport} className="ml-auto"><Hid /><button className="btn">{i.report_text ? "Draft the report again" : "Draft the report"}</button></form>}</div>
-            <div className="cb">{edit ? <form action={saveConclusions} className="grid gap-2"><Hid />
+            <div className="cb">{edit ? <form key={`${i.report_model ?? ""}:${(i.report_text ?? "").length}`} action={saveConclusions} className="grid gap-2"><Hid />
               <label><span className="mini">Conclusions</span><textarea name="conclusions" className="inp" rows={3} defaultValue={i.conclusions ?? ""} /></label>
               <label><span className="mini">Investigation report{i.report_model ? " — drafted from the sections above, to check and complete" : ""}</span><textarea name="report_text" className="inp mono" rows={i.report_text ? 16 : 4} defaultValue={i.report_text ?? ""} /></label>
               <div className="flex justify-end"><button className="btn">Save</button></div></form>
@@ -110,7 +110,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
             <div className="cb"><p className="mini mb-2">A de-identified safety bulletin drafted from this investigation, sent to the people concerned.</p><Link className="btn" href={`/safe/promo?inv=${i.id}${i.report_id ? `&report=${i.report_id}` : ""}`}>+ Safety bulletin</Link></div></section>}
 
           <section className="card"><div className="ch"><span className="eyebrow">History</span></div>
-            <ul className="cb mini" style={{ display: "grid", gap: 4 }}>{((ev ?? []) as { at: string; kind: string; note: string | null }[]).map((e, k) => <li key={k}><span className="mono">{e.at.slice(0, 16).replace("T", " ")}</span> · {e.note ?? e.kind}</li>)}</ul></section>
+            <ul className="cb mini" style={{ display: "grid", gap: 4 }}>{((ev ?? []) as { at: string; kind: string; note: string | null }[]).map((e, k) => <li key={k}><span className="mono">{e.at.slice(0, 16).replace("T", " ")} UTC</span> · {e.note ?? e.kind}</li>)}</ul></section>
         </div>
       </div>
     </>
