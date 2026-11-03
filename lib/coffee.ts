@@ -7,7 +7,7 @@ import { basePost, type Session } from "@/lib/session";
 import { myInbox, groupProjects, kindLabel, KIND, type InboxItem } from "@/lib/inbox";
 import { callClaude } from "@/lib/ai";
 import { userToken } from "@/lib/msgraph-user";
-import { agenda, mail, teams, type Agenda, type MailGroups, type TeamsRecap, type SamTarget } from "@/lib/coffee-ms";
+import { agenda, mail, teams, waitingOn, type Agenda, type MailGroups, type TeamsRecap, type SamTarget, type WaitItem } from "@/lib/coffee-ms";
 import { rank, type Ranked } from "@/lib/coffee-rank";
 
 export const TZ = "Europe/Paris";
@@ -19,6 +19,8 @@ export type Recap = {
   counts?: { overdue: number; today: number; week: number };
   readings: Line[]; validities: Line[]; mor: Line[]; moved: Line[];
   agenda?: Agenda; mail?: MailGroups; teams?: TeamsRecap; errors?: Record<string, string>;
+  /** Lot 2 · questions the person sent that are still unanswered (mail 3+ working days, Teams 2+) */
+  waiting?: WaitItem[];
   synthesis: string;
   /** Lot 1 (03/11) · one list for the person, ranked by importance (4 tiers), first three things on top */
   ranked?: Ranked;
@@ -215,6 +217,7 @@ export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.i
         want.has("calendar") && targetsOf(s).then((tg) => { const n = parisParts(); return agenda(t, g.day, tg, n.hour * 60 + n.minute); }).then((v) => { r.agenda = v; }).catch((e) => { r.errors!.calendar = String(e?.message ?? e); }),
         want.has("mail") && mail(t, s, g.since).then((v) => { r.mail = v; }).catch((e) => { r.errors!.mail = String(e?.message ?? e); }),
         want.has("teams") && teams(t, g.since, s).then((v) => { r.teams = v; }).catch((e) => { r.errors!.teams = String(e?.message ?? e); }),
+        (want.has("mail") || want.has("teams")) && waitingOn(t).then((v) => { r.waiting = v.filter((x) => want.has(x.kind === "mail" ? "mail" : "teams")); }).catch(() => { /* optional */ }),
       ]);
     }
   }

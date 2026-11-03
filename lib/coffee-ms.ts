@@ -182,3 +182,46 @@ export async function teams(token: string, since: string, s?: Session): Promise<
   } catch { /* search unavailable: chats are still shown */ }
   return { chats: chats.slice(0, 20), mentions: mentions.slice(0, 15) };
 }
+
+/* ---------- Lot 2 (03/11) · what the person is waiting for ---------- */
+export type WaitItem = { kind: "mail" | "teams"; who: string; subject: string; since: string; preview: string; link?: string };
+const workingDaysSince = (iso: string) => { let n = 0; const d = new Date(iso); const now = new Date(); while (d < now) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (d <= now && w !== 0 && w !== 6) n++; } return n; };
+/**
+ * Questions / requests the person SENT that are still unanswered: mails sent 3 to 15 working days ago with a question, whose conversation got no
+ * later message from someone else; Teams chats whose last message is the person's, with a question, 2 working days or more ago. Read-only.
+ */
+export async function waitingOn(token: string): Promise<WaitItem[]> {
+  const out: WaitItem[] = [];
+  const from = new Date(Date.now() - 21 * 864e5).toISOString();
+  type SM = { subject?: string; sentDateTime: string; conversationId?: string; bodyPreview?: string; webLink?: string; toRecipients?: { emailAddress?: { name?: string; address?: string } }[]; singleValueExtendedProperties?: { value?: string }[] };
+  const [sent, inbox] = await Promise.all([
+    graphGet<{ value: SM[] }>(token, `/me/mailFolders/sentitems/messages?$filter=sentDateTime ge ${from}&$select=subject,sentDateTime,conversationId,bodyPreview,webLink,toRecipients&$expand=singleValueExtendedProperties($filter=id eq 'Integer 0x0036')&$orderby=sentDateTime desc&$top=80`),
+    graphGet<{ value: { conversationId?: string; receivedDateTime: string }[] }>(token, `/me/messages?$filter=receivedDateTime ge ${from}&$select=conversationId,receivedDateTime&$top=500`),
+  ]);
+  const lastIn = new Map<string, string>();
+  for (const m of inbox.value ?? []) if (m.conversationId) { const cur = lastIn.get(m.conversationId); if (!cur || m.receivedDateTime > cur) lastIn.set(m.conversationId, m.receivedDateTime); }
+  const seenConv = new Set<string>();
+  for (const m of sent.value ?? []) {                                   // newest first: the last thing sent in each conversation
+    if (!m.conversationId || seenConv.has(m.conversationId)) continue; seenConv.add(m.conversationId);
+    if (["1", "2"].includes(String(m.singleValueExtendedProperties?.[0]?.value ?? "0"))) continue;   // Private / Personal
+    const wd = workingDaysSince(m.sentDateTime); if (wd < 3 || wd > 15) continue;
+    if ((lastIn.get(m.conversationId) ?? "") > m.sentDateTime) continue;                             // answered since
+    const pv = (m.bodyPreview ?? "").replace(/\s+/g, " ");
+    if (!/\?/.test(pv) && !/(could you|can you|please (send|confirm|let|advise)|merci de|pouvez-vous|peux-tu|pourrais-tu|est-ce que|thank you in advance)/i.test(pv)) continue;
+    const to = (m.toRecipients ?? []).map((r) => r.emailAddress?.name || r.emailAddress?.address || "").filter(Boolean);
+    out.push({ kind: "mail", who: to.length > 2 ? `${to.slice(0, 2).join(", ")} +${to.length - 2}` : to.join(", "), subject: (m.subject ?? "").replace(/^\s*((re|tr|fw|fwd)\s*:\s*)+/gi, ""), since: m.sentDateTime, preview: pv.slice(0, 200), link: m.webLink });
+  }
+  try {
+    const me = await graphGet<{ id: string }>(token, "/me?$select=id");
+    type C = { topic?: string | null; webUrl?: string; members?: { displayName?: string; userId?: string }[]; lastMessagePreview?: { createdDateTime: string; body?: { content?: string }; from?: { user?: { id?: string } } } };
+    const { value } = await graphGet<{ value: C[] }>(token, "/me/chats?$expand=lastMessagePreview,members&$orderby=lastMessagePreview/createdDateTime desc&$top=50");
+    for (const c of value ?? []) {
+      const p = c.lastMessagePreview; if (!p || p.from?.user?.id !== me.id) continue;
+      const wd = workingDaysSince(p.createdDateTime); if (wd < 2 || wd > 15) continue;
+      const txt = strip(p.body?.content ?? ""); if (!/\?/.test(txt)) continue;
+      const others = (c.members ?? []).filter((x) => x.userId !== me.id).map((x) => x.displayName ?? "").filter(Boolean);
+      out.push({ kind: "teams", who: c.topic || (others.length > 2 ? `${others.slice(0, 2).join(", ")} +${others.length - 2}` : others.join(", ")), subject: c.topic || "Chat", since: p.createdDateTime, preview: txt.slice(0, 200), link: c.webUrl });
+    }
+  } catch { /* chats unavailable: mails still shown */ }
+  return out.sort((a, b) => a.since.localeCompare(b.since)).slice(0, 15);
+}

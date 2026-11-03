@@ -13,7 +13,7 @@ export const TIERS: Record<Tier, { title: string; hint: string }> = {
   4: { title: "Can wait", hint: "notifications, copies, later" },
 };
 export type Src = { kind: "sam" | "mail" | "teams" | "agenda"; label: string; link?: string | null };
-export type RankItem = { id: string; tier: Tier; title: string; why: string; action: string; entity?: string; sources: Src[] };
+export type RankItem = { id: string; tier: Tier; title: string; why: string; action: string; entity?: string; sources: Src[]; badge?: "for-you" | "you-wait"; topic?: string };
 export type Ranked = { top: string[]; items: RankItem[]; by: "sam" | "rules" };
 
 type Cand = RankItem & { max: Tier; text: string };
@@ -37,10 +37,15 @@ export function candidates(r: Omit<Recap, "synthesis">, nowHm: string): Cand[] {
   });
   (r.mail?.groups ?? []).forEach((g) => g.items.forEach((m, i) => {
     const t: Tier = g.name === "Notifications" ? (m.action ? 3 : 4) : g.name === "Authorities" ? 2 : m.action ? 2 : 3;
-    c.push({ id: `ml${g.name[0]}${i}`, tier: t, max: g.name === "Notifications" ? 4 : t, title: `${m.from} — ${m.subject}`, why: g.name === "Authorities" ? "Authority" : m.action ? "Expects something from you" : g.name, action: m.action ? "Answer or act" : "Read", sources: [{ kind: "mail", label: `Mail · ${g.name}${m.count && m.count > 1 ? ` · ${m.count}` : ""}`, link: m.link }], text: `mail (${g.name}) from ${m.from}: ${m.subject} — ${m.summary}` });
+    c.push({ id: `ml${g.name[0]}${i}`, tier: t, max: g.name === "Notifications" ? 4 : t, title: `${m.from} — ${m.subject}`, why: g.name === "Authorities" ? "Authority" : m.action ? "Expects something from you" : g.name, action: m.action ? "Answer or act" : "Read", badge: m.action ? "for-you" : undefined, sources: [{ kind: "mail", label: `Mail · ${g.name}${m.count && m.count > 1 ? ` · ${m.count}` : ""}`, link: m.link }], text: `mail (${g.name}) from ${m.from}: ${m.subject} — ${m.summary}` });
   }));
-  (r.teams?.mentions ?? []).forEach((m, i) => c.push({ id: `tm${i}`, tier: 2, max: 3, title: `${m.name}`, why: "You are named in a channel", action: "Answer in the channel", sources: [{ kind: "teams", label: "Teams · @mention", link: m.link }], text: `teams channel mention by ${m.name}: ${m.preview}` }));
-  (r.teams?.chats ?? []).forEach((m, i) => c.push({ id: `tc${i}`, tier: m.ask ? 2 : 3, max: m.ask ? 2 : 4, title: `${m.name}`, why: m.ask ? "Waits for your answer" : "Unread chat", action: m.ask ? "Answer" : "Read", sources: [{ kind: "teams", label: `Teams · chat${m.count && m.count > 1 ? ` · ${m.count}` : ""}`, link: m.link }], text: `teams chat with ${m.name}: ${m.preview}` }));
+  (r.teams?.mentions ?? []).forEach((m, i) => c.push({ id: `tm${i}`, tier: 2, max: 3, title: `${m.name}`, why: "You are named in a channel", action: "Answer in the channel", badge: "for-you", sources: [{ kind: "teams", label: "Teams · @mention", link: m.link }], text: `teams channel mention by ${m.name}: ${m.preview}` }));
+  (r.teams?.chats ?? []).forEach((m, i) => c.push({ id: `tc${i}`, tier: m.ask ? 2 : 3, max: m.ask ? 2 : 4, title: `${m.name}`, why: m.ask ? "Waits for your answer" : "Unread chat", action: m.ask ? "Answer" : "Read", badge: m.ask ? "for-you" : undefined, sources: [{ kind: "teams", label: `Teams · chat${m.count && m.count > 1 ? ` · ${m.count}` : ""}`, link: m.link }], text: `teams chat with ${m.name}: ${m.preview}` }));
+  // Lot 2 · what the person is waiting for (sent, unanswered)
+  (r.waiting ?? []).forEach((w, i) => {
+    const days = Math.max(1, Math.round((Date.now() - new Date(w.since).getTime()) / 864e5));
+    c.push({ id: `wt${i}`, tier: 3, max: 3, title: `${w.who} — ${w.subject}`, why: `No answer for ${days} days`, action: `Chase ${w.who.split(",")[0]}`, badge: "you-wait", sources: [{ kind: w.kind, label: w.kind === "mail" ? "Mail · sent" : "Teams · sent", link: w.link }], text: `YOU are waiting: you asked ${w.who} (${w.kind}) ${days} days ago, no answer yet: ${w.subject} — ${w.preview}` });
+  });
   return c;
 }
 function addHm(hm: string, min: number) { const t = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)) + min; return `${String(Math.min(23, Math.floor(t / 60))).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; }
@@ -57,14 +62,26 @@ export async function rank(s: Session, r: Omit<Recap, "synthesis">, nowHm: strin
     const { text } = await callClaude({ agent: "coffee", personId: s.person?.id ?? null, entity: null, maxTokens: 4000,
       system: `You prioritise the morning of ${s.name} (${s.roles.join(", ") || "staff"}), compliance & safety manager in an aviation group (Astonjet Ltd ASJMT, Astonjet SAS ASJFR, Astonfly ASFFR, Astontec ASTFR). It is ${nowHm} (Paris).
 Each item has an id, its source text and "max": the WORST tier it may get (rules). Tiers: 1 = do now (regulatory clock, overdue, authority waiting, meeting within 2 h to prepare), 2 = today (due today, someone waits for an answer, authority, Accountable Manager), 3 = to know (information, what moved, this week), 4 = can wait (notifications, copies, later).
-For EVERY item return: "t" tier (1..4, never above max), "w" why in max 8 words, "a" the concrete action in max 10 words (verb first). Merge nothing, drop nothing. Then "top": the first three things to do today, each max 15 words, in order. English, factual, only from the items; never copy a code, password or key.
+For EVERY item return: "t" tier (1..4, never above max), "w" why in max 8 words, "a" the concrete action in max 10 words (verb first), and "g": a short topic label (max 6 words) ONLY when two or more items are about the SAME matter (same report, manual, authority application, aircraft, person and request, e.g. a mail thread, a Teams chat and a S.A.M. task on the ECCAIRS sandbox) — the same "g" for all of them; otherwise "". Drop nothing. Then "top": the first three things to do today, each max 15 words, in order. English, factual, only from the items; never copy a code, password or key.
 Answer ONLY JSON: {"top":["…"],"items":[{"id":"…","t":1,"w":"…","a":"…"}]}`,
       user: JSON.stringify(c.map((x) => ({ id: x.id, max: x.max, text: x.text.slice(0, 400) }))) });
     const m = /\{[\s\S]*\}/.exec(text); if (!m) return plain(c);
-    const j = JSON.parse(m[0]) as { top?: string[]; items?: { id: string; t: number; w?: string; a?: string }[] };
+    const j = JSON.parse(m[0]) as { top?: string[]; items?: { id: string; t: number; w?: string; a?: string; g?: string }[] };
     const byId = new Map((j.items ?? []).map((x) => [x.id, x]));
-    const items = c.map(({ max, text: _t, ...it }) => { const o = byId.get(it.id); return o ? { ...it, tier: cap(o.t, max), why: o.w?.trim() || it.why, action: o.a?.trim() || it.action } : it; })
-      .sort((a, b) => a.tier - b.tier);
-    return { top: (j.top ?? []).filter(Boolean).slice(0, 3), items, by: "sam" };
+    const items = c.map(({ max, text: _t, ...it }) => { const o = byId.get(it.id); return o ? { ...it, tier: cap(o.t, max), why: o.w?.trim() || it.why, action: o.a?.trim() || it.action, topic: o.g?.trim() || undefined } : it; });
+    return { top: (j.top ?? []).filter(Boolean).slice(0, 3), items: mergeTopics(items).sort((a, b) => a.tier - b.tier), by: "sam" };
   } catch { return plain(c); }
+}
+
+/** Lot 2 · the lines SAM put under the same topic become ONE line: best tier, its why / action, every source kept. */
+export function mergeTopics(items: RankItem[]): RankItem[] {
+  const by = new Map<string, RankItem[]>(); const out: RankItem[] = [];
+  for (const it of items) { if (!it.topic) { out.push(it); continue; } const k = it.topic.toLowerCase(); by.set(k, [...(by.get(k) ?? []), it]); }
+  for (const g of by.values()) {
+    if (g.length === 1) { out.push(g[0]); continue; }
+    const best = [...g].sort((a, b) => a.tier - b.tier || Number(!!b.badge) - Number(!!a.badge))[0];
+    out.push({ ...best, id: `g:${best.id}`, title: best.topic!, why: best.why, sources: g.flatMap((x) => x.sources), entity: g.find((x) => x.entity)?.entity, badge: g.some((x) => x.badge === "for-you") ? "for-you" : g.some((x) => x.badge === "you-wait") ? "you-wait" : undefined,
+      topic: g.map((x) => x.title).join(" · ").slice(0, 300) });
+  }
+  return out;
 }
