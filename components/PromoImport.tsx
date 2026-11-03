@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Item = { wmId: number; name: string; file: string; versions?: number; published?: string | null };
-/** SAF-09 · history from Web Manuals: select wm-promotions_<folder>.json and the PDFs together; each PDF is sent on its own (size limit). */
+/** SAF-09 · history from Web Manuals: select wm-promotions_<folder>.json and the PDFs together; each PDF goes straight to the private storage (signed upload URL), then the bulletin is recorded. */
 export default function PromoImport({ entity }: { entity: string }) {
   const [log, setLog] = useState<string[]>([]); const [busy, setBusy] = useState(false); const router = useRouter();
   async function go(files: FileList | null) {
@@ -14,9 +14,13 @@ export default function PromoImport({ entity }: { entity: string }) {
     for (const it of meta.items) {
       const pdf = [...files].find((f) => f.name === it.file);
       if (!pdf) { out.push(`✕ ${it.name}: PDF not selected (${it.file})`); continue; }
-      const fd = new FormData(); fd.set("file", pdf); fd.set("meta", JSON.stringify(it)); fd.set("entity", entity);
-      const r = await fetch("/api/import/promotions", { method: "POST", body: fd }); const j = await r.json().catch(() => ({}));
-      out.push(r.ok ? `✓ ${j.number} — ${j.title}${j.updated ? " (updated)" : ""}` : `✕ ${it.name}: ${j.error ?? r.status}`);
+      const call = async (step: string) => { const r = await fetch("/api/import/promotions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ step, meta: it, entity }) }); return { ok: r.ok, j: await r.json().catch(() => ({})) }; };
+      const sign = await call("sign");
+      if (!sign.ok) { out.push(`✕ ${it.name}: ${sign.j.error ?? "refused"}`); setLog([...out]); continue; }
+      const up = await fetch(sign.j.url, { method: "PUT", headers: { "content-type": "application/pdf", "x-upsert": "true" }, body: pdf });
+      if (!up.ok) { out.push(`✕ ${it.name}: upload ${up.status}`); setLog([...out]); continue; }
+      const { ok, j } = await call("save");
+      out.push(ok ? `✓ ${j.number} — ${j.title}${j.updated ? " (updated)" : ""}` : `✕ ${it.name}: ${j.error ?? "refused"}`);
       setLog([...out]);
     }
     setBusy(false); router.refresh();

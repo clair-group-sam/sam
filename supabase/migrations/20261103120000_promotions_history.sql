@@ -5,4 +5,4 @@ alter table safety_promotions add column if not exists source_ref text;      -- 
 alter table safety_promotions add column if not exists pdf_path text;        -- storage: promotions/<ENT>/<number>.pdf
 alter table safety_promotions add column if not exists issued_on date;       -- the month the bulletin is dated (from its name)
 create unique index if not exists safety_promotions_source on safety_promotions (source, source_ref) where source_ref is not null;
-insert into storage.buckets (id, name, public, file_size_limit) values ('promotions', 'promotions', false, 52428800) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit) values ('promotions', 'promotions', false, 104857600) on conflict (id) do update set file_size_limit = 104857600;   -- 100 MB (one ENVOL bulletin is 52 MB)
