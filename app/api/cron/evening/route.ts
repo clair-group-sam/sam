@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { leonConfigured } from "@/lib/leon";
 import { syncLeonHours } from "@/lib/leon-hours";
 import { flConfigured, syncFlightLogger } from "@/lib/flightlogger-sms";
+import { checkAll } from "@/lib/regulation";
 // Evening (19:00 UTC = 20:00 / 21:00 Paris): Morning coffee recaps are deleted — they hold mail and Teams summaries (UX-02).
 export const maxDuration = 60;
 export async function GET(req: NextRequest) {
@@ -15,5 +16,8 @@ export async function GET(req: NextRequest) {
   // SAF-07 · Astonfly reports from FlightLogger, every evening (the desk can also press "Retrieve from FlightLogger")
   let flightlogger: unknown = "not configured";
   if (flConfigured()) { try { const r = await syncFlightLogger(supabaseAdmin(), "evening run"); flightlogger = { read: r.read, created: r.created, status_changed: r.status_changed.length, errors: r.errors.length }; } catch (e) { flightlogger = (e as Error).message; } }
-  return Response.json({ ran: new Date().toISOString(), coffee_recaps_deleted: count ?? 0, leon, flightlogger });
+  // REG-02 · Easy Access Rules: the EASA pages are read every evening; a new revision becomes current and is raised in the watch
+  let regulations: unknown;
+  try { regulations = (await checkAll(supabaseAdmin())).map((r) => `${r.key}: ${r.result}${r.version ? ` (${r.version})` : ""}`); } catch (e) { regulations = (e as Error).message; }
+  return Response.json({ ran: new Date().toISOString(), coffee_recaps_deleted: count ?? 0, leon, flightlogger, regulations });
 }

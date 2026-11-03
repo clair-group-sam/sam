@@ -16,6 +16,7 @@ const P: Record<string, string> = {
   more: '<path d="M9 6l6 6-6 6"/>',
   search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  reg: '<path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3 3 0 0 0 6 0z"/><path d="M19 7l-3 7a3 3 0 0 0 6 0z"/><path d="M8 21h8"/>',
   coffee: '<path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M16 10h2a2 2 0 0 1 0 4h-2"/><path d="M7 3v2M10 3v2M13 3v2"/>',
 };
 export function Icon({ name, size = 20, className = "" }: { name: string; size?: number; className?: string }) {
