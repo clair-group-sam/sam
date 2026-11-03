@@ -6,6 +6,7 @@ import { CoffeeBox, SameSources } from "@/components/CoffeeBox";
 import { hasGraph } from "@/lib/msgraph-user";
 import { BrewButton } from "@/components/BrewButton";
 import { todaysRecap, dayLabel, hhmm, type Line } from "@/lib/coffee";
+import { TIERS, type RankItem, type Tier } from "@/lib/coffee-rank";
 import { brewCoffee } from "./actions";
 
 export const maxDuration = 60;
@@ -32,7 +33,24 @@ function Block({ title, hint, lines, empty, dueCol = true }: { title: string; hi
   );
 }
 
-/** Home › Morning coffee (UX-02, phase 1: S.A.M. only). */
+const SRC: Record<string, string> = { sam: "k-docs", mail: "k-comp", teams: "k-auth", agenda: "k-proj" };
+function TierBlock({ tier, items }: { tier: Tier; items: RankItem[] }) {
+  if (!items.length) return null;
+  const rows = (
+    <table className="tbl"><tbody>{items.map((it) => (
+      <tr key={it.id}>
+        <td style={{ width: 70 }}>{it.entity && <span className={"ent " + it.entity}>{it.entity}</span>}</td>
+        <td><b>{it.title}</b><div className="mini">{it.why}</div></td>
+        <td style={{ width: 260 }}><span className="mini"><b>→ {it.action}</b></span></td>
+        <td style={{ width: 230 }} className="text-right">{it.sources.map((x, n) => x.link
+          ? (x.link.startsWith("/") ? <Link key={n} href={x.link} className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</Link> : <a key={n} href={x.link} target="_blank" rel="noreferrer" className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</a>)
+          : <span key={n} className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</span>)}</td>
+      </tr>))}</tbody></table>);
+  if (tier === 4) return <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">{tier} · {TIERS[tier].title}</span><span className="mini">{items.length} · {TIERS[tier].hint}</span></summary>{rows}</details>;
+  return <section className={"card mb-4" + (tier === 1 ? " cf-hot" : "")}><div className="ch"><span className="eyebrow">{tier} · {TIERS[tier].title}</span><span className="mini">{items.length} · {TIERS[tier].hint}</span></div>{rows}</section>;
+}
+
+/** Home › Morning coffee (UX-02) — Lot 1 (03/11): one list ranked by importance, first three things on top; details by source below. */
 export default async function MorningCoffee() {
   const s = await getSession();
   if (!s) redirect("/login");
@@ -50,9 +68,17 @@ export default async function MorningCoffee() {
         right={<form action={brewCoffee} className="flex gap-2"><SameSources recap={r} /><Link href="/home/tasks" className="btn">Inbox</Link><BrewButton label="Brew again" primary={false} /></form>} />
 
       <section className={"card coffee-syn mb-4" + (urgent ? " hot" : "")}>
-        <div className="cb"><span className="cf-cup" aria-hidden>☕</span><p>{r.synthesis}</p></div>
+        <div className="cb"><span className="cf-cup" aria-hidden>☕</span>{r.ranked?.top.length
+          ? <div><div className="eyebrow mb-1">First three things today</div><ol style={{ margin: 0, paddingLeft: 18, listStyle: "decimal" }}>{r.ranked.top.map((t, i) => <li key={i}><b>{t}</b></li>)}</ol></div>
+          : <p>{r.synthesis}</p>}</div>
       </section>
 
+      {r.ranked && r.ranked.items.length > 0 && <>
+        {([1, 2, 3, 4] as Tier[]).map((t) => <TierBlock key={t} tier={t} items={r.ranked!.items.filter((x) => x.tier === t)} />)}
+        {r.ranked.by === "rules" && <p className="mini mb-4">Ranked by the rules only — the assistant could not be reached this time.</p>}
+      </>}
+
+      <details className="mb-4" open={!r.ranked}><summary className="eyebrow cursor-pointer mb-3">Details by source</summary>
       <div className="grid grid-cols-4 gap-4 mb-5">
         <div className={"metric" + (c.overdue ? " red" : "")}><div className="eyebrow">Overdue tasks</div><div className="val">{c.overdue}</div><div className="mini">{c.today} due today · {c.week} this week</div></div>
         <div className="metric"><div className="eyebrow">Meetings today</div><div className="val">{r.agenda ? r.agenda.items.filter((i) => !i.allDay).length : "—"}</div>{r.agenda && <div className="mini">{r.agenda.free.length ? `free ${r.agenda.free.slice(0, 2).map((f) => f.from + "–" + f.to).join(", ")}` : "no free slot"}</div>}</div>
@@ -114,6 +140,7 @@ export default async function MorningCoffee() {
       <Block title="Validities ending within 90 days" lines={r.validities} />
       <Block title={`What moved since ${dayLabel(r.since)}`} lines={r.moved} dueCol={false} empty="Nothing moved overnight in your scope." />
 
+      </details>
     </>
   );
 }

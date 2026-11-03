@@ -521,6 +521,9 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 .cf-src.off{color:#8a98a6}
 .coffee-syn .cb{display:flex;align-items:flex-start;gap:14px;font-size:16px;font-weight:600;line-height:1.5}
 .coffee-syn.hot{border-color:#f0c9a8;background:#fff8f1}
+.card.cf-hot{border-color:#f0c9a8}
+.card.cf-hot .ch{background:#fff8f1}
+.coffee-syn ol li{margin:2px 0}
 .coffee-soon{border-style:dashed;background:#fbfcfd}
 @media (max-width:760px){.cf-sources{grid-template-columns:1fr}.cf-head{flex-wrap:wrap}}
 .cf-grp{padding:10px 18px 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#44546a}

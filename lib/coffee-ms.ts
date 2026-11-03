@@ -8,7 +8,7 @@ export type AgendaItem = { start: string; end: string; allDay: boolean; subject:
 export type Agenda = { items: AgendaItem[]; free: { from: string; to: string }[] };
 export type MailItem = { from: string; subject: string; at: string; summary: string; action: boolean; link?: string; count?: number };
 export type MailGroups = { total: number; groups: { name: string; items: MailItem[] }[] };
-export type TeamsItem = { name: string; preview: string; at: string; link?: string };
+export type TeamsItem = { name: string; preview: string; at: string; link?: string; ask?: boolean; count?: number };
 export type TeamsRecap = { chats: TeamsItem[]; mentions: TeamsItem[] };
 export type SamTarget = { label: string; link: string; match: string };
 
@@ -124,8 +124,29 @@ export async function teams(token: string, since: string, s?: Session): Promise<
     const read = c.viewpoint?.lastMessageReadDateTime;
     if (read && read >= p.createdDateTime) continue;
     const who = p.from?.user?.displayName ?? "";
-    chats.push({ name: c.topic || who || (c.chatType === "meeting" ? "Meeting chat" : "Chat"), preview: (c.topic && who ? who + ": " : "") + strip(p.body?.content ?? "").slice(0, 140), at: p.createdDateTime, link: c.webUrl });
+    chats.push({ name: c.topic || who || (c.chatType === "meeting" ? "Meeting chat" : "Chat"), preview: (c.topic && who ? who + ": " : "") + strip(p.body?.content ?? "").slice(0, 140), at: p.createdDateTime, link: c.webUrl, _id: c.id, _read: read } as TeamsItem & { _id: string; _read?: string });
   }
+  // Lot 1 · each unread chat recapped as a whole (its unread messages, max 8), with "does it expect something from me?"
+  if (s && chats.length) {
+    const ctx: { i: number; messages: string[] }[] = [];
+    await Promise.all(chats.slice(0, 15).map(async (c, i) => {
+      const x = c as TeamsItem & { _id: string; _read?: string };
+      try {
+        const { value: msgs } = await graphGet<{ value: { createdDateTime: string; messageType?: string; body?: { content?: string }; from?: { user?: { id?: string; displayName?: string } } }[] }>(token, `/me/chats/${encodeURIComponent(x._id)}/messages?$top=10`);
+        const unread = (msgs ?? []).filter((m) => m.messageType === "message" && (!x._read || m.createdDateTime > x._read)).reverse().slice(-8);
+        x.count = unread.filter((m) => m.from?.user?.id !== me.id).length || 1;
+        ctx.push({ i, messages: unread.map((m) => `${m.from?.user?.id === me.id ? "ME" : m.from?.user?.displayName ?? "?"}: ${strip(m.body?.content ?? "").slice(0, 300)}`) });
+      } catch { ctx.push({ i, messages: [x.preview] }); }
+    }));
+    try {
+      const { text } = await callClaude({ agent: "coffee", personId: s.person?.id ?? null, entity: null, maxTokens: 1500,
+        system: `Each item is ONE Teams chat of ${s.name} with its unread messages ("ME" = ${s.name.split(" ")[0]}). Recap the exchange as a whole in ONE English line (max 30 words): who wants what. "a": true when the chat expects something from ${s.name.split(" ")[0]} (a question, a request, a validation, a decision), false for information, thanks, chit-chat. Never invent; never copy a code, password or key. Answer ONLY JSON: [{"i":0,"s":"…","a":true}]`,
+        user: JSON.stringify(ctx) });
+      const m = /\[[\s\S]*\]/.exec(text); const out = m ? (JSON.parse(m[0]) as { i: number; s: string; a: boolean }[]) : [];
+      for (const o of out) { const c = chats[o.i]; if (c) { c.preview = o.s || c.preview; c.ask = !!o.a; } }
+    } catch { /* previews kept */ }
+  }
+  for (const c of chats) { delete (c as { _id?: string })._id; delete (c as { _read?: string })._read; }
   // channel messages that name me (Microsoft Search), since the previous evening, not written by me
   const mentions: TeamsItem[] = [];
   try {

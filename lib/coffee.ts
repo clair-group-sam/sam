@@ -8,6 +8,7 @@ import { myInbox, groupProjects, kindLabel, KIND, type InboxItem } from "@/lib/i
 import { callClaude } from "@/lib/ai";
 import { userToken } from "@/lib/msgraph-user";
 import { agenda, mail, teams, type Agenda, type MailGroups, type TeamsRecap, type SamTarget } from "@/lib/coffee-ms";
+import { rank, type Ranked } from "@/lib/coffee-rank";
 
 export const TZ = "Europe/Paris";
 export type Line = { kind: string; label: string; cls: string; title: string; ctx?: string; due?: string | null; entity: string; link?: string | null; note?: string };
@@ -19,6 +20,8 @@ export type Recap = {
   readings: Line[]; validities: Line[]; mor: Line[]; moved: Line[];
   agenda?: Agenda; mail?: MailGroups; teams?: TeamsRecap; errors?: Record<string, string>;
   synthesis: string;
+  /** Lot 1 (03/11) · one list for the person, ranked by importance (4 tiers), first three things on top */
+  ranked?: Ranked;
 };
 export const SOURCES = [
   { id: "sam", label: "S.A.M. — deadlines, readings, validities, what moved", ready: true },
@@ -215,7 +218,9 @@ export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.i
       ]);
     }
   }
-  const recap: Recap = { ...r, synthesis: await synthesise(s, r) };
+  const np = parisParts(); const nowHm = `${String(np.hour).padStart(2, "0")}:${String(np.minute).padStart(2, "0")}`;
+  const ranked = await rank(s, r, nowHm);
+  const recap: Recap = { ...r, ranked, synthesis: ranked.top.length ? ranked.top.join(" · ") : await synthesise(s, r) };
   const db = supabaseAdmin();
   await db.from("coffee_recaps").upsert({ person_id: s.person!.id, day: recap.day, data: recap, created_at: recap.at }, { onConflict: "person_id,day" });
   await db.from("coffee_recaps").delete().eq("person_id", s.person!.id).lt("day", recap.day);
