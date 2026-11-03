@@ -8,7 +8,7 @@ import { myInbox, groupProjects, kindLabel, KIND, type InboxItem } from "@/lib/i
 import { callClaude } from "@/lib/ai";
 import { userToken } from "@/lib/msgraph-user";
 import { agenda, mail, teams, waitingOn, type Agenda, type MailGroups, type TeamsRecap, type SamTarget, type WaitItem } from "@/lib/coffee-ms";
-import { rank, type Ranked } from "@/lib/coffee-rank";
+import { rank, type Prefs, type Ranked } from "@/lib/coffee-rank";
 
 export const TZ = "Europe/Paris";
 export type Line = { kind: string; label: string; cls: string; title: string; ctx?: string; due?: string | null; entity: string; link?: string | null; note?: string };
@@ -222,7 +222,8 @@ export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.i
     }
   }
   const np = parisParts(); const nowHm = `${String(np.hour).padStart(2, "0")}:${String(np.minute).padStart(2, "0")}`;
-  const ranked = await rank(s, r, nowHm);
+  const { data: pf } = await supabaseAdmin().from("coffee_prefs").select("important,muted,snoozed").eq("person_id", s.person!.id).maybeSingle();
+  const ranked = await rank(s, r, nowHm, (pf as Prefs | null) ?? null);
   const recap: Recap = { ...r, ranked, synthesis: ranked.top.length ? ranked.top.join(" · ") : await synthesise(s, r) };
   const db = supabaseAdmin();
   await db.from("coffee_recaps").upsert({ person_id: s.person!.id, day: recap.day, data: recap, created_at: recap.at }, { onConflict: "person_id,day" });

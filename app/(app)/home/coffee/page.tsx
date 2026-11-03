@@ -7,6 +7,9 @@ import { hasGraph } from "@/lib/msgraph-user";
 import { BrewButton } from "@/components/BrewButton";
 import { todaysRecap, dayLabel, hhmm, type Line } from "@/lib/coffee";
 import { TIERS, type RankItem, type Tier } from "@/lib/coffee-rank";
+import CoffeeLineActions from "@/components/CoffeeLineActions";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { addRule, unmark } from "./actions";
 import { brewCoffee } from "./actions";
 
 export const maxDuration = 60;
@@ -42,12 +45,29 @@ function TierBlock({ tier, items }: { tier: Tier; items: RankItem[] }) {
         <td style={{ width: 70 }}>{it.entity && <span className={"ent " + it.entity}>{it.entity}</span>}</td>
         <td>{it.badge && <span className={"kind " + (it.badge === "for-you" ? "k-comp" : "k-cert")} style={{ marginRight: 6 }}>{it.badge === "for-you" ? "Waits for you" : "You are waiting"}</span>}<b>{it.title}</b><div className="mini">{it.why}</div>{it.id.startsWith("g:") && it.topic && <div className="mini" style={{ color: "#6b7a8c" }}>{it.topic}</div>}</td>
         <td style={{ width: 260 }}><span className="mini"><b>→ {it.action}</b></span></td>
-        <td style={{ width: 230 }} className="text-right">{it.sources.map((x, n) => x.link
+        <td style={{ width: 300 }} className="text-right">{it.sources.map((x, n) => x.link
           ? (x.link.startsWith("/") ? <Link key={n} href={x.link} className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</Link> : <a key={n} href={x.link} target="_blank" rel="noreferrer" className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</a>)
-          : <span key={n} className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</span>)}</td>
+          : <span key={n} className={"kind " + (SRC[x.kind] ?? "")}>{x.label}</span>)}<CoffeeLineActions it={it} /></td>
       </tr>))}</tbody></table>);
   if (tier === 4) return <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">{tier} · {TIERS[tier].title}</span><span className="mini">{items.length} · {TIERS[tier].hint}</span></summary>{rows}</details>;
   return <section className={"card mb-4" + (tier === 1 ? " cf-hot" : "")}><div className="ch"><span className="eyebrow">{tier} · {TIERS[tier].title}</span><span className="mini">{items.length} · {TIERS[tier].hint}</span></div>{rows}</section>;
+}
+
+/** Lot 3 · what the recap remembers for the person: always important / never important (senders, domains, chats, words). */
+async function Rules({ personId }: { personId: string }) {
+  const { data } = await supabaseAdmin().from("coffee_prefs").select("important,muted").eq("person_id", personId).maybeSingle();
+  const p = (data as { important: string[]; muted: string[] } | null) ?? { important: [], muted: [] };
+  const show = (v: string) => v.replace(/^(mail|teams|sam|agenda|wait):/, "");
+  const Chip = ({ v }: { v: string }) => <form action={unmark} style={{ display: "inline" }}><input type="hidden" name="value" value={v} /><button className="pill" title="Forget this rule" style={{ margin: "2px 4px 2px 0" }}>{show(v)} ✕</button></form>;
+  return (
+    <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">Your ranking rules</span><span className="mini">{p.important.length} important · {p.muted.length} not important — learnt from the buttons, or added here</span></summary>
+      <div className="cb grid gap-2">
+        <div><span className="mini"><b>Always at least “Today”</b> </span>{p.important.map((v) => <Chip key={v} v={v} />)}{!p.important.length && <span className="mini">—</span>}</div>
+        <div><span className="mini"><b>Always “Can wait”</b> </span>{p.muted.map((v) => <Chip key={v} v={v} />)}{!p.muted.length && <span className="mini">—</span>}</div>
+        <form action={addRule} className="flex gap-2"><input name="value" className="inp" placeholder="an address, a domain (@easa.europa.eu) or a word (ECCAIRS, 9H-SFJ…)" style={{ marginTop: 0 }} />
+          <select name="list" className="inp" style={{ width: 170, marginTop: 0 }} defaultValue="important"><option value="important">Important</option><option value="muted">Not important</option></select><button className="btn">Add</button></form>
+        <span className="mini">Applied at the next “Brew again”. A domain or word rule never mutes a regulatory clock, an overdue or a due-today item — only marking that very line does.</span>
+      </div></details>);
 }
 
 /** Home › Morning coffee (UX-02) — Lot 1 (03/11): one list ranked by importance, first three things on top; details by source below. */
@@ -76,6 +96,7 @@ export default async function MorningCoffee() {
       {r.ranked && r.ranked.items.length > 0 && <>
         {([1, 2, 3, 4] as Tier[]).map((t) => <TierBlock key={t} tier={t} items={r.ranked!.items.filter((x) => x.tier === t)} />)}
         {r.ranked.by === "rules" && <p className="mini mb-4">Ranked by the rules only — the assistant could not be reached this time.</p>}
+        <Rules personId={s.person!.id} />
       </>}
 
       <details className="mb-4" open={!r.ranked}><summary className="eyebrow cursor-pointer mb-3">Details by source</summary>

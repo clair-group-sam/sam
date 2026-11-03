@@ -6,7 +6,7 @@ import type { Session } from "@/lib/session";
 
 export type AgendaItem = { start: string; end: string; allDay: boolean; subject: string; location?: string; join?: string; link?: string; sam?: { label: string; link: string }; busy: boolean };
 export type Agenda = { items: AgendaItem[]; free: { from: string; to: string }[] };
-export type MailItem = { from: string; subject: string; at: string; summary: string; action: boolean; link?: string; count?: number };
+export type MailItem = { from: string; subject: string; at: string; summary: string; action: boolean; link?: string; addr?: string; count?: number };
 export type MailGroups = { total: number; groups: { name: string; items: MailItem[] }[] };
 export type TeamsItem = { name: string; preview: string; at: string; link?: string; ask?: boolean; count?: number };
 export type TeamsRecap = { chats: TeamsItem[]; mentions: TeamsItem[] };
@@ -95,7 +95,7 @@ export async function mail(token: string, s: Session, since: string): Promise<Ma
     if (t.key.startsWith("otp:")) { g.items.push({ from: nameOf(last), subject: hideCode(last.subject || "Security code"), at: last.receivedDateTime, summary: "One-time code — not shown here (expires quickly, read it in Outlook).", action: false, link: last.webLink }); return; }
     const l = lines.find((x) => x.i === i);
     const people = [...new Set(t.msgs.map(nameOf))];
-    g.items.push({ from: people.length > 3 ? `${people.slice(0, 3).join(", ")} +${people.length - 3}` : people.join(", "), subject: cleanSubj(last.subject || "(no subject)"), at: last.receivedDateTime, count: t.msgs.length,
+    g.items.push({ addr: (last.from?.emailAddress?.address ?? "").toLowerCase(), from: people.length > 3 ? `${people.slice(0, 3).join(", ")} +${people.length - 3}` : people.join(", "), subject: cleanSubj(last.subject || "(no subject)"), at: last.receivedDateTime, count: t.msgs.length,
       summary: l?.s ?? (last.bodyPreview ?? "").slice(0, 140), action: l ? !!l.a : t.msgs.some((m) => m.importance === "high"), link: last.webLink });
   });
   // FB-005 · identical automatic notifications (same sender, same subject once numbers are removed) are shown once, with a count
