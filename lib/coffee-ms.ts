@@ -193,7 +193,7 @@ const workingDaysSince = (iso: string) => { let n = 0; const d = new Date(iso); 
 export async function waitingOn(token: string): Promise<WaitItem[]> {
   const out: WaitItem[] = [];
   const from = new Date(Date.now() - 21 * 864e5).toISOString();
-  type SM = { subject?: string; sentDateTime: string; conversationId?: string; bodyPreview?: string; webLink?: string; toRecipients?: { emailAddress?: { name?: string; address?: string } }[]; singleValueExtendedProperties?: { value?: string }[] };
+  type SM = { "@odata.type"?: string; subject?: string; sentDateTime: string; conversationId?: string; bodyPreview?: string; webLink?: string; toRecipients?: { emailAddress?: { name?: string; address?: string } }[]; singleValueExtendedProperties?: { value?: string }[] };
   const [sent, inbox] = await Promise.all([
     graphGet<{ value: SM[] }>(token, `/me/mailFolders/sentitems/messages?$filter=sentDateTime ge ${from}&$select=subject,sentDateTime,conversationId,bodyPreview,webLink,toRecipients&$expand=singleValueExtendedProperties($filter=id eq 'Integer 0x0036')&$orderby=sentDateTime desc&$top=80`),
     graphGet<{ value: { conversationId?: string; receivedDateTime: string }[] }>(token, `/me/messages?$filter=receivedDateTime ge ${from}&$select=conversationId,receivedDateTime&$top=500`),
@@ -206,7 +206,9 @@ export async function waitingOn(token: string): Promise<WaitItem[]> {
     if (["1", "2"].includes(String(m.singleValueExtendedProperties?.[0]?.value ?? "0"))) continue;   // Private / Personal
     const wd = workingDaysSince(m.sentDateTime); if (wd < 3 || wd > 15) continue;
     if ((lastIn.get(m.conversationId) ?? "") > m.sentDateTime) continue;                             // answered since
-    const pv = (m.bodyPreview ?? "").replace(/\s+/g, " ");
+    if (/eventMessage/i.test(m["@odata.type"] ?? "")) continue;                                      // meeting invitations / updates are not questions
+    const pv = (m.bodyPreview ?? "").replace(/https?:\/\/\S+/g, " ").replace(/_{5,}/g, " ").replace(/\s+/g, " "); // a "?" in a link (Teams join URL) is not a question
+    if (/r[ée]union microsoft teams|microsoft teams meeting|join the meeting|rejoindre/i.test(pv)) continue;
     if (!/\?/.test(pv) && !/(could you|can you|please (send|confirm|let|advise)|merci de|pouvez-vous|peux-tu|pourrais-tu|est-ce que|thank you in advance)/i.test(pv)) continue;
     const to = (m.toRecipients ?? []).map((r) => r.emailAddress?.name || r.emailAddress?.address || "").filter(Boolean);
     out.push({ kind: "mail", who: to.length > 2 ? `${to.slice(0, 2).join(", ")} +${to.length - 2}` : to.join(", "), subject: (m.subject ?? "").replace(/^\s*((re|tr|fw|fwd)\s*:\s*)+/gi, ""), since: m.sentDateTime, preview: pv.slice(0, 200), link: m.webLink });
