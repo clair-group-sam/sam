@@ -6,6 +6,9 @@ import { ENT } from "@/lib/nav";
 import { PageHeader, Metric } from "@/components/Page";
 import { AUDIENCE, PROMO_KIND, PROMO_STATUS, mayWrite, type Promotion } from "@/lib/promotion";
 import { createPromotion } from "./actions";
+import PromoImport from "@/components/PromoImport";
+import SourceMark from "@/components/SourceMark";
+import { isSafetyDesk } from "@/lib/safety";
 
 /** Safety › Safety promotion (SAF-09): bulletins, notices and surveys — for the desk the register with reading rates; for everyone, what was sent to them. */
 export default async function SafetyPromotion({ searchParams }: { searchParams: Promise<{ k?: string; report?: string; inv?: string }> }) {
@@ -16,7 +19,7 @@ export default async function SafetyPromotion({ searchParams }: { searchParams: 
   const db = supabaseAdmin(); const writer = mayWrite(s);
   const { data: mine } = s.person ? await db.from("safety_promotion_reads").select("promotion_id,read_at,acknowledged_at,answered_at").eq("person_id", s.person.id) : { data: [] };
   const M = new Map(((mine ?? []) as { promotion_id: string; read_at: string | null; acknowledged_at: string | null; answered_at: string | null }[]).map((r) => [r.promotion_id, r]));
-  let q = db.from("safety_promotions").select("*").in("entity", scope).order("created_at", { ascending: false }).limit(300);
+  let q = db.from("safety_promotions").select("*").in("entity", scope).order("published_at", { ascending: false, nullsFirst: true }).limit(300);
   if (!writer) q = q.in("id", [...M.keys(), "00000000-0000-0000-0000-000000000000"]);
   const { data } = await q;
   const all = ((data ?? []) as Promotion[]).filter((p) => writer || p.status !== "draft");
@@ -42,14 +45,15 @@ export default async function SafetyPromotion({ searchParams }: { searchParams: 
         <table className="tbl"><thead><tr><th style={{ width: 160 }}>Number</th><th>Title</th><th style={{ width: 120 }}>Published</th>{writer && <th style={{ width: 110 }}>{"Read / sent"}</th>}<th style={{ width: 130 }}>Status</th></tr></thead>
           <tbody>{rows.map((p) => (
             <tr key={p.id}>
-              <td className="mono"><Link className="underline" href={`/safe/promo/${p.id}`}>{p.number}</Link>{scope.length > 1 && <div><span className={"ent " + p.entity}>{p.entity}</span></div>}</td>
+              <td className="mono"><Link className="underline" href={`/safe/promo/${p.id}`}>{p.number}</Link><SourceMark source={p.source} id={p.source_ref} />{scope.length > 1 && <div><span className={"ent " + p.entity}>{p.entity}</span></div>}</td>
               <td><Link href={`/safe/promo/${p.id}`}><b>{p.title}</b></Link><div className="mini">{PROMO_KIND[p.kind]?.label} · {AUDIENCE[p.audience]}{p.summary ? ` · ${p.summary.slice(0, 120)}` : ""}</div></td>
-              <td className="mono">{p.published_at?.slice(0, 10) ?? "—"}</td>
-              {writer && <td className="mini">{p.status === "draft" ? "—" : rate(p)}</td>}
+              <td className="mono">{(p.issued_on ?? p.published_at)?.slice(0, p.issued_on ? 7 : 10) ?? "—"}</td>
+              {writer && <td className="mini">{p.status === "draft" ? "—" : p.source === "webmanuals" ? "history" : rate(p)}</td>}
               <td><span className={"pill " + (PROMO_STATUS[p.status]?.[1] ?? "")}>{PROMO_STATUS[p.status]?.[0]}</span></td>
             </tr>))}
             {!rows.length && <tr><td colSpan={5} className="p-5 mini">Nothing yet.</td></tr>}</tbody></table>
       </section>
+      {isSafetyDesk(s) && s.entity !== "ALL" && <details className="card mb-5"><summary className="ch cursor-pointer"><span className="eyebrow">Import from Web Manuals</span><span className="mini">bulletins already published (history) — PDF kept, nothing sent</span></summary><div className="cb"><PromoImport entity={s.entity} /></div></details>}
       {writer && s.entity !== "ALL" && <details className="card" open={!!(sp.report || sp.inv)}><summary className="ch cursor-pointer"><span className="eyebrow">+ New</span><span className="mini">{ENT[s.entity]?.name ?? s.entity}</span></summary>
         <form action={createPromotion} className="cb grid grid-cols-6 gap-2">
           <input type="hidden" name="entity" value={s.entity} />{sp.report && <input type="hidden" name="report_id" value={sp.report} />}{sp.inv && <input type="hidden" name="investigation_id" value={sp.inv} />}

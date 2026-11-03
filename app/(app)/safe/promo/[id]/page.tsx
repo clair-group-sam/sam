@@ -37,7 +37,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
   return (
     <>
       <PageHeader eyebrow={`Safety · ${PROMO_KIND[p.kind]?.label} · ${p.entity}`} title={`${p.number} — ${p.title}`} sub={`${AUDIENCE[p.audience]}${p.published_at ? ` · published ${p.published_at.slice(0, 10)}` : ""}${p.due ? ` · by ${p.due}` : ""}`}
-        tag={<span className={"pill " + (PROMO_STATUS[p.status]?.[1] ?? "")}>{PROMO_STATUS[p.status]?.[0]}</span>} right={<Link href="/safe/promo" className="btn">← Safety promotion</Link>} />
+        tag={<span className={"pill " + (PROMO_STATUS[p.status]?.[1] ?? "")}>{PROMO_STATUS[p.status]?.[0]}</span>} right={<>{p.pdf_path && <a className="btn primary" href={`/api/promotions/${p.id}/pdf`} target="_blank" rel="noreferrer">PDF</a>}<Link href="/safe/promo" className="btn">← Safety promotion</Link></>} />
       <div className="grid gap-5" style={{ gridTemplateColumns: edit || desk ? "minmax(0,2fr) minmax(0,1fr)" : "minmax(0,1fr)" }}>
         <div>
           {edit ? <section className="card mb-5"><div className="ch"><span className="eyebrow">Draft</span>

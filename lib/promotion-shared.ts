@@ -10,6 +10,6 @@ export type Question = { key: string; label: string; type: "scale" | "choice" | 
 export type Promotion = {
   id: string; entity: string; kind: string; number: string; title: string; summary: string | null; body: string | null; audience: string; ack_required: boolean;
   questions: Question[]; anonymous: boolean; status: string; published_at: string | null; due: string | null; closes_at: string | null;
-  report_id: string | null; investigation_id: string | null; hazard_id: string | null; draft_model: string | null; created_at: string;
+  report_id: string | null; investigation_id: string | null; hazard_id: string | null; draft_model: string | null; created_at: string; source?: string; source_ref?: string | null; pdf_path?: string | null; issued_on?: string | null;
 };
 export const SCALE = ["1 — strongly disagree", "2", "3", "4", "5 — strongly agree"];
