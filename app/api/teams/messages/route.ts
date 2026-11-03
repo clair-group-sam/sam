@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
-import { ANSWERABLE_KINDS, cardFor, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type TaskRow } from "@/lib/teams";
+import { ANSWERABLE_KINDS, cardFor, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type TaskRow, promoCard } from "@/lib/teams";
 import { applyMove } from "@/lib/authority-moves";
 import { completeAction, verifyActionCore } from "@/lib/actions-core";
 import type { Action } from "@/lib/actions";
@@ -92,6 +92,23 @@ export async function POST(req: NextRequest) {
       const state = { answered: verb === "task_done" ? "done" as const : "not_yet" as const, by: p.display_name, at: hhmm(), comment: comment || null };
       if (verb === "task_done") await refreshCards(db, { ...task, status: "done", answered_via: "teams", answer: comment || null }, state, ref.conversation_id);
       return cardResponse(taskCard(task, state));
+    }
+    if (verb === "promo_ack") {
+      // SAF-09 · the person reads / acknowledges a bulletin or a notice on the card — recorded as in S.A.M., "via Teams"
+      const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();
+      const task = t as TaskRow | null;
+      if (!task || task.owner_person !== p.id) return msgResponse("This one is not addressed to you.");
+      const { data: pr } = await db.from("safety_promotions").select("id,kind,number,title,summary,body,ack_required,status").eq("id", data.promoId ?? task.ref_id ?? "").maybeSingle();
+      const promo = pr as { id: string; kind: string; number: string; title: string; summary: string | null; body: string | null; ack_required: boolean; status: string } | null;
+      if (!promo) return msgResponse("It no longer exists.");
+      const at = now(); const state = { answered: "done" as const, by: p.display_name, at: hhmm() };
+      if (task.status === "open") {
+        await db.from("safety_promotion_reads").upsert({ promotion_id: promo.id, person_id: p.id, read_at: at, acknowledged_at: promo.ack_required ? at : null }, { onConflict: "promotion_id,person_id" });
+        await db.from("tasks").update({ status: "done", answered_via: "teams", answered_at: at }).eq("id", task.id);
+        await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: null, meta: { title: task.title, promotion: promo.number } });
+        await db.from("audit_log").insert({ actor: p.id, entity: task.entity, object_type: "safety_promotion", object_id: promo.id, action: promo.ack_required ? "acknowledged" : "read", after: { via: "teams" } });
+      }
+      return cardResponse(promoCard(task, promo, state));
     }
     if (verb === "file_move" || verb === "action_verify") {
       const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();

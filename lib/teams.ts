@@ -174,10 +174,10 @@ export async function ensureConversation(db: SupabaseClient, person: { id: strin
 
 /* ---------- cards ---------- */
 export type TaskRow = { id: string; title: string; detail: string | null; due: string | null; entity: string; kind: string; status: string; link: string | null; owner_person: string | null; owner_role: string | null; ref_id?: string | null; created_at?: string; teams?: { conversation_id: string; service_url: string; activity_id: string } | null; answer?: string | null; answered_via?: string | null; answered_at?: string | null; teams_notified_at?: string | null };
-const KIND_LABEL: Record<string, string> = { authority: "CAA application", authority_followup: "Authority follow-up", reading: "Read & acknowledge", certificate_validity: "Validity", finding: "Finding", action: "Action", action_verify: "Verify an action", action_effectiveness: "Effectiveness", mitigation: "Mitigation", signature: "Signature", project: "Project", risk_acceptance: "Risk acceptance", risk_review: "Risk review", risk_intolerable: "Intolerable risk", safety_report: "Safety report", safety_question: "Question on your report", status_review: "Status review", escalation: "Escalation", finding_review: "Finding — answer to review", finding_closure: "Finding — closure proposed", watch: "Regulatory watch", watch_check: "Regulatory watch — check due" };
+const KIND_LABEL: Record<string, string> = { authority: "CAA application", authority_followup: "Authority follow-up", reading: "Read & acknowledge", certificate_validity: "Validity", finding: "Finding", action: "Action", action_verify: "Verify an action", action_effectiveness: "Effectiveness", mitigation: "Mitigation", signature: "Signature", project: "Project", risk_acceptance: "Risk acceptance", risk_review: "Risk review", risk_intolerable: "Intolerable risk", safety_report: "Safety report", safety_question: "Question on your report", status_review: "Status review", escalation: "Escalation", finding_review: "Finding — answer to review", finding_closure: "Finding — closure proposed", watch: "Regulatory watch", watch_check: "Regulatory watch — check due", promo_read: "Safety promotion", investigation: "Investigation" };
 /** Kinds that can be answered from the card. The others need the app (a manual to read, evidence to attach, a decision to record, a signature). */
 export const ANSWERABLE_KINDS = new Set(["action", "action_verify", "mitigation", "authority", "authority_followup", "project", "status_review", "escalation"]);
-const NEEDS_APP: Record<string, string> = { watch: "Decide in S.A.M. (applicability, impact, what to do).", watch_check: "Open the sources and tick them in S.A.M.", finding: "Answer in S.A.M.: root cause, factors, plan.", finding_review: "Review the answer in S.A.M.", finding_closure: "Request the closure from the finding in S.A.M.", reading: "Open the manual in S.A.M. and acknowledge it there.", certificate_validity: "Drop the renewed document in S.A.M.", safety_report: "Acknowledge and classify the report in S.A.M.", safety_question: "Answer in S.A.M. (My reports).", risk_acceptance: "Record the decision in S.A.M.", risk_review: "Reassess the hazard in S.A.M.", risk_intolerable: "Decide in S.A.M.", action_effectiveness: "Record the effectiveness in S.A.M.", signature: "Sign in S.A.M." };
+const NEEDS_APP: Record<string, string> = { investigation: "Lead the investigation in S.A.M.", promo_read: "Answer the survey in S.A.M.", watch: "Decide in S.A.M. (applicability, impact, what to do).", watch_check: "Open the sources and tick them in S.A.M.", finding: "Answer in S.A.M.: root cause, factors, plan.", finding_review: "Review the answer in S.A.M.", finding_closure: "Request the closure from the finding in S.A.M.", reading: "Open the manual in S.A.M. and acknowledge it there.", certificate_validity: "Drop the renewed document in S.A.M.", safety_report: "Acknowledge and classify the report in S.A.M.", safety_question: "Answer in S.A.M. (My reports).", risk_acceptance: "Record the decision in S.A.M.", risk_review: "Reassess the hazard in S.A.M.", risk_intolerable: "Decide in S.A.M.", action_effectiveness: "Record the effectiveness in S.A.M.", signature: "Sign in S.A.M." };
 const fr = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "");
 const todayISO = () => new Date().toISOString().slice(0, 10);
 export function origin(): string { return (process.env.SAM_ORIGIN ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://sam-jet-sigma.vercel.app")).replace(/\/$/, ""); }
@@ -246,8 +246,30 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
       { type: "Action.Execute", title: "Accept & close", verb: "action_verify", style: "positive", data: { taskId: t.id, verdict: "accept" } },
       { type: "Action.Execute", title: "Send back", verb: "action_verify", data: { taskId: t.id, verdict: "back" } }] });
     if (t.kind === "action") return taskCard(t, undefined, { doneTitle: "Done — with this note as evidence", commentHint: "What was done, and where the evidence is (required for Done)" });
+    // SAF-09 · a bulletin / notice is read on the card and acknowledged there; a survey is answered in S.A.M.
+    if (t.kind === "promo_read" && t.ref_id) {
+      const { data: pr } = await db.from("safety_promotions").select("id,kind,number,title,summary,body,ack_required,status").eq("id", t.ref_id).maybeSingle();
+      const p = pr as { id: string; kind: string; number: string; title: string; summary: string | null; body: string | null; ack_required: boolean; status: string } | null;
+      if (p && p.kind !== "survey" && p.status === "published") return promoCard(t, p);
+    }
   } catch { /* fall through to the plain card */ }
   return taskCard(t);
+}
+/** SAF-09 · the bulletin / notice itself on the card (summary + text, cut at ~1 800 characters) and one button: read / acknowledged. */
+export function promoCard(t: TaskRow, p: { id: string; kind: string; number: string; title: string; summary: string | null; body: string | null; ack_required: boolean }, state?: CardState): unknown {
+  const url = `${origin()}/safe/promo/${p.id}`;
+  const text = (p.body ?? "").length > 1800 ? `${(p.body ?? "").slice(0, 1800)}… (continued in S.A.M.)` : p.body ?? "";
+  const body: unknown[] = [
+    { type: "TextBlock", text: `${t.entity} · ${p.kind === "notice" ? "Safety notice" : "Safety bulletin"} · ${p.number}`, size: "Small", weight: "Bolder", color: p.kind === "notice" ? "Attention" : "Accent", spacing: "None" },
+    { type: "TextBlock", text: p.title, size: "Medium", weight: "Bolder", wrap: true },
+  ];
+  if (p.summary) body.push({ type: "TextBlock", text: p.summary, wrap: true, weight: "Bolder", spacing: "Small" });
+  for (const para of text.split(/\n\s*\n/).filter(Boolean).slice(0, 12)) body.push({ type: "TextBlock", text: para, wrap: true, spacing: "Small" });
+  const actions: unknown[] = [];
+  if (state) body.push({ type: "TextBlock", text: `✓ ${p.ack_required ? "Acknowledged" : "Read"} — ${state.by}, ${state.at}`, wrap: true, color: "Good", weight: "Bolder", spacing: "Medium" });
+  else actions.push({ type: "Action.Execute", title: p.ack_required ? "I have read and understood" : "Read", verb: "promo_ack", style: "positive", data: { taskId: t.id, promoId: p.id } });
+  actions.push({ type: "Action.OpenUrl", title: "Open in S.A.M.", url });
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions, msteams: { width: "Full" } };
 }
 /** COM-03 · confirmation card before recording a submission: the reference given by the portal, the date, the target date. Nothing moves until confirmed. */
 export function submitConfirmCard(t: TaskRow, f: { id: string; title: string; authority: string | null; portal: string | null; portal_url: string | null; target_days: number }): unknown {
