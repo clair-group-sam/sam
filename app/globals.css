@@ -680,3 +680,16 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .tile .tv{font-size:22px;font-weight:700;color:var(--navy);line-height:1.1}.tile .tl{font-size:11.5px;color:var(--slate6);margin-top:2px}.tile .th{font-size:10.5px;color:var(--slate5);margin-top:3px}
 .tile.amber{border-color:var(--amber);background:var(--amber-s)}.tile.red{border-color:var(--terra);background:var(--terra-s)}.tile.green{border-color:#9fd8b3;background:var(--green-s)}
 .tilelink{color:inherit;display:block}.tilelink:hover .tile{box-shadow:0 2px 8px rgba(13,42,63,.12)}
+/* AUD-01 audit programme grid */
+.agrid{display:grid;gap:2px;font-size:11.5px;min-width:720px}
+.agrid .hd{font-size:10.5px;color:var(--slate45);text-align:center;padding:4px 0;letter-spacing:.04em}
+.agrid .hd.now{color:var(--navy);font-weight:700;box-shadow:inset 0 -2px 0 var(--cyan)}
+.agrid .lab{padding:6px 8px;font-weight:700;color:var(--navy);background:var(--blue05);border-radius:4px}
+.agrid .lab .mini{font-weight:400}
+.agrid .cell{min-height:34px;background:#f7fafc;border-radius:4px;display:flex;flex-direction:column;gap:2px;padding:2px;align-items:stretch}
+.agrid .cell.now{background:var(--blue1)}
+.agrid .au{display:block;border-radius:3px;padding:2px 4px;font-weight:700;text-align:center;font-size:10.5px;background:var(--blue175);color:var(--navy)}
+.agrid .au.closed{background:var(--green-s);color:#1d7a3a}.agrid .au.authority{background:var(--purple-s);color:var(--purple)}
+.agrid .au.checks{background:var(--amber-s);color:#8a5a00}.agrid .au.late{background:var(--terra-s);color:var(--terra)}.agrid .au.repl{outline:1px dashed var(--amber)}
+.matrix{border-collapse:collapse;font-size:11px}.matrix th,.matrix td{border:1px solid var(--line);padding:3px 6px;text-align:center}.matrix th{font-weight:600;color:var(--slate6);white-space:nowrap}
+.matrix td.x{background:var(--blue1);color:var(--navy);font-weight:700}.matrix td.gap{background:var(--terra-s);color:var(--terra);font-weight:700}
