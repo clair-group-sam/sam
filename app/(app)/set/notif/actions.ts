@@ -35,7 +35,6 @@ export async function runNow(): Promise<void> {
   const s = await getSession();
   if (!s || !cmm(s.roles)) throw new Error("Not allowed");
   const { runEscalations } = await import("@/lib/escalation");
-  const r = await runEscalations(supabaseAdmin());
-  await supabaseAdmin().from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "escalation", object_id: "manual", action: "escalation_run", after: r });
+  await runEscalations(supabaseAdmin(), "manual", s.person?.id ?? null);
   revalidatePath("/set/notif");
 }

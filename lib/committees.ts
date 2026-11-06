@@ -143,7 +143,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
   const F = (fnd ?? []) as { status: string; due: string | null }[]; const openF = F.filter((f) => !["closed", "cancelled"].includes(f.status));
   const S = ((sags ?? []) as { id: string; number: string; title: string; starts_at: string | null; planned_on: string | null }[]);
   const { data: sagActs } = S.length ? await db.from("safety_actions").select("committee_id").in("committee_id", S.map((x) => x.id)) : { data: [] };
-  const rows = board.rows.filter((r) => r.status === "active");
+  const rows = board.rows.filter((r) => r.status === "active" || r.status === "proposed"); // FB-054 · same figures as Safety › Overview (proposed SPIs counted, FB-042)
   const spiCounts: Record<string, number> = { ok: 0, improve: 0, far: 0, nodata: 0 };
   for (const r of rows) spiCounts[r.ytdVerdict === "none" ? "nodata" : r.ytdVerdict] = (spiCounts[r.ytdVerdict === "none" ? "nodata" : r.ytdVerdict] ?? 0) + 1;
   return {

@@ -13,15 +13,15 @@ export default async function NotificationRules() {
   const canEdit = s.roles.includes("SUPERADMIN") || s.roles.includes("CMM") || s.roles.includes("SM");
   const db = supabaseAdmin();
   const rules = await loadRules(db);
-  const { data: last } = await db.from("audit_log").select("at,after").eq("object_type", "escalation").order("id", { ascending: false }).limit(1).maybeSingle();
-  const lr = last as { at: string; after: Record<string, number> } | null;
+  const { data: last } = await db.from("audit_log").select("at,after,object_id").eq("object_type", "escalation").order("id", { ascending: false }).limit(1).maybeSingle();
+  const lr = last as { at: string; after: Record<string, number>; object_id: string } | null;
   const def = rules.find((r) => r.kind === "*");
   const others = rules.filter((r) => r.kind !== "*");
   return (
     <>
       <PageHeader eyebrow="Settings · Notification rules" title="Reminders & escalation" sub="One ladder for everything with a due date: reminder, chase, department head, Accountable Manager. Days are counted after the due date." right={canEdit ? <form action={runNow}><button className="btn" type="submit">Run the ladder now</button></form> : undefined} />
       <section className="card mb-4">
-        <div className="ch"><span className="eyebrow">How it works</span><span className="mini">runs once a day with the other S.A.M. jobs · {lr ? `last run ${lr.at.slice(0, 16).replace("T", " ")} · ${Object.entries(lr.after ?? {}).map(([k, v]) => `${k} ${v}`).join(", ")}` : "not run yet"}</span></div>
+        <div className="ch"><span className="eyebrow">How it works</span><span className="mini">runs once a day with the other S.A.M. jobs · {lr ? `last run ${lr.at.slice(0, 16).replace("T", " ")} (${lr.object_id === "manual" ? "by hand" : "daily job"}) · ${Object.entries(lr.after ?? {}).map(([k, v]) => `${k} ${v}`).join(", ")}` : "never run — the daily job (06:00 UTC) has not reached this step yet: run it by hand once"}</span></div>
         <div className="cb mini">
           <p><b>Reminder</b> and <b>chase</b>: the owner gets the Teams card again (Inbox unchanged, the item simply turns red). <b>Escalate</b>: a new Inbox item for the CMM (compliance side) or the SM (safety side), pointing at the same object. <b>AM</b>: the same for the Accountable Manager. Each step happens once per item; escalation items close themselves when the original is done. Leave a box empty to skip that step for a kind. The <Link href="/dash/cs">Compliance &amp; Safety dashboard</Link> shows what is overdue, by post.</p>
         </div>

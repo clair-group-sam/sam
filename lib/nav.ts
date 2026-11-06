@@ -23,6 +23,18 @@ export function roleModules(role: RoleKey): Module[] {
   const R = ROLES[role];
   return MODULES.filter((m) => R.mods.includes(m.id));
 }
+/** FB-051 · the screens that exist in the beta (app/(app)/<mod>/<sub>); the others are prototype placeholders ("soon"). Keep in step with the folders. */
+export const BUILT: Record<string, string[]> = {
+  home: ["tasks", "coffee"], docs: ["lib", "mine", "drafts", "files", "drop", "editor", "manual", "new", "link"],
+  comp: ["prog", "audits", "find", "watch"], reg: ["ear"], dash: ["cs"], np: ["over"], proj: ["boards", "auth", "rex"], ref: ["ptpl", "types"],
+  safe: ["over", "reports", "actions", "new", "mine", "risk", "moc", "ra", "inv", "comm", "mor", "promo"], set: ["integ", "notif", "core"],
+};
+export const isBuilt = (mod: string, sub: string) => (BUILT[mod] ?? []).includes(sub);
+/** The first screen of a module that is actually built — never a placeholder when a real one exists. */
+export function landingFor(role: RoleKey, mod: string): SubItem | undefined {
+  const subs = subsFor(role, mod).filter((x) => !x.hidden);
+  return subs.find((x) => isBuilt(mod, x.id)) ?? subs[0];
+}
 export function subsFor(role: RoleKey, mod: string): SubItem[] {
   const allow = ROLES[role].subs[mod] ?? [];
   const all = SUB[mod] ?? [];

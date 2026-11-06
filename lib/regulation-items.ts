@@ -110,3 +110,25 @@ export async function itemsForCode(db: SupabaseClient, regulationId: string, ver
   const { data } = await db.from("regulation_items").select("*").eq("regulation_id", regulationId).eq("version", version).eq("code", code).or("change.is.null,change.neq.removed").order("ord");
   return (data ?? []) as RegItem[];
 }
+
+/** EASA rule codes found in a text (ORO.GEN.200, CAO.A.095, CAMO.A.305, M.A.201, 145.A.30, FCL.055, ML.A.403, IS.I.OR.200, 21.A.3…). */
+export function ruleCodesIn(text: string): string[] {
+  const re = /\b((?:ORO|CAT|SPA|NCC|NCO|SPO|ARO|ARA|FCL|MED|CC|ATCO|ADR|SERA|CAO|CAMO|ML|CS|IS)(?:\.[A-Z]{1,4})*\.\d{2,4}[A-Z]?|(?:M|T|145|147|66|21)\.[AB]\.\d{2,4}[A-Z]?|IS\.[ID]\.OR\.\d{3})\b/g;
+  return [...new Set((text.match(re) ?? []).map((c) => c.toUpperCase()))].slice(0, 12);
+}
+
+/** FB-050 · official text (IR + AMC/GM) of the rules cited, across the EARs of an entity, as a compact block for the assistant. */
+export async function officialTextsFor(db: SupabaseClient, entity: string, codes: string[], maxChars = 24000): Promise<string> {
+  if (!codes.length) return "";
+  const { data: regs } = await db.from("regulations").select("id,key,title,items_version").contains("entities", [entity]).not("items_version", "is", null);
+  const out: string[] = []; let used = 0;
+  for (const r of (regs ?? []) as { id: string; key: string; title: string; items_version: string }[]) {
+    const { data } = await db.from("regulation_items").select("ref,kind,code,title,body_text").eq("regulation_id", r.id).eq("version", r.items_version).in("code", codes).or("change.is.null,change.neq.removed").order("ord").limit(60);
+    for (const it of (data ?? []) as { ref: string; kind: string; code: string; title: string | null; body_text: string | null }[]) {
+      const block = `[${r.title} · ${r.items_version}] ${it.ref}${it.title ? " — " + it.title : ""}\n${(it.body_text ?? "").slice(0, it.kind === "ir" ? 4000 : 1500)}`;
+      if (used + block.length > maxChars) return out.join("\n\n");
+      out.push(block); used += block.length;
+    }
+  }
+  return out.join("\n\n");
+}

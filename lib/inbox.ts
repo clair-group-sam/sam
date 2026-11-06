@@ -2,6 +2,7 @@
 // Shared by Home › Inbox and Home › Morning coffee.
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { morClock } from "@/lib/safety";
 import { basePost, type Session } from "@/lib/session";
 import { OPEN, project as projectDates, type Dep, type Project, type Task as PTask } from "@/lib/projects";
 
@@ -47,6 +48,21 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
       }
     }
     tasks.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
+  }
+  // FB-047 · a safety report task carries the live MOR clock: once the 72 h are gone, the line says so instead of "within 72 h"
+  const repTasks = tasks.filter((t) => t.kind === "safety_report" && t.link?.startsWith("/safe/reports/"));
+  if (repTasks.length) {
+    const ids = repTasks.map((t) => t.link!.split("/").pop()!);
+    const { data: reps } = await admin.from("reports").select("id,received_at,mor_filed_at,source,report_analysis(mor_status,confirmed_at)").in("id", ids);
+    const now = Date.now();
+    for (const r of (reps ?? []) as unknown as { id: string; received_at: string; mor_filed_at: string | null; source: string | null; report_analysis: { mor_status: string | null; confirmed_at: string | null } | { mor_status: string | null; confirmed_at: string | null }[] | null }[]) {
+      const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis;
+      const c = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, now, (r.source ?? "sam") !== "sam");
+      const t = repTasks.find((x) => x.link!.endsWith("/" + r.id)); if (!t) continue;
+      if (c.state === "late") { const d = Math.floor(-c.left / 24); t.detail = `MOR clock expired ${d >= 1 ? `${d} d` : `${-c.left} h`} ago — acknowledge, classify and decide on the MOR now.`; }
+      else if (c.state === "running") t.detail = `${c.left} h left on the 72 h MOR clock — acknowledge, classify and decide.`;
+      else t.detail = c.state === "filed" ? "MOR filed — follow the report through investigation and closure." : "MOR decided (not reportable) — follow the report through to closure.";
+    }
   }
   return tasks;
 }

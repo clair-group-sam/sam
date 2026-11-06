@@ -29,12 +29,17 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
   const [prop, setProp] = useState<{ html: string; notes: Note[]; model: string } | null>(null);
   const [view, setView] = useState<"diff" | "preview">("diff");
 
+  const [secs, setSecs] = useState(0);
   async function propose() {
-    if (busy) return; setBusy(true); setErr(""); setProp(null);
-    const r = await aiPropose({ revisionId, sectionId, agent, request, currentHtml: editor.getHTML() });
-    setBusy(false);
+    if (busy) return; setBusy(true); setErr(""); setProp(null); setSecs(0);
+    // FB-049 · say what is going on and give up after 90 s instead of spinning forever
+    const t0 = Date.now(); const tick = setInterval(() => setSecs(Math.round((Date.now() - t0) / 1000)), 1000);
+    const timeout = new Promise<{ ok: false; error: string }>((res) => setTimeout(() => res({ ok: false, error: "SAM did not answer within 90 s — the chapter may be long or the service busy. Try again, or ask for a specific sub-chapter." }), 90_000));
+    const r = await Promise.race([aiPropose({ revisionId, sectionId, agent, request, currentHtml: editor.getHTML() }), timeout]);
+    clearInterval(tick); setBusy(false);
     if (r.ok) setProp({ html: r.html, notes: r.notes, model: r.model }); else setErr(r.error);
   }
+  const stage = secs < 3 ? "reading the chapter…" : secs < 8 ? (agent === "check" || agent === "explain" ? "reading the rules cited…" : "preparing the request…") : secs < 60 ? `SAM is writing… ${secs} s` : `still working… ${secs} s (long chapter)`;
   function insert() { if (!prop) return; editor.commands.setContent(prop.html); onInserted(); setProp(null); }
   const diff = prop ? diffWords(textOf(editor.getHTML()), textOf(prop.html)) : [];
   const added = diff.filter((d) => d.k === "+").length, removed = diff.filter((d) => d.k === "-").length;
@@ -47,7 +52,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
         <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "explain" ? "The requirement to explain (ORO.GEN.200(a)(3), CAMO.A.305…) or paste its text — default: the references cited in this chapter" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
         <div className="flex items-center gap-2 mt-2">
-          <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? "SAM is working…" : "Ask SAM"}</button>
+          <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? stage : "Ask SAM"}</button>
           <span className="mini">SAM proposes; nothing enters the manual until you insert it.</span>
         </div>
         {err && <div className="lockbar mt-3" style={{ margin: "12px 0 0" }}>{err}</div>}

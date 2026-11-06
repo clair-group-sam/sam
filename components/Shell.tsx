@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
-import { ENT, ENT_COLOR, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, type Module, type RoleKey } from "@/lib/nav";
+import { ENT, ENT_COLOR, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
 
 type Props = { session: Session; children: React.ReactNode };
@@ -57,8 +57,8 @@ export default function Shell({ session, children }: Props) {
     <aside className={cls} onMouseEnter={onEnter}>
       <div className="h">{curMod ? modLabel(role, curMod) : mod}</div>
       {subs.map((s) => (
-        <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "")}>
-          {subLabel(role, mod, s)}
+        <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "") + (isBuilt(mod, s.id) ? "" : " soon")} title={isBuilt(mod, s.id) ? undefined : "Not built yet — exists in the prototype"}>
+          {subLabel(role, mod, s)}{!isBuilt(mod, s.id) && <small className="soon-tag">soon</small>}
         </Link>
       ))}
     </aside>
@@ -157,7 +157,9 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   async function pick(ent: string) {
     setEntOpen(false);
     await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });
-    router.refresh();
+    // FB-048 · a full reload: router.refresh() only re-renders the current route, and pages prefetched or cached under the
+    // previous entity were served later (the entity "flipped" after a server action). Nothing of the old entity may survive.
+    window.location.reload();
   }
   return (
     <header className={"topbar ent-" + cur} style={{ ["--entc" as string]: ENT_COLOR[cur] ?? "#0b2a4a" } as React.CSSProperties}>

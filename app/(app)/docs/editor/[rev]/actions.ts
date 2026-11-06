@@ -1,6 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { officialTextsFor, ruleCodesIn } from "@/lib/regulation-items";
 import { headers } from "next/headers";
 import { sendUpdateNotice } from "@/lib/notice";
 import { expectedReturn, type ReturnKind } from "@/lib/revisions";
@@ -187,7 +188,13 @@ export async function aiPropose(input: { revisionId: string; sectionId: string; 
     const { data: others } = await db.from("revision_sections").select("ref,title").eq("revision_id", rev.id).order("ord");
     const html = input.currentHtml.slice(0, 120_000);
     if (stripHtml(html).length > 60_000) return { ok: false, error: "This chapter is too long for a single proposal — split it or ask for a specific sub-chapter." };
-    const user = userPromptFor(input.agent, { manual: manual.title, entity: manual.entity, chapterRef: cur.ref as string, chapterTitle: (cur.title as string) ?? "", chapterHtml: html, neighbours: ((others ?? []) as { ref: string; title: string | null }[]).map((o) => `${o.ref} ${o.title ?? ""}`).slice(0, 80), request: input.request });
+    // FB-050 · Check / Explain read the official text of the rules cited (request + chapter), from the EARs loaded in S.A.M.
+    let officialTexts = "";
+    if (input.agent === "check" || input.agent === "explain") {
+      const codes = ruleCodesIn(`${input.request}\n${stripHtml(html)}`);
+      officialTexts = await officialTextsFor(db, manual.entity, codes).catch(() => "");
+    }
+    const user = userPromptFor(input.agent, { manual: manual.title, entity: manual.entity, chapterRef: cur.ref as string, chapterTitle: (cur.title as string) ?? "", chapterHtml: html, neighbours: ((others ?? []) as { ref: string; title: string | null }[]).map((o) => `${o.ref} ${o.title ?? ""}`).slice(0, 80), request: input.request, officialTexts });
     const { text, model } = await callClaude({ agent: input.agent, personId: s.person?.id ?? null, entity: manual.entity, user, maxTokens: 12000 });
     const parsed = parseJsonBlock(text);
     return { ok: true, html: parsed.html, notes: parsed.notes, model };

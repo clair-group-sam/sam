@@ -37,9 +37,15 @@ export function stepsDue(rule: Rule, overdue: number): Step[] {
 type Esc = Partial<Record<Step, string>>;
 type Row = TaskRow & { escalation: Esc | null };
 
-export async function runEscalations(db: SupabaseClient): Promise<Record<string, number>> {
+export async function runEscalations(db: SupabaseClient, source: "cron" | "manual" = "cron", actor: string | null = null): Promise<Record<string, number>> {
+  const out = await runEscalationsInner(db);
+  // FB-055 · every run is written down (Settings › Notification rules showed "not run yet" although the daily job calls this)
+  await db.from("audit_log").insert({ actor, entity: null, object_type: "escalation", object_id: source, action: "escalation_run", after: out }).then(() => undefined, () => undefined);
+  return out;
+}
+async function runEscalationsInner(db: SupabaseClient): Promise<Record<string, number>> {
   const t0 = today();
-  const out = { reminded: 0, chased: 0, escalated: 0, am: 0, closed: 0 };
+  const out = { reminded: 0, chased: 0, escalated: 0, am: 0, closed: 0, candidates: 0 };
   const rules = await loadRules(db);
   if (!rules.length) return out;
   const { data: people } = await db.from("people").select("id,display_name").limit(500);
@@ -47,6 +53,7 @@ export async function runEscalations(db: SupabaseClient): Promise<Record<string,
   // 1 · the ladder
   const { data } = await db.from("tasks").select("*").eq("status", "open").not("due", "is", null).lte("due", t0).order("due").limit(500);
   const resend: TaskRow[] = [];
+  out.candidates = (data ?? []).length;
   for (const t of (data ?? []) as Row[]) {
     if (SKIP.has(t.kind)) continue;
     const rule = ruleFor(rules, t.kind);

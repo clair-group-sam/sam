@@ -13,6 +13,8 @@ import { addCheck, raiseFinding, refreshHints, reopenAudit, reportAudit, setChec
 type Sp = { c?: string };
 type A = Audit & { checklist_id: string | null; started_on: string | null; report_summary: string | null; report_at: string | null; closed_at: string | null; closed_by: string | null };
 /* AUD-02 · one audit: start (checklist → checks), the checks by section, the open check with the official text, S.A.M.'s hints, result / comment / evidence, finding, report, close. */
+// FB-053 · the list shows the precise reference (AMC1 …, (c)) and the question, and an unambiguous short result
+const SHORT: Record<string, string> = { conforming: "OK", partial: "Partial", non_conforming: "Not conf.", not_applicable: "N/A", not_covered: "Not cov." };
 export default async function AuditPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Sp> }) {
   const { id } = await params; const sp = await searchParams;
   const s = await getSession(); if (!s) redirect("/login");
@@ -70,7 +72,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
 
       {checks.length > 0 && <div className="grid gap-4" style={{ gridTemplateColumns: "340px 1fr" }}>
         <div>{sections.map((sec) => <section key={sec} className="card mb-3"><div className="ch"><span className="eyebrow">{sec}</span><span className="mini">{checks.filter((c) => (c.section ?? "Checks") === sec && c.result).length}/{checks.filter((c) => (c.section ?? "Checks") === sec).length}</span></div>
-          <div className="cb" style={{ padding: 0 }}>{checks.filter((c) => (c.section ?? "Checks") === sec).map((c) => <Link key={c.id} href={`/comp/audits/${a.id}?c=${c.id}#check`} className={"chk" + (open?.id === c.id ? " on" : "")}><span className={"dot " + (RESULT_TONE[c.result ?? ""] || (c.result ? "grey" : "none"))} /><span className="mono">{c.code}</span><span className="mini" style={{ marginLeft: "auto" }}>{c.finding_id ? "FND" : c.result ? RESULT_LABEL[c.result].split(" ")[0] : ""}</span></Link>)}</div></section>)}
+          <div className="cb" style={{ padding: 0 }}>{checks.filter((c) => (c.section ?? "Checks") === sec).map((c) => <Link key={c.id} href={`/comp/audits/${a.id}?c=${c.id}#check`} className={"chk" + (open?.id === c.id ? " on" : "")}><span className={"dot " + (RESULT_TONE[c.result ?? ""] || (c.result ? "grey" : "none"))} /><span className="chk-txt"><span className="mono">{c.ref && c.ref !== c.code ? c.ref : c.code}</span>{c.question && <span className="chk-q">{c.question.slice(0, 70)}{c.question.length > 70 ? "…" : ""}</span>}</span><span className="mini chk-res" style={{ marginLeft: "auto" }}>{c.finding_id ? "FND" : c.result ? SHORT[c.result] ?? RESULT_LABEL[c.result] : ""}</span></Link>)}</div></section>)}
           {live && <details className="card"><summary className="ch"><span className="eyebrow">+ Add a check</span></summary><form action={addCheck} className="cb grid gap-2"><input type="hidden" name="audit" value={a.id} /><input name="code" className="inp mono" placeholder="ORO.FC.230 or C1-06" required /><input name="question" className="inp" placeholder="What is checked (optional)" /><div className="flex justify-end"><button className="btn sm">Add</button></div></form></details>}
         </div>
 
