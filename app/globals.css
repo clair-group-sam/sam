@@ -693,3 +693,6 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .agrid .au.checks{background:var(--amber-s);color:#8a5a00}.agrid .au.late{background:var(--terra-s);color:var(--terra)}.agrid .au.repl{outline:1px dashed var(--amber)}
 .matrix{border-collapse:collapse;font-size:11px}.matrix th,.matrix td{border:1px solid var(--line);padding:3px 6px;text-align:center}.matrix th{font-weight:600;color:var(--slate6);white-space:nowrap}
 .matrix td.x{background:var(--blue1);color:var(--navy);font-weight:700}.matrix td.gap{background:var(--terra-s);color:var(--terra);font-weight:700}
+/* REG-03 rule text */
+.ruletext p{margin:4px 0;font-size:13px;line-height:1.5}.ruletext .rt-h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate6);margin:10px 0 4px;font-weight:700}
+.ruletext .rt-src{margin:6px 0 2px;font-style:italic}.ruletext .rt-appl{color:#8a5a00;font-style:italic}

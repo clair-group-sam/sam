@@ -46,12 +46,13 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
           return (
             <section key={r.id} className="card">
               <div className="ch" style={{ alignItems: "flex-start" }}>
-                <span><b>{r.short}</b><div className="mini">{r.number}{r.number ? " · " : ""}{r.entities.filter((e) => !desk ? scope.includes(e) : true).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</div></span>
+                <span><Link href={`/reg/ear/${r.key}`}><b>{r.short}</b></Link><div className="mini">{r.number}{r.number ? " · " : ""}{r.entities.filter((e) => !desk ? scope.includes(e) : true).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</div></span>
                 <span style={{ textAlign: "right" }}><span className={"pill " + (r.current_version ? "green" : "amber")}>{r.current_version ?? "version not read yet"}</span>{r.version_since && <div className="mini">in S.A.M. since {r.version_since}</div>}</span>
               </div>
               <div className="cb">
                 <div className="flex gap-2" style={{ flexWrap: "wrap" }}>
-                  {r.online_url && <a className="btn primary sm" href={r.online_url} target="_blank" rel="noreferrer">Read online ↗</a>}
+                  {r.items_count ? <Link className="btn primary sm" href={`/reg/ear/${r.key}`}>Read in S.A.M.</Link> : null}
+                  {r.online_url && <a className={"btn sm" + (r.items_count ? "" : " primary")} href={r.online_url} target="_blank" rel="noreferrer">Read online ↗</a>}
                   {r.pdf_url && <a className={"btn sm" + (r.online_url ? "" : " primary")} href={r.pdf_url} target="_blank" rel="noreferrer">PDF ↗</a>}
                   {r.xml_url && desk && <a className="btn sm" href={r.xml_url} target="_blank" rel="noreferrer">XML ↗</a>}
                   <a className={"btn sm" + (!r.online_url && !r.pdf_url ? " primary" : "")} href={r.page_url} target="_blank" rel="noreferrer">{r.kind === "ear" ? "EASA page ↗" : "Official text ↗"}</a>
