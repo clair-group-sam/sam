@@ -31,23 +31,36 @@ export async function POST(req: NextRequest) {
   const domainOf = (sub: string) => /CAMO/i.test(sub) ? "CAMO" : /OPS/i.test(sub) ? "OPS" : /ATO|FSTD/i.test(sub) ? "ATO" : null;
   const defRegKey = (sub: string) => (domainOf(sub) === "CAMO" ? "continuing-airworthiness" : "air-operations");
 
+  if (body.step === "reset") { // start the templates again (imported audits stay: a new import updates them and rebuilds their checks)
+    const { data: ic } = await db.from("checklists").select("id").eq("entity", entity).like("imported_from", "Centrik%");
+    const cids = ((ic ?? []) as { id: string }[]).map((x) => x.id);
+    if (cids.length) { await db.from("audits").update({ checklist_id: null }).in("checklist_id", cids); await db.from("audit_modules").update({ checklist_id: null }).in("checklist_id", cids); await db.from("audit_checks").update({ item_id: null }).in("item_id", (await db.from("checklist_items").select("id").in("checklist_id", cids)).data?.map((x) => (x as { id: string }).id) ?? ["00000000-0000-0000-0000-000000000000"]); await db.from("checklists").delete().in("id", cids); }
+    return Response.json({ checklists_removed: cids.length });
+  }
   if (body.step === "checklists") {
     // the schedule rows: "1 ORG" + name → checklist code ORG (last token with letters), title = name; one per (subsystem, no)
     const seen = new Set<string>(); let n = 0;
     for (const c of body.checklists ?? []) {
       const k = `${c.subsystem}|${c.no}`; if (seen.has(k) || !c.name) continue; seen.add(k);
       const tok = c.no.split(/\s+/).filter(Boolean); const code = (tok.find((t) => /[A-Z]/i.test(t) && !/^\d+$/.test(t)) ?? tok.join("")).toUpperCase().slice(0, 24);
-      const { data: ex } = await db.from("checklists").select("id,imported_from").eq("entity", entity).eq("code", code).maybeSingle();
-      if (!ex) { await db.from("checklists").insert({ entity, code, title: c.name.slice(0, 200), domain: domainOf(c.subsystem), regulation_id: reg(defRegKey(c.subsystem))?.id ?? null, imported_from: `Centrik ${c.subsystem} · ${c.no}`, note: kindOf(c.subsystem) === "authority" ? "Authority / external checklist" : null, created_by: s.person?.id ?? null }); n++; }
+      let code2 = code;
+      const { data: ex } = await db.from("checklists").select("id,domain,imported_from").eq("entity", entity).eq("code", code).maybeSingle();
+      if (ex && (ex as { domain: string | null }).domain !== domainOf(c.subsystem) && domainOf(c.subsystem)) { code2 = `${code}-${domainOf(c.subsystem)}`; }
+      const { data: ex2 } = code2 !== code ? await db.from("checklists").select("id").eq("entity", entity).eq("code", code2).maybeSingle() : { data: ex };
+      if (!ex2) { await db.from("checklists").insert({ entity, code: code2, title: c.name.slice(0, 200), domain: domainOf(c.subsystem), regulation_id: reg(defRegKey(c.subsystem))?.id ?? null, imported_from: `Centrik ${c.subsystem} · ${c.no}`, note: kindOf(c.subsystem) === "authority" ? "Authority / external checklist" : null, created_by: s.person?.id ?? null }); n++; }
     }
     return Response.json({ checklists: n });
   }
   const a = body.audit; if (!a) return Response.json({ error: "audit" }, { status: 400 });
   // the checklist of this audit: by name among the imported ones (same entity), else created from the audit name
-  const { data: cls } = await db.from("checklists").select("id,code,title,regulation_id,imported_from").eq("entity", entity);
-  type CL = { id: string; code: string; title: string; regulation_id: string | null; imported_from: string | null };
   const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  let cl = ((cls ?? []) as CL[]).find((c) => norm(c.title) === norm(a.name)) ?? ((cls ?? []) as CL[]).find((c) => norm(a.name).includes(norm(c.title)) || norm(c.title).includes(norm(a.name)));
+  const toks = (x: string) => new Set(norm(x).split(" ").filter((t) => t.length > 2 && !["and", "the", "incl", "audit", "checklist", "with", "for"].includes(t)));
+  const score = (x: string, y: string) => { const A = toks(x), B = toks(y); if (!A.size || !B.size) return 0; let n = 0; for (const t of A) if (B.has(t)) n++; return n / Math.max(A.size, B.size); };
+  const { data: clsFull } = await db.from("checklists").select("id,code,title,regulation_id,imported_from,domain").eq("entity", entity);
+  type CL = { id: string; code: string; title: string; regulation_id: string | null; imported_from: string | null; domain?: string | null };
+  const sameDom = ((clsFull ?? []) as CL[]).filter((c) => !c.domain || !domainOf(a.subsystem) || c.domain === domainOf(a.subsystem));
+  let cl: CL | undefined = sameDom.find((c) => norm(c.title) === norm(a.name));
+  if (!cl) { const ranked = sameDom.map((c) => ({ c, s: Math.max(score(c.title, a.name), norm(a.name).includes(norm(c.title)) || norm(c.title).includes(norm(a.name)) ? 0.8 : 0) })).filter((x) => x.s >= 0.5).sort((x, y) => y.s - x.s); cl = ranked[0]?.c; }
   if (!cl) {
     const code = a.name.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase().slice(0, 24) || "CL";
     const { data } = await db.from("checklists").insert({ entity, code, title: a.name.slice(0, 200), domain: domainOf(a.subsystem), regulation_id: reg(defRegKey(a.subsystem))?.id ?? null, imported_from: `Centrik ${a.subsystem}`, created_by: s.person?.id ?? null }).select("id,code,title,regulation_id,imported_from").single();
