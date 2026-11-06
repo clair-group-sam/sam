@@ -5,7 +5,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { citedTexts, type RegVersion, type Regulation } from "@/lib/regulation";
+type RegRow = Regulation & { items_version: string | null; items_count: number | null; items_loaded_at: string | null; items_note: string | null };
 import { archiveRegulation, checkNow, recordByHand, saveRegulation } from "./actions";
+import { RegItemsLoad } from "@/components/RegItemsLoad";
 
 type Sp = { cited?: string };
 /* REG-02 · Regulation › Easy Access Rules. The texts we work with, always in the version EASA publishes today (checked every evening);
@@ -18,7 +20,7 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
   const db = supabaseAdmin();
   const desk = s.role === "cmm";
   const { data } = await db.from("regulations").select("*").eq("active", true).order("sort").order("short");
-  const regs = ((data ?? []) as Regulation[]).filter((r) => r.entities.some((e) => scope.includes(e)));
+  const regs = ((data ?? []) as RegRow[]).filter((r) => r.entities.some((e) => scope.includes(e)));
   const ids = regs.map((r) => r.id);
   const { data: vd } = ids.length ? await db.from("regulation_versions").select("*").in("regulation_id", ids).order("seen_on", { ascending: false }) : { data: [] };
   const versions = (vd ?? []) as RegVersion[];
@@ -55,6 +57,7 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
                   <a className={"btn sm" + (!r.online_url && !r.pdf_url ? " primary" : "")} href={r.page_url} target="_blank" rel="noreferrer">{r.kind === "ear" ? "EASA page ↗" : "Official text ↗"}</a>
                 </div>
                 {desk && <div className="mini mt-2">{r.checked_at ? `checked ${r.checked_at.slice(0, 16).replace("T", " ")} UTC · ` : "never checked · "}<span className={r.check_result === "unreachable" ? "red" : ""}>{r.check_result === "unreachable" ? `page not read (${r.check_note ?? ""})` : r.check_result === "manual" ? "version recorded by hand" : r.check_result === "changed" ? `new version (${r.check_note ?? ""})` : r.checked_at ? "up to date" : ""}</span></div>}
+                {desk && r.kind === "ear" && <div className="mini mt-1">{r.items_count ? <>Articles: <b>{r.items_count}</b> · {r.items_version}{r.items_version !== r.current_version ? <span className="red"> · not the current version</span> : ""}{r.items_note ? ` · ${r.items_note}` : ""} · </> : r.xml_url ? "Articles not loaded yet · " : "No XML export · "}{r.xml_url && <RegItemsLoad regKey={r.key} label={r.items_count ? "Reload articles" : "Load the articles"} />}</div>}
                 {desk && ent.length > 0 && <div className="mini mt-1">To analyse in the watch: {ent.map((e) => <Link key={e.id} href={`/comp/watch/${e.id}`} className="mono" style={{ marginRight: 8 }}>{e.number}</Link>)}</div>}
                 {desk && <details className="mt-2"><summary className="mini">Versions ({vs.length}) · record by hand · settings</summary>
                   <table className="tbl mt-2"><tbody>{vs.map((v) => <tr key={v.id}><td>{v.version}</td><td className="mono mini">{v.seen_on}</td><td className="mini">{v.recorded_by ? "recorded by hand" : "found by S.A.M."}{v.watch_entry_ids.length ? ` · ${v.watch_entry_ids.length} watch entr${v.watch_entry_ids.length > 1 ? "ies" : "y"}` : ""}</td></tr>)}{!vs.length && <tr><td className="mini">No version recorded yet.</td></tr>}</tbody></table>
