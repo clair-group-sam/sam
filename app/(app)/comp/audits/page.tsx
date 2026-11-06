@@ -32,7 +32,7 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
   if (scope) cq = cq.in("entity", scope);
   const { data: cld } = desk ? await cq : { data: [] };
   const checklists = (cld ?? []) as { id: string; entity: string; code: string; title: string; domain: string | null; imported_from: string | null }[];
-  const { data: cnt } = checklists.length ? await db.from("checklist_items").select("checklist_id").in("checklist_id", checklists.map((c) => c.id)).eq("active", true) : { data: [] };
+  const { data: cnt } = checklists.length ? await db.from("checklist_items").select("checklist_id").in("checklist_id", checklists.map((c) => c.id)).eq("active", true).limit(50000) : { data: [] };
   const nItems = (id: string) => ((cnt ?? []) as { checklist_id: string }[]).filter((x) => x.checklist_id === id).length;
   return (
     <>

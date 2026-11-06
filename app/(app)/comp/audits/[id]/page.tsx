@@ -25,7 +25,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   const me = s.person?.id ?? null;
   const team = desk || a.lead_auditor === me || (!!me && a.auditors.includes(me));
   const [{ data: cd }, { data: ppl }, { data: ev }, { data: cls }, { data: fnd }] = await Promise.all([
-    db.from("audit_checks").select("*").eq("audit_id", a.id).order("ord"),
+    db.from("audit_checks").select("*").eq("audit_id", a.id).order("ord").limit(5000),
     db.from("people").select("id,display_name").limit(500),
     db.from("audit_events").select("*").eq("audit_id", a.id).order("at", { ascending: false }).limit(50),
     db.from("checklists").select("*").eq("entity", a.entity).eq("active", true).order("code"),

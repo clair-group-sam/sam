@@ -25,7 +25,7 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
   // a module's requirements = the rule codes of its checklist (when it has one) + those typed on the module
   type M = typeof rawMods[number] & { checklist_id?: string | null };
   const clIds = (rawMods as M[]).map((m) => m.checklist_id).filter(Boolean) as string[];
-  const { data: clItems } = clIds.length ? await db.from("checklist_items").select("checklist_id,code").in("checklist_id", clIds).eq("active", true) : { data: [] };
+  const { data: clItems } = clIds.length ? await db.from("checklist_items").select("checklist_id,code").in("checklist_id", clIds).eq("active", true).limit(50000) : { data: [] };
   const { data: clRows } = clIds.length ? await db.from("checklists").select("id,code,title").in("id", clIds) : { data: [] };
   const clOf = (id: string | null | undefined) => ((clRows ?? []) as { id: string; code: string; title: string }[]).find((c) => c.id === id);
   const codesOf = (id: string | null | undefined) => [...new Set(((clItems ?? []) as { checklist_id: string; code: string }[]).filter((i) => i.checklist_id === id).map((i) => i.code))];

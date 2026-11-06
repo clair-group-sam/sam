@@ -84,7 +84,7 @@ export async function raiseFinding(fd: FormData) {
 export async function reportAudit(fd: FormData) {
   const s = await me(); const a = await audit(String(fd.get("id")));
   if (!team(s, a)) throw new Error("Audit team only.");
-  const { data } = await db().from("audit_checks").select("*").eq("audit_id", a.id);
+  const { data } = await db().from("audit_checks").select("*").eq("audit_id", a.id).limit(5000);
   const b = breakdown((data ?? []) as Check[]);
   const summary = str(fd, "summary");
   const toStatus = str(fd, "to") === "closed" ? "closed" : "report";

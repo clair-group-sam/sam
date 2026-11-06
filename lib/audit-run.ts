@@ -29,7 +29,7 @@ export async function loadChecklist(db: SupabaseClient, id: string) {
   if (!c) return null;
   const [{ data: s }, { data: i }] = await Promise.all([
     db.from("checklist_sections").select("*").eq("checklist_id", id).order("ord"),
-    db.from("checklist_items").select("*").eq("checklist_id", id).eq("active", true).order("ord"),
+    db.from("checklist_items").select("*").eq("checklist_id", id).eq("active", true).order("ord").limit(5000),
   ]);
   return { cl: c as Checklist, sections: (s ?? []) as Section[], items: (i ?? []) as ClItem[] };
 }
