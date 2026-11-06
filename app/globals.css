@@ -752,7 +752,7 @@ a.areafig:hover span{text-decoration:underline}
 @media (max-width:900px){.card.areas{grid-template-columns:minmax(0,1fr)}.card.areas .area{border-right:0 !important;border-top:1px solid var(--line)}.card.areas .area:first-child{border-top:0}}
 td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:#c0050f;font-weight:600}td.due small{font-size:12px;font-weight:600}
 /* DA v3 · top bar holds at 1440 px: search as a button until used, avatar only (name and role in its menu) */
-.searchbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,var(--entc,#0b2a4a) 25%,#fff);border-radius:8px;padding:7px 12px;background:var(--white);color:var(--slate6);font-size:13px;cursor:pointer}
-.searchbtn kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;background:var(--blue1);padding:1px 6px;border-radius:4px;color:var(--slate6)}
+.searchbtn{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,var(--entc,#0b2a4a) 25%,#fff);border-radius:8px;padding:7px 12px;background:var(--white);color:var(--slate6);font-size:13px;cursor:pointer}
+.searchbtn kbd{white-space:nowrap;font-family:"IBM Plex Mono",monospace;font-size:11px;background:var(--blue1);padding:1px 6px;border-radius:4px;color:var(--slate6)}
 .topbar .user{padding-left:10px}
 .helpsteps{list-style:decimal;padding-left:18px;margin:0 0 8px;display:grid;gap:6px}

@@ -66,14 +66,14 @@ async function runEscalationsInner(db: SupabaseClient): Promise<Record<string, n
     const step = todo[todo.length - 1];
     const owner = t.owner_person ? nameOf(t.owner_person) ?? "the owner" : t.owner_role ?? "nobody";
     if (step === "remind" || step === "chase") {
-      resend.push({ ...t, title: `${step === "remind" ? "Due today" : `Overdue ${overdue} day${overdue === 1 ? "" : "s"}`} · ${t.title}`.slice(0, 200) });
+      resend.push({ ...t, title: `${t.title}: ${step === "remind" ? "due today" : `overdue ${overdue} day${overdue === 1 ? "" : "s"}`}`.slice(0, 200) });
       if (step === "remind") out.reminded++; else out.chased++;
     } else {
       const role = step === "am" ? "AM" : rule.escalate_to!;
       if (role === t.owner_role) { for (const s of todo) done[s] = t0; await db.from("tasks").update({ escalation: done }).eq("id", t.id); continue; } // FB-066 · the owner is the post we would escalate to: nothing to escalate
       const { data: ex } = await db.from("tasks").select("id").eq("kind", "escalation").eq("ref_id", t.id).eq("owner_role", role).eq("status", "open").limit(1);
       if (!ex?.length) {
-        await db.from("tasks").insert({ entity: t.entity, kind: "escalation", title: `Overdue ${overdue} days — ${t.title}`.slice(0, 200), detail: `${rule.label} · for ${owner} · due ${t.due}. ${step === "am" ? "The department head was informed and the item is still open: decide what happens." : "Nobody closed it: chase the owner or take it over."}`, due: t0, owner_role: role, status: "open", link: t.link, ref_id: t.id });
+        await db.from("tasks").insert({ entity: t.entity, kind: "escalation", title: `${t.title}: overdue ${overdue} days`.slice(0, 200), detail: `${rule.label} · for ${owner} · due ${t.due}. ${step === "am" ? "The department head was informed and the item is still open: decide what happens." : "Nobody closed it: chase the owner or take it over."}`, due: t0, owner_role: role, status: "open", link: t.link, ref_id: t.id });
       }
       if (step === "am") out.am++; else out.escalated++;
     }

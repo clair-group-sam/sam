@@ -124,7 +124,7 @@ function EntityColumn({ d, compact }: { d: EntityDash; compact: boolean }) {
       </section>
       <section className="card">
         <div className="ch"><span className="eyebrow">Overdue by post</span><Link className="mini" href="/dash/cs/overdue">Open the full table</Link></div>
-        <div className="cb" style={{ padding: 0 }}>{d.overdue.groups.length ? <table className="tbl"><tbody>{d.overdue.groups.slice(0, 6).map((g) => <tr key={g.owner}><td>{g.owner}{g.isPerson ? "" : " (post)"}</td><td style={{ textAlign: "right" }}><span className={"pill " + (g.worst > 15 ? "red" : g.worst > 7 ? "amber" : "")}>{g.count} items, worst {g.worst} d</span></td></tr>)}</tbody></table> : <p className="p-3 mini">Nothing overdue.</p>}</div>
+        <div className="cb" style={{ padding: 0 }}>{d.overdue.groups.length ? <table className="tbl"><tbody>{d.overdue.groups.slice(0, 6).map((g) => <tr key={g.owner}><td>{g.owner}{g.isPerson ? "" : " (post)"}</td><td style={{ textAlign: "right" }}><span className={"pill " + (g.worst > 15 ? "red" : g.worst > 7 ? "amber" : "")}>{g.count} item{g.count === 1 ? "" : "s"}, worst {g.worst} d</span></td></tr>)}</tbody></table> : <p className="p-3 mini">Nothing overdue.</p>}</div>
       </section>
     </div>
   );
