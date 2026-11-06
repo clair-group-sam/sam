@@ -54,7 +54,7 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
         })}</tbody></table>)}</div></section>
       {desk && <details className="card mt-4 mb-4"><summary className="ch"><span className="eyebrow">Checklists · {checklists.length}</span><span className="mini">the templates behind the audits — linked to the programme's modules</span></summary>
         <div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Checklist</th><th>Domain</th><th>Items</th><th>Origin</th></tr></thead><tbody>{checklists.map((c) => <tr key={c.id}><td><Link href={`/comp/prog/cl/${c.id}`}><b className="mono">{c.code}</b> {c.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[c.entity] ?? "#888" }} />{c.entity}</div></td><td className="mini">{c.domain ?? "—"}</td><td className={nItems(c.id) ? "" : "late"}>{nItems(c.id)}</td><td className="mini">{c.imported_from ?? "S.A.M."}</td></tr>)}{!checklists.length && <tr><td className="mini" colSpan={4}>No checklist yet — create one from a programme module, or import from Centrik.</td></tr>}</tbody></table></div></details>}
-      {desk && <AuditImport entities={scope ?? ENTS4} initial={s.entity === "ALL" ? (scope ?? ENTS4)[0] : s.entity} />}
+      {desk && <AuditImport entities={s.group ? ENTS4 : s.entities} initial={s.entity === "ALL" ? (s.group ? ENTS4 : s.entities)[0] : s.entity} />}
     </>
   );
 }
