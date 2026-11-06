@@ -37,7 +37,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
   const paras = (t: string | null) => (t ?? "").split(/\n\s*\n/).filter(Boolean);
   return (
     <>
-      <PageHeader eyebrow={`Safety · ${PROMO_KIND[p.kind]?.label} · ${p.entity}`} title={`${p.number} — ${p.title}`} sub={`${AUDIENCE[p.audience]}${p.published_at ? ` · published ${p.published_at.slice(0, 10)}` : ""}${p.due ? ` · by ${p.due}` : ""}`}
+      <PageHeader eyebrow={`Safety, ${PROMO_KIND[p.kind]?.label}, ${p.entity}`} title={`${p.number}, ${p.title}`} sub={`${AUDIENCE[p.audience]}${p.published_at ? `, published ${p.published_at.slice(0, 10)}` : ""}${p.due ? `, by ${p.due}` : ""}`}
         tag={<span className={"pill " + (PROMO_STATUS[p.status]?.[1] ?? "")}>{PROMO_STATUS[p.status]?.[0]}</span>} right={<>{p.pdf_path && <a className="btn primary" href={`/api/promotions/${p.id}/pdf`} target="_blank" rel="noreferrer">PDF</a>}<Link href="/safe/promo" className="btn">← Safety promotion</Link></>} />
       <div className="grid gap-5" style={{ gridTemplateColumns: edit || desk ? "minmax(0,2fr) minmax(0,1fr)" : "minmax(0,1fr)" }}>
         <div>
@@ -46,14 +46,14 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
             <form key={`${p.draft_model ?? ""}:${(p.body ?? "").length}:${(p.summary ?? "").length}`} action={savePromotion} className="cb grid grid-cols-3 gap-2"><Hid /><input type="hidden" name="ack_flag" value="1" /><input type="hidden" name="anon_flag" value="1" />
               <label className="col-span-3"><span className="mini">Title</span><input name="title" className="inp" defaultValue={p.title} /></label>
               <label className="col-span-3"><span className="mini">Summary (one line, shown in the Inbox)</span><input name="summary" className="inp" defaultValue={p.summary ?? ""} /></label>
-              <label className="col-span-3"><span className="mini">{p.kind === "survey" ? "Introduction" : "Text"}{p.report_id ? ` · from report ${p.report_id}` : ""} — de-identified: no names, registrations, flight numbers</span><textarea name="body" className="inp" rows={12} defaultValue={p.body ?? ""} /></label>
+              <label className="col-span-3"><span className="mini">{p.kind === "survey" ? "Introduction" : "Text"}{p.report_id ? `, from report ${p.report_id}` : ""}, de-identified: no names, registrations, flight numbers</span><textarea name="body" className="inp" rows={12} defaultValue={p.body ?? ""} /></label>
               <label><span className="mini">Audience</span><select name="audience" className="inp" defaultValue={p.audience}>{Object.entries(AUDIENCE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
               <label><span className="mini">{p.kind === "survey" ? "Closes on" : "To read by"}</span><input type="date" name={p.kind === "survey" ? "closes_at" : "due"} className="inp" defaultValue={(p.kind === "survey" ? p.closes_at : p.due) ?? ""} /></label>
               <label className="mini flex items-end gap-2">{p.kind === "survey" ? <><input type="checkbox" name="anonymous" value="1" defaultChecked={p.anonymous} /> anonymous answers</> : <><input type="checkbox" name="ack" value="1" defaultChecked={p.ack_required} /> acknowledgement required</>}</label>
               <div className="col-span-3 flex justify-end"><button className="btn">Save</button></div></form></section>
             : <section className="card mb-5"><div className="cb">{p.summary && <p className="mb-3"><b>{p.summary}</b></p>}{paras(p.body).map((t, k) => <p key={k} className="mb-2" style={{ whiteSpace: "pre-wrap" }}>{t}</p>)}</div></section>}
 
-          {p.kind === "survey" && <section className="card mb-5"><div className="ch"><span className="eyebrow">Questions</span>{p.anonymous && <span className="mini">anonymous — answers are not linked to you</span>}</div>
+          {p.kind === "survey" && <section className="card mb-5"><div className="ch"><span className="eyebrow">Questions</span>{p.anonymous && <span className="mini">anonymous, answers are not linked to you</span>}</div>
             {edit ? <div className="cb grid gap-2">
                 {p.questions.map((q, k) => <div key={q.key} className="flex gap-2 items-center"><span className="flex-1">{k + 1}. {q.label} <span className="mini">· {q.type}{q.options?.length ? `: ${q.options.join(" / ")}` : ""}</span></span><form action={saveQuestion}><Hid /><input type="hidden" name="remove" value={q.key} /><button className="btn"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></div>)}
                 <form action={saveQuestion} className="grid grid-cols-6 gap-2"><Hid />
@@ -64,7 +64,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
                 {p.questions.map((q, k) => <label key={q.key}><span>{k + 1}. {q.label}</span>
                   {q.type === "text" ? <textarea name={q.key} className="inp" rows={2} /> : <select name={q.key} className="inp" defaultValue=""><option value="">—</option>{(q.type === "scale" ? SCALE : q.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}</select>}</label>)}
                 <div className="flex justify-end"><button className="btn primary">Send my answers</button></div></form>
-              : <div className="cb mini">{mine?.answered_at ? "Answered — thank you." : p.status === "closed" ? "The survey is closed." : `${p.questions.length} question(s).`}</div>}
+              : <div className="cb mini">{mine?.answered_at ? "Answered, thank you." : p.status === "closed" ? "The survey is closed." : `${p.questions.length} question(s).`}</div>}
           </section>}
 
           {mine && p.status === "published" && p.kind !== "survey" && p.ack_required && <section className="card mb-5"><div className="cb flex items-center gap-3">
@@ -74,7 +74,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
             <div className="cb grid gap-3">{p.questions.map((q, k) => { const v = A.map((a) => a[q.key]).filter(Boolean); const opts = q.type === "scale" ? SCALE : q.options ?? [];
               return <div key={q.key}><b>{k + 1}. {q.label}</b>
                 {q.type === "text" ? <ul className="mini" style={{ margin: "4px 0 0 16px", listStyle: "disc" }}>{v.map((t, j) => <li key={j}>{t}</li>)}{!v.length && <li>—</li>}</ul>
-                  : <div className="grid gap-1 mt-1">{opts.map((o) => { const n = v.filter((x) => x === o).length; const pc = v.length ? Math.round((n / v.length) * 100) : 0; return <div key={o} className="flex gap-2 items-center mini"><span style={{ width: 170 }}>{o}</span><span style={{ flex: 1, background: "var(--line, #e3e8ee)", height: 8, borderRadius: 4 }}><span style={{ display: "block", width: `${pc}%`, height: 8, borderRadius: 4, background: "var(--accent, #006c9c)" }} /></span><span style={{ width: 70, textAlign: "right" }}>{n} · {pc}%</span></div>; })}
+                  : <div className="grid gap-1 mt-1">{opts.map((o) => { const n = v.filter((x) => x === o).length; const pc = v.length ? Math.round((n / v.length) * 100) : 0; return <div key={o} className="flex gap-2 items-center mini"><span style={{ width: 170 }}>{o}</span><span style={{ flex: 1, background: "var(--line, #e3e8ee)", height: 8, borderRadius: 4 }}><span style={{ display: "block", width: `${pc}%`, height: 8, borderRadius: 4, background: "var(--accent, #006c9c)" }} /></span><span style={{ width: 70, textAlign: "right" }}>{n}, {pc}%</span></div>; })}
                     {q.type === "scale" && v.length > 0 && <span className="mini">mean {(v.reduce((t, x) => t + Number(String(x)[0]), 0) / v.length).toFixed(1)} / 5</span>}</div>}</div>; })}</div></section>}
         </div>
 

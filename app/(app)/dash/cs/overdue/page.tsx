@@ -20,7 +20,7 @@ export default async function ComplianceSafetyDash() {
   const worst = groups[0]?.worst ?? 0;
   return (
     <>
-      <PageHeader eyebrow="Dashboards · Compliance & Safety · Overdue" title="Overdue items by post" sub="Open Inbox items past their due date, who holds them and how far the reminder ladder has gone. Updated every night." right={<span className="flex gap-2"><Link className="btn" href="/dash/cs">← Dashboard</Link><Link className="btn" href="/set/notif">Notification rules</Link></span>} />
+      <PageHeader eyebrow="Dashboards, Compliance & Safety, Overdue" title="Overdue items by post" sub="Open Inbox items past their due date, who holds them and how far the reminder ladder has gone. Updated every night." right={<span className="flex gap-2"><Link className="btn" href="/dash/cs">← Dashboard</Link><Link className="btn" href="/set/notif">Notification rules</Link></span>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Overdue items" value={total} tone={total ? "amber" : "green"} hint={total ? `${groups.length} post${groups.length === 1 ? "" : "s"} / person${groups.length === 1 ? "" : "s"}` : "nothing overdue"} />
         <Metric label="Oldest" value={worst ? `${worst} d` : "—"} tone={worst > 15 ? "red" : worst > 7 ? "amber" : undefined} hint="days past due" />
@@ -32,8 +32,8 @@ export default async function ComplianceSafetyDash() {
         {groups.map((g) => (
           <section className="card" key={`${g.entity}|${g.owner}`}>
             <div className="ch">
-              <span className="eyebrow"><span className="entdot" style={{ background: ENT_COLOR[g.entity] ?? "#888" }} /> {g.entity} · {g.owner}{g.isPerson ? "" : " (post)"}</span>
-              <span className={"pill " + (g.worst > 15 ? "red" : g.worst > 7 ? "amber" : "")}>{g.count} overdue · worst {g.worst} d</span>
+              <span className="eyebrow"><span className="entdot" style={{ background: ENT_COLOR[g.entity] ?? "#888" }} /> {g.entity}, {g.owner}{g.isPerson ? "" : " (post)"}</span>
+              <span className={"pill " + (g.worst > 15 ? "red" : g.worst > 7 ? "amber" : "")}>{g.count} overdue, worst {g.worst} d</span>
             </div>
             <div className="cb" style={{ padding: 0 }}>
               <table className="tbl">

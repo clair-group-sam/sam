@@ -29,7 +29,7 @@ export default function LinkPicker({ manualId, chapters, initialUrl, onPick, onR
       {tab !== "web" && <input className="inp mb-2" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter chapters…" />}
       {tab === "self" && <div className="lplist">{chapters.filter(f).map((c) => <button key={c.uid} type="button" onClick={() => onPick(`/docs/link/ch/${manualId}/${c.uid}`, `${c.ref} ${c.title ?? ""}`.trim())}><span className="mono">{c.ref}</span> {c.title}</button>)}</div>}
       {tab === "other" && (<>
-        <select className="inp mb-2" value={other} onChange={(e) => setOther(e.target.value)}><option value="">— choose a manual —</option>{manuals.map((m) => <option key={m.id} value={m.id}>{m.entity} · {m.code} — {m.title}</option>)}</select>
+        <select className="inp mb-2" value={other} onChange={(e) => setOther(e.target.value)}><option value="">— choose a manual —</option>{manuals.map((m) => <option key={m.id} value={m.id}>{m.entity}, {m.code}, {m.title}</option>)}</select>
         <div className="lplist">{otherCh.filter(f).map((c) => <button key={c.uid} type="button" onClick={() => onPick(`/docs/link/ch/${other}/${c.uid}`, `${man?.code ?? ""} ${c.ref} ${c.title ?? ""}`.trim())}><span className="mono">{c.ref}</span> {c.title}</button>)}
           {other && !otherCh.length && <span className="mini">No published chapter in this manual.</span>}</div>
       </>)}

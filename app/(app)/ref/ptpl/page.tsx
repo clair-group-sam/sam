@@ -30,10 +30,10 @@ function TemplateForm({ t, isNew }: { t: ProjectTemplate | null; isNew?: boolean
         <label className="mini flex items-center gap-1"><input type="checkbox" name="active" defaultChecked={t ? t.active : true} /> active</label>
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <label><span className="mini">Phases — one per line: <code>key | Label</code></span><textarea name="phases" className="inp mono" rows={Math.max(8, (t?.phases.length ?? 0) + 2)} defaultValue={txt.phases} /></label>
-        <label className="col-span-2"><span className="mini">Tasks — one per line: <code>key | phase | Title | ROLE | days | dep1,dep2 | link:REF | detail</code> (link = manual:OM-A · authority_file:AC-NEW · certificate:insurance · moc)</span><textarea name="tasks" className="inp mono" rows={Math.max(8, (t?.tasks.length ?? 0) + 2)} defaultValue={txt.tasks} style={{ fontSize: 11.5 }} /></label>
+        <label><span className="mini">Phases, one per line: <code>key | Label</code></span><textarea name="phases" className="inp mono" rows={Math.max(8, (t?.phases.length ?? 0) + 2)} defaultValue={txt.phases} /></label>
+        <label className="col-span-2"><span className="mini">Tasks, one per line: <code>key | phase | Title | ROLE | days | dep1,dep2 | link:REF | detail</code> (link = manual:OM-A, authority_file:AC-NEW, certificate:insurance, moc)</span><textarea name="tasks" className="inp mono" rows={Math.max(8, (t?.tasks.length ?? 0) + 2)} defaultValue={txt.tasks} style={{ fontSize: 11.5 }} /></label>
       </div>
-      <div className="flex items-center gap-3"><button className="btn primary" type="submit">{isNew ? "+ Create the template" : "Save"}</button><span className="mini">Applies to projects opened afterwards; running projects keep their own tasks. Keys are what dependencies point to — keep them stable.</span></div>
+      <div className="flex items-center gap-3"><button className="btn primary" type="submit">{isNew ? "+ Create the template" : "Save"}</button><span className="mini">Applies to projects opened afterwards; running projects keep their own tasks. Keys are what dependencies point to, keep them stable.</span></div>
     </form>
   );
 }
@@ -51,11 +51,11 @@ export default async function ProjectTemplates({ searchParams }: { searchParams:
       <PageHeader eyebrow="References" title="Project templates" sub="What a kind of project is made of: phases, tasks with their post, duration, dependencies and the S.A.M. object each task calls for. Projects opened from a template copy all of it; lessons learned on a closed project can be pushed back here." right={<Link href="/proj/boards/new" className="btn primary">Open a project</Link>} />
       {templates.map((t) => (
         <section key={t.code} className="card mb-4" id={t.code} style={{ opacity: t.active ? 1 : 0.6 }}>
-          <div className="ch"><span className="pill">{t.code}</span><b>{t.name}</b><span className="mini ml-auto">{t.entities.join(", ")} · {t.phases.length} phases · {t.tasks.length} tasks{t.pivots.length ? ` · asks ${t.pivots.map((k) => PIVOT_LABEL[k] ?? k).join(", ")}` : ""}{!t.active ? " · inactive" : ""}</span></div>
+          <div className="ch"><span className="pill">{t.code}</span><b>{t.name}</b><span className="mini ml-auto">{t.entities.join(", ")}, {t.phases.length} phases, {t.tasks.length} tasks{t.pivots.length ? `, asks ${t.pivots.map((k) => PIVOT_LABEL[k] ?? k).join(", ")}` : ""}{!t.active ? ", inactive" : ""}</span></div>
           <div className="cb">
             {t.description && <p className="mini mb-2">{t.description}</p>}
             <div className="grid grid-cols-2 gap-4">
-              {t.phases.map((ph) => <div key={ph.key}><div className="eyebrow mb-1">{ph.label}</div><ol className="pl-5 text-[13px] grid gap-1">{t.tasks.filter((x) => x.phase === ph.key).map((x) => <li key={x.key}>{x.title}<span className="mini mono"> {x.owner_role ?? ""}{x.days ? ` · ${x.days} d` : ""}{x.deps?.length ? ` · after ${x.deps.join(", ")}` : ""}{x.link_kind ? ` · ${x.link_kind}${x.link_ref ? `:${x.link_ref}` : ""}` : ""}</span></li>)}</ol></div>)}
+              {t.phases.map((ph) => <div key={ph.key}><div className="eyebrow mb-1">{ph.label}</div><ol className="pl-5 text-[13px] grid gap-1">{t.tasks.filter((x) => x.phase === ph.key).map((x) => <li key={x.key}>{x.title}<span className="mini mono"> {x.owner_role ?? ""}{x.days ? `, ${x.days} d` : ""}{x.deps?.length ? `, after ${x.deps.join(", ")}` : ""}{x.link_kind ? `, ${x.link_kind}${x.link_ref ? `:${x.link_ref}` : ""}` : ""}</span></li>)}</ol></div>)}
             </div>
             {cmm && <details className="mt-2" open={edit === t.code}><summary className="mini underline cursor-pointer">Edit this template</summary><TemplateForm t={t} /></details>}
           </div>

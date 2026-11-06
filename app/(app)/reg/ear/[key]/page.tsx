@@ -28,12 +28,12 @@ export default async function EarPage({ params, searchParams }: { params: Promis
   }
   return (
     <>
-      <PageHeader eyebrow="Regulation · Easy Access Rules" title={r.title} sub={`${r.number ?? ""} · ${r.current_version ?? "version not read"}${v ? ` · ${r.items_count} articles in S.A.M. (${v})` : " · articles not loaded"}`}
+      <PageHeader eyebrow="Regulation, Easy Access Rules" title={r.title} sub={`${r.number ?? ""}, ${r.current_version ?? "version not read"}${v ? `, ${r.items_count} articles in S.A.M. (${v})` : ", articles not loaded"}`}
         right={<div className="flex gap-2"><Link className="btn" href="/reg/ear">All rules</Link>{r.online_url && <a className="btn" href={r.online_url} target="_blank" rel="noreferrer">EASA online ↗</a>}</div>} />
-      <form className="card cb mb-4" style={{ display: "flex", gap: 8 }}><input name="q" className="inp" defaultValue={q} placeholder="ORO.GEN.200 · SPA.RVSM · fatigue · flight data monitoring…" style={{ flex: 1 }} /><button className="btn primary">Find</button></form>
-      {!v && <section className="card"><div className="cb mini">The articles of this text are not loaded in S.A.M. yet — read it on the EASA site.</div></section>}
+      <form className="card cb mb-4" style={{ display: "flex", gap: 8 }}><input name="q" className="inp" defaultValue={q} placeholder="ORO.GEN.200, SPA.RVSM, fatigue, flight data monitoring…" style={{ flex: 1 }} /><button className="btn primary">Find</button></form>
+      {!v && <section className="card"><div className="cb mini">The articles of this text are not loaded in S.A.M. yet, read it on the EASA site.</div></section>}
       {hits.length > 0 && <section className="card mb-4"><div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Rule</th><th>Where</th></tr></thead><tbody>
-        {hits.map((h) => <tr key={h.id}><td><Link href={`/reg/ear/${key}?code=${encodeURIComponent(h.code)}`}><b className="mono">{h.ref}</b> {h.title}</Link><div className="mini">{h.kind.toUpperCase()}{h.source ? ` · ${h.source}` : ""}</div></td><td className="mini">{h.annex}{h.section ? ` · ${h.section}` : ""}</td></tr>)}</tbody></table></div></section>}
+        {hits.map((h) => <tr key={h.id}><td><Link href={`/reg/ear/${key}?code=${encodeURIComponent(h.code)}`}><b className="mono">{h.ref}</b> {h.title}</Link><div className="mini">{h.kind.toUpperCase()}{h.source ? `, ${h.source}` : ""}</div></td><td className="mini">{h.annex}{h.section ? `, ${h.section}` : ""}</td></tr>)}</tbody></table></div></section>}
       {q && !hits.length && !code && v && <p className="mini">Nothing found for “{q}”.</p>}
       {items.length > 0 && <RuleText items={items} version={v!} onlineUrl={r.online_url} />}
     </>

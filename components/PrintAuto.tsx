@@ -21,7 +21,7 @@ export default function PrintAuto({ fileName, auto }: { fileName: string; auto: 
   return (
     <div className="pm-bar">
       <b>{fileName}.pdf</b>
-      <span>{ready ? "Ready — choose “Save as PDF” as destination in the dialog." : `Loading figures… ${left ?? ""}`}</span>
+      <span>{ready ? "Ready, choose “Save as PDF” as destination in the dialog." : `Loading figures… ${left ?? ""}`}</span>
       <button type="button" className="btn primary" disabled={!ready} onClick={() => window.print()}>Download PDF</button>
       <button type="button" className="btn" onClick={() => window.close()}>Close</button>
     </div>

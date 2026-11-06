@@ -22,11 +22,11 @@ export default async function Mocs({ searchParams }: { searchParams: Promise<{ s
   const rows = st === "closed" ? all.filter((r) => !live(r)) : st === "all" ? all : all.filter(live);
   return (
     <>
-      <PageHeader eyebrow="Safety · Management of change" title="Management of change" sub="ORO.GEN.200(a)(3) · MSM §3.4 — every change gets its risk assessment, signed off by the most relevant NP (the AM decides on a red residual risk), before it is implemented. Its lasting hazards are linked to the hazard log." right={mayEditRisk(s) ? <Link href="/safe/moc/new" className="btn primary">+ New MOC</Link> : undefined} />
+      <PageHeader eyebrow="Safety, Management of change" title="Management of change" sub="ORO.GEN.200(a)(3), MSM §3.4, every change gets its risk assessment, signed off by the most relevant NP (the AM decides on a red residual risk), before it is implemented. Its lasting hazards are linked to the hazard log." right={mayEditRisk(s) ? <Link href="/safe/moc/new" className="btn primary">+ New MOC</Link> : undefined} />
       <RiskTabs on="moc" toMatch={toMatch} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="In risk assessment" value={all.filter((r) => r.status === "draft" && live(r)).length} />
-        <Metric label="Red — AM decision" value={all.filter((r) => r.status === "validated").length} tone={all.some((r) => r.status === "validated") ? "amber" : undefined} />
+        <Metric label="Red. AM decision" value={all.filter((r) => r.status === "validated").length} tone={all.some((r) => r.status === "validated") ? "amber" : undefined} />
         <Metric label="Approved, to implement" value={all.filter((r) => r.moc_status === "approved").length} />
         <Metric label="Implemented, to close" value={all.filter((r) => r.moc_status === "implemented").length} />
       </div>
@@ -44,7 +44,7 @@ export default async function Mocs({ searchParams }: { searchParams: Promise<{ s
                 {mayEditRisk(s) && <td>{r.status === "accepted" && r.moc_status !== "closed" && <input type="checkbox" name="ids" value={r.id} form="bulk-moc" />}</td>}
                 <td className="mono"><Link className="underline" href={`/safe/risk/a/${r.id}`}>{r.number}</Link><SourceMark source={r.source} /></td>
                 <td className="entcol"><span className={"ent " + r.entity}>{r.entity}</span></td>
-                <td><Link href={`/safe/risk/a/${r.id}`}><b>{r.name}</b></Link><div className="mini">{MOC_CATEGORIES[r.category ?? ""] ?? r.domain ?? ""}{r.project_id ? " · from a project" : ""} · {r.hazards.filter((h) => !h.proposed).length} hazards ({r.hazards.filter((h) => !h.proposed && h.log_hazard_id).length} in log)</div></td>
+                <td><Link href={`/safe/risk/a/${r.id}`}><b>{r.name}</b></Link><div className="mini">{MOC_CATEGORIES[r.category ?? ""] ?? r.domain ?? ""}{r.project_id ? ", from a project" : ""}, {r.hazards.filter((h) => !h.proposed).length} hazards ({r.hazards.filter((h) => !h.proposed && h.log_hazard_id).length} in log)</div></td>
                 <td>{w ? <span className={"pill " + tolTone(w)}>{w}</span> : <span className="mini">—</span>}</td>
                 <td className="mono">{r.start_date ?? "—"}</td>
                 <td><span className={"pill " + (RA_STATUS[r.status]?.[1] ?? "")}>{RA_STATUS[r.status]?.[0]}</span>{r.moc_status && r.moc_status !== "assessment" && <div className="mini">{MOC_STATUS[r.moc_status]?.[0]}</div>}</td>

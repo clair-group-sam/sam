@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const { data } = await supabaseAdmin().from("manuals").select("entity,code,title").eq("id", id).maybeSingle();
   const m = data as { entity: string; code: string; title: string } | null;
-  return { title: m ? `${ENT[m.entity]?.name ?? m.entity} · ${m.code} — ${m.title}` : "S.A.M." };
+  return { title: m ? `${ENT[m.entity]?.name ?? m.entity}, ${m.code}, ${m.title}` : "S.A.M." };
 }
 
 export default async function ManualPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; sec?: string; rev?: string; q?: string }> }) {
@@ -128,7 +128,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       const after = c.deleted_at ? "" : c.body.html ?? "";
       const u = (c.body as { uid?: string }).uid;
       const before = (u ? baseByUid.get(u) : undefined) ?? baseByRef.get(c.base_ref ?? c.ref);
-      const note = c.deleted_at ? `Deleted in Rev ${current.rev}` : !c.base_ref && basedOn ? "New chapter" : c.base_ref && c.base_ref !== c.ref ? `Renumbered — was ${c.base_ref}` : "";
+      const note = c.deleted_at ? `Deleted in Rev ${current.rev}` : !c.base_ref && basedOn ? "New chapter" : c.base_ref && c.base_ref !== c.ref ? `Renumbered, was ${c.base_ref}` : "";
       return { id: c.id, ref: c.ref, title: c.title, note, rows: before !== undefined ? diffBlocks(before, after) : null, passages: before === undefined ? revbarPassages(after) : [] };
     });
   }
@@ -148,7 +148,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   return (
     <>
       <EntityBand entity={manual.entity} current={s.entity} multi={multi} />
-      <PageHeader stacked eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
+      <PageHeader stacked eyebrow={`Documents, ${manual.entity}, ${manual.code}`} title={manual.title}
         tag={<ManualClass internal={!!(manual as Manual & { internal?: boolean }).internal} entity={manual.entity} />}
         sub={current ? `${manual.code}, owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${manual.path ? `, folder ${manual.path}` : ""}${published.length ? `, ${published.length} published revision${published.length > 1 ? "s" : ""}` : ""}` : "No revision yet"}
         right={<>
@@ -181,22 +181,22 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
 
       {current && !(current.step === "published" || current.step === "repository") && (
         <div className="previewbar mb-4">
-          <div><b>Preview — Rev {current.rev} is not published</b> ({STEP_LABEL[current.step]}). This is how readers will see it once published{published[0] ? `; today they read Rev ${published[0].rev}` : ""}.</div>
+          <div><b>Preview. Rev {current.rev} is not published</b> ({STEP_LABEL[current.step]}). This is how readers will see it once published{published[0] ? `; today they read Rev ${published[0].rev}` : ""}.</div>
           {(isCmm(s) || ownsManual(s, manual.owner_role)) && <Link className="btn primary" href={`/docs/editor/${current.id}?tab=write${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`}>‹ Back to the draft</Link>}
           {published[0] && <Link className="btn" href={`/docs/manual/${manual.id}`}>Published version</Link>}
         </div>
       )}
       {current && (current.step === "published" || current.step === "repository") && tab !== "history" && (
         <div className="statusline mb-4">
-          <span className="pill green">Published · Iss {current.issue} Rev {current.rev}{current.published_at ? ` · ${current.published_at}` : ""}</span>
+          <span className="pill green">Published, Iss {current.issue} Rev {current.rev}{current.published_at ? `, ${current.published_at}` : ""}</span>
           {current.authority_route === "approval" && <span className="mini">approved by the civil aviation authority before publication</span>}
           {current.authority_route === "notification" && <span className="mini">notified to the civil aviation authority</span>}
-          {workings.map((w) => <Link key={w.id} href={`/docs/manual/${manual.id}?rev=${w.id}`} className="pill amber">Rev {w.rev} — {STEP_LABEL[w.step]}</Link>)}
+          {workings.map((w) => <Link key={w.id} href={`/docs/manual/${manual.id}?rev=${w.id}`} className="pill amber">Rev {w.rev}, {STEP_LABEL[w.step]}</Link>)}
           {!workings.length && s.role !== "user" && <span className="mini">no revision in progress</span>}
         </div>
       )}
       {current && !(current.step === "published" || current.step === "repository") && s.role !== "user" && (
-        <div className="mini mb-2">CAA application: {authFiles.get(current.id) ? <Link className="underline" href={`/proj/auth/${authFiles.get(current.id)!.id}`}>{authFiles.get(current.id)!.portal_ref ?? "open"} · {authFiles.get(current.id)!.stage}</Link> : <>none yet{(isCmm(s) || ownsManual(s, manual.owner_role)) && <> · <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${current.id}`}>open one</Link></>}</>}</div>
+        <div className="mini mb-2">CAA application: {authFiles.get(current.id) ? <Link className="underline" href={`/proj/auth/${authFiles.get(current.id)!.id}`}>{authFiles.get(current.id)!.portal_ref ?? "open"}, {authFiles.get(current.id)!.stage}</Link> : <>none yet{(isCmm(s) || ownsManual(s, manual.owner_role)) && <>, <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${current.id}`}>open one</Link></>}</>}</div>
       )}
       {current && !(current.step === "published" || current.step === "repository") && (
         <div className="steps mb-5">
@@ -218,7 +218,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       {tab === "read" && !current && <section className="card"><div className="cb text-slate6">No revision to read yet.</div></section>}
 
       {tab === "changed" && (
-        <section className="card"><div className="ch"><span className="eyebrow">What changed in Rev {current?.rev ?? "—"}{baseRevLabel ? ` · compared with ${baseRevLabel}` : ""}</span><span className="mini">{changes.length} chapter{changes.length === 1 ? "" : "s"}</span></div>
+        <section className="card"><div className="ch"><span className="eyebrow">What changed in Rev {current?.rev ?? "—"}{baseRevLabel ? `, compared with ${baseRevLabel}` : ""}</span><span className="mini">{changes.length} chapter{changes.length === 1 ? "" : "s"}</span></div>
           <div className="cb">
             <p className="mb-4">{current?.summary ?? "No revision summary recorded."}</p>
             {!changes.length && <p className="mini">No chapter is marked as changed in this revision.</p>}
@@ -254,13 +254,13 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         <section className="card"><table className="tbl">
           <thead><tr><th>Issue / Rev</th><th>Step</th><th>Authority route</th><th>Published</th><th>Summary</th></tr></thead>
           <tbody>{revs.map((r) => (
-            <tr key={r.id}><td className="mono"><Link className="underline" href={`/docs/manual/${manual.id}?rev=${r.id}`}>Iss {r.issue} Rev {r.rev}</Link></td><td>{STEP_LABEL[r.step]}</td><td className="mini">{r.authority_route ?? "—"}{r.authority_ref ? ` · ${r.authority_ref}` : ""}</td><td className="mono">{r.published_at ?? "—"}</td><td className="mini">{r.summary}</td></tr>
+            <tr key={r.id}><td className="mono"><Link className="underline" href={`/docs/manual/${manual.id}?rev=${r.id}`}>Iss {r.issue} Rev {r.rev}</Link></td><td>{STEP_LABEL[r.step]}</td><td className="mini">{r.authority_route ?? "—"}{r.authority_ref ? `, ${r.authority_ref}` : ""}</td><td className="mono">{r.published_at ?? "—"}</td><td className="mini">{r.summary}</td></tr>
           ))}</tbody>
         </table></section>
       )}
 
       {tab === "readers" && office && (<>
-        <section className="card mb-4"><div className="ch"><span className="eyebrow">Readers · Rev {current?.rev}</span>
+        <section className="card mb-4"><div className="ch"><span className="eyebrow">Readers, Rev {current?.rev}</span>
           <span className="mini">{expected.length === 0 ? <>no one attached to {ENT[manual.entity]?.name ?? manual.entity} yet. <Link href="/set/core" className="underline">add people in Settings › Core</Link></> : <>{expected.filter((p) => readings.some((r) => r.person_id === p.id && r.acknowledged_at)).length} / {expected.length} acknowledged</>}</span></div>
           <table className="tbl"><thead><tr><th>Person</th><th>Post</th><th>Acknowledged</th><th>Via</th></tr></thead>
             <tbody>
@@ -277,7 +277,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             <form action={saveAudience} className="cb">
               <input type="hidden" name="manual_id" value={manual.id} />
               <label className="flex items-center gap-2 mb-3"><input type="checkbox" name="all" defaultChecked={audience.includes("ALL")} /> <b>All staff of {ENT[manual.entity]?.name ?? manual.entity}</b><span className="mini">(everyone attached to the entity; group functions only when named below)</span></label>
-              <div className="eyebrow mb-1">Posts — holders and their deputies</div>
+              <div className="eyebrow mb-1">Posts, holders and their deputies</div>
               <div className="audgrid mb-3">{POSTS.map((p) => <label key={p} className="audchk"><input type="checkbox" name="post" value={p} defaultChecked={audience.includes(`ROLE:${p}`)} /> {p}</label>)}</div>
               <div className="eyebrow mb-1">People by name</div>
               <div className="audgrid people mb-3">{entityPeople.map((p) => <label key={p.id} className="audchk"><input type="checkbox" name="person" value={p.id} defaultChecked={audience.includes(`PERSON:${p.id}`)} /> {p.display_name}<span className="mini"> {p.roles.join(", ")}</span></label>)}

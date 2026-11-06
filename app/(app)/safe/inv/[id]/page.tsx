@@ -34,18 +34,18 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
   const T = ({ v }: { v: string | null }) => (v ? <p style={{ whiteSpace: "pre-wrap" }}>{v}</p> : <p className="mini">Not written.</p>);
   return (
     <>
-      <PageHeader eyebrow={`Safety · Investigations · ${i.entity}`} title={`${i.number} — ${i.title}`} sub={`${INV_LEVEL[i.level]?.[0] ?? i.level} · lead ${i.lead_name ?? "—"} · due ${i.due ?? "—"}`}
-        tag={<span className="flex gap-2"><span className={"pill " + (invLate(i) ? "red" : INV_STATUS[i.status]?.[1] ?? "")}>{invLate(i) ? "Overdue" : INV_STATUS[i.status]?.[0]}</span><span className="pill">Confidential · just culture</span></span>}
+      <PageHeader eyebrow={`Safety, Investigations, ${i.entity}`} title={`${i.number}, ${i.title}`} sub={`${INV_LEVEL[i.level]?.[0] ?? i.level}, lead ${i.lead_name ?? "—"}, due ${i.due ?? "—"}`}
+        tag={<span className="flex gap-2"><span className={"pill " + (invLate(i) ? "red" : INV_STATUS[i.status]?.[1] ?? "")}>{invLate(i) ? "Overdue" : INV_STATUS[i.status]?.[0]}</span><span className="pill">Confidential, just culture</span></span>}
         right={<><Link href="/safe/inv" className="btn">← Investigations</Link>{i.report_text && <a className="btn" href={`/print/investigation/${i.id}`} target="_blank" rel="noreferrer">Report PDF</a>}</>} />
 
-      {i.status !== "cancelled" && <div className="steps mb-4">{["1 · Scope & team", "2 · Facts", "3 · Analysis", "4 · Conclusions & report", "5 · Closed"].map((l, k) => <span key={l} className={step >= k ? "on" : ""}>{l}</span>)}</div>}
+      {i.status !== "cancelled" && <div className="steps mb-4">{["1, Scope & team", "2, Facts", "3, Analysis", "4, Conclusions & report", "5, Closed"].map((l, k) => <span key={l} className={step >= k ? "on" : ""}>{l}</span>)}</div>}
 
       <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)" }}>
         <div>
           {r && <section className="card mb-5"><div className="ch"><span className="eyebrow">Report</span><Link className="mini underline ml-auto" href={`/safe/reports/${r.id}`}>{r.id} ↗</Link></div>
             <div className="cb"><b>{r.headline_en ?? r.headline}</b><div className="mini">{[r.event_date, r.aircraft, r.phase, r.location].filter(Boolean).join(", ")}</div><p className="mt-2" style={{ whiteSpace: "pre-wrap" }}>{(r.narrative_en ?? r.narrative).slice(0, 1500)}</p></div></section>}
 
-          <section className="card mb-5"><div className="ch"><span className="eyebrow">1 · Terms of reference</span></div>
+          <section className="card mb-5"><div className="ch"><span className="eyebrow">1, Terms of reference</span></div>
             <div className="cb">{edit ? <form action={saveScope} className="grid grid-cols-3 gap-2"><Hid />
               <label className="col-span-3"><span className="mini">Title</span><input name="title" className="inp" defaultValue={i.title} /></label>
               <label><span className="mini">Level</span><select name="level" className="inp" defaultValue={i.level}>{Object.entries(INV_LEVEL).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select></label>
@@ -54,7 +54,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
               <label className="col-span-3"><span className="mini">Scope and the questions the investigation must answer</span><textarea name="terms" className="inp" rows={3} defaultValue={i.terms ?? ""} /></label>
               <div className="col-span-3 flex justify-end"><button className="btn">Save</button></div></form> : <T v={i.terms} />}</div></section>
 
-          <section className="card mb-5"><div className="ch"><span className="eyebrow">2 · Facts</span><span className="mini">interviews, flight data, documents, records — facts only</span></div>
+          <section className="card mb-5"><div className="ch"><span className="eyebrow">2, Facts</span><span className="mini">interviews, flight data, documents, records, facts only</span></div>
             <div className="cb">
               <table className="tbl mb-2"><thead><tr><th style={{ width: 150 }}>When (UTC)</th><th>Sequence of events</th>{edit && <th style={{ width: 40 }} />}</tr></thead>
                 <tbody>{i.timeline.map((t, k) => <tr key={k}><td className="mono">{t.at.replace("T", " ")}</td><td>{t.text}</td>{edit && <td><form action={saveFacts}><Hid /><input type="hidden" name={`trm${k}`} value="1" /><button className="btn" title="Remove"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></td>}</tr>)}
@@ -65,14 +65,14 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
                 <div className="flex justify-end"><button className="btn">Save</button></div></form> : <T v={i.facts} />}
             </div></section>
 
-          <section className="card mb-5"><div className="ch"><span className="eyebrow">3 · Analysis</span><span className="mini">contributing factors, then causes</span></div>
+          <section className="card mb-5"><div className="ch"><span className="eyebrow">3, Analysis</span><span className="mini">contributing factors, then causes</span></div>
             <div className="cb">
               {Object.entries(FACTOR_CAT).map(([cat, l]) => { const f = i.factors.map((x, k) => ({ ...x, k })).filter((x) => x.cat === cat); return f.length ? (
                 <div key={cat} className="mb-2"><div className="mini"><b>{l}</b></div><ul style={{ margin: "2px 0 0 16px", listStyle: "disc" }}>{f.map((x) => <li key={x.k} className="flex gap-2 items-start"><span style={{ flex: 1 }}>{x.text}</span>{edit && <form action={saveAnalysis}><Hid /><input type="hidden" name={`frm${x.k}`} value="1" /><button className="btn" title="Remove"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form>}</li>)}</ul></div>) : null; })}
               {!i.factors.length && <p className="mini mb-2">No contributing factor recorded.</p>}
               {edit ? <form action={saveAnalysis} className="grid gap-2"><Hid />
                 <div className="flex gap-2"><select name="f_cat" className="inp" style={{ width: 260, marginTop: 0 }} defaultValue="human">{Object.entries(FACTOR_CAT).map(([k, l]) => <option key={k} value={k}>{l.split(" (")[0]}</option>)}</select><input name="f_text" className="inp" placeholder="+ Add a contributing factor" style={{ marginTop: 0 }} /></div>
-                <label><span className="mini">Causes — why it happened (main and underlying)</span><textarea name="causes" className="inp" rows={3} defaultValue={i.causes ?? ""} /></label>
+                <label><span className="mini">Causes, why it happened (main and underlying)</span><textarea name="causes" className="inp" rows={3} defaultValue={i.causes ?? ""} /></label>
                 <div className="flex justify-end"><button className="btn">Save</button></div></form> : <><div className="mini mt-2"><b>Causes</b></div><T v={i.causes} /></>}
             </div></section>
 
@@ -82,11 +82,11 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
             {edit && <div className="cb"><NewActionForm entity={i.entity} source="investigation" investigation_id={i.id} report_id={i.report_id ?? undefined} stay /></div>}
           </section>
 
-          <section className="card mb-5"><div className="ch"><span className="eyebrow">4 · Conclusions &amp; report</span>
+          <section className="card mb-5"><div className="ch"><span className="eyebrow">4, Conclusions &amp; report</span>
             {edit && <form action={draftInvReport} className="ml-auto"><Hid /><button className="btn">{i.report_text ? "Draft the report again" : "Draft the report"}</button></form>}</div>
             <div className="cb">{edit ? <form key={`${i.report_model ?? ""}:${(i.report_text ?? "").length}`} action={saveConclusions} className="grid gap-2"><Hid />
               <label><span className="mini">Conclusions</span><textarea name="conclusions" className="inp" rows={3} defaultValue={i.conclusions ?? ""} /></label>
-              <label><span className="mini">Investigation report{i.report_model ? " — drafted from the sections above, to check and complete" : ""}</span><textarea name="report_text" className="inp mono" rows={i.report_text ? 16 : 4} defaultValue={i.report_text ?? ""} /></label>
+              <label><span className="mini">Investigation report{i.report_model ? ", drafted from the sections above, to check and complete" : ""}</span><textarea name="report_text" className="inp mono" rows={i.report_text ? 16 : 4} defaultValue={i.report_text ?? ""} /></label>
               <div className="flex justify-end"><button className="btn">Save</button></div></form>
               : <><div className="mini"><b>Conclusions</b></div><T v={i.conclusions} />{i.report_text && <><div className="mini mt-2"><b>Report</b></div><p className="mono" style={{ whiteSpace: "pre-wrap", fontSize: 12 }}>{i.report_text}</p></>}</>}</div></section>
         </div>
@@ -94,11 +94,11 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
         <div>
           <section className="card mb-5"><div className="ch"><span className="eyebrow">Team</span></div>
             <div className="cb">{edit ? <form action={saveTeam} className="grid gap-2"><Hid />
-              {i.team.map((t, k) => <label key={k} className="flex gap-2 items-center"><span style={{ flex: 1 }}>{t.name}{t.role ? <span className="mini"> · {t.role}</span> : null}</span><span className="mini"><input type="checkbox" name={`rm${k}`} value="1" /> remove</span></label>)}
+              {i.team.map((t, k) => <label key={k} className="flex gap-2 items-center"><span style={{ flex: 1 }}>{t.name}{t.role ? <span className="mini">, {t.role}</span> : null}</span><span className="mini"><input type="checkbox" name={`rm${k}`} value="1" /> remove</span></label>)}
               <select name="new_person" className="inp" defaultValue=""><option value="">+ add a person…</option>{P.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select>
               <div className="flex gap-2"><input name="new_name" className="inp" placeholder="or an external expert" style={{ marginTop: 0 }} /><input name="new_role" className="inp" placeholder="role (SME, NPFO…)" style={{ marginTop: 0, width: 140 }} /></div>
               <div className="flex justify-end"><button className="btn">Save</button></div></form>
-              : <ul>{i.team.map((t, k) => <li key={k}>{t.name}{t.role ? <span className="mini"> · {t.role}</span> : null}</li>)}{!i.team.length && <li className="mini">—</li>}</ul>}</div></section>
+              : <ul>{i.team.map((t, k) => <li key={k}>{t.name}{t.role ? <span className="mini">, {t.role}</span> : null}</li>)}{!i.team.length && <li className="mini">—</li>}</ul>}</div></section>
 
           {edit && <section className="card mb-5"><div className="ch"><span className="eyebrow">Close</span></div>
             <div className="cb grid gap-2"><p className="mini">Closing freezes the investigation. The report gets an entry: give the reporter feedback, then close the report. Recommendations stay open in Safety › Actions until verified.</p>

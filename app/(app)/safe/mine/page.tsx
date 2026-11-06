@@ -20,7 +20,7 @@ export default async function MyReports() {
   const events = (evs ?? []) as Ev[];
   return (
     <>
-      <PageHeader eyebrow="Safety · My reports" title="My reports" sub="What you reported, where it stands, and what was done with it." right={<Link href="/safe/new" className="btn primary">+ Report an event</Link>} />
+      <PageHeader eyebrow="Safety, My reports" title="My reports" sub="What you reported, where it stands, and what was done with it." right={<Link href="/safe/new" className="btn primary">+ Report an event</Link>} />
       {!reps.length && <section className="card"><div className="cb">You have not sent any report yet (anonymous reports are not listed here).</div></section>}
       {reps.map((r) => {
         const ev = events.filter((e) => e.report_id === r.id);

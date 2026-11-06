@@ -19,7 +19,7 @@ export default async function NotificationRules() {
   const others = rules.filter((r) => r.kind !== "*");
   return (
     <>
-      <PageHeader eyebrow="Settings · Notification rules" title="Reminders & escalation" sub="One ladder for everything with a due date: reminder, chase, department head, Accountable Manager. Days are counted after the due date." right={canEdit ? <form action={runNow}><button className="btn" type="submit">Run the ladder now</button></form> : undefined} />
+      <PageHeader eyebrow="Settings, Notification rules" title="Reminders & escalation" sub="One ladder for everything with a due date: reminder, chase, department head, Accountable Manager. Days are counted after the due date." right={canEdit ? <form action={runNow}><button className="btn" type="submit">Run the ladder now</button></form> : undefined} />
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">How it works</span><span className="mini">runs once a day with the other S.A.M. jobs · {lr ? `last run ${lr.at.slice(0, 16).replace("T", " ")} (${lr.object_id === "manual" ? "by hand" : "daily job"}) · ${Object.entries(lr.after ?? {}).map(([k, v]) => `${k} ${v}`).join(", ")}` : "never run — the daily job (06:00 UTC) has not reached this step yet: run it by hand once"}</span></div>
         <div className="cb mini">
@@ -37,7 +37,7 @@ export default async function NotificationRules() {
                   <td colSpan={8} style={{ padding: 0 }}>
                     <form action={saveRule} className="rulerow">
                       <input type="hidden" name="kind" value={r!.kind} />
-                      <span className="rk"><b>{r!.label}</b><span className="mini"> · {r!.kind}</span></span>
+                      <span className="rk"><b>{r!.label}</b><span className="mini">, {r!.kind}</span></span>
                       <input className="inp n" name="remind_days" type="number" min={0} defaultValue={r!.remind_days ?? ""} disabled={!canEdit} />
                       <input className="inp n" name="chase_days" type="number" min={0} defaultValue={r!.chase_days ?? ""} disabled={!canEdit} />
                       <input className="inp n" name="escalate_days" type="number" min={0} defaultValue={r!.escalate_days ?? ""} disabled={!canEdit} />

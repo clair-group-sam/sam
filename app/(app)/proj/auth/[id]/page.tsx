@@ -43,8 +43,8 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
   return (
     <>
       <EntityBand entity={f.entity} current={s.entity} multi={s.group || s.entities.length > 1} what="file" />
-      <PageHeader eyebrow={`Projects · CAA applications · ${f.type_code}`} title={f.title}
-        sub={`${ENT[f.entity]?.name ?? f.entity} · ${type?.name ?? f.type_code} · ${f.portal ?? f.authority ?? ""}${f.category ? ` · ${CATEGORY_LABEL[f.category] ?? f.category}` : ""}`}
+      <PageHeader eyebrow={`Projects, CAA applications, ${f.type_code}`} title={f.title}
+        sub={`${ENT[f.entity]?.name ?? f.entity}, ${type?.name ?? f.type_code}, ${f.portal ?? f.authority ?? ""}${f.category ? `, ${CATEGORY_LABEL[f.category] ?? f.category}` : ""}`}
         right={<><span className={"pill " + STAGE_TONE[f.stage]} style={{ alignSelf: "center" }}>{STAGE_LABEL[f.stage]}</span><Link href="/proj/auth" className="btn">All files</Link></>} />
 
       {f.stage !== "standby" && (
@@ -65,7 +65,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                   <form key={m.to} action={moveStage} className="flex gap-2 items-end flex-wrap" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
                     <input type="hidden" name="id" value={f.id} /><input type="hidden" name="to" value={m.to} />
                     {m.needsRef && <>
-                      <label style={{ width: 240 }}><span className="mini">Portal reference</span><input name="portal_ref" className="inp" required placeholder="APP/AJD/OPS_4/38315 · METEOR 252776 · SL-102901" defaultValue={f.portal_ref ?? ""} /></label>
+                      <label style={{ width: 240 }}><span className="mini">Portal reference</span><input name="portal_ref" className="inp" required placeholder="APP/AJD/OPS_4/38315, METEOR 252776, SL-102901" defaultValue={f.portal_ref ?? ""} /></label>
                       <label style={{ width: 260 }}><span className="mini">Portal URL</span><input name="portal_url" className="inp" placeholder="https://…" defaultValue={f.portal_url ?? ""} /></label>
                       <label style={{ width: 150 }}><span className="mini">Submitted on</span><input name="submitted_at" type="date" className="inp" defaultValue={t0} /></label>
                       <label style={{ width: 150 }}><span className="mini">Target date</span><input name="target_date" type="date" className="inp" /></label>
@@ -87,7 +87,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                     <label style={{ width: 150 }}><span className="mini">Submitted on</span><input name="submitted_at" type="date" className="inp" /></label>
                     <label style={{ width: 150 }}><span className="mini">Decision on</span><input name="decision_at" type="date" className="inp" required /></label>
                     <label style={{ width: 150 }}><span className="mini">Outcome</span><select name="outcome" className="inp" defaultValue={f.category === "notification" ? "acknowledged" : "approved"}><option value="approved">approved</option><option value="acknowledged">acknowledged</option></select></label>
-                    <label style={{ width: 220 }}><span className="mini">Portal reference</span><input name="portal_ref" className="inp mono" placeholder="APP/AJD/… · METEOR …" /></label>
+                    <label style={{ width: 220 }}><span className="mini">Portal reference</span><input name="portal_ref" className="inp mono" placeholder="APP/AJD/…, METEOR …" /></label>
                     <button className="btn" type="submit">Record as granted</button></form>
                   <p className="mini mt-1">The file jumps to Decision received, its checklist is marked done, the project task follows. Close-out still applies.</p>
                 </details>
@@ -99,7 +99,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
 
           {/* checklist */}
           <section className="card">
-            <div className="ch"><span className="eyebrow">Dossier checklist</span><span className="mini">{done} / {required.length} required done{items.length > required.length ? ` · ${items.length - required.length} optional` : ""}</span></div>
+            <div className="ch"><span className="eyebrow">Dossier checklist</span><span className="mini">{done} / {required.length} required done{items.length > required.length ? `, ${items.length - required.length} optional` : ""}</span></div>
             <table className="tbl"><tbody>
               {items.map((it) => (
                 <tr key={it.id}>
@@ -110,7 +110,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                   <td className={it.done ? "text-slate6" : ""}>{it.label}{it.note && <div className="mini">{it.note}</div>}</td>
                   <td className="mono" style={{ width: 80 }}>{it.role ?? ""}</td>
                   <td style={{ width: 110 }}>{it.required ? <span className="pill amber">required</span> : <span className="mini">optional</span>}</td>
-                  <td className="mini" style={{ width: 190 }}>{it.done ? `${nameOf.get(it.done_by ?? "") ?? ""} · ${fr(it.done_at)}` : ""}</td>
+                  <td className="mini" style={{ width: 190 }}>{it.done ? `${nameOf.get(it.done_by ?? "") ?? ""}, ${fr(it.done_at)}` : ""}</td>
                 </tr>))}
               {!items.length && <tr><td className="p-5 text-slate6">No checklist item.</td></tr>}
             </tbody></table>
@@ -121,15 +121,15 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
             )}
           </section>
 
-          {/* exchanges with the authority — the rounds of the same application (DOC-09), shared with the revision's Publish tab */}
+          {/* exchanges with the authority, the rounds of the same application (DOC-09), shared with the revision's Publish tab */}
           <section className="card">
-            <div className="ch"><span className="eyebrow">Exchanges with the authority</span><span className="mini">{rounds.length} round{rounds.length === 1 ? "" : "s"} · one application, every reply as a comment or a new version inside it</span></div>
+            <div className="ch"><span className="eyebrow">Exchanges with the authority</span><span className="mini">{rounds.length} round{rounds.length === 1 ? "" : "s"}, one application, every reply as a comment or a new version inside it</span></div>
             <table className="tbl"><tbody>
               {rounds.map((r) => (
                 <tr key={r.id}>
                   <td className="mono" style={{ width: 100 }}>{fr(r.at)}</td>
                   <td style={{ width: 120 }}><span className={"pill " + (r.direction === "sent" ? "" : "amber")}>{r.direction === "sent" ? "⇧ sent" : "⇩ received"}</span></td>
-                  <td>{r.note}<div className="mini">{r.who}{r.revision_id && !r.file_id ? " · from the revision editor" : ""}</div></td>
+                  <td>{r.note}<div className="mini">{r.who}{r.revision_id && !r.file_id ? ", from the revision editor" : ""}</div></td>
                 </tr>))}
               {!rounds.length && <tr><td className="p-5 text-slate6">No exchange yet. The submission, the remarks and the decision are recorded here automatically; mails and calls can be added below.</td></tr>}
             </tbody></table>
@@ -145,7 +145,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
 
           {/* attachments */}
           <section className="card">
-            <div className="ch"><span className="eyebrow">Attachments</span><span className="mini">{attachments.length} · signed manual, checklist, forms, MOC, letters</span></div>
+            <div className="ch"><span className="eyebrow">Attachments</span><span className="mini">{attachments.length}, signed manual, checklist, forms, MOC, letters</span></div>
             <table className="tbl"><tbody>
               {attachments.map((a) => (
                 <tr key={a.id}>
@@ -167,7 +167,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
 
           {/* journal */}
           <section className="card">
-            <div className="ch"><span className="eyebrow">Journal</span><span className="mini">append-only · {events.length}</span></div>
+            <div className="ch"><span className="eyebrow">Journal</span><span className="mini">append-only, {events.length}</span></div>
             <form action={addNote} className="nprow"><input type="hidden" name="id" value={f.id} />
               <select name="kind" className="inp" style={{ maxWidth: 140 }} defaultValue="note"><option value="note">note</option><option value="mail">mail exchanged</option><option value="remarks">authority remark</option><option value="reply">our reply</option></select>
               <input name="note" className="inp" placeholder="What happened (who, what, where)" required /><button className="btn" type="submit">Add</button></form>
@@ -182,14 +182,14 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
           <section className="card">
             <div className="ch"><span className="eyebrow">Route and portal</span></div>
             <form action={saveFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />
-              <div className="mini">Authority <b>{f.authority}</b>{f.stage !== "draft" && f.stage !== "compliance" ? "" : " · route decided by Compliance"}</div>
+              <div className="mini">Authority <b>{f.authority}</b>{f.stage !== "draft" && f.stage !== "compliance" ? "" : ", route decided by Compliance"}</div>
               <label><span className="mini">Category</span><select name="category" className="inp" defaultValue={f.category ?? "approval"} disabled={!cmm}>{Object.entries(CATEGORY_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
               <label><span className="mini">Portal / form</span><input name="portal" className="inp" defaultValue={f.portal ?? ""} disabled={!cmm} /></label>
               <label><span className="mini">Reference</span><input name="portal_ref" className="inp mono" defaultValue={f.portal_ref ?? ""} disabled={!mayEdit} /></label>
               <label><span className="mini">URL</span><input name="portal_url" className="inp" defaultValue={f.portal_url ?? ""} disabled={!mayEdit} /></label>
               <label><span className="mini">Target date</span><input name="target_date" type="date" className="inp" defaultValue={f.target_date ?? ""} disabled={!mayEdit} /></label>
               {cmm && <label><span className="mini">Fee (€)</span><input name="fee" type="number" step="0.01" className="inp" defaultValue={f.fee ?? ""} /></label>}
-              <div className="mini">Triggered {fr(f.triggered_at)}{f.submitted_at ? ` · submitted ${fr(f.submitted_at)}` : ""}{f.decision_at ? ` · decision ${fr(f.decision_at)} (${f.outcome ?? ""})` : ""}{f.closed_at ? ` · closed ${fr(f.closed_at)}` : ""}{days !== null ? ` · ${days} day(s) at the authority` : ""}{f.rounds ? ` · ${f.rounds} round(s)` : ""}</div>
+              <div className="mini">Triggered {fr(f.triggered_at)}{f.submitted_at ? `, submitted ${fr(f.submitted_at)}` : ""}{f.decision_at ? `, decision ${fr(f.decision_at)} (${f.outcome ?? ""})` : ""}{f.closed_at ? `, closed ${fr(f.closed_at)}` : ""}{days !== null ? `, ${days} day(s) at the authority` : ""}{f.rounds ? `, ${f.rounds} round(s)` : ""}</div>
               {mayEdit && <button className="btn" type="submit">Save</button>}
             </form>
           </section>
@@ -203,7 +203,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
               <label><span className="mini">Trigger</span><select name="trigger_kind" className="inp" defaultValue={f.trigger_kind ?? "other"} disabled={!mayEdit}>{TRIGGERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
               <label><span className="mini">Trigger note</span><input name="trigger_note" className="inp" defaultValue={f.trigger_note ?? ""} disabled={!mayEdit} /></label>
               <div className="mini">Project: {projectOf ? <Link className="underline" href={`/proj/boards/${projectOf.id}`}>{projectOf.title}</Link> : "— (standalone file)"}</div>
-              <div className="mini">Manual revision: {revision ? <Link className="underline" href={`/docs/manual/${revision.manuals.id}?rev=${revision.id}`}>{revision.manuals.code} Iss {revision.issue} Rev {revision.rev} · {STEP_LABEL[revision.step] ?? revision.step}</Link> : "—"}</div>
+              <div className="mini">Manual revision: {revision ? <Link className="underline" href={`/docs/manual/${revision.manuals.id}?rev=${revision.id}`}>{revision.manuals.code} Iss {revision.issue} Rev {revision.rev}, {STEP_LABEL[revision.step] ?? revision.step}</Link> : "—"}</div>
               <label><span className="mini">Finding</span><input name="finding_ref" className="inp mono" defaultValue={f.finding_ref ?? ""} disabled={!mayEdit} /></label>
               <label><span className="mini">Aircraft</span><input name="aircraft_reg" className="inp mono" defaultValue={f.aircraft_reg ?? ""} disabled={!mayEdit} /></label>
               <label><span className="mini">Nominated post</span><input name="np_post_code" className="inp mono" defaultValue={f.np_post_code ?? ""} disabled={!mayEdit} /></label>
@@ -213,9 +213,9 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
           </section>
 
           {s.roles.includes("SUPERADMIN") && !f.portal_ref && ["draft", "compliance", "signing", "ready", "standby"].includes(f.stage) && (
-            <details className="card"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">Delete this file</span><span className="mini">super admin · never submitted</span></summary>
+            <details className="card"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">Delete this file</span><span className="mini">super admin, never submitted</span></summary>
               <form action={deleteFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />
-                <label className="mini flex items-center gap-2"><input type="checkbox" name="confirm" /> I confirm — checklist, journal and attachments are deleted for good; a project task bound to it goes back to “to do”.</label>
+                <label className="mini flex items-center gap-2"><input type="checkbox" name="confirm" /> I confirm, checklist, journal and attachments are deleted for good; a project task bound to it goes back to “to do”.</label>
                 <div><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></div></form>
             </details>
           )}

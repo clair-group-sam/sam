@@ -44,18 +44,18 @@ export default function DownloadMenu({ manualId, published, drafts, archive }: {
           <div className={"dlrow" + (drafts.length ? "" : " off")}>
             <span className="k">Draft</span>
             <span className="v">{drafts.length ? (
-              <select value={draft} onChange={(e) => setDraft(e.target.value)}>{drafts.map((d) => <option key={d.id} value={d.id}>{d.label} — {d.sub}</option>)}</select>
+              <select value={draft} onChange={(e) => setDraft(e.target.value)}>{drafts.map((d) => <option key={d.id} value={d.id}>{d.label}, {d.sub}</option>)}</select>
             ) : "no revision in progress"}</span>
             <button type="button" className="btn" disabled={!draft || !!busy} onClick={() => draft && go(draft)}>{busy && busy === draft ? "Preparing…" : "Download"}</button>
           </div>
           <div className={"dlrow" + (archive.length ? "" : " off")}>
             <span className="k">Archive</span>
             <span className="v">{archive.length ? (
-              <select value={arch} onChange={(e) => setArch(e.target.value)}>{archive.map((d) => <option key={d.id} value={d.id}>{d.label} — {d.sub}</option>)}</select>
+              <select value={arch} onChange={(e) => setArch(e.target.value)}>{archive.map((d) => <option key={d.id} value={d.id}>{d.label}, {d.sub}</option>)}</select>
             ) : "no superseded revision"}</span>
             <button type="button" className="btn" disabled={!arch || !!busy} onClick={() => arch && go(arch)}>{busy && busy === arch ? "Preparing…" : "Download"}</button>
           </div>
-          {busy && <p className="mini px-3 pb-2">Preparing the PDF with its bookmarks — a few seconds for a large manual.</p>}
+          {busy && <p className="mini px-3 pb-2">Preparing the PDF with its bookmarks, a few seconds for a large manual.</p>}
           {err && <p className="mini red px-3 pb-2">{err}</p>}
         </div>
       )}

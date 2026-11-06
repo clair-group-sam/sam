@@ -14,7 +14,7 @@ export default async function SpiData({ searchParams }: { searchParams: Promise<
   if (!s) redirect("/login");
   if (!mayEditSpi(s)) redirect("/safe/over");
   const sp = await searchParams; const year = Number(sp.y) || new Date().getUTCFullYear();
-  if (s.entity === "ALL") return <><PageHeader eyebrow="Safety · Overview" title="Monthly data" sub="Pick an entity in the top bar: data is entered entity by entity." /></>;
+  if (s.entity === "ALL") return <><PageHeader eyebrow="Safety, Overview" title="Monthly data" sub="Pick an entity in the top bar: data is entered entity by entity." /></>;
   const e = s.entity; const db = supabaseAdmin();
   const [{ data: defs }, { data: rows }] = await Promise.all([
     db.from("spi_defs").select("*").eq("entity", e).neq("status", "retired").order("sort"),
@@ -37,25 +37,25 @@ export default async function SpiData({ searchParams }: { searchParams: Promise<
   const head = <tr><th style={{ width: 280 }}>Data</th>{months.map((m) => <th key={m} className="dcell">{monthShort(m)}</th>)}</tr>;
   return (
     <>
-      <PageHeader eyebrow="Safety · Overview" title={`Monthly data ${year}`} sub={`${ENT[e]?.name ?? e} — enter at month end what S.A.M. cannot count itself (ENR-CM-06). Reports, MOR, ERC, hazards, assessments and actions are counted by S.A.M.`}
+      <PageHeader eyebrow="Safety, Overview" title={`Monthly data ${year}`} sub={`${ENT[e]?.name ?? e}, enter at month end what S.A.M. cannot count itself (ENR-CM-06). Reports, MOR, ERC, hazards, assessments and actions are counted by S.A.M.`}
         right={<><div className="yseg">{[year - 1, year].map((y) => <Link key={y} href={`/safe/over/data?y=${y}`} className={"btn" + (y === year ? " on" : "")}>{y}</Link>)}</div><Link href={`/safe/over?y=${year}`} className="btn">← Overview</Link></>} />
       <form action={saveData}>
         <input type="hidden" name="entity" value={e} />
         <section className="card mb-5 overflow-x-auto">
-          <div className="ch"><span className="eyebrow">Activity</span><span className="mini">denominator of the rates{needs.size ? ` — needed: ${[...needs].map((k) => ACTIVITY[k].toLowerCase()).join(", ")}` : ""}</span></div>
+          <div className="ch"><span className="eyebrow">Activity</span><span className="mini">denominator of the rates{needs.size ? `, needed: ${[...needs].map((k) => ACTIVITY[k].toLowerCase()).join(", ")}` : ""}</span></div>
           <table className="tbl dgrid"><thead>{head}</thead><tbody>
             {Object.entries(ACTIVITY).map(([k, l]) => <tr key={k} className={needs.has(k) ? "" : "opacity-60"}><td><b>{l}</b>{needs.has(k) && <div className="mini">used by the SPI rates</div>}</td>{months.map((m) => cell(k, m))}</tr>)}
           </tbody></table>
         </section>
         <section className="card mb-5 overflow-x-auto">
-          <div className="ch"><span className="eyebrow">SPIs entered by hand</span><span className="mini">counts of the month · percentages as « x of y » · scores 1–5</span></div>
+          <div className="ch"><span className="eyebrow">SPIs entered by hand</span><span className="mini">counts of the month, percentages as « x of y », scores 1–5</span></div>
           <table className="tbl dgrid"><thead>{head}</thead><tbody>
             {manual.map((d) => <tr key={d.id}><td><Link href={`/safe/over/spi/${d.id}?y=${year}`} className="hover:underline"><span className="mono">{d.code}</span> {d.label}</Link><div className="mini">{d.basis === "percent" ? "x of y" : d.basis === "score" ? "score 1–5" : BASIS[d.basis].den ? `events (rate ${BASIS[d.basis].short})` : "number"}</div></td>{months.map((m) => cell(`spi:${d.code}`, m, d.basis === "percent"))}</tr>)}
             {!manual.length && <tr><td colSpan={13} className="mini p-4">Every SPI of this entity is computed by S.A.M.</td></tr>}
           </tbody></table>
         </section>
         {sp.all ? <section className="card mb-5 overflow-x-auto">
-          <div className="ch"><span className="eyebrow">Corrections of computed SPIs</span><span className="mini">a value entered here replaces what S.A.M. counts for that month — use it for history or a known gap</span></div>
+          <div className="ch"><span className="eyebrow">Corrections of computed SPIs</span><span className="mini">a value entered here replaces what S.A.M. counts for that month, use it for history or a known gap</span></div>
           <table className="tbl dgrid"><thead>{head}</thead><tbody>
             {computed.map((d) => <tr key={d.id}><td><Link href={`/safe/over/spi/${d.id}?y=${year}`} className="hover:underline"><span className="mono">{d.code}</span> {d.label}</Link><div className="mini">S.A.M.: {METRICS[d.metric!]?.label}</div></td>{months.map((m) => cell(`spi:${d.code}`, m, d.basis === "percent"))}</tr>)}
           </tbody></table>

@@ -11,10 +11,10 @@ export default async function Drafts() {
   const rows = (await listManuals(s)).flatMap((r) => r.workings.map((w) => ({ manual: r.manual, working: w })));
   return (
     <>
-      <PageHeader eyebrow="Documents · Drafts in progress" title="Drafts in progress" sub="One draft per manual; the whole manual moves through the steps (DOC-09)." />
+      <PageHeader eyebrow="Documents, Drafts in progress" title="Drafts in progress" sub="One draft per manual; the whole manual moves through the steps (DOC-09)." />
       <HowItWorks id="drafts"><div className="grid grid-cols-3 gap-4">
         <section className="card"><div className="ch"><span className="eyebrow">The steps</span></div><div className="cb mini">{STEPS.map((st) => STEP_LABEL[st]).join(" → ")}</div></section>
-        <section className="card"><div className="ch"><span className="eyebrow">Who does what</span></div><div className="cb mini">Author drafts · NP approves the content · Compliance checks against the requirements · signatures when required (NP + CMM; MSM by the AM + CMM) · Compliance runs the CAA application and publishes.</div></section>
+        <section className="card"><div className="ch"><span className="eyebrow">Who does what</span></div><div className="cb mini">Author drafts, NP approves the content, Compliance checks against the requirements, signatures when required (NP + CMM; MSM by the AM + CMM), Compliance runs the CAA application and publishes.</div></section>
         <section className="card"><div className="ch"><span className="eyebrow">Reading</span></div><div className="cb mini">Reading is not a step: it is tracked per reader on the manual page (Readers tab) and in Communication › Read tracking.</div></section>
       </div></HowItWorks>
       <section className="card">
@@ -22,7 +22,7 @@ export default async function Drafts() {
           <tbody>
             {rows.map(({ manual, working }) => (
               <tr key={working.id}><td className="entcol"><span className={"ent " + manual.entity}>{manual.entity}</span></td>
-                <td><Link href={working.step === "draft" || working.step === "approved_np" ? `/docs/editor/${working.id}` : `/docs/manual/${manual.id}?rev=${working.id}`}><b>{manual.code} — {manual.title}</b></Link></td>
+                <td><Link href={working.step === "draft" || working.step === "approved_np" ? `/docs/editor/${working.id}` : `/docs/manual/${manual.id}?rev=${working.id}`}><b>{manual.code}, {manual.title}</b></Link></td>
                 <td className="mono">Iss {working.issue} Rev {working.rev}</td><td><span className="pill amber">{STEP_LABEL[working.step]}</span></td><td className="mono">{working.created_at.slice(0, 10)}</td></tr>
             ))}
             {!rows.length && <tr><td colSpan={5} className="p-6 text-slate6">No draft in progress. The revision editor (Write / Publish) arrives with the first revision written in S.A.M.</td></tr>}

@@ -43,9 +43,9 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
   const today = new Date().toISOString().slice(0, 10);
   return (
     <>
-      <PageHeader eyebrow={`Safety · ${a?.kind === "hazard_log" ? "Hazard log" : a ? KINDS[a.kind] : "Risk"} · ${h.ref}`} title={h.title}
+      <PageHeader eyebrow={`Safety, ${a?.kind === "hazard_log" ? "Hazard log" : a ? KINDS[a.kind] : "Risk"}, ${h.ref}`} title={h.title}
         tag={<span className="flex gap-2 items-center"><span className={"pill " + (HZ_STATUS[h.status]?.[1] ?? "")}>{HZ_STATUS[h.status]?.[0]}</span><RiskPill lik={h.lik_before} sev={h.sev_before} entity={h.entity} prefix="pre" /><RiskPill lik={h.lik_after} sev={h.sev_after} entity={h.entity} prefix="post" />{h.proposed && <span className="pill">proposed by SAM</span>}{h.needs_review && <span className="pill red">to reassess</span>}</span>}
-        sub={`${h.entity}${a ? ` · ${KINDS[a.kind]} ${a.number} — ${a.name}` : ""}`}
+        sub={`${h.entity}${a ? `, ${KINDS[a.kind]} ${a.number}, ${a.name}` : ""}`}
         right={<>{a && <Link className="btn" href={`/safe/risk/a/${a.id}`}>{a.number}</Link>}<Link className="btn" href="/safe/risk">Hazard log</Link></>} />
       {signed && <p className="mini mb-3">The assessment {a!.number} is signed: to change this hazard, reopen a new version of the assessment.</p>}
       {h.proposed && edit && (
@@ -54,7 +54,7 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
       )}
       {h.needs_review && mayEditRisk(s) && (
         <section className="card hz-proposed mb-4"><form action={reviewedNoChange} className="cb flex gap-3 items-center"><input type="hidden" name="id" value={h.id} /><span className="flex-1">A new occurrence was linked to this hazard: reassess it (MSM §3.5.1). Changing a rating closes the reassessment; or record that the values stay valid.</span>
-          <input name="note" className="inp" placeholder="Why the values stay valid" style={{ marginTop: 0, maxWidth: 320 }} /><button className="btn">Reviewed — no change</button></form></section>
+          <input name="note" className="inp" placeholder="Why the values stay valid" style={{ marginTop: 0, maxWidth: 320 }} /><button className="btn">Reviewed, no change</button></form></section>
       )}
       <div className="repgrid2">
         <div>
@@ -64,7 +64,7 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
               <label><span className="mini">Hazard (headline)</span><input name="title" className="inp" defaultValue={h.title} disabled={!edit} /></label>
               <label><span className="mini">Description</span><textarea name="description" className="inp" rows={2} defaultValue={h.description ?? ""} disabled={!edit} /></label>
               <label><span className="mini">Consequence (reasonably worst case)</span><textarea name="consequence" className="inp" rows={2} defaultValue={h.consequence ?? ""} disabled={!edit} /></label>
-              <div className="grid grid-cols-2 gap-2"><label><span className="mini">Main impact</span><input name="main_impact" className="inp" defaultValue={h.main_impact ?? ""} disabled={!edit} placeholder="safety · security · CIA (Part-IS)…" /></label><label><span className="mini">Owner (post)</span><input name="owner_role" className="inp mono" defaultValue={h.owner_role ?? ""} disabled={!edit} /></label></div>
+              <div className="grid grid-cols-2 gap-2"><label><span className="mini">Main impact</span><input name="main_impact" className="inp" defaultValue={h.main_impact ?? ""} disabled={!edit} placeholder="safety, security, CIA (Part-IS)…" /></label><label><span className="mini">Owner (post)</span><input name="owner_role" className="inp mono" defaultValue={h.owner_role ?? ""} disabled={!edit} /></label></div>
               {edit && <div className="flex justify-end"><button className="btn">Save</button></div>}
             </form>
           </section>
@@ -73,7 +73,7 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
             <div className="cb">
               <table className="tbl mb-3"><tbody>{mit.map((x) => (
                 <tr key={x.id}><td style={{ width: 120 }}><span className={"kind " + (x.existing || x.done_at ? "k-read" : x.due && x.due < today ? "k-comp" : "k-cert")}>{x.existing ? "Current" : x.done_at ? "Done" : x.due && x.due < today ? "Overdue" : "Planned"}</span></td>
-                  <td>{x.text}<div className="mini">{x.owner_role ?? ""}{x.due ? ` · by ${x.due}` : ""}{x.done_at ? ` · done ${x.done_at.slice(0, 10)}` : ""}</div></td>
+                  <td>{x.text}<div className="mini">{x.owner_role ?? ""}{x.due ? `, by ${x.due}` : ""}{x.done_at ? `, done ${x.done_at.slice(0, 10)}` : ""}</div></td>
                   <td style={{ width: 190 }} className="text-right">{!x.existing && (x.action_id ? <Link className="underline mono mini" href={`/safe/actions/${x.action_id}`}>{(x as M & { safety_actions?: { number: string } | null }).safety_actions?.number ?? "action"}</Link>
                     : !x.done_at && mayEditRisk(s) && <span className="flex gap-1 justify-end"><Link className="btn" title="Follow it as a safety action: owner, due date, evidence, verification" href={`/safe/actions/new?entity=${h.entity}&hazard=${h.id}&mitigation=${x.id}&title=${encodeURIComponent(x.text.slice(0, 280))}${x.owner_role ? `&owner_role=${encodeURIComponent(x.owner_role)}` : ""}`}>Create an action</Link><form action={doneMitigation}><input type="hidden" name="id" value={x.id} /><button className="btn">Done</button></form></span>)}</td></tr>))}
                 {!mit.length && <tr><td className="mini p-3">No mitigation listed yet.</td></tr>}</tbody></table>
@@ -91,8 +91,8 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
           {logH && <section className="card mb-4"><div className="ch"><span className="eyebrow">In the hazard log</span><RiskPill lik={logH.lik_after} sev={logH.sev_after} entity={h.entity} prefix="log" /></div><div className="cb"><Link className="underline mono" href={`/safe/risk/${logH.id}`}>{logH.ref}</Link> {logH.title}<p className="mini mt-1">When this study is accepted with a different residual rating, the log hazard is flagged for reassessment.</p></div></section>}
           {a && a.kind !== "hazard_log" && !logH && h.local_only && <p className="mini mb-4">Kept local to {a.number}: temporary hazard, not in the hazard log.</p>}
           {studies.length > 0 && <section className="card mb-4"><div className="ch"><span className="eyebrow">Studies referencing this hazard</span><span className="mini">MOC / risk assessments</span></div>
-            <table className="tbl"><tbody>{studies.map((x) => <tr key={x.id}><td style={{ width: 120 }} className="mono"><Link className="underline" href={`/safe/risk/a/${x.risk_assessments.id}`}>{x.risk_assessments.number}</Link></td><td>{x.risk_assessments.name}<div className="mini">{KINDS[x.risk_assessments.kind]} · <Link className="underline" href={`/safe/risk/${x.id}`}>{x.ref}</Link> {x.title}</div></td><td style={{ width: 110 }}><RiskPill lik={x.lik_after} sev={x.sev_after} entity={h.entity} prefix="post" /></td></tr>)}</tbody></table></section>}
-          {related.length > 0 && <section className="card mb-4"><div className="ch"><span className="eyebrow">Related safety reports</span></div><div className="cb">{related.map((r) => <div key={r.report_id}><Link className="underline" href={`/safe/reports/${r.report_id}`}>Report {r.report_id}</Link> — {r.reports?.headline_en ?? r.reports?.headline}</div>)}</div></section>}
+            <table className="tbl"><tbody>{studies.map((x) => <tr key={x.id}><td style={{ width: 120 }} className="mono"><Link className="underline" href={`/safe/risk/a/${x.risk_assessments.id}`}>{x.risk_assessments.number}</Link></td><td>{x.risk_assessments.name}<div className="mini">{KINDS[x.risk_assessments.kind]}, <Link className="underline" href={`/safe/risk/${x.id}`}>{x.ref}</Link> {x.title}</div></td><td style={{ width: 110 }}><RiskPill lik={x.lik_after} sev={x.sev_after} entity={h.entity} prefix="post" /></td></tr>)}</tbody></table></section>}
+          {related.length > 0 && <section className="card mb-4"><div className="ch"><span className="eyebrow">Related safety reports</span></div><div className="cb">{related.map((r) => <div key={r.report_id}><Link className="underline" href={`/safe/reports/${r.report_id}`}>Report {r.report_id}</Link>, {r.reports?.headline_en ?? r.reports?.headline}</div>)}</div></section>}
           <section className="card">
             <div className="ch"><span className="eyebrow">Journal</span></div>
             <div className="cb"><ul className="journal">{events.map((e) => <li key={e.id}><span className="mini mono mr-2">{when(e.at)}</span><b>{e.kind.replace(/_/g, " ")}</b> — {e.note}</li>)}</ul></div>

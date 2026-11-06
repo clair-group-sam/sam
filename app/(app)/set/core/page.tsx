@@ -20,7 +20,7 @@ export default async function Core() {
   const env = process.env.VERCEL_ENV ?? "local";
   return (
     <>
-      <PageHeader eyebrow="Settings · Core" title="Core" sub={`Deployment ${env} · Supabase project ${projectRef() || "?"} · ${local.length} migration files in this build.`} />
+      <PageHeader eyebrow="Settings, Core" title="Core" sub={`Deployment ${env}, Supabase project ${projectRef() || "?"}, ${local.length} migration files in this build.`} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <section className="card"><div className="ch"><span className="eyebrow">Database</span><span className={"pill " + (done.ok ? "green" : "amber")}>{done.ok ? "reachable" : "not configured"}</span></div><div className="cb mini">{done.ok ? `${done.versions.length} migration(s) applied on the project.` : done.error}</div></section>
         <section className="card"><div className="ch"><span className="eyebrow">Pending</span><span className={"pill " + (pending.length ? "amber" : "green")}>{pending.length}</span></div><div className="cb mini">{pending.length ? "Migrations in this build not yet applied on the project." : "The project matches this build."}</div></section>

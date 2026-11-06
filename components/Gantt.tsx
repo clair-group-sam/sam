@@ -30,7 +30,7 @@ export default function Gantt({ projectId, phases, tasks, proj, startedAt, targe
             {pt.map((t) => { const p = proj.get(t.id)!; const cls = t.status === "done" ? "done" : p.late ? "late" : t.status === "blocked" ? "blocked" : t.status === "waiting" ? "waiting" : p.openDeps.length ? "next" : "ready"; return (
               <div key={t.id} className="grow">
                 <div className="glabel" title={t.title}><Link href={`/proj/boards/${projectId}?show=all#t-${t.id}`}>{p.critical && t.status !== "done" ? <><Icon name="bolt" size={11} /> </> : ""}{t.title}</Link><span className="mini">{t.owner_role ?? ""}</span></div>
-                <div className="gbars"><span className="gtoday" style={{ left: x(t0) }} />{target && <span className="gtarget" style={{ left: x(target) }} />}<span className={"gbar " + cls} style={{ left: x(p.start), width: w(p.start, p.end) }} title={`${fr(p.start)} → ${fr(p.end)}${t.days ? ` · ${t.days} d` : ""}`}>{(daysBetween(p.start, p.end) ?? 0) >= Math.ceil(span / 25) ? `${fr(p.start).slice(0, 5)} → ${fr(p.end).slice(0, 5)}` : ""}</span></div>
+                <div className="gbars"><span className="gtoday" style={{ left: x(t0) }} />{target && <span className="gtarget" style={{ left: x(target) }} />}<span className={"gbar " + cls} style={{ left: x(p.start), width: w(p.start, p.end) }} title={`${fr(p.start)} → ${fr(p.end)}${t.days ? `, ${t.days} d` : ""}`}>{(daysBetween(p.start, p.end) ?? 0) >= Math.ceil(span / 25) ? `${fr(p.start).slice(0, 5)} → ${fr(p.end).slice(0, 5)}` : ""}</span></div>
               </div>); })}
           </div>);
       })}

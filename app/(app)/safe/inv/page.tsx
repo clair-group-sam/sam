@@ -26,7 +26,7 @@ export default async function Investigations({ searchParams }: { searchParams: P
   const tab = (k: string, l: string) => <Link key={k} href={k ? `/safe/inv?st=${k}` : "/safe/inv"} className={"btn" + ((sp.st ?? "") === k ? " on" : "")}>{l}</Link>;
   return (
     <>
-      <PageHeader eyebrow="Safety · Safety assurance" title="Investigations" sub="Internal safety investigation of a report: scope, facts and timeline, analysis of the contributing factors, causes, conclusions and safety recommendations — just culture, no blame." right={<>{tab("", "Open")}{tab("closed", "Closed")}{tab("all", "All")}</>} />
+      <PageHeader eyebrow="Safety, Safety assurance" title="Investigations" sub="Internal safety investigation of a report: scope, facts and timeline, analysis of the contributing factors, causes, conclusions and safety recommendations, just culture, no blame." right={<>{tab("", "Open")}{tab("closed", "Closed")}{tab("all", "All")}</>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open" value={open.length} />
         <Metric label="Overdue" value={open.filter((i) => invLate(i)).length} tone={open.some((i) => invLate(i)) ? "red" : undefined} />
@@ -38,7 +38,7 @@ export default async function Investigations({ searchParams }: { searchParams: P
           <tbody>{rows.map((i) => (
             <tr key={i.id}>
               <td className="mono"><Link className="underline" href={`/safe/inv/${i.id}`}>{i.number}</Link>{scope.length > 1 && <div><span className={"ent " + i.entity}>{i.entity}</span></div>}</td>
-              <td><Link href={`/safe/inv/${i.id}`}><b>{i.title}</b></Link><div className="mini">{INV_LEVEL[i.level]?.[0]}{i.report_id ? ` · report ${i.report_id}` : ""}</div></td>
+              <td><Link href={`/safe/inv/${i.id}`}><b>{i.title}</b></Link><div className="mini">{INV_LEVEL[i.level]?.[0]}{i.report_id ? `, report ${i.report_id}` : ""}</div></td>
               <td className="mini">{i.lead_name ?? "—"}</td>
               <td className={"mono" + (invLate(i) ? " text-red-700" : "")}>{i.due ?? "—"}</td>
               <td className="mini">{nAct(i.id).length || "—"}</td>
@@ -49,12 +49,12 @@ export default async function Investigations({ searchParams }: { searchParams: P
       {desk && <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ Open an investigation</span><span className="mini">{ENT[s.entity]?.name ?? s.entity}</span></summary>
         <form action={openInvestigation} className="cb grid grid-cols-6 gap-2">
           <input type="hidden" name="entity" value={s.entity} />
-          <label className="col-span-3"><span className="mini">On report</span><select name="report_id" className="inp" defaultValue=""><option value="">— none (a topic, a trend)</option>{((reps ?? []) as { id: string; headline: string }[]).map((r) => <option key={r.id} value={r.id}>{r.id} — {r.headline.slice(0, 80)}</option>)}</select></label>
+          <label className="col-span-3"><span className="mini">On report</span><select name="report_id" className="inp" defaultValue=""><option value="">— none (a topic, a trend)</option>{((reps ?? []) as { id: string; headline: string }[]).map((r) => <option key={r.id} value={r.id}>{r.id}, {r.headline.slice(0, 80)}</option>)}</select></label>
           <label className="col-span-3"><span className="mini">Title (default: the report title)</span><input name="title" className="inp" /></label>
-          <label className="col-span-2"><span className="mini">Level</span><select name="level" className="inp" defaultValue="standard">{Object.entries(INV_LEVEL).map(([k, [l, d]]) => <option key={k} value={k}>{l} · {d} days</option>)}</select></label>
+          <label className="col-span-2"><span className="mini">Level</span><select name="level" className="inp" defaultValue="standard">{Object.entries(INV_LEVEL).map(([k, [l, d]]) => <option key={k} value={k}>{l}, {d} days</option>)}</select></label>
           <label className="col-span-2"><span className="mini">Lead</span><select name="lead_person" className="inp" defaultValue={s.person?.id ?? ""}>{((ppl ?? []) as { id: string; display_name: string }[]).map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select></label>
           <label className="col-span-2"><span className="mini">Due (default from the level)</span><input type="date" name="due" className="inp" /></label>
-          <label className="col-span-6"><span className="mini">Terms of reference — scope and the questions to answer</span><textarea name="terms" className="inp" rows={2} /></label>
+          <label className="col-span-6"><span className="mini">Terms of reference, scope and the questions to answer</span><textarea name="terms" className="inp" rows={2} /></label>
           <div className="col-span-6 flex justify-end"><button className="btn primary">Open</button></div>
         </form></details>}
     </>

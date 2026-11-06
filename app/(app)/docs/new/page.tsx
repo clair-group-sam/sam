@@ -13,7 +13,7 @@ import { createManual, setCreators } from "./actions";
 export default async function NewManual({ searchParams }: { searchParams: Promise<{ entity?: string }> }) {
   const s = await getSession();
   if (!s) redirect("/login");
-  if (!(await mayCreateManual(s))) return (<><PageHeader eyebrow="Documents · New manual" title="Not available" /><section className="card"><div className="cb">Creating a manual is reserved for Compliance, the accountable manager, nominated persons, their deputies and the people Compliance names.</div></section></>);
+  if (!(await mayCreateManual(s))) return (<><PageHeader eyebrow="Documents, New manual" title="Not available" /><section className="card"><div className="cb">Creating a manual is reserved for Compliance, the accountable manager, nominated persons, their deputies and the people Compliance names.</div></section></>);
   const { entity: q } = await searchParams;
   const ents = s.group ? ENTS4 : s.entities;
   const entity = q && ents.includes(q) ? q : s.entity !== "ALL" && ents.includes(s.entity) ? s.entity : ents[0];
@@ -27,15 +27,15 @@ export default async function NewManual({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader eyebrow="Documents · Library" title="New manual" sub="Issue 1 Rev 00 is created as a draft; you write it in the editor." right={<Link href="/docs/lib" className="btn">‹ Library</Link>} />
+      <PageHeader eyebrow="Documents, Library" title="New manual" sub="Issue 1 Rev 00 is created as a draft; you write it in the editor." right={<Link href="/docs/lib" className="btn">‹ Library</Link>} />
       <form action={createManual} className="card mb-5">
         <div className="cb grid grid-cols-2 gap-4">
           <label><span className="eyebrow">Entity</span>
-            <select name="entity" defaultValue={entity} className="inp">{ents.map((e) => <option key={e} value={e}>{e} — {ENT[e]?.name}</option>)}</select>
+            <select name="entity" defaultValue={entity} className="inp">{ents.map((e) => <option key={e} value={e}>{e}, {ENT[e]?.name}</option>)}</select>
             <span className="mini">Folders below are those of {ENT[entity]?.name}; <Link className="underline" href={`/docs/new?entity=${ents.find((e) => e !== entity) ?? entity}`}>switch entity</Link> to see others.</span></label>
           <label><span className="eyebrow">Owner</span>
             <select name="owner" defaultValue={myPosts[0] ?? `PERSON:${s.person?.id}`} className="inp">
-              {myPosts.map((p) => <option key={p} value={p}>{p} (my post — deputies included)</option>)}
+              {myPosts.map((p) => <option key={p} value={p}>{p} (my post, deputies included)</option>)}
               {cmm && POSTS.filter((p) => !myPosts.includes(p)).map((p) => <option key={p} value={p}>{p}</option>)}
               {s.person && <option value={`PERSON:${s.person.id}`}>Myself, by name ({s.name})</option>}
             </select></label>
@@ -46,9 +46,9 @@ export default async function NewManual({ searchParams }: { searchParams: Promis
           <label><span className="eyebrow">…or a new folder</span><input name="folder_new" className="inp" placeholder="e.g. 4. PROCESS MANUAL › #GLOBAL › POLICIES" /></label>
           <label className="col-span-2 flex items-start gap-3 p-3 border border-line rounded-lg">
             <input type="checkbox" name="internal" className="mt-1" />
-            <span><b>Internal document</b> — no approval by or notification to the civil aviation authority. You review it with the assistant (comments you can use or ignore) and publish it yourself. Leave unticked for a regulated manual (NP → Compliance → authority).</span>
+            <span><b>Internal document</b>, no approval by or notification to the civil aviation authority. You review it with the assistant (comments you can use or ignore) and publish it yourself. Leave unticked for a regulated manual (NP → Compliance → authority).</span>
           </label>
-          <label className="col-span-2"><span className="eyebrow">Chapters — one per line (“1.2 Scope” keeps its number; a plain title is numbered in order)</span>
+          <label className="col-span-2"><span className="eyebrow">Chapters, one per line (“1.2 Scope” keeps its number; a plain title is numbered in order)</span>
             <textarea name="chapters" rows={7} className="inp" placeholder={"Purpose and scope\nDefinitions\nResponsibilities\nProcedure\nRecords"} /></label>
         </div>
         <div className="p-4 pt-0"><button className="btn primary" type="submit">Create and open the editor</button></div>

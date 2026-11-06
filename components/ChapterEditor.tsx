@@ -107,14 +107,14 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
     const r = await orgSnapshot({ revisionId });
     if (!r.ok) { setMsg(r.error); return; }
     editor.chain().focus().insertContent({ type: "orgChart", attrs: { entity: r.entity, snapshot: r.snapshot } }).run();
-    setMsg("Organisation chart inserted — save the chapter");
+    setMsg("Organisation chart inserted, save the chapter");
   }
   async function addImage(f: File | null) {
     if (!f || !editor) return;
     setMsg("Uploading the image…");
     const b64 = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] ?? ""); r.readAsDataURL(f); });
     const r = await uploadImage({ revisionId, name: f.name, type: f.type, b64 });
-    if (r.ok && r.src) { editor.chain().focus().setImage({ src: r.src, alt: f.name }).run(); setMsg("Image inserted — save the chapter"); } else setMsg(r.error ?? "Upload failed");
+    if (r.ok && r.src) { editor.chain().focus().setImage({ src: r.src, alt: f.name }).run(); setMsg("Image inserted, save the chapter"); } else setMsg(r.error ?? "Upload failed");
     if (fileRef.current) fileRef.current.value = "";
   }
   const B = ({ on, act, label, title }: { on?: boolean; act: () => void; label: string; title?: string }) => (
@@ -126,7 +126,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
         <span className="badge big">{refCode}</span>
         <input className="edtitle" value={title} onChange={(e) => { setTitle(e.target.value); titleRef.current = e.target.value; setDirty(true); keepLocal(editor.getHTML()); }} disabled={!editable} />
         {changed && <span className="pill amber">changed in this revision</span>}
-        {frozenBy && <span className="pill red">frozen · changed in Rev {frozenBy}, under review</span>}
+        {frozenBy && <span className="pill red">frozen, changed in Rev {frozenBy}, under review</span>}
       </div>
       {recover && editable && (
         <div className="recoverbar">
@@ -194,7 +194,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
         <div className="edbody">
           <EditorContent editor={editor} className="reader" />
         </div>
-        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} initialRequest={aiRequest} onInserted={() => { setDirty(true); setMsg("SAM's proposal inserted — review, then save"); }} onClose={() => setAi(false)} />}
+        {ai && editable && <AiPanel editor={editor} revisionId={revisionId} sectionId={sectionId} initialRequest={aiRequest} onInserted={() => { setDirty(true); setMsg("SAM's proposal inserted, review, then save"); }} onClose={() => setAi(false)} />}
       </div>
     </div>
   );

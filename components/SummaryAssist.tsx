@@ -15,7 +15,7 @@ export default function SummaryAssist({ revisionId, textareaName = "summary" }: 
     setBusy(false);
     if (!r.ok) { setMsg(r.error); return; }
     if (ta) { ta.value = r.summary; ta.dispatchEvent(new Event("input", { bubbles: true })); }
-    setMsg(`Drafted from ${r.changed} changed chapter${r.changed === 1 ? "" : "s"} — read it, adjust, then Save.`);
+    setMsg(`Drafted from ${r.changed} changed chapter${r.changed === 1 ? "" : "s"}, read it, adjust, then Save.`);
   }
   return (
     <div className="flex items-center gap-2 mt-2 mini">

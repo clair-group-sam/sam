@@ -42,11 +42,11 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   const manuals = (mans ?? []) as { id: string; code: string; title: string }[];
   const events = (evs ?? []) as { at: string; actor: string | null; action: string; after: Record<string, unknown> | null }[];
   const who = f.owner_person ? name(f.owner_person) : f.owner_role ?? "—";
-  const Pts = ({ pts, part }: { pts: Point[] | null | undefined; part?: "rca" | "plan" }) => <ul className="pts">{(pts ?? []).filter((q) => !part || (q.part ?? "rca") === part).map((q, i) => <li key={i}><b>{q.label}</b>{q.detail && q.detail !== q.label ? <> — {q.detail}</> : null}</li>)}</ul>;
+  const Pts = ({ pts, part }: { pts: Point[] | null | undefined; part?: "rca" | "plan" }) => <ul className="pts">{(pts ?? []).filter((q) => !part || (q.part ?? "rca") === part).map((q, i) => <li key={i}><b>{q.label}</b>{q.detail && q.detail !== q.label ? <>, {q.detail}</> : null}</li>)}</ul>;
   /** S.A.M.'s reading for the author: what could make the part stronger. Never a score. */
   const SamNote = ({ a, part }: { a: Assistant | null; part: "rca" | "plan" }) => a ? (
     <div className="samnote"><div className="eyebrow">S.A.M. read this with you{a.model === "rules" ? " (quick check)" : ""}</div>
-      {a.points.filter((q) => (q.part ?? "rca") === part).length ? <><p className="mini">Points that would strengthen it — your call:</p><Pts pts={a.points} part={part} /></> : <p className="mini">Nothing to point out: {part === "rca" ? "the cause explains, the factors are there." : "the plan answers the cause, each action has an owner and a date."}</p>}
+      {a.points.filter((q) => (q.part ?? "rca") === part).length ? <><p className="mini">Points that would strengthen it, your call:</p><Pts pts={a.points} part={part} /></> : <p className="mini">Nothing to point out: {part === "rca" ? "the cause explains, the factors are there." : "the plan answers the cause, each action has an owner and a date."}</p>}
     </div>
   ) : null;
   const RcaText = ({ r }: { r: Pick<Round, "root_cause" | "factors" | "immediate"> }) => <div className="grid gap-3">
@@ -68,7 +68,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
         {mayEditPlan && (
           <details className="mt-2"><summary className="mini">+ Expected manual change</summary>
             <form action={addChange} className="grid gap-2 grid-cols-3 mt-2"><input type="hidden" name="id" value={f.id} />
-              <label><span className="mini">Manual</span><select name="manual_id" className="inp" defaultValue=""><option value="">— not in S.A.M. yet —</option>{manuals.map((m) => <option key={m.id} value={m.id}>{m.code} · {m.title}</option>)}</select></label>
+              <label><span className="mini">Manual</span><select name="manual_id" className="inp" defaultValue=""><option value="">— not in S.A.M. yet —</option>{manuals.map((m) => <option key={m.id} value={m.id}>{m.code}, {m.title}</option>)}</select></label>
               <label><span className="mini">or code</span><input name="manual_code" className="inp mono" placeholder="OM-A" /></label>
               <label><span className="mini">Section</span><input name="section_ref" className="inp mono" placeholder="5.2.3" /></label>
               <label className="col-span-3"><span className="mini">What must change</span><input name="expected" className="inp" required placeholder="Name who checks …, add the record …" /></label>
@@ -76,8 +76,8 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
         )}
       </div>
       <div>
-        <div className="eyebrow mb-1">Other actions <span className="mini">(contracts, training, audits, tools — owner, date, evidence, verified by Compliance)</span></div>
-        {actions.length ? <table className="tbl"><tbody>{actions.map((a) => <tr key={a.id}><td><Link href={`/safe/actions/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini">{a.owner_role ?? name(a.owner_person)} · due {a.due ?? "—"}</div></td><td style={{ textAlign: "right" }}>{step >= 4 && <span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0] ?? a.status}</span>}</td></tr>)}</tbody></table> : <p className="mini">None yet.</p>}
+        <div className="eyebrow mb-1">Other actions <span className="mini">(contracts, training, audits, tools, owner, date, evidence, verified by Compliance)</span></div>
+        {actions.length ? <table className="tbl"><tbody>{actions.map((a) => <tr key={a.id}><td><Link href={`/safe/actions/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini">{a.owner_role ?? name(a.owner_person)}, due {a.due ?? "—"}</div></td><td style={{ textAlign: "right" }}>{step >= 4 && <span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0] ?? a.status}</span>}</td></tr>)}</tbody></table> : <p className="mini">None yet.</p>}
         {mayEditPlan && <details className="mt-2"><summary className="mini">+ Action</summary><div className="mt-2"><NewActionForm entity={f.entity} source="finding" finding_id={f.id} owner_role={f.owner_role} compact stay /></div></details>}
       </div>
     </>
@@ -86,7 +86,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   return (
     <>
       <EntityBand entity={f.entity} current={s.entity} multi={s.entities.length > 1} what="finding" />
-      <PageHeader eyebrow={`Compliance · Findings · ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? ` · ${f.authority}` : ""}`} title={`${f.number} — ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? ` · ${f.requirement}` : ""}${f.audit_ref ? ` · ${f.audit_ref}` : ""} · raised ${f.notified ?? "—"} · answer due ${f.due ?? "—"} · answered by ${who}`}
+      <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${f.notified ?? "—"}, answer due ${f.due ?? "—"}, answered by ${who}`}
         right={<span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>} />
 
       <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? <Icon name="check" size={12} /> : i + 1}</i><span>{l}</span></div>)}</div>
@@ -100,7 +100,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
 
       {sentBack && (
         <section className="card mb-4 sentback">
-          <div className="ch"><span className="eyebrow">Analysis sent back — {sentBack.points?.length ?? 0} point{(sentBack.points?.length ?? 0) === 1 ? "" : "s"} to address</span><span className="mini">by {name(sentBack.decided_by)} · {sentBack.decided_at?.slice(0, 10)}</span></div>
+          <div className="ch"><span className="eyebrow">Analysis sent back, {sentBack.points?.length ?? 0} point{(sentBack.points?.length ?? 0) === 1 ? "" : "s"} to address</span><span className="mini">by {name(sentBack.decided_by)}, {sentBack.decided_at?.slice(0, 10)}</span></div>
           <div className="cb grid grid-cols-2 gap-4">
             <div><div className="eyebrow">Root cause</div>{sentBack.points?.some((q) => (q.part ?? "rca") === "rca") ? <Pts pts={sentBack.points} part="rca" /> : <p className="mini">Nothing to change.</p>}</div>
             <div><div className="eyebrow">Action plan</div>{sentBack.points?.some((q) => q.part === "plan") ? <Pts pts={sentBack.points} part="plan" /> : <p className="mini">Nothing to change.</p>}</div>
@@ -120,7 +120,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <label><span className="mini">Reference</span><input name="audit_ref" className="inp" defaultValue={f.audit_ref ?? ""} /></label>
                 <label><span className="mini">Raised on</span><input type="date" name="notified" className="inp" defaultValue={f.notified ?? ""} /></label>
                 <label><span className="mini">Answer due</span><input type="date" name="due" className="inp" defaultValue={f.due ?? ""} /></label>
-                <label><span className="mini">Answered by — post</span><input name="owner_role" className="inp mono" defaultValue={f.owner_role ?? ""} /></label>
+                <label><span className="mini">Answered by, post</span><input name="owner_role" className="inp mono" defaultValue={f.owner_role ?? ""} /></label>
                 <label><span className="mini">or person</span><select name="owner_person" className="inp" defaultValue={f.owner_person ?? ""}><option value="">—</option>{((ppl ?? []) as { id: string; display_name: string }[]).map((q) => <option key={q.id} value={q.id}>{q.display_name}</option>)}</select></label>
                 <label className="col-span-2"><span className="mini">Text</span><textarea name="description" className="inp" rows={4} defaultValue={f.description ?? ""} /></label>
                 <div className="col-span-2 flex justify-end"><button className="btn" type="submit">Save</button></div></form></details>}</div>
@@ -135,8 +135,8 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <div className="cb">
                   {ds === 1 ? (
                     <form action={saveRootCause} className="grid gap-3"><input type="hidden" name="id" value={f.id} />
-                      <label><span className="mini">Root cause — why did the organisation let this happen? (not what was found, not who)</span><textarea name="root_cause" className="inp" rows={4} required defaultValue={f.draft_root_cause ?? ""} placeholder="Example: the procedure for … did not name who checks …, so the check depended on memory when the roster changed." /></label>
-                      <label><span className="mini">Contributing factors — procedure, training, resources, supervision, interface, tools</span><textarea name="factors" className="inp" rows={3} defaultValue={f.draft_factors ?? ""} /></label>
+                      <label><span className="mini">Root cause, why did the organisation let this happen? (not what was found, not who)</span><textarea name="root_cause" className="inp" rows={4} required defaultValue={f.draft_root_cause ?? ""} placeholder="Example: the procedure for … did not name who checks …, so the check depended on memory when the roster changed." /></label>
+                      <label><span className="mini">Contributing factors, procedure, training, resources, supervision, interface, tools</span><textarea name="factors" className="inp" rows={3} defaultValue={f.draft_factors ?? ""} /></label>
                       <label><span className="mini">Immediate action taken</span><textarea name="immediate" className="inp" rows={2} defaultValue={f.draft_immediate ?? ""} /></label>
                       <SamNote a={f.rca_check} part="rca" />
                       <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="next" value="0">Save &amp; read with S.A.M.</button><button className="btn primary" type="submit" name="next" value="1">Save → action plan</button></div>
@@ -169,14 +169,14 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
             </>
           ) : current ? (
             <section className="card">
-              <div className="ch"><span className="eyebrow">Analysis — round {current.n}</span><span className="mini">{current.decision === "accepted" ? `accepted by ${name(current.decided_by)} · ${current.decided_at?.slice(0, 10)}` : `by ${name(current.answered_by)} · ${current.answered_at.slice(0, 10)}`}</span></div>
+              <div className="ch"><span className="eyebrow">Analysis, round {current.n}</span><span className="mini">{current.decision === "accepted" ? `accepted by ${name(current.decided_by)}, ${current.decided_at?.slice(0, 10)}` : `by ${name(current.answered_by)}, ${current.answered_at.slice(0, 10)}`}</span></div>
               <div className="cb grid gap-3"><RcaText r={current} />{current.comment && <div><div className="eyebrow">How the plan answers the cause</div><p className="mini">{current.comment}</p></div>}</div>
             </section>
           ) : <section className="card"><div className="ch"><span className="eyebrow">Analysis</span></div><div className="cb mini">Waiting for {who}.</div></section>}
 
           {rounds.filter((r) => r.decision === "sent_back").length > 0 && (
             <section className="card"><div className="ch"><span className="eyebrow">Previous rounds</span></div>
-              <div className="cb grid gap-2">{rounds.filter((r) => r.decision).reverse().map((r) => <details key={r.id}><summary><b>Round {r.n}</b> · {name(r.answered_by)} · {r.answered_at.slice(0, 10)} · {r.decision === "accepted" ? "accepted" : `sent back — ${r.points?.length ?? 0} point${(r.points?.length ?? 0) === 1 ? "" : "s"}`}</summary><div className="mini mt-2"><RcaText r={r} /></div>{r.decision === "sent_back" && <div className="mini mt-2"><Pts pts={r.points} /></div>}</details>)}</div></section>
+              <div className="cb grid gap-2">{rounds.filter((r) => r.decision).reverse().map((r) => <details key={r.id}><summary><b>Round {r.n}</b>, {name(r.answered_by)}, {r.answered_at.slice(0, 10)}, {r.decision === "accepted" ? "accepted" : `sent back, ${r.points?.length ?? 0} point${(r.points?.length ?? 0) === 1 ? "" : "s"}`}</summary><div className="mini mt-2"><RcaText r={r} /></div>{r.decision === "sent_back" && <div className="mini mt-2"><Pts pts={r.points} /></div>}</details>)}</div></section>
           )}
 
           <section className="card">
@@ -193,10 +193,10 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <form action={reviewAnswer} className="grid gap-3"><input type="hidden" name="id" value={f.id} />
                   {(["rca", "plan"] as const).map((part) => { const pts = (current.assistant?.points ?? []).filter((q) => (q.part ?? "rca") === part); return (
                     <div key={part}><div className="eyebrow mb-1">{part === "rca" ? "Root cause" : "Action plan"}</div>
-                      {pts.length ? <ul className="pts chk">{pts.map((q) => <li key={`${part}:${q.code}`}><label><input type="checkbox" name="point" value={`${part}:${q.code}`} /> <span><b>{q.label}</b> — {q.detail}</span></label></li>)}</ul> : <p className="mini">S.A.M. found nothing to point out.</p>}</div>); })}
+                      {pts.length ? <ul className="pts chk">{pts.map((q) => <li key={`${part}:${q.code}`}><label><input type="checkbox" name="point" value={`${part}:${q.code}`} /> <span><b>{q.label}</b>, {q.detail}</span></label></li>)}</ul> : <p className="mini">S.A.M. found nothing to point out.</p>}</div>); })}
                   <p className="mini">Tick the points to send back to {who}; nothing goes out unticked.</p>
-                  <div className="grid grid-cols-3 gap-2"><label className="col-span-2"><span className="mini">Your note (optional — added as a point if you send back)</span><textarea name="note" className="inp" rows={2} /></label><label><span className="mini">about</span><select name="note_part" className="inp" defaultValue="rca"><option value="rca">the root cause</option><option value="plan">the plan</option></select></label></div>
-                  <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="decision" value="back">Send back with the ticked points</button><button className="btn primary" type="submit" name="decision" value="accept">Accept root cause and plan — the plan starts</button></div>
+                  <div className="grid grid-cols-3 gap-2"><label className="col-span-2"><span className="mini">Your note (optional, added as a point if you send back)</span><textarea name="note" className="inp" rows={2} /></label><label><span className="mini">about</span><select name="note_part" className="inp" defaultValue="rca"><option value="rca">the root cause</option><option value="plan">the plan</option></select></label></div>
+                  <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="decision" value="back">Send back with the ticked points</button><button className="btn primary" type="submit" name="decision" value="accept">Accept root cause and plan, the plan starts</button></div>
                 </form>
               </div>
             </section>
@@ -208,7 +208,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
               {step >= 4 && p.total > 0 && <div className="bar"><i style={{ width: `${Math.round((100 * p.done) / p.total)}%` }} /></div>}
               <div className="cb grid gap-3">
                 {PlanItems}
-                {f.status === "accepted" && actor && <form action={requestClosure} className="flex items-center justify-between" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><input type="hidden" name="id" value={f.id} /><span className="mini">{p.remaining.length ? `${p.remaining.length} item${p.remaining.length === 1 ? "" : "s"} still open — S.A.M. proposes the closure when everything is verified.` : "Everything is verified."}</span><button className="btn" type="submit" disabled={!!p.remaining.length && !compliance}>Request closure</button></form>}
+                {f.status === "accepted" && actor && <form action={requestClosure} className="flex items-center justify-between" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><input type="hidden" name="id" value={f.id} /><span className="mini">{p.remaining.length ? `${p.remaining.length} item${p.remaining.length === 1 ? "" : "s"} still open. S.A.M. proposes the closure when everything is verified.` : "Everything is verified."}</span><button className="btn" type="submit" disabled={!!p.remaining.length && !compliance}>Request closure</button></form>}
               </div>
             </section>
           )}
@@ -224,7 +224,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
           )}
 
           <section className="card">
-            <div className="ch"><span className="eyebrow">Authority dossier</span><span className="mini">OM-FND · manual revision for finding closure</span></div>
+            <div className="ch"><span className="eyebrow">Authority dossier</span><span className="mini">OM-FND, manual revision for finding closure</span></div>
             <div className="cb flex items-center justify-between">
               {f.authority_file_id ? <Link className="btn" href={`/proj/auth/${f.authority_file_id}`}>Open the dossier</Link> : <span className="mini">No dossier yet. Open it when a manual revision answers the finding at the authority.</span>}
               {compliance && !f.authority_file_id && <form action={openDossier}><input type="hidden" name="id" value={f.id} /><button className="btn" type="submit">Open the dossier</button></form>}
@@ -234,10 +234,10 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
           {compliance && !closedOrCancelled && f.status !== "closure_requested" && (
             <details className="card"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">Close or cancel</span></summary>
               <div className="cb"><form action={decideClosure} className="grid gap-2"><input type="hidden" name="id" value={f.id} />
-                <label><span className="mini">Note</span><input name="note" className="inp" placeholder="Why — accepted by the authority on …, raised by mistake…" /></label>
+                <label><span className="mini">Note</span><input name="note" className="inp" placeholder="Why, accepted by the authority on …, raised by mistake…" /></label>
                 <div className="flex gap-2 justify-end"><button className="btn" name="what" value="cancel">Cancel the finding</button><button className="btn" name="what" value="close">Close directly</button></div></form></div></details>
           )}
-          {f.closed_at && <section className="card"><div className="ch"><span className="eyebrow">{f.status === "cancelled" ? "Cancelled" : "Closed"}</span><span className="mini">{f.closed_at.slice(0, 10)} · {name(f.closed_by)}</span></div>{f.closed_note && <div className="cb">{f.closed_note}</div>}</section>}
+          {f.closed_at && <section className="card"><div className="ch"><span className="eyebrow">{f.status === "cancelled" ? "Cancelled" : "Closed"}</span><span className="mini">{f.closed_at.slice(0, 10)}, {name(f.closed_by)}</span></div>{f.closed_note && <div className="cb">{f.closed_note}</div>}</section>}
         </div>
       </div>
     </>

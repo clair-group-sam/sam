@@ -58,7 +58,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
   const flag = (k: string, l: string, n: number, tone?: string) => <Link href={qs(sp, { flag: sp.flag === k ? undefined : k })} className={"btn" + (sp.flag === k ? " on" : "")}>{l} <span className={"pill " + (n ? tone ?? "" : "")}>{n}</span></Link>;
   return (
     <>
-      <PageHeader eyebrow="Safety · Risk management" title="Hazard log" sub={`Each lasting hazard once, with its current rating — reviewed at the SRB, reassessed with each new occurrence · ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
+      <PageHeader eyebrow="Safety, Risk management" title="Hazard log" sub={`Each lasting hazard once, with its current rating, reviewed at the SRB, reassessed with each new occurrence, ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
       <RiskTabs on="log" toMatch={toMatch} />
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Hazards in the log" value={live.length} hint={`${new Set(live.map((h) => h.assessment_id)).size} entries`} />
@@ -82,13 +82,13 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
               <button className="btn">Filter</button>
             </form>
           </div>
-          {(sp.cell || sp.tol || sp.domain || sp.q || sp.flag) && <p className="mini mb-2">{rows.length} hazards · <Link className="underline" href={qs({ m: sp.m }, {})}>clear filters</Link></p>}
+          {(sp.cell || sp.tol || sp.domain || sp.q || sp.flag) && <p className="mini mb-2">{rows.length} hazards, <Link className="underline" href={qs({ m: sp.m }, {})}>clear filters</Link></p>}
         </div>
         <section className="card">
-          <div className="ch"><span className="eyebrow">Heat map · {post ? "current (post-mitigation)" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
+          <div className="ch"><span className="eyebrow">Heat map, {post ? "current (post-mitigation)" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
           <div className="cb">
             <table className="rmx heat"><thead><tr><th />{SEVERITIES.map((v) => <th key={v.id} title={v.label}>{v.id}</th>)}</tr></thead>
-              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)} · ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
+              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)}, ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
             <p className="mini mt-2">{sch === "centrik" ? "Scores as in Centrik: green 1–10, yellow 20–100, red 300–2500." : "ICAO tolerability table."} Click a cell to filter.</p>
           </div>
         </section>
@@ -117,17 +117,17 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
           </table>
         </section>
       ))}
-      {!rows.length && <section className="card mb-4"><p className="p-6 text-slate6">No hazard{sp.cell || sp.q || sp.tol || sp.domain || sp.flag ? " matching the filters" : " in the log yet — create an entry below, or import Centrik / Monday in Settings › Integrations"}.</p></section>}
+      {!rows.length && <section className="card mb-4"><p className="p-6 text-slate6">No hazard{sp.cell || sp.q || sp.tol || sp.domain || sp.flag ? " matching the filters" : " in the log yet, create an entry below, or import Centrik / Monday in Settings › Integrations"}.</p></section>}
       <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: archived ? undefined : "archived" })}>{archived ? "Back to the current log" : "Closed and archived hazards"}</Link></p>
 
       {edit && (
-        <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New hazard log entry</span><span className="mini">a lasting hazard — for a change use a MOC, for a one-off case a risk assessment</span></summary>
+        <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New hazard log entry</span><span className="mini">a lasting hazard, for a change use a MOC, for a one-off case a risk assessment</span></summary>
           <form action={createAssessment} className="cb grid grid-cols-3 gap-3"><input type="hidden" name="kind" value="hazard_log" />
-            <label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={s.entity !== "ALL" ? s.entity : s.entities[0]}>{s.entities.map((e) => <option key={e} value={e}>{e} — {ENT[e]?.name ?? e}</option>)}</select></label>
+            <label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={s.entity !== "ALL" ? s.entity : s.entities[0]}>{s.entities.map((e) => <option key={e} value={e}>{e}, {ENT[e]?.name ?? e}</option>)}</select></label>
             <label><span className="mini">Domain</span><select name="domain" className="inp">{DOMAINS.map((d) => <option key={d}>{d}</option>)}</select></label>
             <label><span className="mini">Owner (post)</span><input name="owner_role" className="inp mono" placeholder="SM" /></label>
             <label className="col-span-3"><span className="mini">Name</span><input name="name" className="inp" required placeholder="e.g. HZ - Runway incursions (RI)" /></label>
-            <label className="col-span-3"><span className="mini">Participants — one per line: Name — role</span><textarea name="participants" className="inp" rows={2} placeholder={"Guillaume Fournie — SM\nJonathan Wolski — NPFO"} /></label>
+            <label className="col-span-3"><span className="mini">Participants, one per line: Name, role</span><textarea name="participants" className="inp" rows={2} placeholder={"Guillaume Fournie. SM\nJonathan Wolski. NPFO"} /></label>
             <div className="col-span-3 flex justify-end"><button className="btn primary">Create</button></div>
           </form>
         </details>

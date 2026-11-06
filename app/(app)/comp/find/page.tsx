@@ -28,7 +28,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
   const tabs: [string, string, number][] = [["mine", "Mine", open.filter(mine).length], ["open", "Open", open.length], ["review", "To review", open.filter((f) => CMM_TURN.includes(f.status)).length], ["closed", "Closed", all.length - open.length], ["all", "All", all.length]];
   return (
     <>
-      <PageHeader eyebrow="Compliance · Findings" title="Findings" sub="Authority and internal audit findings: the nominated person analyses and plans, S.A.M. pre-reads, Compliance decides, the plan is followed to closure." right={compliance ? <Link className="btn primary" href="/comp/find/new">+ Raise a finding</Link> : undefined} />
+      <PageHeader eyebrow="Compliance, Findings" title="Findings" sub="Authority and internal audit findings: the nominated person analyses and plans, S.A.M. pre-reads, Compliance decides, the plan is followed to closure." right={compliance ? <Link className="btn primary" href="/comp/find/new">+ Raise a finding</Link> : undefined} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open" value={open.length} hint={`${open.filter((f) => f.level === "1").length} level 1`} />
         <Metric label="Waiting for an answer" value={open.filter((f) => NP_TURN.includes(f.status)).length} tone={open.some((f) => NP_TURN.includes(f.status) && f.due && f.due < t0) ? "red" : undefined} hint={`${open.filter((f) => NP_TURN.includes(f.status) && f.due && f.due < t0).length} past due`} />
@@ -44,7 +44,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
               <tbody>
                 {rows.map((f) => (
                   <tr key={f.id}>
-                    <td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[f.entity] ?? "#888" }} />{f.entity} · {SOURCE_LABEL[f.source] ?? f.source}{f.authority ? ` · ${f.authority}` : ""}{f.audit_ref ? ` · ${f.audit_ref}` : ""}</div></td>
+                    <td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[f.entity] ?? "#888" }} />{f.entity}, {SOURCE_LABEL[f.source] ?? f.source}{f.authority ? `, ${f.authority}` : ""}{f.audit_ref ? `, ${f.audit_ref}` : ""}</div></td>
                     <td className="mono">{f.requirement ?? "—"}</td>
                     <td>{LEVEL_LABEL[f.level] ?? f.level}</td>
                     <td>{f.owner_role ?? "person"}</td>
@@ -62,7 +62,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
         const fx = open as FX[]; const cats = [...new Set(fx.map((f) => f.category).filter(Boolean))] as string[]; const causes = [...new Set(fx.map((f) => f.cause).filter(Boolean))] as string[];
         if (!cats.length || !causes.length) return null;
         const n = (c: string, k: string) => fx.filter((f) => f.category === c && f.cause === k).length; const max = Math.max(1, ...cats.flatMap((c) => causes.map((k) => n(c, k))));
-        return <section className="card mt-4"><div className="ch"><span className="eyebrow">Open findings · category × cause</span><span className="mini">{fx.filter((f) => f.repeat).length} repeat</span></div><div className="cb" style={{ overflow: "auto" }}>
+        return <section className="card mt-4"><div className="ch"><span className="eyebrow">Open findings, category × cause</span><span className="mini">{fx.filter((f) => f.repeat).length} repeat</span></div><div className="cb" style={{ overflow: "auto" }}>
           <table className="matrix"><thead><tr><th></th>{causes.map((k) => <th key={k}>{k}</th>)}<th>Total</th></tr></thead><tbody>{cats.map((c) => <tr key={c}><td style={{ textAlign: "left" }}><b>{c}</b></td>{causes.map((k) => { const v = n(c, k); return <td key={k} style={{ background: v ? `rgba(226,6,18,${0.12 + 0.6 * v / max})` : undefined, color: v / max > 0.5 ? "#fff" : undefined }}>{v || ""}</td>; })}<td><b>{fx.filter((f) => f.category === c).length}</b></td></tr>)}</tbody></table>
         </div></section>; })()}
     </>

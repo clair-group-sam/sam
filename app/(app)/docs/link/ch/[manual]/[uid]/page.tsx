@@ -23,7 +23,7 @@ export default async function ChapterLink({ params }: { params: Promise<{ manual
   }
   return (
     <>
-      <PageHeader eyebrow="Documents · link" title="This chapter cannot be opened" sub={man ? `${man.code} — ${man.title}` : "Referenced document"} />
+      <PageHeader eyebrow="Documents, link" title="This chapter cannot be opened" sub={man ? `${man.code}, ${man.title}` : "Referenced document"} />
       <section className="card"><div className="cb">
         {!man ? <p>The referenced manual no longer exists in S.A.M.</p>
           : !(s.group || s.entities.includes(man.entity)) ? <p>The manual belongs to <b>{ENT[man.entity]?.name ?? man.entity}</b>, which is outside your access in S.A.M. Ask Compliance if you need to read it.</p>

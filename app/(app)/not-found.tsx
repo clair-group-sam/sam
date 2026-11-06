@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/Page";
 export default function NotFound() {
   return (
     <>
-      <PageHeader eyebrow="S.A.M." title="Nothing here" sub="This address does not match any page or object — it may have been renamed, closed, or belong to another entity." />
+      <PageHeader eyebrow="S.A.M." title="Nothing here" sub="This address does not match any page or object, it may have been renamed, closed, or belong to another entity." />
       <section className="card" style={{ maxWidth: 640 }}>
         <div className="cb">
           <p className="mini mb-3">Where you probably wanted to go:</p>

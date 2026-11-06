@@ -32,7 +32,7 @@ export default async function SafetyPromotion({ searchParams }: { searchParams: 
   const y = String(new Date().getUTCFullYear());
   return (
     <>
-      <PageHeader eyebrow="Safety · Safety promotion" title={writer ? "Safety promotion" : "Safety bulletins"} sub="Safety bulletins (lessons learned, trends), safety notices (short, urgent, action required) and safety surveys — sent to the people concerned, reading and answers recorded." right={<>{tab("", "All")}{tab("bulletin", "Bulletins")}{tab("notice", "Notices")}{tab("survey", "Surveys")}</>} />
+      <PageHeader eyebrow="Safety, Safety promotion" title={writer ? "Safety promotion" : "Safety bulletins"} sub="Safety bulletins (lessons learned, trends), safety notices (short, urgent, action required) and safety surveys, sent to the people concerned, reading and answers recorded." right={<>{tab("", "All")}{tab("bulletin", "Bulletins")}{tab("notice", "Notices")}{tab("survey", "Surveys")}</>} />
       {writer && <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label={`Bulletins ${y}`} value={all.filter((p) => p.kind === "bulletin" && (p.published_at ?? "").startsWith(y)).length} />
         <Metric label={`Notices ${y}`} value={all.filter((p) => p.kind === "notice" && (p.published_at ?? "").startsWith(y)).length} />
@@ -46,18 +46,18 @@ export default async function SafetyPromotion({ searchParams }: { searchParams: 
           <tbody>{rows.map((p) => (
             <tr key={p.id}>
               <td className="mono"><Link className="underline" href={`/safe/promo/${p.id}`}>{p.number}</Link><SourceMark source={p.source} id={p.source_ref} />{scope.length > 1 && <div><span className={"ent " + p.entity}>{p.entity}</span></div>}</td>
-              <td><Link href={`/safe/promo/${p.id}`}><b>{p.title}</b></Link><div className="mini">{PROMO_KIND[p.kind]?.label} · {AUDIENCE[p.audience]}{p.summary ? ` · ${p.summary.slice(0, 120)}` : ""}</div></td>
+              <td><Link href={`/safe/promo/${p.id}`}><b>{p.title}</b></Link><div className="mini">{PROMO_KIND[p.kind]?.label}, {AUDIENCE[p.audience]}{p.summary ? `, ${p.summary.slice(0, 120)}` : ""}</div></td>
               <td className="mono">{(p.issued_on ?? p.published_at)?.slice(0, p.issued_on ? 7 : 10) ?? "—"}</td>
               {writer && <td className="mini">{p.status === "draft" ? "—" : p.source === "webmanuals" ? "history" : rate(p)}</td>}
               <td><span className={"pill " + (PROMO_STATUS[p.status]?.[1] ?? "")}>{PROMO_STATUS[p.status]?.[0]}</span></td>
             </tr>))}
             {!rows.length && <tr><td colSpan={5} className="p-5 mini">Nothing yet.</td></tr>}</tbody></table>
       </section>
-      {isSafetyDesk(s) && s.entity !== "ALL" && <details className="card mb-5"><summary className="ch cursor-pointer"><span className="eyebrow">Import from Web Manuals</span><span className="mini">bulletins already published (history) — PDF kept, nothing sent</span></summary><div className="cb"><PromoImport entity={s.entity} /></div></details>}
+      {isSafetyDesk(s) && s.entity !== "ALL" && <details className="card mb-5"><summary className="ch cursor-pointer"><span className="eyebrow">Import from Web Manuals</span><span className="mini">bulletins already published (history). PDF kept, nothing sent</span></summary><div className="cb"><PromoImport entity={s.entity} /></div></details>}
       {writer && s.entity !== "ALL" && <details className="card" open={!!(sp.report || sp.inv)}><summary className="ch cursor-pointer"><span className="eyebrow">+ New</span><span className="mini">{ENT[s.entity]?.name ?? s.entity}</span></summary>
         <form action={createPromotion} className="cb grid grid-cols-6 gap-2">
           <input type="hidden" name="entity" value={s.entity} />{sp.report && <input type="hidden" name="report_id" value={sp.report} />}{sp.inv && <input type="hidden" name="investigation_id" value={sp.inv} />}
-          <label className="col-span-2"><span className="mini">Kind</span><select name="kind" className="inp" defaultValue="bulletin">{Object.entries(PROMO_KIND).map(([k, v]) => <option key={k} value={k}>{v.label} — {v.hint}</option>)}</select></label>
+          <label className="col-span-2"><span className="mini">Kind</span><select name="kind" className="inp" defaultValue="bulletin">{Object.entries(PROMO_KIND).map(([k, v]) => <option key={k} value={k}>{v.label}, {v.hint}</option>)}</select></label>
           <label className="col-span-4"><span className="mini">Title</span><input name="title" className="inp" required /></label>
           <label className="col-span-2"><span className="mini">Audience</span><select name="audience" className="inp" defaultValue="all">{Object.entries(AUDIENCE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
           <label className="col-span-4"><span className="mini">Notes for the text (S.A.M. drafts from them{sp.report ? ` and report ${sp.report}` : ""}{sp.inv ? " and the investigation" : ""}, de-identified)</span><textarea name="notes" className="inp" rows={2} /></label>

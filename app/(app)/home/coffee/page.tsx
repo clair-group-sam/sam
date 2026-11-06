@@ -52,8 +52,8 @@ function TierBlock({ tier, items }: { tier: Tier; items: RankItem[] }) {
           ? (x.link.startsWith("/") ? <Link key={n} href={x.link} className={"kind " + (SRC[x.kind] ?? "")} style={{ marginLeft: 4 }}>{x.label}</Link> : <a key={n} href={x.link} target="_blank" rel="noreferrer" className={"kind " + (SRC[x.kind] ?? "")} style={{ marginLeft: 4 }}>{x.label}</a>)
           : <span key={n} className={"kind " + (SRC[x.kind] ?? "")} style={{ marginLeft: 4 }}>{x.label}</span>)}<CoffeeLineActions it={it} /></td>
       </tr>))}</tbody></table>);
-  if (tier === 4) return <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">{tier} · {TIERS[tier].title}</span><span className="mini">{items.length} · {TIERS[tier].hint}</span></summary>{rows}</details>;
-  return <section className={"card mb-4" + (tier === 1 ? " cf-hot" : "")}><div className="ch"><span className="eyebrow">{tier} · {TIERS[tier].title}</span><span className="mini">{items.length} · {TIERS[tier].hint}</span></div>{rows}</section>;
+  if (tier === 4) return <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">{tier}, {TIERS[tier].title}</span><span className="mini">{items.length}, {TIERS[tier].hint}</span></summary>{rows}</details>;
+  return <section className={"card mb-4" + (tier === 1 ? " cf-hot" : "")}><div className="ch"><span className="eyebrow">{tier}, {TIERS[tier].title}</span><span className="mini">{items.length}, {TIERS[tier].hint}</span></div>{rows}</section>;
 }
 
 /** Lot 3 · what the recap remembers for the person: always important / never important (senders, domains, chats, words). */
@@ -63,13 +63,13 @@ async function Rules({ personId }: { personId: string }) {
   const show = (v: string) => v.replace(/^(mail|teams|sam|agenda|wait):/, "");
   const Chip = ({ v }: { v: string }) => <form action={unmark} style={{ display: "inline" }}><input type="hidden" name="value" value={v} /><button className="pill" title="Forget this rule" style={{ margin: "2px 4px 2px 0" }}>{show(v)} <Icon name="x" size={11} /></button></form>;
   return (
-    <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">Your ranking rules</span><span className="mini">{p.important.length} important · {p.muted.length} not important — learnt from the buttons, or added here</span></summary>
+    <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">Your ranking rules</span><span className="mini">{p.important.length} important, {p.muted.length} not important, learnt from the buttons, or added here</span></summary>
       <div className="cb grid gap-2">
         <div><span className="mini"><b>Always at least “Today”</b> </span>{p.important.map((v) => <Chip key={v} v={v} />)}{!p.important.length && <span className="mini">—</span>}</div>
         <div><span className="mini"><b>Always “Can wait”</b> </span>{p.muted.map((v) => <Chip key={v} v={v} />)}{!p.muted.length && <span className="mini">—</span>}</div>
         <form action={addRule} className="flex gap-2"><input name="value" className="inp" placeholder="an address, a domain (@easa.europa.eu) or a word (ECCAIRS, 9H-SFJ…)" style={{ marginTop: 0 }} />
           <select name="list" className="inp" style={{ width: 170, marginTop: 0 }} defaultValue="important"><option value="important">Important</option><option value="muted">Not important</option></select><button className="btn">Add</button></form>
-        <span className="mini">Applied at the next “Brew again”. A domain or word rule never mutes a regulatory clock, an overdue or a due-today item — only marking that very line does.</span>
+        <span className="mini">Applied at the next “Brew again”. A domain or word rule never mutes a regulatory clock, an overdue or a due-today item, only marking that very line does.</span>
       </div></details>);
 }
 
@@ -78,7 +78,7 @@ export default async function MorningCoffee() {
   const s = await getSession();
   if (!s) redirect("/login");
   const r = s.person ? await todaysRecap(s.person.id) : null;
-  if (!r) return (<><PageHeader eyebrow="Home · Morning coffee" title="Morning coffee" sub="Nothing prepared yet today." /><CoffeeBox recap={null} connected={s.person ? await hasGraph(s.person.id) : false} /></>);
+  if (!r) return (<><PageHeader eyebrow="Home, Morning coffee" title="Morning coffee" sub="Nothing prepared yet today." /><CoffeeBox recap={null} connected={s.person ? await hasGraph(s.person.id) : false} /></>);
   const err = r.errors ?? {};
   const Err = ({ k }: { k: string }) => err[k] ? <div className="cb mini red">Could not read it this time: {err[k]}</div> : null;
   const actions = r.mail?.groups.reduce((n, g) => n + g.items.filter((m) => m.action).length, 0) ?? 0;
@@ -86,8 +86,8 @@ export default async function MorningCoffee() {
   const c = r.counts ?? { overdue: r.overdue.length, today: r.today.length, week: r.week.length }; // FB-002 · same unit as the Inbox: tasks
   return (
     <>
-      <PageHeader eyebrow="Home · Morning coffee" title={`Your morning, ${s.name.split(" ")[0]}`}
-        sub={`Prepared at ${hhmm(r.at)} · since ${dayLabel(r.since)} · nothing was sent, marked read or moved · deleted tonight.`}
+      <PageHeader eyebrow="Home, Morning coffee" title={`Your morning, ${s.name.split(" ")[0]}`}
+        sub={`Prepared at ${hhmm(r.at)}, since ${dayLabel(r.since)}, nothing was sent, marked read or moved, deleted tonight.`}
         right={<form action={brewCoffee} className="flex gap-2"><SameSources recap={r} /><Link href="/home/tasks" className="btn">Inbox</Link><BrewButton label="Brew again" primary={false} /></form>} />
 
       <section className={"card coffee-syn mb-4" + (urgent ? " hot" : "")}>
@@ -98,16 +98,16 @@ export default async function MorningCoffee() {
 
       {r.ranked && r.ranked.items.length > 0 && <>
         {([1, 2, 3, 4] as Tier[]).map((t) => <TierBlock key={t} tier={t} items={r.ranked!.items.filter((x) => x.tier === t)} />)}
-        {r.ranked.by === "rules" && <p className="mini mb-4">Ranked by the rules only — the assistant could not be reached this time.</p>}
+        {r.ranked.by === "rules" && <p className="mini mb-4">Ranked by the rules only, the assistant could not be reached this time.</p>}
         <Rules personId={s.person!.id} />
       </>}
 
       <details className="mb-4" open={!r.ranked}><summary className="eyebrow cursor-pointer mb-3">Details by source</summary>
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <div className={"metric" + (c.overdue ? " red" : "")}><div className="eyebrow">Overdue tasks</div><div className="val">{c.overdue}</div><div className="mini">{c.today} due today · {c.week} this week</div></div>
+        <div className={"metric" + (c.overdue ? " red" : "")}><div className="eyebrow">Overdue tasks</div><div className="val">{c.overdue}</div><div className="mini">{c.today} due today, {c.week} this week</div></div>
         <div className="metric"><div className="eyebrow">Meetings today</div><div className="val">{r.agenda ? r.agenda.items.filter((i) => !i.allDay).length : "—"}</div>{r.agenda && <div className="mini">{r.agenda.free.length ? `free ${r.agenda.free.slice(0, 2).map((f) => f.from + "–" + f.to).join(", ")}` : "no free slot"}</div>}</div>
         <div className={"metric" + (actions ? " amber" : "")}><div className="eyebrow">Unread mail</div><div className="val">{r.mail ? r.mail.total : "—"}</div>{r.mail && <div className="mini">{actions} to act on</div>}</div>
-        <div className="metric"><div className="eyebrow">Teams</div><div className="val">{r.teams ? r.teams.chats.length + r.teams.mentions.length : "—"}</div>{r.teams && <div className="mini">{r.teams.chats.length} chats · {r.teams.mentions.length} mentions</div>}</div>
+        <div className="metric"><div className="eyebrow">Teams</div><div className="val">{r.teams ? r.teams.chats.length + r.teams.mentions.length : "—"}</div>{r.teams && <div className="mini">{r.teams.chats.length} chats, {r.teams.mentions.length} mentions</div>}</div>
       </div>
 
       {(r.agenda || err.calendar) && (
@@ -127,7 +127,7 @@ export default async function MorningCoffee() {
 
       {(r.mail || err.mail) && (
         <section className="card mb-4">
-          <div className="ch"><span className="eyebrow">Unread mail since {dayLabel(r.since)}</span><span className="mini">{r.mail ? `${r.mail.total} · Private / Personal left out` : ""}</span></div>
+          <div className="ch"><span className="eyebrow">Unread mail since {dayLabel(r.since)}</span><span className="mini">{r.mail ? `${r.mail.total}, Private / Personal left out` : ""}</span></div>
           <Err k="mail" />
           {r.mail && (r.mail.total ? r.mail.groups.map((g) => (
             <div key={g.name} className="cf-mailgrp">
@@ -135,7 +135,7 @@ export default async function MorningCoffee() {
               <table className="tbl"><tbody>{g.items.map((m, n) => (
                 <tr key={n}>
                   <td style={{ width: 90 }}>{m.action && <span className="kind k-comp">Action</span>}</td>
-                  <td style={{ width: 220 }}><b>{m.from}</b><div className="mini mono">{m.count && m.count > 1 ? `${m.count} messages · last ${hhmm(m.at)}` : hhmm(m.at)}</div></td>
+                  <td style={{ width: 220 }}><b>{m.from}</b><div className="mini mono">{m.count && m.count > 1 ? `${m.count} messages, last ${hhmm(m.at)}` : hhmm(m.at)}</div></td>
                   <td>{m.link ? <a href={m.link} target="_blank" rel="noreferrer" className="underline">{m.subject}</a> : m.subject}<div className="mini">{m.summary}</div></td>
                 </tr>))}</tbody></table>
             </div>
@@ -145,7 +145,7 @@ export default async function MorningCoffee() {
 
       {(r.teams || err.teams) && (
         <section className="card mb-4">
-          <div className="ch"><span className="eyebrow">Teams</span><span className="mini">unread chats · channel messages naming you</span></div>
+          <div className="ch"><span className="eyebrow">Teams</span><span className="mini">unread chats, channel messages naming you</span></div>
           <Err k="teams" />
           {r.teams && (r.teams.chats.length + r.teams.mentions.length ? (
             <table className="tbl"><tbody>
@@ -156,10 +156,10 @@ export default async function MorningCoffee() {
         </section>
       )}
 
-      <Block title="Regulatory clocks · MOR 72 h" lines={r.mor} dueCol={false} />
-      <Block title="Overdue" hint={c.overdue !== r.overdue.length ? `${c.overdue} tasks · ${r.overdue.length} lines` : undefined} lines={r.overdue} />
-      <Block title="Due today" hint={c.today !== r.today.length ? `${c.today} tasks · ${r.today.length} lines` : undefined} lines={r.today} empty={r.overdue.length ? undefined : "Nothing due today."} />
-      <Block title="Next 7 days" hint={c.week !== r.week.length ? `${c.week} tasks · ${r.week.length} lines` : undefined} lines={r.week} />
+      <Block title="Regulatory clocks, MOR 72 h" lines={r.mor} dueCol={false} />
+      <Block title="Overdue" hint={c.overdue !== r.overdue.length ? `${c.overdue} tasks, ${r.overdue.length} lines` : undefined} lines={r.overdue} />
+      <Block title="Due today" hint={c.today !== r.today.length ? `${c.today} tasks, ${r.today.length} lines` : undefined} lines={r.today} empty={r.overdue.length ? undefined : "Nothing due today."} />
+      <Block title="Next 7 days" hint={c.week !== r.week.length ? `${c.week} tasks, ${r.week.length} lines` : undefined} lines={r.week} />
       <Block title="Read & acknowledge" lines={r.readings} />
       <Block title="Validities ending within 90 days" lines={r.validities} />
       <Block title={`What moved since ${dayLabel(r.since)}`} lines={r.moved} dueCol={false} empty="Nothing moved overnight in your scope." />

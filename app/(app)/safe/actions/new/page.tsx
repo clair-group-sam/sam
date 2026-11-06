@@ -15,7 +15,7 @@ export default async function NewAction({ searchParams }: { searchParams: Promis
   const back = p.report ? `/safe/reports/${p.report}` : p.hazard ? `/safe/risk/${p.hazard}` : p.assessment ? `/safe/risk/a/${p.assessment}` : "/safe/actions";
   return (
     <>
-      <PageHeader eyebrow="Safety · Actions" title="New action" sub="Who does what by when — the owner gets it in the Inbox, marks it done with the evidence, the safety desk verifies." right={<Link className="btn" href={back}>Back</Link>} />
+      <PageHeader eyebrow="Safety, Actions" title="New action" sub="Who does what by when, the owner gets it in the Inbox, marks it done with the evidence, the safety desk verifies." right={<Link className="btn" href={back}>Back</Link>} />
       <section className="card"><div className="cb">
         <NewActionForm entity={entity} source={p.source ?? (p.report ? "report" : p.hazard ? "hazard" : p.assessment ? "assessment" : "other")} title={p.title} description={p.description} owner_role={p.owner_role} report_id={p.report} hazard_id={p.hazard} mitigation_id={p.mitigation} assessment_id={p.assessment} />
       </div></section>

@@ -16,7 +16,7 @@ export default async function NewActionForm({ entity, source, title, description
       <label className={compact ? "" : "col-span-4"}><span className="mini">Action</span><input name="title" className="inp" required defaultValue={title ?? ""} placeholder="What must be done (verb first)" /></label>
       {!compact && <label className="col-span-4"><span className="mini">Details (why, scope, expected result)</span><textarea name="description" className="inp" rows={2} defaultValue={description ?? ""} /></label>}
       <div className={compact ? "grid grid-cols-2 gap-2" : "contents"}>
-        <label><span className="mini">Owner — post</span><input name="owner_role" className="inp mono" defaultValue={owner_role ?? ""} placeholder="NPFO, NPCA, SM, HT…" /></label>
+        <label><span className="mini">Owner, post</span><input name="owner_role" className="inp mono" defaultValue={owner_role ?? ""} placeholder="NPFO, NPCA, SM, HT…" /></label>
         <label><span className="mini">or person</span><select name="owner_person" className="inp" defaultValue=""><option value="">—</option>{people.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select></label>
         <label><span className="mini">Due</span><input type="date" name="due" className="inp" defaultValue={in2w} /></label>
         <label><span className="mini">Type</span><select name="kind" className="inp" defaultValue="corrective">{Object.entries(ACTION_KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>

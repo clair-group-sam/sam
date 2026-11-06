@@ -51,14 +51,14 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
   const old = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10); // pre-ticked for closing: conducted more than 2 weeks ago
   return (
     <>
-      <PageHeader eyebrow="Safety · Risk management" title="Risk assessments" sub={`One-off, dated assessments — their lasting hazards are linked to the hazard log · ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
+      <PageHeader eyebrow="Safety, Risk management" title="Risk assessments" sub={`One-off, dated assessments, their lasting hazards are linked to the hazard log, ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
       <RiskTabs on="ra" toMatch={toMatch} />
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open assessments" value={openRa.filter((a) => a.status !== "accepted").length} hint={`${openRa.length} current`} />
         <Metric label="Residual intolerable" value={intoler} tone={intoler ? "red" : undefined} hint="current rating" />
         <Metric label="Hazards to match" value={toMatch} tone={toMatch ? "amber" : undefined} hint="link to the log / keep local" />
         <Metric label="Review overdue" value={openRa.filter((a) => a.kind !== "moc" && a.next_due && a.next_due < today).length} tone={openRa.some((a) => a.kind !== "moc" && a.next_due && a.next_due < today) ? "red" : undefined} />
-        <Metric label="Red — AM decision" value={openRa.filter((a) => a.status === "validated").length} tone={openRa.some((a) => a.status === "validated") ? "amber" : undefined} />
+        <Metric label="Red. AM decision" value={openRa.filter((a) => a.status === "validated").length} tone={openRa.some((a) => a.status === "validated") ? "amber" : undefined} />
       </div>
 
       <div className="grid gap-4 mb-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 360px" }}>
@@ -72,13 +72,13 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
               <button className="btn">Filter</button>
             </form>
           </div>
-          {(sp.cell || sp.tol || sp.domain || sp.q) && <p className="mini mb-2">{rows.length} assessments · {shownH.length} hazards · <Link className="underline" href={qs({ kind: sp.kind, m: sp.m }, {})}>clear filters</Link></p>}
+          {(sp.cell || sp.tol || sp.domain || sp.q) && <p className="mini mb-2">{rows.length} assessments, {shownH.length} hazards, <Link className="underline" href={qs({ kind: sp.kind, m: sp.m }, {})}>clear filters</Link></p>}
         </div>
         <section className="card">
-          <div className="ch"><span className="eyebrow">Heat map · {post ? "post-mitigation" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
+          <div className="ch"><span className="eyebrow">Heat map, {post ? "post-mitigation" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
           <div className="cb">
             <table className="rmx heat"><thead><tr><th />{SEVERITIES.map((v) => <th key={v.id} title={v.label}>{v.id}</th>)}</tr></thead>
-              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)} · ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
+              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)}, ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
             <p className="mini mt-2">{sch === "centrik" ? "Scores as in Centrik: green 1–10, yellow 20–100, red 300–2500." : "ICAO tolerability table."} Click a cell to filter.</p>
           </div>
         </section>
@@ -95,10 +95,10 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
               const ch = msmChecks(a, (byRa.get(a.id) ?? []) as Hz[]); const okN = ch.filter((c) => c.ok).length;
               return (
                 <tr key={a.id}>
-                  {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" defaultChecked={!!a.conducted_on && a.conducted_on < old && a.status !== "validated"} title="Close — case over" /></td>}
+                  {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" defaultChecked={!!a.conducted_on && a.conducted_on < old && a.status !== "validated"} title="Close, case over" /></td>}
                   <td className="mono"><Link className="underline" href={`/safe/risk/a/${a.id}`}>{a.number}</Link><SourceMark source={a.source} /></td>
                   <td className="entcol"><span className={"ent " + a.entity}>{a.entity}</span></td>
-                  <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? ` · ${a.domain}` : ""}{a.top_risk ? " · top risk" : ""}{hs.some((h) => h.needs_review) ? ", to reassess" : ""}</div></td>
+                  <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? `, ${a.domain}` : ""}{a.top_risk ? ", top risk" : ""}{hs.some((h) => h.needs_review) ? ", to reassess" : ""}</div></td>
                   <td>{hs.length}<div className="mini">{hs.filter((h) => h.log_hazard_id).length} in log</div></td>
                   <td>{pre && pre[0] ? <span className={"pill " + tolTone(tolerability(pre[0], pre[1], sc))}>{riskLabel(pre[0], pre[1], sc)}</span> : <span className="mini">—</span>} → {po && po[0] ? <span className={"pill " + tolTone(tolerability(po[0], po[1], sc))}>{riskLabel(po[0], po[1], sc)}</span> : <span className="mini">—</span>}</td>
                   <td className={"mono" + (a.kind !== "moc" && a.next_due && a.next_due < today ? " red" : "")}>{a.kind === "moc" ? (a.start_date ?? "—") : (a.next_due ?? "—")}</td>
@@ -106,23 +106,23 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
                   <td><span className={"pill " + (okN === ch.length ? "green" : okN >= ch.length - 2 ? "amber" : "red")} title={ch.filter((c) => !c.ok).map((c) => "Missing: " + c.label).join("\n")}>{okN}/{ch.length}</span></td>
                 </tr>);
             })}
-            {!rows.length && <tr><td colSpan={8} className="p-6 text-slate6">No risk assessment{sp.cell || sp.q || sp.tol || sp.domain ? " matching the filters" : " yet — create one below, or import Centrik in Settings › Integrations"}.</td></tr>}
+            {!rows.length && <tr><td colSpan={8} className="p-6 text-slate6">No risk assessment{sp.cell || sp.q || sp.tol || sp.domain ? " matching the filters" : " yet, create one below, or import Centrik in Settings › Integrations"}.</td></tr>}
           </tbody>
         </table>
       </section>
-      {edit && sp.st !== "archived" && rows.length > 0 && <form id="bulk-ra" action={bulkAssessments} className="flex gap-2 items-center mb-3"><input type="hidden" name="op" value="close" /><button className="btn">Close the ticked assessments — case over</button><span className="mini">pre-ticked: conducted more than 2 weeks ago (not the ones waiting for the AM). They stay readable under “Closed”.</span></form>}
+      {edit && sp.st !== "archived" && rows.length > 0 && <form id="bulk-ra" action={bulkAssessments} className="flex gap-2 items-center mb-3"><input type="hidden" name="op" value="close" /><button className="btn">Close the ticked assessments, case over</button><span className="mini">pre-ticked: conducted more than 2 weeks ago (not the ones waiting for the AM). They stay readable under “Closed”.</span></form>}
       <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: sp.st === "archived" ? undefined : "archived" })}>{sp.st === "archived" ? "Back to current assessments" : "Closed and cancelled assessments"}</Link></p>
 
       {edit && (
-        <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New risk assessment</span><span className="mini">hazards are added on its page — SAM checks them against the hazard log</span></summary>
+        <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New risk assessment</span><span className="mini">hazards are added on its page. SAM checks them against the hazard log</span></summary>
           <form action={createAssessment} className="cb grid grid-cols-3 gap-3">
-            <label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={s.entity !== "ALL" ? s.entity : s.entities[0]}>{s.entities.map((e) => <option key={e} value={e}>{e} — {ENT[e]?.name ?? e}</option>)}</select></label>
+            <label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={s.entity !== "ALL" ? s.entity : s.entities[0]}>{s.entities.map((e) => <option key={e} value={e}>{e}, {ENT[e]?.name ?? e}</option>)}</select></label>
             <input type="hidden" name="kind" value="ra" />
             <label><span className="mini">Domain</span><select name="domain" className="inp">{DOMAINS.map((d) => <option key={d}>{d}</option>)}</select></label>
             <label><span className="mini">Owner (post)</span><input name="owner_role" className="inp mono" placeholder="SM" /></label>
-            <label className="col-span-3"><span className="mini">Name</span><input name="name" className="inp" required placeholder="e.g. RA - Ferry flight 9H-XXX · RA - CZIB flight OLBA 12/11" /></label>
+            <label className="col-span-3"><span className="mini">Name</span><input name="name" className="inp" required placeholder="e.g. RA - Ferry flight 9H-XXX, RA - CZIB flight OLBA 12/11" /></label>
             <label className="col-span-3"><span className="mini">Description</span><textarea name="description" className="inp" rows={2} /></label>
-            <label className="col-span-3"><span className="mini">Participants — one per line: Name — role</span><textarea name="participants" className="inp" rows={2} placeholder={"Guillaume Fournie — SM\nJonathan Wolski — NPFO"} /></label>
+            <label className="col-span-3"><span className="mini">Participants, one per line: Name, role</span><textarea name="participants" className="inp" rows={2} placeholder={"Guillaume Fournie. SM\nJonathan Wolski. NPFO"} /></label>
             <div className="col-span-3 flex justify-end"><button className="btn primary">Create</button></div>
           </form>
         </details>

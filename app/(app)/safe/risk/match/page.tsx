@@ -37,7 +37,7 @@ export default async function MatchPage() {
   const seen = new Set<string>();
   return (
     <>
-      <PageHeader eyebrow="Safety · Risk management" title="To match with the hazard log" sub="Hazards of the MOCs and risk assessments: same as a hazard of the log → link · new lasting hazard → add to the log · temporary → keep local. SAM suggests, you decide." />
+      <PageHeader eyebrow="Safety, Risk management" title="To match with the hazard log" sub="Hazards of the MOCs and risk assessments: same as a hazard of the log → link, new lasting hazard → add to the log, temporary → keep local. SAM suggests, you decide." />
       <RiskTabs on="match" toMatch={hs.length} />
       {edit && (
         <div className="flex gap-2 mb-4 flex-wrap items-center">
@@ -73,7 +73,7 @@ export default async function MatchPage() {
       </section>
 
       <section className="card">
-        <div className="ch"><span className="eyebrow">Possible duplicates in the hazard log</span><span className="mini">merge by closing one and linking its reports — SAM only suggests</span></div>
+        <div className="ch"><span className="eyebrow">Possible duplicates in the hazard log</span><span className="mini">merge by closing one and linking its reports. SAM only suggests</span></div>
         <table className="tbl"><tbody>
           {dups.flatMap((d) => d.suggestions.filter((x) => { const k = [d.subject_id, x.id].sort().join(); if (seen.has(k)) return false; seen.add(k); return true; }).map((x) => { const a = dName.get(d.subject_id); return (
             <tr key={d.subject_id + x.id}>
@@ -83,7 +83,7 @@ export default async function MatchPage() {
               <td style={{ width: 70 }}><span className={"pill " + (x.score >= 0.8 ? "green" : "amber")}>{Math.round(x.score * 100)}%</span></td>
               <td style={{ width: 130 }}>{edit && <form action={dismissMatch}><input type="hidden" name="kind" value="duplicate" /><input type="hidden" name="subject" value={d.subject_id} /><input type="hidden" name="other" value={x.id} /><button className="btn">Not a duplicate</button></form>}</td>
             </tr>); }))}
-          {!dups.length && <tr><td className="p-4 mini">No duplicate flagged{edit ? " — run the check after an import" : ""}.</td></tr>}
+          {!dups.length && <tr><td className="p-4 mini">No duplicate flagged{edit ? ", run the check after an import" : ""}.</td></tr>}
         </tbody></table>
       </section>
     </>

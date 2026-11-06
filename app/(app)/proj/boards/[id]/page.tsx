@@ -57,14 +57,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   return (
     <>
       <EntityBand entity={p.entity} current={s.entity} multi={s.group || s.entities.length > 1} what="project" />
-      <PageHeader eyebrow={`Projects · ${p.entity} · ${p.template_code ?? "project"}`} title={p.title}
-        sub={`${ENT[p.entity]?.name ?? p.entity}${pivotTxt ? ` · ${pivotTxt}` : ""} · owner ${p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"} · started ${fr(p.started_at)}${p.target_date ? ` · target ${fr(p.target_date)}` : ""}`}
+      <PageHeader eyebrow={`Projects, ${p.entity}, ${p.template_code ?? "project"}`} title={p.title}
+        sub={`${ENT[p.entity]?.name ?? p.entity}${pivotTxt ? `, ${pivotTxt}` : ""}, owner ${p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"}, started ${fr(p.started_at)}${p.target_date ? `, target ${fr(p.target_date)}` : ""}`}
         right={<><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")} style={{ alignSelf: "center" }}>{PROJECT_STATUS_LABEL[p.status]}</span><Link href="/proj/boards" className="btn">‹ Projects</Link></>} />
       {p.description && <p className="mini mb-4" style={{ maxWidth: 1000 }}>{p.description}</p>}
-      {(() => { const miss = [...links.values()].filter((l) => l.state === "create it").length; return miss >= 3 ? <div className="lockbar mb-4">{miss} manuals of this template do not exist in {ENT[p.entity]?.name ?? p.entity} yet — each task below offers to create its manual; the rest of the project is not blocked.</div> : null; })()}
+      {(() => { const miss = [...links.values()].filter((l) => l.state === "create it").length; return miss >= 3 ? <div className="lockbar mb-4">{miss} manuals of this template do not exist in {ENT[p.entity]?.name ?? p.entity} yet, each task below offers to create its manual; the rest of the project is not blocked.</div> : null; })()}
 
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Progress" value={`${pr.pct} %`} hint={`${pr.done} / ${pr.total} tasks${tasks.length - pr.total ? ` · ${tasks.length - pr.total} not needed` : ""}`} tone={pr.pct === 100 ? "green" : undefined} />
+        <Metric label="Progress" value={`${pr.pct} %`} hint={`${pr.done} / ${pr.total} tasks${tasks.length - pr.total ? `, ${tasks.length - pr.total} not needed` : ""}`} tone={pr.pct === 100 ? "green" : undefined} />
         <Metric label="Projected end" value={end ? fr(end) : "—"} hint={p.target_date ? (end && end > p.target_date ? `after the target (${fr(p.target_date)})` : `target ${fr(p.target_date)}`) : "from durations and dependencies"} tone={end && p.target_date && end > p.target_date ? "red" : undefined} />
         <Metric label="Late" value={late} tone={late ? "red" : undefined} hint="due date passed, or started and over its duration" />
         <Metric label="Ready to do" value={ready.length} hint="no open dependency" tone={ready.length ? "amber" : undefined} />
@@ -73,7 +73,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       <div className="grid grid-cols-3 gap-4 items-start">
         <div className="col-span-2 grid gap-4">
           <div className="tabs"><Link href={`/proj/boards/${p.id}`} className={"tab" + (view === "tasks" ? " on" : "")}>Tasks by department</Link><Link href={`/proj/boards/${p.id}?view=gantt`} className={"tab" + (view === "gantt" ? " on" : "")}>Timeline</Link><span className="mini ml-auto"><Icon name="bolt" size={13} /> critical path. Dates are projected from durations and dependencies.</span></div>
-          {view === "gantt" && <section className="card"><div className="ch"><span className="eyebrow">Timeline</span><span className="mini">projected · {fr(p.started_at)} → {end ? fr(end) : "—"}</span></div><div className="cb"><Gantt projectId={p.id} phases={phases} tasks={tasks} proj={proj} startedAt={p.started_at} target={p.target_date} /></div></section>}
+          {view === "gantt" && <section className="card"><div className="ch"><span className="eyebrow">Timeline</span><span className="mini">projected, {fr(p.started_at)} → {end ? fr(end) : "—"}</span></div><div className="cb"><Gantt projectId={p.id} phases={phases} tasks={tasks} proj={proj} startedAt={p.started_at} target={p.target_date} /></div></section>}
           {view === "tasks" && groups.map((g) => {
             const done = g.tasks.filter((t) => t.status === "done").length, counted = g.tasks.filter((t) => t.status !== "not_needed").length;
             return (
@@ -84,11 +84,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     <tr key={t.id} id={`t-${t.id}`} className={"prow" + (t.status === "done" ? " isdone" : t.status === "not_needed" ? " muted" : "")}>
                       <td style={{ width: 34 }}>
                         <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
-                          <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!canWork || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? <Icon name="check" size={14} /> : ""}</button></form>
+                          <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!canWork || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done, click to reopen" : "Mark as done"}>{t.status === "done" ? <Icon name="check" size={14} /> : ""}</button></form>
                       </td>
                       <td style={{ width: 96 }}>
                         {t.status === "todo" && pj.openDeps.length > 0 ? <span className="pill later" title={`After: ${openDs.map((d) => d.title).join(", ")}`}>Later</span>
-                          : t.status === "todo" && canWork ? <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start now — it also starts by itself when the linked manual or a document is touched">To do ▸</button></form>
+                          : t.status === "todo" && canWork ? <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start now, it also starts by itself when the linked manual or a document is touched">To do ▸</button></form>
                           : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
                       </td>
                       <td>
@@ -96,8 +96,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                           {pj.critical && open && <span title="critical path"><Icon name="bolt" size={13} /></span>}
                           <b>{t.title}</b>
                           {lk && t.status === "done" && !t.link_id && (lk.tone === "" || lk.tone === "amber") && lk.state !== "filed" ? ( // FB-031 · ticked done by hand, object not in S.A.M.: no call to action
-                            <span className="objlink" title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> done outside S.A.M.{t.link_kind === "certificate" ? <> · <Link className="underline" href={lk.href}>attach the certificate</Link></> : t.link_kind === "manual" && lk.state === "create it" ? <> · {t.link_ref} not in S.A.M. yet</> : null}</span>
-                          ) : lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label} · <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span> : null}
+                            <span className="objlink" title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> done outside S.A.M.{t.link_kind === "certificate" ? <>, <Link className="underline" href={lk.href}>attach the certificate</Link></> : t.link_kind === "manual" && lk.state === "create it" ? <>, {t.link_ref} not in S.A.M. yet</> : null}</span>
+                          ) : lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}, <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? `, ${t.link_ref}` : ""}</span> : null}
                           {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}><Icon name="clip" size={13} /> {tf.length}</span>}
                           {openDs.length > 0 && t.status !== "todo" && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(", ")}`}>waits for {openDs.length}</span>}
                         </div>
@@ -131,11 +131,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                                   <label className="col-span-3"><span className="mini">Detail</span><input name="detail" className="inp" defaultValue={t.detail ?? ""} /></label>
                                   <label><span className="mini">Phase (timeline)</span><select name="phase_id" className="inp" defaultValue={t.phase_id ?? ""}>{phases.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
                                   <label><span className="mini">Linked object</span><select name="link_kind" className="inp" defaultValue={t.link_kind ?? ""}><option value="">none</option>{Object.entries(LINK_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-                                  <label><span className="mini">Code / type / kind</span><input name="link_ref" className="inp mono" defaultValue={t.link_ref ?? ""} placeholder="OM-A · AC-NEW · insurance" /></label>
+                                  <label><span className="mini">Code / type / kind</span><input name="link_ref" className="inp mono" defaultValue={t.link_ref ?? ""} placeholder="OM-A, AC-NEW, insurance" /></label>
                                   <label className="col-span-3"><span className="mini">Depends on</span><select name="depends_on" multiple className="inp" size={4} defaultValue={ds.map((d) => d.id)}>{tasks.filter((x) => x.id !== t.id).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
                                   <label className="col-span-2"><span className="mini">Note</span><input name="note" className="inp" defaultValue={t.note ?? ""} /></label>
                                   <label><span className="mini">Status</span><select name="status" className="inp" defaultValue={t.status}>{STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}</select></label>
-                                  <label className="col-span-4"><span className="mini">If not needed — why (kept for the authority)</span><input name="not_needed_reason" className="inp" defaultValue={t.not_needed_reason ?? ""} /></label>
+                                  <label className="col-span-4"><span className="mini">If not needed, why (kept for the authority)</span><input name="not_needed_reason" className="inp" defaultValue={t.not_needed_reason ?? ""} /></label>
                                   <div className="col-span-2 flex gap-2 items-end"><button className="btn primary" type="submit">Save</button><button className="btn" type="submit" formAction={deleteTask} title="Delete this task">Delete</button></div>
                                 </form>
                               )}
@@ -161,7 +161,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <div className="grid gap-4">
           {/* the applications S.A.M. prepares and files; each fills up as the tasks it depends on are done */}
           <section className="card">
-            <div className="ch"><span className="eyebrow">Applications</span><span className="mini">{apps.length} · prepared and filed by S.A.M.</span></div>
+            <div className="ch"><span className="eyebrow">Applications</span><span className="mini">{apps.length}, prepared and filed by S.A.M.</span></div>
             <div className="cb grid gap-3">
               {apps.sort((a, b) => (proj.get(a.id)!.start < proj.get(b.id)!.start ? -1 : 1)).map((a) => {
                 const f = files.find((x) => x.id === a.link_id);
@@ -179,13 +179,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     </div>
                     <div className="bar wide mt-1"><i style={{ width: `${pct}%` }} /></div>
                     <div className="mini flex items-center gap-2 flex-wrap mt-1">
-                      {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : isConditional(a) ? <span><span className="pill">Conditional</span> {up.length ? `${doneUp} / ${up.length} tasks done — ` : ""}your call: open it, or mark it not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"} — {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
+                      {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : isConditional(a) ? <span><span className="pill">Conditional</span> {up.length ? `${doneUp} / ${up.length} tasks done, ` : ""}your call: open it, or mark it not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"}, {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
                       {canOpen && <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><button className="linkbtn" type="submit">open now</button></form>}
                       {mayEdit && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="not_needed" /><input name="not_needed_reason" className="inp" style={{ height: 22, fontSize: 11, width: 150 }} placeholder="not needed because…" required /><button className="linkbtn" type="submit">not needed</button></form>}
                       {cmm && a.status !== "done" && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1" title="Application already granted outside S.A.M. (project taken over from Monday / Centrik)"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="done" /><input name="done_at" type="date" className="inp" style={{ height: 22, fontSize: 11, width: 130 }} /><button className="linkbtn" type="submit">already done</button></form>}
                       {cmm && a.status === "done" && !a.link_id && active && <form action={updateTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="todo" /><button className="linkbtn" type="submit">reopen</button></form>}
                     </div>
-                    {up.length > 0 && !f && <div className="mini" style={{ color: "var(--slate5)" }} title={up.map((t) => `${t.title}${t.status === "done" ? " (done)" : ""}`).join("\n")}>{up.filter((t) => t.status !== "done").slice(0, 3).map((t) => t.title).join(", ")}{up.filter((t) => t.status !== "done").length > 3 ? " · …" : ""}</div>}
+                    {up.length > 0 && !f && <div className="mini" style={{ color: "var(--slate5)" }} title={up.map((t) => `${t.title}${t.status === "done" ? " (done)" : ""}`).join("\n")}>{up.filter((t) => t.status !== "done").slice(0, 3).map((t) => t.title).join(", ")}{up.filter((t) => t.status !== "done").length > 3 ? ", …" : ""}</div>}
                   </div>);
               })}
               {!apps.length && <p className="mini text-slate6">No application in this project.</p>}
@@ -217,7 +217,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               {cmm && (
                 <div className="cb grid gap-2" style={{ borderTop: "1px solid var(--line)" }}>
                   <div className="eyebrow">Improve the template</div>
-                  <p className="mini">Push this project as it really ran — tasks, posts, real durations, dependencies, applications — into the template, so the next project starts from what you learned.</p>
+                  <p className="mini">Push this project as it really ran, tasks, posts, real durations, dependencies, applications, into the template, so the next project starts from what you learned.</p>
                   {p.template_code && <form action={pushToTemplate}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="mode" value="update" /><button className="btn" type="submit">Update template {p.template_code}</button></form>}
                   <form action={pushToTemplate} className="flex gap-2 items-end flex-wrap"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="mode" value="new" />
                     <label style={{ width: 120 }}><span className="mini">New code</span><input name="code" className="inp mono" placeholder="BASE-NEW" required /></label><label className="flex-1" style={{ minWidth: 140 }}><span className="mini">Name</span><input name="name" className="inp" placeholder="New template name" /></label><button className="btn" type="submit">Save as new template</button></form>

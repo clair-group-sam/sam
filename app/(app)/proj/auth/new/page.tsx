@@ -30,7 +30,7 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader eyebrow="Projects · CAA applications" title="New CAA application" sub={`${ENT[entity]?.name ?? entity} — ${ENT[entity]?.auth ?? ""}. The type sets the route, the checklist and the expected time at the authority.`} />
+      <PageHeader eyebrow="Projects, CAA applications" title="New CAA application" sub={`${ENT[entity]?.name ?? entity}, ${ENT[entity]?.auth ?? ""}. The type sets the route, the checklist and the expected time at the authority.`} />
       <form action={createFile} className="grid grid-cols-3 gap-4 items-start">
         {s.entity === "ALL" ? <div className="mb-3"><label><span className="mini">Entity (group view: choose, the form reloads)</span><div className="flex gap-2 flex-wrap mt-1">{ents.map((e) => <Link key={e} href={`/proj/auth/new?entity=${e}`} className={"btn" + (e === entity ? " primary" : "")}>{ENT[e]?.name ?? e}</Link>)}</div></label><input type="hidden" name="entity" value={entity} /></div> : <input type="hidden" name="entity" value={entity} />}
         <section className="card col-span-2">
@@ -38,9 +38,9 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
           <div className="cb grid grid-cols-2 gap-3">
             <label className="col-span-2"><span className="mini">Type</span>
               <select name="type_code" className="inp" defaultValue={defType} required>
-                {FAMILIES.map((fam) => { const ts = list.filter((t) => t.family === fam); return ts.length ? <optgroup key={fam} label={fam}>{ts.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.name} · {t.routes[entity]?.portal ?? ""}</option>)}</optgroup> : null; })}
+                {FAMILIES.map((fam) => { const ts = list.filter((t) => t.family === fam); return ts.length ? <optgroup key={fam} label={fam}>{ts.map((t) => <option key={t.code} value={t.code}>{t.code}, {t.name}, {t.routes[entity]?.portal ?? ""}</option>)}</optgroup> : null; })}
               </select></label>
-            <label className="col-span-2"><span className="mini">Title (manual + revision, aircraft, person, programme…)</span><input name="title" className="inp" required placeholder={pre ? `${pre.manuals.code} Iss ${pre.issue} Rev ${pre.rev}` : "e.g. OM-D Iss 01 Rev 17 — addition of the Global Express"} defaultValue={pre ? `${pre.manuals.code} Iss ${pre.issue} Rev ${pre.rev} — ${pre.manuals.title}` : ""} /></label>
+            <label className="col-span-2"><span className="mini">Title (manual + revision, aircraft, person, programme…)</span><input name="title" className="inp" required placeholder={pre ? `${pre.manuals.code} Iss ${pre.issue} Rev ${pre.rev}` : "e.g. OM-D Iss 01 Rev 17, addition of the Global Express"} defaultValue={pre ? `${pre.manuals.code} Iss ${pre.issue} Rev ${pre.rev}, ${pre.manuals.title}` : ""} /></label>
             <label><span className="mini">Trigger</span><select name="trigger_kind" className="inp" defaultValue={pre ? "revision" : sp.finding ? "finding" : sp.aircraft ? "aircraft" : sp.np ? "np" : "other"}>{TRIGGERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
             <label><span className="mini">Trigger note</span><input name="trigger_note" className="inp" placeholder="change request, finding, new aircraft…" /></label>
             <label><span className="mini">Owner (post that prepares the dossier)</span><select name="owner_role" className="inp" defaultValue="">{<option value="">type default</option>}{roles.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
@@ -52,10 +52,10 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
         <section className="card">
           <div className="ch"><span className="eyebrow">Linked objects</span></div>
           <div className="cb grid gap-3">
-            <label><span className="mini">Manual revision</span><select name="revision_id" className="inp" defaultValue={sp.revision ?? ""}><option value="">—</option>{revisions.map((r) => <option key={r.id} value={r.id}>{r.manuals.code} Iss {r.issue} Rev {r.rev} · {STEP_LABEL[r.step] ?? r.step}</option>)}</select></label>
+            <label><span className="mini">Manual revision</span><select name="revision_id" className="inp" defaultValue={sp.revision ?? ""}><option value="">—</option>{revisions.map((r) => <option key={r.id} value={r.id}>{r.manuals.code} Iss {r.issue} Rev {r.rev}, {STEP_LABEL[r.step] ?? r.step}</option>)}</select></label>
             <label><span className="mini">Finding reference</span><input name="finding_ref" className="inp" defaultValue={sp.finding ?? ""} placeholder="2026-265B" /></label>
             <label><span className="mini">Aircraft registration</span><input name="aircraft_reg" className="inp" defaultValue={sp.aircraft ?? ""} placeholder="9H-SOC" /></label>
-            <label><span className="mini">Nominated post</span><select name="np_post_code" className="inp" defaultValue={sp.np ?? ""}><option value="">—</option>{((posts ?? []) as { code: string; title: string; holder_name: string | null }[]).map((p) => <option key={p.code} value={p.code}>{p.code} — {p.title}{p.holder_name ? ` (${p.holder_name})` : ""}</option>)}</select></label>
+            <label><span className="mini">Nominated post</span><select name="np_post_code" className="inp" defaultValue={sp.np ?? ""}><option value="">—</option>{((posts ?? []) as { code: string; title: string; holder_name: string | null }[]).map((p) => <option key={p.code} value={p.code}>{p.code}, {p.title}{p.holder_name ? ` (${p.holder_name})` : ""}</option>)}</select></label>
             <button className="btn primary mt-2" type="submit">Open the file</button>
             <p className="mini">The checklist of the type is copied into the file; you can add items. Tasks go to the owner's Inbox.</p>
           </div>
@@ -64,7 +64,7 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
       <section className="card mt-5">
         <div className="ch"><span className="eyebrow">Types available for {entity}</span><Link className="mini underline" href="/ref/types">full reference</Link></div>
         <table className="tbl"><thead><tr><th>Code</th><th>Type</th><th>Route</th><th>Checklist</th><th>Owner</th><th>Days at authority</th></tr></thead>
-          <tbody>{list.map((t) => <tr key={t.code}><td className="mono">{t.code}</td><td>{t.name}<div className="mini">{t.family}</div></td><td className="mini">{t.routes[entity]?.portal} · {t.routes[entity]?.category}</td><td className="mini">{t.checklist.length} items{t.needs_signature ? " · signature" : ""}</td><td className="mono">{t.default_owner_role}</td><td className="mono">{t.target_days}</td></tr>)}</tbody></table>
+          <tbody>{list.map((t) => <tr key={t.code}><td className="mono">{t.code}</td><td>{t.name}<div className="mini">{t.family}</div></td><td className="mini">{t.routes[entity]?.portal}, {t.routes[entity]?.category}</td><td className="mini">{t.checklist.length} items{t.needs_signature ? ", signature" : ""}</td><td className="mono">{t.default_owner_role}</td><td className="mono">{t.target_days}</td></tr>)}</tbody></table>
       </section>
     </>
   );

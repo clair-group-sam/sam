@@ -95,9 +95,9 @@ export default function AuthorityReturn({ revisionId, entity, code, rev, kind }:
             <div key={i} className={"athumb" + (roles[i] ? " on" : "")}>
               <img src={u} alt={`page ${i + 1}`} />
               <select value={roles[i] ?? ""} onChange={(e) => setRoles((r) => r.map((x, j) => (j === i ? (e.target.value as Role) : x)))}>
-                <option value="">p. {i + 1} — not kept</option>
-                <option value={kind === "consolidated" ? "signature" : "approval"}>p. {i + 1} — {kind === "consolidated" ? "signature page" : "approval page"}</option>
-                {kind !== "consolidated" && <option value="lep">p. {i + 1} — stamped LEP</option>}
+                <option value="">p. {i + 1}, not kept</option>
+                <option value={kind === "consolidated" ? "signature" : "approval"}>p. {i + 1}, {kind === "consolidated" ? "signature page" : "approval page"}</option>
+                {kind !== "consolidated" && <option value="lep">p. {i + 1}, stamped LEP</option>}
               </select>
             </div>
           ))}

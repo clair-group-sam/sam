@@ -36,7 +36,7 @@ export default function WmImport({ manuals, entities }: Props) {
         if (partsRef.current.of !== of) partsRef.current = { of, texts: new Map(), name: split[0].x.name.replace(/\.part\d+of\d+\.json$/, ".json") };
         for (const p of split) partsRef.current.texts.set(Number(p.m![1]), await p.x.text());
         const have = partsRef.current.texts.size;
-        if (have < of) { setLog([`Split export ${partsRef.current.name}: ${have} / ${of} parts received — add the remaining parts.`]); return; }
+        if (have < of) { setLog([`Split export ${partsRef.current.name}: ${have} / ${of} parts received, add the remaining parts.`]); return; }
         text = [...partsRef.current.texts.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]).join("");
         setFileName(`${partsRef.current.name} (${of} parts)`); setLog([]);
         partsRef.current = { of: 0, texts: new Map(), name: "" };
@@ -65,7 +65,7 @@ export default function WmImport({ manuals, entities }: Props) {
         const bin = Uint8Array.from(atob(f.b64), (ch) => ch.charCodeAt(0));
         const bucket = bundle.kind === "file" ? "certificates" : "manuals";
         const key = bundle.kind === "file" ? `${entity}/${code}/${f.name}` : `${entity}/${code}/${rev}/${f.name}`;
-        say(`${bundle.kind === "file" ? "File" : "Official PDF"} ${f.name} · ${Math.round(f.size / 1024)} KB`);
+        say(`${bundle.kind === "file" ? "File" : "Official PDF"} ${f.name}, ${Math.round(f.size / 1024)} KB`);
         const { error } = await sb.storage.from(bucket).upload(key, bin, { upsert: true, contentType: f.type || "application/pdf" });
         if (error) { say(`upload: ${error.message}`); return; }
         say("Stored in the private bucket.");
@@ -76,7 +76,7 @@ export default function WmImport({ manuals, entities }: Props) {
       const images = bundle.images ?? {};
       const ext: Record<string, string> = {};
       const ids = Object.keys(images);
-      say(`${bundle.pages.length} pages · ${ids.length} images · Rev ${rev}`);
+      say(`${bundle.pages.length} pages, ${ids.length} images, Rev ${rev}`);
       let n = 0;
       for (const id of ids) {
         const im = images[id]; const e = imageExt(im.name, im.type); ext[id] = e;
@@ -97,11 +97,11 @@ export default function WmImport({ manuals, entities }: Props) {
   return (
     <div className="grid grid-cols-2 gap-5">
       <div>
-        <label className="block mb-3"><span className="eyebrow">1 · Export file</span>
+        <label className="block mb-3"><span className="eyebrow">1, Export file</span>
           <input type="file" accept=".json,application/json" multiple className="block mt-1 text-sm" onChange={(e) => onFile(e.target.files)} /></label>
         <p className="mini mb-3">One export file, or all the parts of a split export selected together (…part1of3.json, part2of3.json…).</p>
         {bundle && (
-          <div className="mini mb-3">{fileName} — <b>{bundle.manual.name}</b> · Issue {bundle.manual.issue} Rev {bundle.manual.rev} · published {bundle.manual.publishedDate?.slice(0, 10)} · {bundle.kind === "pages" || !bundle.kind ? `${bundle.pages.length} pages · ${Object.keys(bundle.images ?? {}).length} images` : bundle.kind === "pdf" ? `official PDF ${bundle.file?.name}` : `file ${bundle.file?.name} → Certificates & Validities`}</div>
+          <div className="mini mb-3">{fileName}, <b>{bundle.manual.name}</b>, Issue {bundle.manual.issue} Rev {bundle.manual.rev}, published {bundle.manual.publishedDate?.slice(0, 10)}, {bundle.kind === "pages" || !bundle.kind ? `${bundle.pages.length} pages, ${Object.keys(bundle.images ?? {}).length} images` : bundle.kind === "pdf" ? `official PDF ${bundle.file?.name}` : `file ${bundle.file?.name} → Certificates & Validities`}</div>
         )}
         <div className="grid grid-cols-2 gap-3">
           <label><span className="eyebrow">Entity</span>

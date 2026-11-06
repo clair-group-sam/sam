@@ -50,16 +50,16 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
   const moc = a.kind === "moc";
   return (
     <>
-      <PageHeader eyebrow={`Safety · ${KINDS[a.kind]} · ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number} — ${a.name}`}
-        tag={<span className="flex gap-2 items-center flex-wrap"><span className={"pill " + (RA_STATUS[a.status]?.[1] ?? "")}>{RA_STATUS[a.status]?.[0]}</span>{moc && a.moc_status && <span className={"pill " + (MOC_STATUS[a.moc_status]?.[1] ?? "")}>MOC · {MOC_STATUS[a.moc_status]?.[0]}</span>}{a.decision && <span className="pill">{DECISIONS[a.decision]}</span>}{worstPost && <span className={"pill " + tolTone(worstPost)}>residual {worstPost}</span>}<span className="mini">v{a.version}{a.source !== "sam" ? ` · imported from ${a.source}` : ""}</span></span>}
-        sub={`${a.domain ?? "—"} · owner ${a.owner_role ?? "—"} · ${MSM_REF[a.entity] ?? ""}${a.kind !== "moc" ? ` · next review ${a.next_due ?? "—"}` : a.start_date ? ` · planned ${a.start_date}` : ""}`}
+      <PageHeader eyebrow={`Safety, ${KINDS[a.kind]}, ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number}, ${a.name}`}
+        tag={<span className="flex gap-2 items-center flex-wrap"><span className={"pill " + (RA_STATUS[a.status]?.[1] ?? "")}>{RA_STATUS[a.status]?.[0]}</span>{moc && a.moc_status && <span className={"pill " + (MOC_STATUS[a.moc_status]?.[1] ?? "")}>MOC, {MOC_STATUS[a.moc_status]?.[0]}</span>}{a.decision && <span className="pill">{DECISIONS[a.decision]}</span>}{worstPost && <span className={"pill " + tolTone(worstPost)}>residual {worstPost}</span>}<span className="mini">v{a.version}{a.source !== "sam" ? `, imported from ${a.source}` : ""}</span></span>}
+        sub={`${a.domain ?? "—"}, owner ${a.owner_role ?? "—"}, ${MSM_REF[a.entity] ?? ""}${a.kind !== "moc" ? `, next review ${a.next_due ?? "—"}` : a.start_date ? `, planned ${a.start_date}` : ""}`}
         right={<><PdfButton id={a.id} />{a.project_id && <Link className="btn" href={`/proj/boards/${a.project_id}`}>Project</Link>}{a.authority_file_id && <Link className="btn" href={`/proj/auth/${a.authority_file_id}`}>CAA application</Link>}<Link className="btn" href={moc ? "/safe/moc" : a.kind === "ra" ? "/safe/ra" : "/safe/risk"}>{moc ? "All MOCs" : a.kind === "ra" ? "All risk assessments" : "Hazard log"}</Link></>} />
 
       <div className="repgrid2">
         <div>
           {draft && a.kind !== "hazard_log" && !hazards.length && mayEditRisk(s) && <RiskStart a={a as unknown as Parameters<typeof RiskStart>[0]["a"]} />}
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">Hazards summary</span><span className="mini">hazard – consequence · pre → post mitigation{sch === "centrik" ? " · score" : ""}</span></div>
+            <div className="ch"><span className="eyebrow">Hazards summary</span><span className="mini">hazard – consequence, pre → post mitigation{sch === "centrik" ? ", score" : ""}</span></div>
             <table className="tbl"><tbody>
               {hazards.map((h) => {
                 const pre = tolerability(h.lik_before, h.sev_before, sch), po = tolerability(h.lik_after, h.sev_after, sch);
@@ -67,10 +67,10 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 return (
                   <tr key={h.id} className={(h.proposed ? "hz-proposed" : "") + (h.status === "closed" ? " muted" : "")}>
                     <td style={{ width: 105 }} className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.proposed && <div className="mini">proposed</div>}{h.needs_review && <div className="mini red">to reassess</div>}</td>
-                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}{h.proposed && h.prefill_note && <div className="mini"><Icon name="bulb" size={14} /> {h.prefill_note}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
+                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}{h.proposed && h.prefill_note && <div className="mini"><Icon name="bulb" size={14} /> {h.prefill_note}</div>}<div className="mini">{cur} current, {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? ", overdue" : ""}{h.hazard_reports.length ? `, ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
                       {study && !h.proposed && h.status !== "closed" && (h.log_hazard_id ? <div className="mini"><Icon name="book" size={12} /> Hazard log: <Link className="underline mono" href={`/safe/risk/${h.log_hazard_id}`}>{logOf.get(h.log_hazard_id)?.ref ?? "linked"}</Link> {logOf.get(h.log_hazard_id)?.title}{canLink && <form action={unlinkLog} className="inline ml-2"><input type="hidden" name="id" value={h.id} /><button className="linkbtn mini">unlink</button></form>}</div>
                         : h.local_only ? <div className="mini">Kept local to this study (temporary)</div>
-                        : <div className="mini mt-1">{(sugOf.get(h.id) ?? []).slice(0, 2).map((x) => <form key={x.id} action={linkToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="log_id" value={x.id} /><button className="btn" disabled={!canLink} title={x.why}>Link to {x.ref} · {x.title.slice(0, 40)} ({Math.round(x.score * 100)}%)</button></form>)}
+                        : <div className="mini mt-1">{(sugOf.get(h.id) ?? []).slice(0, 2).map((x) => <form key={x.id} action={linkToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="log_id" value={x.id} /><button className="btn" disabled={!canLink} title={x.why}>Link to {x.ref}, {x.title.slice(0, 40)} ({Math.round(x.score * 100)}%)</button></form>)}
                             {canLink && <><form action={promoteToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">+ Add to the log</button></form><form action={keepLocal} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">Keep local</button></form>{!sugOf.has(h.id) && <form action={suggestMatches} className="inline"><input type="hidden" name="entity" value={a.entity} /><input type="hidden" name="hazard_id" value={h.id} /><input type="hidden" name="assessment_id" value={a.id} /><button className="btn"><Icon name="bulb" size={14} /> In the log?</button></form>}</>}</div>)}
                     </td>
                     <td style={{ width: 165 }}>{pre ? <span className={"pill " + tolTone(pre)}>{riskLabel(h.lik_before, h.sev_before, sch)}</span> : <span className="mini">—</span>} → {po ? <span className={"pill " + tolTone(po)}>{riskLabel(h.lik_after, h.sev_after, sch)}</span> : <span className="mini">—</span>}</td>
@@ -83,22 +83,22 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
               <div className="cb">
                 <form action={createHazard} className="grid gap-2 mb-3" style={{ gridTemplateColumns: "1fr 1fr auto" }}><input type="hidden" name="assessment_id" value={a.id} /><input type="hidden" name="stay" value="1" />
                   <input name="title" className="inp" placeholder="Hazard" required style={{ marginTop: 0 }} /><input name="consequence" className="inp" placeholder="Consequence (reasonably worst case)" style={{ marginTop: 0 }} /><button className="btn">Add</button></form>
-                <form action={proposeHazards}><input type="hidden" name="id" value={a.id} /><button className="btn"><Icon name="bulb" size={14} /> Ask SAM to propose hazards</button> <span className="mini">rated pre / post with mitigations and owners — each stays “proposed” until you keep it</span></form>
+                <form action={proposeHazards}><input type="hidden" name="id" value={a.id} /><button className="btn"><Icon name="bulb" size={14} /> Ask SAM to propose hazards</button> <span className="mini">rated pre / post with mitigations and owners, each stays “proposed” until you keep it</span></form>
               </div>
             )}
           </section>
 
           {moc && (
             <section className="card mb-4">
-              <div className="ch"><span className="eyebrow">The change · MOC steps 1–6</span><span className="mini">{MSM_REF[a.entity]}.4</span></div>
+              <div className="ch"><span className="eyebrow">The change, MOC steps 1–6</span><span className="mini">{MSM_REF[a.entity]}.4</span></div>
               <form action={updateAssessment} className="cb grid grid-cols-2 gap-2"><input type="hidden" name="id" value={a.id} />
-                <label className="col-span-2"><span className="mini">1 · The change in detail (indirect changes, timing, transition period)</span><textarea name="description" className="inp" rows={4} defaultValue={a.description ?? ""} disabled={!edit} /></label>
-                <label><span className="mini">2 · Reason for the change</span><textarea name="reason" className="inp" rows={2} defaultValue={a.reason ?? ""} disabled={!edit} /></label>
-                <label><span className="mini">Requestor · induced responsibilities</span><textarea name="requestor" className="inp" rows={2} defaultValue={a.requestor ?? ""} disabled={!edit} /></label>
-                <label><span className="mini">3 · Regulations, domains and services affected</span><textarea name="affected" className="inp" rows={2} defaultValue={a.affected ?? ""} disabled={!edit} /></label>
-                <label><span className="mini">4 · Criticality and impact (incl. human performance)</span><textarea name="criticality" className="inp" rows={2} defaultValue={a.criticality ?? ""} disabled={!edit} /></label>
-                <label><span className="mini">5 · Prior safety assessments impacted</span><textarea name="prior_assessments" className="inp" rows={2} defaultValue={a.prior_assessments ?? ""} disabled={!edit} /></label>
-                <label><span className="mini">6 · Actions and controls already in place / to create</span><textarea name="actions_in_place" className="inp" rows={2} defaultValue={a.actions_in_place ?? ""} disabled={!edit} /></label>
+                <label className="col-span-2"><span className="mini">1, The change in detail (indirect changes, timing, transition period)</span><textarea name="description" className="inp" rows={4} defaultValue={a.description ?? ""} disabled={!edit} /></label>
+                <label><span className="mini">2, Reason for the change</span><textarea name="reason" className="inp" rows={2} defaultValue={a.reason ?? ""} disabled={!edit} /></label>
+                <label><span className="mini">Requestor, induced responsibilities</span><textarea name="requestor" className="inp" rows={2} defaultValue={a.requestor ?? ""} disabled={!edit} /></label>
+                <label><span className="mini">3, Regulations, domains and services affected</span><textarea name="affected" className="inp" rows={2} defaultValue={a.affected ?? ""} disabled={!edit} /></label>
+                <label><span className="mini">4, Criticality and impact (incl. human performance)</span><textarea name="criticality" className="inp" rows={2} defaultValue={a.criticality ?? ""} disabled={!edit} /></label>
+                <label><span className="mini">5, Prior safety assessments impacted</span><textarea name="prior_assessments" className="inp" rows={2} defaultValue={a.prior_assessments ?? ""} disabled={!edit} /></label>
+                <label><span className="mini">6, Actions and controls already in place / to create</span><textarea name="actions_in_place" className="inp" rows={2} defaultValue={a.actions_in_place ?? ""} disabled={!edit} /></label>
                 <label><span className="mini">Category</span><select name="category" className="inp" defaultValue={a.category ?? "other"} disabled={!edit}>{Object.entries(MOC_CATEGORIES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
                 <label><span className="mini">Permanent / temporary</span><select name="change_type" className="inp" defaultValue={a.change_type ?? "permanent"} disabled={!edit}><option value="permanent">permanent</option><option value="temporary">temporary</option></select></label>
                 <label><span className="mini">Start</span><input type="date" name="start_date" className="inp" defaultValue={a.start_date ?? ""} disabled={!edit} /></label>
@@ -123,10 +123,10 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 <form action={validateAssessment} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
                   <select name="decision" className="inp" defaultValue={a.decision ?? (worstPost === "intolerable" ? "stop" : "continue")}>{Object.entries(DECISIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
                   <textarea name="decision_comment" className="inp" rows={2} defaultValue={a.decision_comment ?? ""} placeholder="Comments (e.g. hazards reviewed, related reports do not change the values…)" />
-                  <button className="btn primary">Sign off — {s.name.split(" ")[0]}</button>
+                  <button className="btn primary">Sign off, {s.name.split(" ")[0]}</button>
                   <span className="mini">Validation by the most relevant nominated person, his/her deputy or the SM.</span>
                 </form>)) : <p className="mini">Waiting for the sign-off of the most relevant nominated person (or deputy / SM).</p>)}
-              {a.validated_at && <p className="mb-2">Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""} · {a.validated_at.slice(0, 10)}{a.decision ? ` · ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
+              {a.validated_at && <p className="mb-2">Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""}, {a.validated_at.slice(0, 10)}{a.decision ? `, ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
               {a.status === "validated" && (mayAccept(s) ? (
                 <form action={acceptAssessment} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
                   <p className="mini">The residual risk stays red. Approve the activity anyway (justification required) or stop it.</p>
@@ -134,34 +134,34 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                   <div className="flex gap-2"><button className="btn primary" name="verdict" value="approve">Approve the red risk (AM)</button><button className="btn" name="verdict" value="stop">Stop (AM)</button></div>
                 </form>
               ) : <p className="mini">Residual risk red: waiting for the Accountable Manager&apos;s decision.</p>)}
-              {a.status === "validated" && mayEditRisk(s) && !mayAccept(s) && <><details className="mt-2"><summary className="mini cursor-pointer underline">The AM already decided outside S.A.M. (e-mail, meeting) — record it</summary>
+              {a.status === "validated" && mayEditRisk(s) && !mayAccept(s) && <><details className="mt-2"><summary className="mini cursor-pointer underline">The AM already decided outside S.A.M. (e-mail, meeting), record it</summary>
                   <form action={recordAmDecision} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
                     <div className="grid grid-cols-2 gap-2"><input type="date" name="on" className="inp" required /><input name="am_name" className="inp" placeholder="AM name" /></div>
-                    <input name="reference" className="inp" required placeholder="Reference — e.g. e-mail of 02/03/2026 “RE: RA 25 …”" />
+                    <input name="reference" className="inp" required placeholder="Reference, e.g. e-mail of 02/03/2026 “RE: RA 25 …”" />
                     <select name="verdict" className="inp" defaultValue="approve"><option value="approve">Approved the red residual risk</option><option value="stop">Stopped it (no-go)</option></select>
                     <button className="btn">Record the AM&apos;s decision</button></form></details></>}
               {a.status === "accepted" && !a.accepted_at && worstPost === "intolerable" && a.decision !== "stop" && mayEditRisk(s) && (
                 <div className="hz-proposed p-3 mb-2" style={{ borderRadius: 8 }}><p className="mini mb-2"><b>Residual risk red, no decision of the AM recorded</b> (MSM: the AM decides on a red residual risk).</p>
-                  <form action={referToAm}><input type="hidden" name="id" value={a.id} /><button className="btn primary">Refer to the AM — he decides in S.A.M.</button></form>
-                  <details className="mt-2"><summary className="mini cursor-pointer underline">The AM already decided outside S.A.M. (e-mail, meeting) — record it</summary>
+                  <form action={referToAm}><input type="hidden" name="id" value={a.id} /><button className="btn primary">Refer to the AM, he decides in S.A.M.</button></form>
+                  <details className="mt-2"><summary className="mini cursor-pointer underline">The AM already decided outside S.A.M. (e-mail, meeting), record it</summary>
                   <form action={recordAmDecision} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
                     <div className="grid grid-cols-2 gap-2"><input type="date" name="on" className="inp" required /><input name="am_name" className="inp" placeholder="AM name" /></div>
-                    <input name="reference" className="inp" required placeholder="Reference — e.g. e-mail of 02/03/2026 “RE: RA 25 …”" />
+                    <input name="reference" className="inp" required placeholder="Reference, e.g. e-mail of 02/03/2026 “RE: RA 25 …”" />
                     <select name="verdict" className="inp" defaultValue="approve"><option value="approve">Approved the red residual risk</option><option value="stop">Stopped it (no-go)</option></select>
                     <button className="btn">Record the AM&apos;s decision</button></form></details>
                 </div>)}
-              {a.status === "accepted" && !a.accepted_at && <p className="mini mb-2">Accepted by the sign-off (green / yellow residual risk) — the AM may overrule it by opening a new version.</p>}
-              {a.accepted_at && <p className="mb-2">Decided by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
+              {a.status === "accepted" && !a.accepted_at && <p className="mini mb-2">Accepted by the sign-off (green / yellow residual risk), the AM may overrule it by opening a new version.</p>}
+              {a.accepted_at && <p className="mb-2">Decided by the AM <b>{a.accepted_name}</b>, {a.accepted_at.slice(0, 10)}</p>}
               {moc && a.status === "accepted" && a.moc_status === "approved" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="implemented" /><button className="btn primary">Mark the change as implemented</button></form>}
               {moc && a.moc_status === "implemented" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="closed" /><button className="btn primary">Close the MOC</button></form>}
               {a.kind !== "hazard_log" && ["accepted", "archived"].includes(a.status) && mayEditRisk(s) && <form action={saveAsTemplate} className="mt-3 flex gap-2"><input type="hidden" name="id" value={a.id} /><input name="name" className="inp flex-1" style={{ marginTop: 0 }} placeholder="Template name (e.g. Ferry flight)" /><button className="btn">Save as a template</button></form>}
-              {!draft && mayEditRisk(s) && !["archived", "cancelled"].includes(a.status) && <form action={reopenAssessment} className="mt-3 grid gap-2"><input type="hidden" name="id" value={a.id} />{mayAccept(s) && <input name="comment" className="inp" placeholder="Reason (AM overrule: scoring / decision changed)" />}<button className="btn">{mayAccept(s) ? "Overrule — new version" : "Reopen — new version"} (v{a.version + 1})</button></form>}
+              {!draft && mayEditRisk(s) && !["archived", "cancelled"].includes(a.status) && <form action={reopenAssessment} className="mt-3 grid gap-2"><input type="hidden" name="id" value={a.id} />{mayAccept(s) && <input name="comment" className="inp" placeholder="Reason (AM overrule: scoring / decision changed)" />}<button className="btn">{mayAccept(s) ? "Overrule, new version" : "Reopen, new version"} (v{a.version + 1})</button></form>}
             </div>
           </section>
 
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">MSM conformity</span><span className="mini">{checks.filter((c) => c.ok).length}/{checks.length} · {MSM_REF[a.entity]}</span></div>
-            <div className="cb"><ul className="checks">{checks.map((c, i) => <li key={i}><span className={c.ok ? "ok" : "ko"}>{c.ok ? <Icon name="check" size={14} /> : <Icon name="x" size={14} />}</span><span className="flex-1">{c.label}{c.detail ? <span className="mini"> — {c.detail}</span> : null}</span><span className="mini mono">{c.ref}</span></li>)}</ul></div>
+            <div className="ch"><span className="eyebrow">MSM conformity</span><span className="mini">{checks.filter((c) => c.ok).length}/{checks.length}, {MSM_REF[a.entity]}</span></div>
+            <div className="cb"><ul className="checks">{checks.map((c, i) => <li key={i}><span className={c.ok ? "ok" : "ko"}>{c.ok ? <Icon name="check" size={14} /> : <Icon name="x" size={14} />}</span><span className="flex-1">{c.label}{c.detail ? <span className="mini">, {c.detail}</span> : null}</span><span className="mini mono">{c.ref}</span></li>)}</ul></div>
           </section>
 
           <section className="card mb-4">
@@ -175,9 +175,9 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 {!moc && <label><span className="mini">Next review</span><input type="date" name="next_due" className="inp" defaultValue={a.next_due ?? ""} disabled={!edit} /></label>}
                 {!moc && <label><span className="mini">Top risk</span><select name="top_risk" className="inp" defaultValue={a.top_risk ? "1" : "0"} disabled={!edit}><option value="0">no</option><option value="1">yes</option></select></label>}
               </div>
-              <label><span className="mini">Participants — one per line: Name — role</span><textarea name="participants" className="inp" rows={3} defaultValue={(a.participants ?? []).map((p) => `${p.name}${p.role ? " — " + p.role : ""}`).join("\n")} disabled={!edit} /></label>
+              <label><span className="mini">Participants, one per line: Name, role</span><textarea name="participants" className="inp" rows={3} defaultValue={(a.participants ?? []).map((p) => `${p.name}${p.role ? ", " + p.role : ""}`).join("\n")} disabled={!edit} /></label>
               {edit && <div className="flex justify-end"><button className="btn">Save</button></div>}
-              {!draft && <p className="mini">Signed versions are read-only — reopen a new version to change them.</p>}
+              {!draft && <p className="mini">Signed versions are read-only, reopen a new version to change them.</p>}
             </form>
           </section>
 

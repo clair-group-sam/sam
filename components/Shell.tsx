@@ -57,7 +57,7 @@ export default function Shell({ session, children }: Props) {
     <aside className={cls} onMouseEnter={onEnter}>
       <div className="h">{curMod ? modLabel(role, curMod) : mod}</div>
       {subs.map((s) => (
-        <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "") + (isBuilt(mod, s.id) ? "" : " soon")} title={isBuilt(mod, s.id) ? undefined : "Not built yet — exists in the prototype"}>
+        <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "") + (isBuilt(mod, s.id) ? "" : " soon")} title={isBuilt(mod, s.id) ? undefined : "Not built yet, exists in the prototype"}>
           {subLabel(role, mod, s)}{!isBuilt(mod, s.id) && <small className="soon-tag">soon</small>}
         </Link>
       ))}
@@ -87,7 +87,7 @@ export default function Shell({ session, children }: Props) {
         </div>
         <div className="railbottom">
           <button type="button" className={"rl lockrow" + (compact ? "" : " locked")} onClick={toggleCompact} aria-pressed={!compact}
-            title={compact ? "Menus collapse automatically — click to lock them open  [" : "Menus locked open — click to let them collapse automatically  ["}>
+            title={compact ? "Menus collapse automatically, click to lock them open  [" : "Menus locked open, click to let them collapse automatically  ["}>
             <LockIcon locked={!compact} /><span>Lock menus</span><i className={"tgl" + (compact ? "" : " on")} aria-hidden />
           </button>
           {bottom.map((m) => <RailLink key={m.id} m={m} role={role} on={mod === m.id} />)}
@@ -134,8 +134,8 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
     { label: "Manual or internal document", href: "/docs/new", hint: "a new manual in the library" },
     { label: "To-do", href: "/home/todo", hint: "personal reminder" },
     { label: "Finding", href: session.role === "cmm" ? "/comp/find/new" : undefined, hint: session.role === "cmm" ? "authority or internal audit finding, answered by a nominated person" : "raised by the Compliance department" },
-    { label: "Action", hint: "Compliance — step 6" },
-    { label: "Safety report", hint: "Safety — step 5" },
+    { label: "Action", hint: "Compliance, step 6" },
+    { label: "Safety report", hint: "Safety, step 5" },
     { label: "Communication", hint: "Communication module" },
   ];
   // the working entity: one at a time, always shown in full at the top-left; group view only for group functions
@@ -156,7 +156,7 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   const choices = session.entities;
   const cur = session.entity;
   const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
-  const curSub = cur === "ALL" ? `lists across every entity · ${choices.join(", ")}` : `${ENT[cur]?.qual ?? ""} · ${ENT[cur]?.auth ?? ""}`;
+  const curSub = cur === "ALL" ? `lists across every entity, ${choices.join(", ")}` : `${ENT[cur]?.qual ?? ""}, ${ENT[cur]?.auth ?? ""}`;
   async function pick(ent: string) {
     setEntOpen(false);
     await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });

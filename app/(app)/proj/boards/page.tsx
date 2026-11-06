@@ -45,7 +45,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
   const superadmin = s.roles.includes("SUPERADMIN");
   return (
     <>
-      <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks — aircraft addition or removal, nominated person change, new approval… The manuals, CAA applications and certificates it needs are the real objects of S.A.M., linked to their task."
+      <PageHeader eyebrow="Projects" title="Projects" sub="Any objective broken into phases and tasks, aircraft addition or removal, nominated person change, new approval… The manuals, CAA applications and certificates it needs are the real objects of S.A.M., linked to their task."
         right={<><Link href="/proj/auth" className="btn">CAA applications</Link><Link href="/proj/boards/new" className="btn primary">+ New project</Link></>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open projects" value={open.length} hint={testOpen ? `+ ${testOpen} test` : undefined} />
@@ -61,10 +61,10 @@ export default async function Projects({ searchParams }: { searchParams: Promise
             {rows.map(({ p, pr, late, blocked, end, next }) => (
               <tr key={p.id}>
                 <td className="entcol"><span className={"ent " + p.entity}>{p.entity}</span></td>
-                <td><Link href={`/proj/boards/${p.id}`}><b>{p.title}</b></Link>{isTestData(p.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}<div className="mini">{p.template_code ?? "blank project"} · started {fr(p.started_at)}{p.target_date ? ` · target ${fr(p.target_date)}` : ""}</div></td>
+                <td><Link href={`/proj/boards/${p.id}`}><b>{p.title}</b></Link>{isTestData(p.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}<div className="mini">{p.template_code ?? "blank project"}, started {fr(p.started_at)}{p.target_date ? `, target ${fr(p.target_date)}` : ""}</div></td>
                 <td className="mini">{p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"}</td>
-                <td><div className="bar"><i style={{ width: `${pr.pct}%` }} /></div><div className="mini">{pr.done} / {pr.total} · {pr.pct} %{late ? <span className="red"> · {late} late</span> : ""}{blocked ? <span className="amber"> · {blocked} blocked</span> : ""}</div></td>
-                <td className="mini">{p.status === "closed" ? "—" : next.length ? next.map((t) => <div key={t.id}>{t.title}{t.owner_role ? ` · ${t.owner_role}` : ""}</div>) : "nothing ready to start"}</td>
+                <td><div className="bar"><i style={{ width: `${pr.pct}%` }} /></div><div className="mini">{pr.done} / {pr.total}, {pr.pct} %{late ? <span className="red">, {late} late</span> : ""}{blocked ? <span className="amber">, {blocked} blocked</span> : ""}</div></td>
+                <td className="mini">{p.status === "closed" ? "—" : next.length ? next.map((t) => <div key={t.id}>{t.title}{t.owner_role ? `, ${t.owner_role}` : ""}</div>) : "nothing ready to start"}</td>
                 <td className="mono">{p.status === "closed" ? fr(p.closed_at) : end ? <span className={end < t0 ? "red" : ""}>{fr(end)}</span> : "—"}</td>
                 <td><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")}>{PROJECT_STATUS_LABEL[p.status]}</span></td>
                 {superadmin && (
@@ -72,13 +72,13 @@ export default async function Projects({ searchParams }: { searchParams: Promise
                     <details className="more"><summary title="Cancel or delete (super admin)">⋯</summary>
                       <div className="morepanel" style={{ width: 360 }}>
                         {p.status !== "cancelled" && p.status !== "closed" && <form action={cancelProject} className="flex items-center gap-2"><input type="hidden" name="id" value={p.id} /><input name="reason" className="inp" placeholder="Why it is cancelled (optional)" /><button className="btn" type="submit">Cancel the project</button></form>}
-                        <form action={deleteProject} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><label className="mini flex items-center gap-1"><input type="checkbox" name="confirm" /> I confirm — tasks and attached documents are deleted for good</label><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></form>
+                        <form action={deleteProject} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><label className="mini flex items-center gap-1"><input type="checkbox" name="confirm" /> I confirm, tasks and attached documents are deleted for good</label><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></form>
                       </div>
                     </details>
                   </td>
                 )}
               </tr>))}
-            {!rows.length && <tr><td colSpan={superadmin ? 8 : 7} className="p-6 text-slate6">No project in this scope. <Link className="underline" href="/proj/boards/new">Open one</Link> — blank or from a template.</td></tr>}
+            {!rows.length && <tr><td colSpan={superadmin ? 8 : 7} className="p-6 text-slate6">No project in this scope. <Link className="underline" href="/proj/boards/new">Open one</Link>, blank or from a template.</td></tr>}
           </tbody>
         </table>
       </section>

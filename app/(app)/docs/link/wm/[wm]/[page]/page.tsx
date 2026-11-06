@@ -20,7 +20,7 @@ export default async function WmLink({ params }: { params: Promise<{ wm: string;
   if (man && (s.group || s.entities.includes(man.entity))) redirect(`/docs/manual/${man.manualId}${ref ? `?sec=${encodeURIComponent(ref)}` : ""}`);
   return (
     <>
-      <PageHeader eyebrow="Documents · link" title="This document cannot be opened" sub={man ? `${man.code} — ${man.title}` : `Referenced document #${wm}`} />
+      <PageHeader eyebrow="Documents, link" title="This document cannot be opened" sub={man ? `${man.code}, ${man.title}` : `Referenced document #${wm}`} />
       <section className="card"><div className="cb">
         {man
           ? <p>The document belongs to <b>{ENT[man.entity]?.name ?? man.entity}</b>, which is outside your access in S.A.M. Ask Compliance if you need to read it.</p>

@@ -82,7 +82,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={mode === "toc" ? "Filter chapters and sub-chapters…" : "Search every word of this manual…"} autoFocus={!!initialQuery} />
         {q && <button type="button" className="clr" onClick={() => { setQ(""); setHits(null); }} aria-label="Clear">×</button>}
         <span className="mini">{mode === "full" ? (busy ? "searching…" : hits ? `${hits.length} passage${hits.length === 1 ? "" : "s"}` : "type at least 2 letters") : `${filtered.length} / ${toc.length} chapters`}</span>
-        {active && <span className="mini ml-auto">Chapter {idx + 1} / {toc.length} · {progress}% read</span>}
+        {active && <span className="mini ml-auto">Chapter {idx + 1} / {toc.length}, {progress}% read</span>}
       </div>
 
       <div className="flex gap-4 items-start">

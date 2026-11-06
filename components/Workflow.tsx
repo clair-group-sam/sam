@@ -37,7 +37,7 @@ export default function Workflow({ revisionId, current, rows, transitions, block
             <div className="wfbody">
               <div className="wfhead"><b>{r.label}</b>{r.locked && state !== "done" && <span className="lockpill">Compliance</span>}<span className="mini">{r.skipped ?? r.who}</span></div>
               {r.detail && state !== "skip" && <div className="mini">{r.detail}</div>}
-              {state === "done" && r.done && <div className="mini">done {r.done.at.slice(0, 10)}{r.done.by ? ` · ${r.done.by}` : ""}</div>}
+              {state === "done" && r.done && <div className="mini">done {r.done.at.slice(0, 10)}{r.done.by ? `, ${r.done.by}` : ""}</div>}
               {state === "now" && !forward.length && <div className="mini">{routeHint ?? `Waiting for ${r.who}.`}</div>}
               {state === "now" && forward.map((t) => (
                 <form key={t.to} action={moveStep} className="wfact">

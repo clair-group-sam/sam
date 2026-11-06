@@ -13,7 +13,7 @@ export default async function SpiSet({ searchParams }: { searchParams: Promise<{
   if (!s) redirect("/login");
   if (!mayEditSpi(s)) redirect("/safe/over");
   const sp = await searchParams; const year = Number(sp.y) || new Date().getUTCFullYear();
-  if (s.entity === "ALL") return <PageHeader eyebrow="Safety · Overview" title="SPI set & targets" sub="Pick an entity in the top bar." />;
+  if (s.entity === "ALL") return <PageHeader eyebrow="Safety, Overview" title="SPI set & targets" sub="Pick an entity in the top bar." />;
   const e = s.entity; const db = supabaseAdmin();
   const { data: defs } = await db.from("spi_defs").select("*").eq("entity", e).order("sort");
   const D = (defs ?? []) as SpiDef[];
@@ -44,9 +44,9 @@ export default async function SpiSet({ searchParams }: { searchParams: Promise<{
     </form>); };
   return (
     <>
-      <PageHeader eyebrow="Safety · Overview" title={`SPI set & targets ${year}`} sub={`${ENT[e]?.name ?? e} — safety performance indicators linked to the safety objectives of the MSM; targets set by the AM on proposal of the SM and reviewed yearly at the SRB (AMC1 ORA.GEN.200(a)(1)).`}
+      <PageHeader eyebrow="Safety, Overview" title={`SPI set & targets ${year}`} sub={`${ENT[e]?.name ?? e}, safety performance indicators linked to the safety objectives of the MSM; targets set by the AM on proposal of the SM and reviewed yearly at the SRB (AMC1 ORA.GEN.200(a)(1)).`}
         right={<><div className="yseg">{[year - 1, year, year + 1].map((y) => <Link key={y} href={`/safe/over/set?y=${y}`} className={"btn" + (y === year ? " on" : "")}>{y}</Link>)}</div><Link href={`/safe/over?y=${Math.min(year, new Date().getUTCFullYear())}`} className="btn">← Overview</Link></>} />
-      {proposed > 0 && <section className="card mb-4"><div className="cb flex items-center gap-3"><span><b>{proposed} SPIs are proposed</b> — taken from the ASJFR set (same MSM family, same matrix). Change, retire or add what you need, then confirm the set: the SPIs become active on the Overview.</span>
+      {proposed > 0 && <section className="card mb-4"><div className="cb flex items-center gap-3"><span><b>{proposed} SPIs are proposed</b>, taken from the ASJFR set (same MSM family, same matrix). Change, retire or add what you need, then confirm the set: the SPIs become active on the Overview.</span>
         <form action={setStatus} className="ml-auto"><input type="hidden" name="entity" value={e} /><input type="hidden" name="status" value="active" /><button className="btn primary">Confirm the set</button></form></div></section>}
       {nextMissing && <form action={copyTargets} className="mb-4 flex justify-end"><input type="hidden" name="entity" value={e} /><input type="hidden" name="from" value={year} /><button className="btn">Carry the {year} targets to {year + 1}</button></form>}
       <section className="card mb-5">
@@ -55,12 +55,12 @@ export default async function SpiSet({ searchParams }: { searchParams: Promise<{
           <tbody>{D.map((d) => { const t = tOf(d.id, year); return (
             <tr key={d.id} id={d.code} className={d.status === "retired" ? "opacity-50" : ""}>
               <td className="mono">{d.code}</td>
-              <td><details><summary className="cursor-pointer"><b>{d.label}</b><div className="mini">{d.objective} · {d.metric ? `S.A.M.: ${METRICS[d.metric]?.label}` : "entered monthly"} · {BASIS[d.basis].label} · target {PERIOD[d.period]}</div></summary><div className="mt-3"><Form d={d} /></div></details></td>
+              <td><details><summary className="cursor-pointer"><b>{d.label}</b><div className="mini">{d.objective}, {d.metric ? `S.A.M.: ${METRICS[d.metric]?.label}` : "entered monthly"}, {BASIS[d.basis].label}, target {PERIOD[d.period]}</div></summary><div className="mt-3"><Form d={d} /></div></details></td>
               <td className="mono">{t?.target == null ? "TBD" : `${DIR[d.direction]} ${t.target}`}{t?.alert != null && <div className="mini">alert {t.alert}</div>}</td>
               <td><span className={"pill " + (d.status === "active" ? "green" : d.status === "proposed" ? "amber" : "")}>{d.status}</span>
                 <form action={setStatus} className="mt-1"><input type="hidden" name="entity" value={e} /><input type="hidden" name="id" value={d.id} /><input type="hidden" name="status" value={d.status === "retired" ? "active" : "retired"} /><button className="btn">{d.status === "retired" ? "Restore" : "Retire"}</button></form></td>
             </tr>); })}
-            {!D.length && <tr><td colSpan={4} className="p-6 mini">No SPI yet — add the first one below.</td></tr>}
+            {!D.length && <tr><td colSpan={4} className="p-6 mini">No SPI yet, add the first one below.</td></tr>}
           </tbody>
         </table>
       </section>

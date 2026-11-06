@@ -153,7 +153,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <PageHeader eyebrow="Documents · Library" title="Document library" sub="Each manual is revised and approved as a whole."
+      <PageHeader eyebrow="Documents, Library" title="Document library" sub="Each manual is revised and approved as a whole."
         right={canCreate ? <><Link href="/docs/drop" className="btn">+ Drop a document</Link><Link href={`/docs/new${s.entity !== "ALL" ? `?entity=${s.entity}` : ""}`} className="btn primary">+ New manual</Link></> : undefined} />
       <form className="card mb-5" action="/docs/lib" method="get">
         <div className="p-3 flex gap-2">
@@ -164,7 +164,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       </form>
       {q && (
         <section className="card mb-5">
-          <div className="ch"><span className="eyebrow">“{q}” · {groups.length} manual{groups.length === 1 ? "" : "s"} · {nHits} passage{nHits === 1 ? "" : "s"}</span><span className="mini">published text · {s.entity === "ALL" ? "every manual of the group" : `manuals of ${ENT[s.entity]?.name ?? s.entity}`}</span></div>
+          <div className="ch"><span className="eyebrow">“{q}”, {groups.length} manual{groups.length === 1 ? "" : "s"}, {nHits} passage{nHits === 1 ? "" : "s"}</span><span className="mini">published text, {s.entity === "ALL" ? "every manual of the group" : `manuals of ${ENT[s.entity]?.name ?? s.entity}`}</span></div>
           <div className="srch">
             {groups.map((g) => {
               const href = (ref?: string) => `/docs/manual/${g.manual_id}?${ref ? `sec=${encodeURIComponent(ref)}&` : ""}q=${encodeURIComponent(q)}`;
@@ -172,11 +172,11 @@ export default async function Library({ searchParams }: { searchParams: Promise<
                 <details key={g.manual_id} className="srch-m" open={groups.length <= 6 || g.titleMatch}>
                   <summary><span className={"ent " + g.entity}>{g.entity}</span><Link href={href()} className="srch-t"><b>{g.code}</b> {g.title}</Link><span className="mini ml-auto">{g.hits.length ? `${g.hits.length} passage${g.hits.length === 1 ? "" : "s"}` : "title"}</span></summary>
                   {g.hits.length > 0 && <ul>{g.hits.slice(0, 12).map((h, i) => (
-                    <li key={i}><Link href={href(h.ref)}><span className="mono">{h.ref}</span> <b>{h.stitle ?? ""}</b></Link>{h.also.length ? <span className="mini"> · also in {h.also.join(", ")}</span> : null}<div className="mini">…{h.snippet}…</div></li>))}
-                    {g.hits.length > 12 && <li><Link className="underline mini" href={href()}>+ {g.hits.length - 12} more in {g.code} — open the manual with the search</Link></li>}</ul>}
+                    <li key={i}><Link href={href(h.ref)}><span className="mono">{h.ref}</span> <b>{h.stitle ?? ""}</b></Link>{h.also.length ? <span className="mini">, also in {h.also.join(", ")}</span> : null}<div className="mini">…{h.snippet}…</div></li>))}
+                    {g.hits.length > 12 && <li><Link className="underline mini" href={href()}>+ {g.hits.length - 12} more in {g.code}, open the manual with the search</Link></li>}</ul>}
                 </details>);
             })}
-            {!groups.length && <p className="p-5 text-slate6">Nothing found in the published manuals{s.entity === "ALL" ? "" : ` of ${ENT[s.entity]?.name ?? s.entity} — try the group view to search every manual`}.</p>}
+            {!groups.length && <p className="p-5 text-slate6">Nothing found in the published manuals{s.entity === "ALL" ? "" : ` of ${ENT[s.entity]?.name ?? s.entity}, try the group view to search every manual`}.</p>}
           </div>
         </section>
       )}
@@ -195,7 +195,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       )}
       {q && <p className="mini mb-4">The passages above are the search result. <Link className="underline" href="/docs/lib">Clear the search</Link> to browse the library.</p>}
       {!q && <><div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Manuals" value={realRows.length} hint={`structured, revisable${testRows ? ` · + ${testRows} test` : ""}${certCount ? ` · + ${certCount} certificate${certCount > 1 ? "s" : ""} in the folders` : ""}`} />
+        <Metric label="Manuals" value={realRows.length} hint={`structured, revisable${testRows ? `, + ${testRows} test` : ""}${certCount ? `, + ${certCount} certificate${certCount > 1 ? "s" : ""} in the folders` : ""}`} />
         <Metric label="Published" value={published} hint="current revision available" />
         <Metric label="Revisions in progress" value={drafts} tone={drafts ? "amber" : undefined} hint="draft, review or authority" />
         <Metric label="Never published" value={never} tone={never ? "red" : undefined} hint="to clean or publish" />
@@ -203,7 +203,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       <div className="flex gap-4 items-start">
         <aside className="card folders">
           <div className="ch"><span className="eyebrow">Folders</span><span className="mini">colour = worst status inside</span></div>
-          <FolderTree nodes={tnodes} selected={folder} total={rows.length + (certCount ?? 0)} several={several} />{/* FB-006 · folder counts include certificates, so does the total */}
+          <FolderTree nodes={tnodes} selected={folder} total={rows.length + (certCount ?? 0)} several={several} />{/* FB-006, folder counts include certificates, so does the total */}
         </aside>
         <section className="card flex-1 min-w-0">
           <div className="ch"><span className="eyebrow">{folder || "All documents"}</span><span className="mini">{inFolder.length} document{inFolder.length > 1 ? "s" : ""}</span></div>
@@ -217,7 +217,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
                   <td><Link href={`/docs/manual/${manual.id}`}><b>{manual.title}</b></Link>{(manual as typeof manual & { internal?: boolean }).internal && <span className="nature ml-2">internal</span>}{isTestData(manual.code, manual.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}{!folder && <div className="mini">{manual.path}</div>}</td>
                   <td className="mini">{manual.owner_role}</td>
                   <td className="mono">{current ? `Iss ${current.issue} Rev ${current.rev}` : "—"}{current?.published_at && <div className="mini">{current.published_at}</div>}</td>
-                  <td>{current ? <span className="pill green">Published</span> : <span className="pill red">Never published</span>}{workings.map((w) => <span key={w.id} className="pill amber ml-1">Rev {w.rev} · {STEP_LABEL[w.step]}</span>)}</td>
+                  <td>{current ? <span className="pill green">Published</span> : <span className="pill red">Never published</span>}{workings.map((w) => <span key={w.id} className="pill amber ml-1">Rev {w.rev}, {STEP_LABEL[w.step]}</span>)}</td>
                 </tr>
               ))}
               {!inFolder.length && <tr><td colSpan={6} className="p-6 text-slate6">No manual in this folder yet. Add one with <b>Drop a document</b> or <b>New manual</b>.</td></tr>}

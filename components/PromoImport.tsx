@@ -20,14 +20,14 @@ export default function PromoImport({ entity }: { entity: string }) {
       const up = await fetch(sign.j.url, { method: "PUT", headers: { "content-type": "application/pdf", "x-upsert": "true" }, body: pdf });
       if (!up.ok) { out.push(`FAILED ${it.name}: upload ${up.status}`); setLog([...out]); continue; }
       const { ok, j } = await call("save");
-      out.push(ok ? `OK ${j.number} — ${j.title}${j.updated ? " (updated)" : ""}` : `FAILED ${it.name}: ${j.error ?? "refused"}`);
+      out.push(ok ? `OK ${j.number}, ${j.title}${j.updated ? " (updated)" : ""}` : `FAILED ${it.name}: ${j.error ?? "refused"}`);
       setLog([...out]);
     }
     setBusy(false); router.refresh();
   }
   return (
     <div>
-      <p className="mini mb-2">In Web Manuals (admin), run <span className="mono">samWmPromotions(&lt;folder id&gt;)</span> from scripts/wm-promotions-export.js — read-only — then select the JSON and all the PDFs here.</p>
+      <p className="mini mb-2">In Web Manuals (admin), run <span className="mono">samWmPromotions(&lt;folder id&gt;)</span> from scripts/wm-promotions-export.js, read-only, then select the JSON and all the PDFs here.</p>
       <input type="file" multiple accept=".json,.pdf,application/pdf,application/json" disabled={busy} onChange={(e) => go(e.target.files)} />
       {log.length > 0 && <ul className="mini mt-2" style={{ display: "grid", gap: 2 }}>{log.map((l, i) => <li key={i}>{l}</li>)}</ul>}
     </div>

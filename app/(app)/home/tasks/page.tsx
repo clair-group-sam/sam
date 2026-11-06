@@ -28,7 +28,7 @@ export default async function Inbox() {
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   return (
     <>
-      <PageHeader eyebrow="S.A.M. · Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
+      <PageHeader eyebrow="S.A.M., Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
       <CoffeeBox recap={recap} connected={connected} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? `, + ${testCount} test` : "") + (tasks.length !== all.length ? `, ${tasks.length} lines (a project = one line)` : "")} />

@@ -11,8 +11,8 @@ export function RiskMatrix({ id, entity, which, lik, sev, editable }: { id: stri
         <tr key={l.id}><th title={l.hint}>{l.id}<span>{l.label}</span></th>
           {SEVERITIES.map((s) => { const t = tolerability(l.id, s.id, sch); const on = lik === l.id && sev === s.id; const txt = sch === "centrik" ? String(riskLabel(l.id, s.id, sch)?.split(", ")[1]) : riskIndex(l.id, s.id); return (
             <td key={s.id} className={tolTone(t)}>
-              {editable ? <form action={setRating}><input type="hidden" name="id" value={id} /><input type="hidden" name="which" value={which} /><input type="hidden" name="lik" value={l.id} /><input type="hidden" name="sev" value={s.id} /><button className={on ? "on" : ""} title={`${riskLabel(l.id, s.id, sch)} · ${t}`}>{txt}</button></form>
-                : <span className={"cell" + (on ? " on" : "")} title={`${riskLabel(l.id, s.id, sch)} · ${t}`}>{txt}</span>}
+              {editable ? <form action={setRating}><input type="hidden" name="id" value={id} /><input type="hidden" name="which" value={which} /><input type="hidden" name="lik" value={l.id} /><input type="hidden" name="sev" value={s.id} /><button className={on ? "on" : ""} title={`${riskLabel(l.id, s.id, sch)}, ${t}`}>{txt}</button></form>
+                : <span className={"cell" + (on ? " on" : "")} title={`${riskLabel(l.id, s.id, sch)}, ${t}`}>{txt}</span>}
             </td>); })}
         </tr>))}</tbody>
     </table>

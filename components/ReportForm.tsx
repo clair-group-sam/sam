@@ -39,7 +39,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
   if (step === "sent") return (
     <section className="card">
       <div className="cb">
-        <h2 className="text-[20px] font-bold mb-2">Thank you — report {sentId} received</h2>
+        <h2 className="text-[20px] font-bold mb-2">Thank you, report {sentId} received</h2>
         <p>The Safety Manager has it now. You will see its status and any question in <Link className="underline" href="/safe/mine">My reports</Link>{r.anonymous ? ". As you sent it anonymously, keep the number " + sentId + " if you want to follow it up" : ""}.</p>
         <p className="mini mt-2">Reports are used to improve safety, never to blame (Regulation (EU) 376/2014, just culture). You will receive feedback on what was done with it.</p>
         <div className="mt-4 flex gap-2"><Link href="/safe/mine" className="btn primary">My reports</Link><button className="btn" onClick={() => { setStep("write"); setR((x) => ({ ...x, headline: "", narrative: "", contributing: "", precisions: {} })); }}>Report another event</button></div>
@@ -55,7 +55,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
           <label className="block mb-3"><span className="eyebrow">In one line</span><input className="inp w-full" value={r.headline} onChange={(e) => set({ headline: e.target.value })} placeholder="e.g. TCAS RA on approach LFMN" disabled={step !== "write"} /></label>
           <label className="block mb-3"><span className="eyebrow">Your account</span><textarea className="inp w-full rep-text" value={r.narrative} onChange={(e) => set({ narrative: e.target.value })} placeholder="What happened, as you saw it." disabled={step !== "write"} /></label>
           <div className="grid grid-cols-3 gap-3 mb-3">
-            <label><span className="eyebrow">Entity</span><select className="inp w-full" value={r.entity} onChange={(e) => set({ entity: e.target.value })} disabled={step !== "write"}>{entities.map((e) => <option key={e.code} value={e.code}>{e.code} — {e.name}</option>)}</select></label>
+            <label><span className="eyebrow">Entity</span><select className="inp w-full" value={r.entity} onChange={(e) => set({ entity: e.target.value })} disabled={step !== "write"}>{entities.map((e) => <option key={e.code} value={e.code}>{e.code}, {e.name}</option>)}</select></label>
             <label><span className="eyebrow">Date</span><input type="date" className="inp w-full" value={r.event_date} onChange={(e) => set({ event_date: e.target.value })} disabled={step !== "write"} /></label>
             <label><span className="eyebrow">Time (UTC)</span><input type="time" className="inp w-full" value={r.event_time_utc} onChange={(e) => set({ event_time_utc: e.target.value })} disabled={step !== "write"} /></label>
             <label><span className="eyebrow">Aircraft</span><input className="inp w-full" value={r.aircraft} onChange={(e) => set({ aircraft: e.target.value.toUpperCase() })} placeholder="F-HXXX / 9H-XXX" disabled={step !== "write"} /></label>
@@ -71,7 +71,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
 
       {step === "precise" && (
         <section className="card rep-prec">
-          <div className="ch"><span className="eyebrow">Before sending · {items.length} precisions would help the Safety Manager</span></div>
+          <div className="ch"><span className="eyebrow">Before sending, {items.length} precisions would help the Safety Manager</span></div>
           <div className="cb">
             {items.map((q) => (
               <div key={q.key} className="mb-3">

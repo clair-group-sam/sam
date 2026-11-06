@@ -22,9 +22,9 @@ export default async function NewReport() {
         <a className="btn primary" href={REPORTS_ELSEWHERE[c].url} target="_blank" rel="noreferrer">Report in {REPORTS_ELSEWHERE[c].tool} ↗</a></div></section>))}</>;
   return (
     <>
-      <PageHeader eyebrow="Safety · Report an event" title="New safety report" sub="Occurrence, hazard or anything that could affect safety. Takes 3 minutes." />
+      <PageHeader eyebrow="Safety, Report an event" title="New safety report" sub="Occurrence, hazard or anything that could affect safety. Takes 3 minutes." />
       {first && <Elsewhere />}
-      {entities.length ? <ReportForm entities={entities} defaultEntity={def} /> : !elsewhere.length && <section className="card"><div className="cb">Your account has no entity yet — ask Compliance to add you.</div></section>}
+      {entities.length ? <ReportForm entities={entities} defaultEntity={def} /> : !elsewhere.length && <section className="card"><div className="cb">Your account has no entity yet, ask Compliance to add you.</div></section>}
       {!first && <Elsewhere />}
     </>
   );

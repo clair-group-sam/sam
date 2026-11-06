@@ -20,7 +20,7 @@ export default async function ComplianceSafetyDash() {
   const multi = dashes.length > 1;
   return (
     <>
-      <PageHeader eyebrow="Dashboards · Compliance & Safety" title="Compliance & Safety" sub={`${multi ? "All entities" : ENT[ents[0]]?.name ?? ents[0]} today: documents, authority files, findings, regulatory watch, safety. Click a line or a number to open the list.`} right={<Link className="btn" href="/dash/cs/overdue">Overdue by post</Link>} />
+      <PageHeader eyebrow="Dashboards, Compliance & Safety" title="Compliance & Safety" sub={`${multi ? "All entities" : ENT[ents[0]]?.name ?? ents[0]} today: documents, authority files, findings, regulatory watch, safety. Click a line or a number to open the list.`} right={<Link className="btn" href="/dash/cs/overdue">Overdue by post</Link>} />
       <div className={multi ? "grid gap-4" : ""} style={multi ? { gridTemplateColumns: `repeat(${dashes.length}, minmax(0, 1fr))` } : undefined}>
         {dashes.map((d) => <EntityColumn key={d.entity} d={d} compact={multi} />)}
       </div>

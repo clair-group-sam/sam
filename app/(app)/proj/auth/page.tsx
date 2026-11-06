@@ -41,7 +41,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader eyebrow="Projects · CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC — one file per change, from the trigger to the close-out."
+      <PageHeader eyebrow="Projects, CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC, one file per change, from the trigger to the close-out."
         right={<Link href="/proj/auth/new" className="btn primary">+ New file</Link>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
@@ -65,7 +65,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
                 <tr key={f.id}>
                   <td className="entcol"><span className={"ent " + f.entity}>{f.entity}</span></td>
                   <td className="mono"><Link className="underline" href={link({ type: f.type_code })} title={typeMap.get(f.type_code)?.name}>{f.type_code}</Link></td>
-                  <td><Link href={`/proj/auth/${f.id}`} className="underline"><b>{f.title}</b></Link><div className="mini">{f.portal ?? f.authority}{f.trigger_note ? ` · ${f.trigger_note}` : ""}</div></td>
+                  <td><Link href={`/proj/auth/${f.id}`} className="underline"><b>{f.title}</b></Link><div className="mini">{f.portal ?? f.authority}{f.trigger_note ? `, ${f.trigger_note}` : ""}</div></td>
                   <td><span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{f.rounds > 0 && <div className="mini">{f.rounds} round{f.rounds > 1 ? "s" : ""}</div>}</td>
                   <td className="mono">{f.portal_url ? <a className="underline" href={f.portal_url} target="_blank" rel="noreferrer">{f.portal_ref ?? "portal"}</a> : f.portal_ref ?? "—"}</td>
                   <td className="mono">{f.owner_role ?? "—"}</td>
@@ -78,7 +78,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
           </tbody>
         </table>
       </section>
-      <p className="mini mt-3">Types: {[...typeMap.values()].map((t) => <Link key={t.code} href={link({ type: t.code })} className={"mr-2 underline" + (sp.type === t.code ? " font-bold" : "")}>{t.code}</Link>)} {sp.type && <Link href={link({ type: "" })} className="underline">clear</Link>} · <Link className="underline" href="/ref/types">Reference of application types</Link></p>
+      <p className="mini mt-3">Types: {[...typeMap.values()].map((t) => <Link key={t.code} href={link({ type: t.code })} className={"mr-2 underline" + (sp.type === t.code ? " font-bold" : "")}>{t.code}</Link>)} {sp.type && <Link href={link({ type: "" })} className="underline">clear</Link>}, <Link className="underline" href="/ref/types">Reference of application types</Link></p>
     </>
   );
 }

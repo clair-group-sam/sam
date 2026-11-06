@@ -48,7 +48,7 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader eyebrow="NP management · Overview" title={`Nominated persons — ${ENT[entity ?? ""]?.name ?? entity}`} sub="Posts, holders and deputies. The organisation charts of the manuals are drawn from this list." />
+      <PageHeader eyebrow="NP management, Overview" title={`Nominated persons, ${ENT[entity ?? ""]?.name ?? entity}`} sub="Posts, holders and deputies. The organisation charts of the manuals are drawn from this list." />
       {ents.length > 1 && s.entity === "ALL" && <div className="chips mb-4 flex items-center gap-2">{ents.map((e) => <Link key={e} href={`/np/over?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}<span className="mini">— or pick the entity in the top bar</span></div>}
 
       <section className="card mb-4">
@@ -61,8 +61,8 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
           <div className="ch"><span className="eyebrow">Manuals carrying this chart</span><span className="mini">a published manual keeps the chart approved with its revision</span></div>
           <table className="tbl"><tbody>{uses.map((u, i) => (
             <tr key={i}>
-              <td className="mono" style={{ width: 160 }}>{u.code} · {u.ref}</td>
-              <td>{u.title}<div className="mini">Rev {u.rev} · {published(u.step) ? "published" : "in progress"}</div></td>
+              <td className="mono" style={{ width: 160 }}>{u.code}, {u.ref}</td>
+              <td>{u.title}<div className="mini">Rev {u.rev}, {published(u.step) ? "published" : "in progress"}</div></td>
               <td style={{ width: 170 }}><span className={"pill " + (u.upToDate ? "green" : "amber")}>{u.upToDate ? "up to date" : "out of date"}</span></td>
               <td style={{ width: 230 }} className="text-right">
                 {!u.upToDate && !published(u.step) && <Link className="btn" href={`/docs/editor/${u.revId}?tab=write&sec=${encodeURIComponent(u.ref)}`}>Update in Rev {u.rev}</Link>}

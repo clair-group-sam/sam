@@ -35,7 +35,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
     if (busy) return; setBusy(true); setErr(""); setProp(null); setSecs(0);
     // FB-049 · say what is going on and give up after 90 s instead of spinning forever
     const t0 = Date.now(); const tick = setInterval(() => setSecs(Math.round((Date.now() - t0) / 1000)), 1000);
-    const timeout = new Promise<{ ok: false; error: string }>((res) => setTimeout(() => res({ ok: false, error: "SAM did not answer within 90 s — the chapter may be long or the service busy. Try again, or ask for a specific sub-chapter." }), 90_000));
+    const timeout = new Promise<{ ok: false; error: string }>((res) => setTimeout(() => res({ ok: false, error: "SAM did not answer within 90 s, the chapter may be long or the service busy. Try again, or ask for a specific sub-chapter." }), 90_000));
     const r = await Promise.race([aiPropose({ revisionId, sectionId, agent, request, currentHtml: editor.getHTML() }), timeout]);
     clearInterval(tick); setBusy(false);
     if (r.ok) setProp({ html: r.html, notes: r.notes, model: r.model }); else setErr(r.error);
@@ -51,7 +51,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
       <div className="ch"><span className="eyebrow"><Icon name="bulb" size={14} /> Work with SAM</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
       <div className="p-3">
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
-        <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "explain" ? "The requirement to explain (ORO.GEN.200(a)(3), CAMO.A.305…) or paste its text — default: the references cited in this chapter" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
+        <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language, the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "explain" ? "The requirement to explain (ORO.GEN.200(a)(3), CAMO.A.305…) or paste its text, default: the references cited in this chapter" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
         <div className="flex items-center gap-2 mt-2">
           <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? stage : "Ask SAM"}</button>
           <span className="mini">SAM proposes; nothing enters the manual until you insert it.</span>
@@ -62,7 +62,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
             {agent !== "check" && agent !== "explain" && (<>
               <div className="flex items-center gap-2 mb-2">
                 <div className="seg"><button type="button" className={view === "diff" ? "on" : ""} onClick={() => setView("diff")}>Changes</button><button type="button" className={view === "preview" ? "on" : ""} onClick={() => setView("preview")}>Preview</button></div>
-                <span className="mini"><b style={{ color: "#1d7a3a" }}>+{added}</b> · <b style={{ color: "var(--terra)" }}>−{removed}</b> words</span>
+                <span className="mini"><b style={{ color: "#1d7a3a" }}>+{added}</b>, <b style={{ color: "var(--terra)" }}>−{removed}</b> words</span>
               </div>
               {view === "diff"
                 ? <div className="aidiff">{diff.map((d, i) => d.k === "=" ? <span key={i}>{d.t} </span> : d.k === "+" ? <ins key={i}>{d.t} </ins> : <del key={i}>{d.t} </del>)}</div>
@@ -71,7 +71,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
             {prop.notes.length > 0 && (
               <div className="mt-3">
                 <div className="eyebrow mb-1">{agent === "check" ? "Findings" : agent === "explain" ? "What the requirement asks, and where the chapter stands" : "What changed and why"}</div>
-                <ul className="ainotes">{prop.notes.map((n, i) => <li key={i}><b>{n.where}</b> — {n.change}{n.why && <span className="mini"> · {n.why}</span>}</li>)}</ul>
+                <ul className="ainotes">{prop.notes.map((n, i) => <li key={i}><b>{n.where}</b>, {n.change}{n.why && <span className="mini">, {n.why}</span>}</li>)}</ul>
               </div>
             )}
             {agent !== "check" && agent !== "explain" && (

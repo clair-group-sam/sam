@@ -31,14 +31,14 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
   const step = c.status === "planned" ? 1 : c.status === "held" ? 2 : 3;
   return (
     <>
-      <PageHeader eyebrow={`Safety · Committees · ${entitiesLabel(c)}`} title={`${c.number} — ${c.title}`} sub={`${isJoint(c) ? `Joint meeting ${entitiesLabel(c)} · ` : ""}${kindName(c.entity, c.kind)} · ${c.planned_on ?? "date to set"}${c.starts_at ? ` ${hm(c.starts_at)}${c.ends_at ? `–${hm(c.ends_at)}` : ""} UTC` : ""}${c.location ? ` · ${c.location}` : ""}`}
+      <PageHeader eyebrow={`Safety, Committees, ${entitiesLabel(c)}`} title={`${c.number}, ${c.title}`} sub={`${isJoint(c) ? `Joint meeting ${entitiesLabel(c)}, ` : ""}${kindName(c.entity, c.kind)}, ${c.planned_on ?? "date to set"}${c.starts_at ? ` ${hm(c.starts_at)}${c.ends_at ? `–${hm(c.ends_at)}` : ""} UTC` : ""}${c.location ? `, ${c.location}` : ""}`}
         tag={<span className="flex gap-2 flex-wrap"><span className={"pill " + (STATUS[c.status]?.[1] ?? "")}>{STATUS[c.status]?.[0]}</span>{c.source !== "sam" && <span className="pill">from {c.source === "centrik" ? "Centrik" : "SharePoint"}{c.source_ref ? ` ${c.source_ref}` : ""}</span>}{(parent as { id: string; number: string } | null) && <Link className="pill" href={`/safe/comm/${(parent as { id: string }).id}`}>reports to {(parent as { number: string }).number}</Link>}</span>}
         right={<><Link href="/safe/comm" className="btn">← Committees</Link>{["held", "closed"].includes(c.status) && <a className="btn" href={`/print/committee/${c.id}`} target="_blank" rel="noreferrer">Minutes PDF</a>}</>} />
 
       {(myTask ?? []).length > 0 && <section className="card mb-4"><div className="cb flex items-center gap-3"><span>The minutes of this meeting were issued to you.</span><form action={ackMinutes} className="ml-auto"><input type="hidden" name="id" value={c.id} /><button className="btn primary">I have read the minutes</button></form></div></section>}
 
       {mayRun(s) && c.status !== "cancelled" && <div className="steps mb-4">
-        <span className={step >= 1 ? "on" : ""}>1 · Plan &amp; prepare</span><span className={step >= 2 ? "on" : ""}>2 · Hold — attendance, notes, decisions, actions</span><span className={step >= 3 ? "on" : ""}>3 · Minutes issued</span>
+        <span className={step >= 1 ? "on" : ""}>1, Plan &amp; prepare</span><span className={step >= 2 ? "on" : ""}>2, Hold, attendance, notes, decisions, actions</span><span className={step >= 3 ? "on" : ""}>3, Minutes issued</span>
       </div>}
 
       <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)" }}>
@@ -59,16 +59,16 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
           </section>
 
           <section className="card mb-5" id="actions">
-            <div className="ch"><span className="eyebrow">Actions decided</span><span className="mini">{A.length} — followed in Safety › Actions (owner, due date, evidence, verification)</span></div>
+            <div className="ch"><span className="eyebrow">Actions decided</span><span className="mini">{A.length}, followed in Safety › Actions (owner, due date, evidence, verification)</span></div>
             <table className="tbl"><tbody>{A.map((a) => <tr key={a.id}><td className="mono" style={{ width: 150 }}><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link></td><td>{a.title}</td><td className="mono" style={{ width: 80 }}>{a.owner_role ?? ""}</td><td className="mono" style={{ width: 100 }}>{a.due ?? ""}</td><td style={{ width: 150 }}><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span></td></tr>)}
               {!A.length && <tr><td className="p-4 mini">No action yet.</td></tr>}</tbody></table>
             {edit && <div className="cb"><NewActionForm entity={c.entity} source="committee" committee_id={c.id} stay compact /></div>}
           </section>
 
           {c.status !== "planned" && <section className="card mb-5">
-            <div className="ch"><span className="eyebrow">Minutes</span>{c.minutes_model && <span className="mini">draft prepared by SAM from the notes — edited by the safety desk</span>}
+            <div className="ch"><span className="eyebrow">Minutes</span>{c.minutes_model && <span className="mini">draft prepared by SAM from the notes, edited by the safety desk</span>}
               {edit && <form action={draftMinutes} className="ml-auto"><input type="hidden" name="id" value={c.id} /><button className="btn">{c.minutes ? "Draft again" : "Draft the minutes"}</button></form>}</div>
-            <div className="cb">{edit ? <form action={saveMinutes} className="grid gap-2"><input type="hidden" name="id" value={c.id} /><textarea name="minutes" className="inp" rows={c.minutes ? 16 : 4} defaultValue={c.minutes ?? ""} placeholder="Summary of the minutes — drafted from the item notes, decisions and actions" /><div className="flex justify-end"><button className="btn">Keep the text</button></div></form>
+            <div className="cb">{edit ? <form action={saveMinutes} className="grid gap-2"><input type="hidden" name="id" value={c.id} /><textarea name="minutes" className="inp" rows={c.minutes ? 16 : 4} defaultValue={c.minutes ?? ""} placeholder="Summary of the minutes, drafted from the item notes, decisions and actions" /><div className="flex justify-end"><button className="btn">Keep the text</button></div></form>
               : c.minutes ? <p style={{ whiteSpace: "pre-wrap" }}>{c.minutes}</p> : <p className="mini">The minutes are the item notes and decisions above.</p>}</div>
             {edit && c.status === "held" && <div className="cb flex items-center gap-3 border-t"><span className="mini">Issuing freezes the minutes and sends a « read the minutes » task to the AM and to every attendee with a S.A.M. account.</span><form action={issueMinutes} className="ml-auto"><input type="hidden" name="id" value={c.id} /><button className="btn primary">Issue the minutes</button></form></div>}
           </section>}

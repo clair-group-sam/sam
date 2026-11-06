@@ -41,9 +41,9 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
   const in3m = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
   return (
     <>
-      <PageHeader eyebrow={`Safety · Actions · ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number} — ${a.title}`}
+      <PageHeader eyebrow={`Safety, Actions, ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number}, ${a.title}`}
         tag={<span className="flex gap-2 items-center"><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span>{isLate(a, today) && <span className="pill red">overdue</span>}<span className="pill">{ACTION_KINDS[a.kind]}</span>{a.effectiveness && <span className={"pill " + (a.effectiveness === "effective" ? "green" : "red")}>{a.effectiveness === "effective" ? "effective" : "not effective"}</span>}</span>}
-        sub={`Owner ${a.owner_person ? nameOf.get(a.owner_person) ?? "—" : a.owner_role ?? "—"} · due ${a.due ?? "—"} · from ${ACTION_SOURCES[a.source_kind]}`}
+        sub={`Owner ${a.owner_person ? nameOf.get(a.owner_person) ?? "—" : a.owner_role ?? "—"}, due ${a.due ?? "—"}, from ${ACTION_SOURCES[a.source_kind]}`}
         right={<Link className="btn" href="/safe/actions">All actions</Link>} />
       <div className="repgrid2">
         <div>
@@ -58,8 +58,8 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Evidence</span><span className="mini">{evidence.length}</span></div>
             <table className="tbl"><tbody>
-              {evidence.map((e) => <tr key={e.id}><td>{e.path && urlOf.get(e.path) ? <a className="underline" href={urlOf.get(e.path)} target="_blank" rel="noreferrer">{e.name}</a> : <b>{e.name}</b>}{!e.path && e.name !== "Note" && <span className="mini"> · kept on the server</span>}{e.note && <div className="mini">{e.note}</div>}</td><td className="mini" style={{ width: 170 }}>{e.added_by ? nameOf.get(e.added_by) ?? "" : ""} · {when(e.added_at)}</td></tr>)}
-              {!evidence.length && <tr><td className="p-4 mini">No evidence yet — a file, the name of a document kept on the server, or a note.</td></tr>}
+              {evidence.map((e) => <tr key={e.id}><td>{e.path && urlOf.get(e.path) ? <a className="underline" href={urlOf.get(e.path)} target="_blank" rel="noreferrer">{e.name}</a> : <b>{e.name}</b>}{!e.path && e.name !== "Note" && <span className="mini">, kept on the server</span>}{e.note && <div className="mini">{e.note}</div>}</td><td className="mini" style={{ width: 170 }}>{e.added_by ? nameOf.get(e.added_by) ?? "" : ""}, {when(e.added_at)}</td></tr>)}
+              {!evidence.length && <tr><td className="p-4 mini">No evidence yet, a file, the name of a document kept on the server, or a note.</td></tr>}
             </tbody></table>
             {(owner || manage) && !["verified", "cancelled"].includes(a.status) && (
               <form action={addEvidence} className="cb grid gap-2" style={{ gridTemplateColumns: "1fr 1fr auto" }}><input type="hidden" name="id" value={a.id} />
@@ -75,31 +75,31 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Next step</span></div>
             <div className="cb grid gap-3">
-              {a.status === "open" && (owner || manage) && <form action={startAction}><input type="hidden" name="id" value={a.id} /><button className="btn">Start — in progress</button></form>}
+              {a.status === "open" && (owner || manage) && <form action={startAction}><input type="hidden" name="id" value={a.id} /><button className="btn">Start, in progress</button></form>}
               {live && (owner || manage) && (
                 <form action={markDone} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
-                  <span className="mini"><b>Mark it done</b> — what was done, with the evidence (or add it on the left first)</span>
+                  <span className="mini"><b>Mark it done</b>, what was done, with the evidence (or add it on the left first)</span>
                   <textarea name="done_note" className="inp" rows={3} required placeholder="What was done, when, by whom" />
                   <input type="file" name="file" className="inp" /><input name="evidence_name" className="inp" placeholder="or the document's name (on the server)" />
-                  <button className="btn primary">Done — send to the safety desk</button></form>)}
+                  <button className="btn primary">Done, send to the safety desk</button></form>)}
               {live && !owner && !manage && <p className="mini">Waiting for the owner.</p>}
               {a.status === "done" && (verify ? (
                 <form action={verifyAction} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
-                  <p className="mini">Done by {a.done_by ? nameOf.get(a.done_by) ?? "" : ""} · {a.done_at?.slice(0, 10)} — {a.done_note}</p>
-                  <textarea name="verified_note" className="inp" rows={2} placeholder="Verification (what you checked) — or what is missing" />
+                  <p className="mini">Done by {a.done_by ? nameOf.get(a.done_by) ?? "" : ""}, {a.done_at?.slice(0, 10)}, {a.done_note}</p>
+                  <textarea name="verified_note" className="inp" rows={2} placeholder="Verification (what you checked), or what is missing" />
                   <label><span className="mini">Check effectiveness on</span><input type="date" name="effectiveness_due" className="inp" defaultValue={in3m} /></label>
-                  <select name="verdict" className="inp" defaultValue="accept"><option value="accept">Verified — close the action</option><option value="back">Not complete — send back to the owner</option></select>
+                  <select name="verdict" className="inp" defaultValue="accept"><option value="accept">Verified, close the action</option><option value="back">Not complete, send back to the owner</option></select>
                   <button className="btn primary">Confirm</button></form>
-              ) : <p className="mini">Done — waiting for the safety desk&apos;s verification.</p>)}
-              {a.status === "verified" && <p className="mini">Verified by {a.verified_by ? nameOf.get(a.verified_by) ?? "" : ""} · {a.verified_at?.slice(0, 10)}{a.verified_note ? ` — ${a.verified_note}` : ""}</p>}
+              ) : <p className="mini">Done, waiting for the safety desk&apos;s verification.</p>)}
+              {a.status === "verified" && <p className="mini">Verified by {a.verified_by ? nameOf.get(a.verified_by) ?? "" : ""}, {a.verified_at?.slice(0, 10)}{a.verified_note ? `, ${a.verified_note}` : ""}</p>}
               {effDue && (verify ? (
                 <form action={checkEffectiveness} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
-                  <span className="mini"><b>Effectiveness</b>{a.effectiveness_due ? ` — planned on ${a.effectiveness_due}` : ""}: did the action remove or reduce the problem (new reports, audits, SPI)?</span>
-                  <select name="effectiveness" className="inp" defaultValue="effective"><option value="effective">Effective</option><option value="not_effective">Not effective — open a follow-up action</option></select>
+                  <span className="mini"><b>Effectiveness</b>{a.effectiveness_due ? `, planned on ${a.effectiveness_due}` : ""}: did the action remove or reduce the problem (new reports, audits, SPI)?</span>
+                  <select name="effectiveness" className="inp" defaultValue="effective"><option value="effective">Effective</option><option value="not_effective">Not effective, open a follow-up action</option></select>
                   <textarea name="effectiveness_note" className="inp" rows={2} placeholder="What shows it (required if not effective)" />
                   <button className="btn">Record</button></form>
               ) : <p className="mini">Effectiveness to check{a.effectiveness_due ? ` on ${a.effectiveness_due}` : ""}.</p>)}
-              {a.effectiveness && <p className="mini">{a.effectiveness === "effective" ? "Effective" : "Not effective"} · {a.effectiveness_at?.slice(0, 10)}{a.effectiveness_note ? ` — ${a.effectiveness_note}` : ""}</p>}
+              {a.effectiveness && <p className="mini">{a.effectiveness === "effective" ? "Effective" : "Not effective"}, {a.effectiveness_at?.slice(0, 10)}{a.effectiveness_note ? `, ${a.effectiveness_note}` : ""}</p>}
               {a.status === "cancelled" && <p className="mini">Cancelled.</p>}
             </div>
           </section>
@@ -110,7 +110,7 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
                 <label><span className="mini">Action</span><input name="title" className="inp" defaultValue={a.title} /></label>
                 <label><span className="mini">Details</span><textarea name="description" className="inp" rows={3} defaultValue={a.description ?? ""} /></label>
                 <div className="grid grid-cols-2 gap-2">
-                  <label><span className="mini">Owner — post</span><input name="owner_role" className="inp mono" defaultValue={a.owner_role ?? ""} /></label>
+                  <label><span className="mini">Owner, post</span><input name="owner_role" className="inp mono" defaultValue={a.owner_role ?? ""} /></label>
                   <label><span className="mini">or person</span><select name="owner_person" className="inp" defaultValue={a.owner_person ?? ""}><option value="">—</option>{people.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select></label>
                   <label><span className="mini">Due</span><input type="date" name="due" className="inp" defaultValue={a.due ?? ""} /></label>
                   <label><span className="mini">Type</span><select name="kind" className="inp" defaultValue={a.kind}>{Object.entries(ACTION_KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>

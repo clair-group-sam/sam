@@ -83,7 +83,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const wentries = (weData ?? []) as { id: string; number: string; title: string; reference: string | null; url: string | null; applicability: string; task: string | null; due: string | null; revision_ids: string[]; assistant: { chapters?: { manual: string; ref: string; why: string }[] } | null }[];
   const watchCard = wentries.length ? (
     <section className="card mb-4 samcard">
-      <div className="ch"><span className="eyebrow">Regulatory changes to consider in this revision</span><span className="mini">{wentries.length} open watch entr{wentries.length === 1 ? "y" : "ies"} name this manual · information, your call</span></div>
+      <div className="ch"><span className="eyebrow">Regulatory changes to consider in this revision</span><span className="mini">{wentries.length} open watch entr{wentries.length === 1 ? "y" : "ies"} name this manual, information, your call</span></div>
       <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{wentries.map((w) => (
         <tr key={w.id}><td><Link href={`/comp/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${w.due}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
           <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) && <Link className="btn" href={`/docs/editor/${rev.id}?tab=write${(w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)?.ref ? `&sec=${encodeURIComponent((w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)!.ref)}` : sec ? `&sec=${encodeURIComponent(sec)}` : ""}&ai=${encodeURIComponent(`Regulatory change ${w.number}${w.reference ? ` (${w.reference})` : ""}: ${w.title}. Integrate what this change requires in this chapter.`)}`} style={{ marginRight: 4 }}>Draft it with SAM</Link>}{w.revision_ids.includes(rev.id) ? <span className="pill green">Addressed in this draft</span> : editable && (owner || cmm) ? <form action={addressedInDraft} style={{ display: "inline" }}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="rev" value={rev.id} /><button className="btn" type="submit">Addressed in this draft</button></form> : null}</td></tr>))}</tbody></table></div>
@@ -91,9 +91,9 @@ export default async function Editor({ params, searchParams }: { params: Promise
   ) : null;
   const findCard = fchanges.length ? (
     <section className="card mb-4 sentback">
-      <div className="ch"><span className="eyebrow">Corrective changes waiting for this manual</span><span className="mini">{fchanges.filter((c) => c.status === "included").length} included in this draft · {fchanges.length - fchanges.filter((c) => c.status === "included").length} waiting</span></div>
+      <div className="ch"><span className="eyebrow">Corrective changes waiting for this manual</span><span className="mini">{fchanges.filter((c) => c.status === "included").length} included in this draft, {fchanges.length - fchanges.filter((c) => c.status === "included").length} waiting</span></div>
       <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{fchanges.map((c) => (
-        <tr key={c.id}><td><Link href={`/comp/find/${c.findings.id}`} className="mono"><b>{c.findings.number}</b></Link> {c.section_ref && <span className="mono">{c.section_ref} · </span>}{c.expected}<div className="mini">{c.findings.title} · {CHANGE_LABEL[c.status] ?? c.status}</div></td>
+        <tr key={c.id}><td><Link href={`/comp/find/${c.findings.id}`} className="mono"><b>{c.findings.number}</b></Link> {c.section_ref && <span className="mono">{c.section_ref}, </span>}{c.expected}<div className="mini">{c.findings.title}, {CHANGE_LABEL[c.status] ?? c.status}</div></td>
           <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) ? <form action={decideFindingChange} className="flex gap-1 justify-end"><input type="hidden" name="rev" value={rev.id} /><input type="hidden" name="change" value={c.id} />
             {c.status === "included" ? <><Link className="btn primary" href={`/docs/editor/${rev.id}?tab=write${c.section_ref ? `&sec=${encodeURIComponent(c.section_ref)}` : sec ? `&sec=${encodeURIComponent(sec)}` : ""}&ai=${encodeURIComponent(`Corrective change for finding ${c.findings.number}: ${c.expected}`)}`}>Draft it with SAM</Link><button className="btn" name="what" value="undo">Take out of this draft</button></> : <><button className="btn primary" name="what" value="include">Include</button>{c.status !== "deferred" && <button className="btn" name="what" value="defer">Not this time</button>}</>}</form> : <span className={"pill " + (c.status === "included" ? "green" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}</td></tr>))}</tbody></table></div>
     </section>
@@ -115,8 +115,8 @@ export default async function Editor({ params, searchParams }: { params: Promise
   const holder = (code: string) => posts.find((p) => p.code === basePost(code))?.holder_name ?? null;
   const ownerPost = manual.owner_role.startsWith("PERSON:") ? null : basePost(manual.owner_role);
   const ownerMissing = !!ownerPost && !holder(ownerPost); // FB-013 · owner post not in NP management for this entity: say it once, with the way to fix it
-  const ownerWho = !ownerPost ? (manual.owner_name ?? "the author") : holder(ownerPost) ? `${holder(ownerPost)} (${ownerPost})` : `${ownerPost} post — no holder named for ${manual.entity} yet`;
-  const cmmWho = `Compliance department${holder("CMM") ? ` · ${holder("CMM")}` : ""}`;
+  const ownerWho = !ownerPost ? (manual.owner_name ?? "the author") : holder(ownerPost) ? `${holder(ownerPost)} (${ownerPost})` : `${ownerPost} post, no holder named for ${manual.entity} yet`;
+  const cmmWho = `Compliance department${holder("CMM") ? `, ${holder("CMM")}` : ""}`;
   const signWho = /MSM/i.test(manual.code) ? `Accountable Manager${holder("AM") ? ` ${holder("AM")}` : ""} + CMM` : `${ownerWho} + CMM`;
   const { data: histData } = internal ? { data: [] } : await admin.from("audit_log").select("action,at,actor").eq("object_type", "revision").eq("object_id", rev.id).like("action", "step_%").order("at");
   const hist = (histData ?? []) as { action: string; at: string; actor: string | null }[];
@@ -129,7 +129,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
     { step: "approved_np", label: `Approve (${ownerPost ?? "author"})`, who: ownerWho, detail: `The owner of the manual${ownerPost && !["CMM", "SM"].includes(ownerPost) ? " (nominated person)" : ""} validates the content and hands over to Compliance.`, done: doneAt("approved_np") },
     { step: "approved_compliance", label: "Approve (Compliance)", who: cmmWho, locked: !cmm, detail: "Checked against the requirements; the authority route is decided here.", done: doneAt("approved_compliance") },
     ...(manual.needs_signature ? [{ step: "signed", label: "Sign", who: signWho, locked: !cmm, done: doneAt("signed") }] : []),
-    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, locked: !cmm, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance — every revision is at least notified.", done: doneAt("with_civil_aviation") },
+    { step: "with_civil_aviation", label: `Send to ${auth}`, who: `Compliance → ${auth}`, locked: !cmm, detail: route === "approval" ? "Prior approval: one application, every reply inside it." : route === "notification" ? "Notification to the authority." : "Approval or notification, decided by Compliance, every revision is at least notified.", done: doneAt("with_civil_aviation") },
     { step: "published", label: "Publish", who: "Compliance", locked: !cmm, detail: "Readers are notified; reading is tracked per reader.", done: doneAt("published") },
     ...(manual.to_tmcad_repository ? [{ step: "repository", label: "TM-CAD repository", who: "Compliance", locked: !cmm, done: doneAt("repository") }] : []),
   ];
@@ -137,18 +137,18 @@ export default async function Editor({ params, searchParams }: { params: Promise
   // FB-012 · the NP approval needs something to approve: at least one changed chapter and the summary readers will see
   const blocked: Record<string, string> = {};
   if (rev.step === "draft") {
-    if (!changedCount && !conflicts) blocked.approved_np = "Nothing has changed yet in this revision — edit a chapter in Write first.";
+    if (!changedCount && !conflicts) blocked.approved_np = "Nothing has changed yet in this revision, edit a chapter in Write first.";
     else if (!rev.summary?.trim()) blocked.approved_np = "Write what changes in this revision (card on the left) before approving: readers see it in “What changed”.";
   }
 
   return (
     <>
       <EntityBand entity={manual.entity} current={s.entity} multi={s.group || s.entities.length > 1} />
-      <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code} · revision editor`} title={`${manual.title} — Issue ${rev.issue} Rev ${rev.rev}`}
+      <PageHeader eyebrow={`Documents, ${manual.entity}, ${manual.code}, revision editor`} title={`${manual.title}. Issue ${rev.issue} Rev ${rev.rev}`}
         tag={<ManualClass internal={internal} entity={manual.entity} action={cmm && rev.step === "draft" ? (
           <form action={setManualClass} className="inline"><input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="internal" value={internal ? "0" : "1"} />
             <button className="btn" type="submit" style={{ padding: "3px 10px", fontSize: 12 }}>{internal ? "Make it a regulated manual" : "Make it an internal document"}</button></form>) : null} />}
-        sub={`${STEP_LABEL[rev.step]} · based on ${baseLabel} · ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? ` · ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? ` · ${conflicts} in conflict` : ""} · owner ${manual.owner_name ?? manual.owner_role}${editable ? "" : " · read-only at this step"}`}
+        sub={`${STEP_LABEL[rev.step]}, based on ${baseLabel}, ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? `, ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? `, ${conflicts} in conflict` : ""}, owner ${manual.owner_name ?? manual.owner_role}${editable ? "" : ", read-only at this step"}`}
         right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
 
       <div className="steps mb-4">
@@ -159,12 +159,12 @@ export default async function Editor({ params, searchParams }: { params: Promise
       <div className="tabs mb-4">
         {tabs.map(([k, l]) => <Link key={k} href={`/docs/editor/${rev.id}?tab=${k}${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`} className={"tab" + (tab === k ? " on" : "")}>{l}</Link>)}
         <span className="nature ml-auto" title={internal ? "Internal document: no authority route, published by its author after the review" : "Regulated manual: DOC-09 cycle, authority route decided by Compliance"}>{internal ? "internal document" : "regulated manual"}</span>
-        {!cmm && !internal && <span className="mini"><span className="lockpill">Compliance</span> marks what the Compliance department decides and validates (DOC-06) — shown to you, not editable.</span>}
+        {!cmm && !internal && <span className="mini"><span className="lockpill">Compliance</span> marks what the Compliance department decides and validates (DOC-06), shown to you, not editable.</span>}
       </div>
       {editable ? (
-        <div className="draftbar mb-4"><div><b>Draft — Rev {rev.rev}</b> is the working copy, based on {baseLabel}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
+        <div className="draftbar mb-4"><div><b>Draft. Rev {rev.rev}</b> is the working copy, based on {baseLabel}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
       ) : (
-        <div className="draftbar mb-4"><div><b>Rev {rev.rev} — {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
+        <div className="draftbar mb-4"><div><b>Rev {rev.rev}, {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
       )}
 
       {tab === "write" && findCard}
@@ -179,7 +179,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
                 {metas.filter((x) => partOf(x.ref) === p.key).map((x) => (
                   <Link key={x.id} href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`} className={"tocch" + (active?.id === x.id ? " on" : "") + (x.changed ? " changed" : "") + (x.deleted_at ? " deleted" : "")} title={x.deleted_at ? "deleted in this revision" : x.base_ref && x.base_ref !== x.ref ? `was ${x.base_ref}` : !x.base_ref && rev.based_on ? "new chapter" : undefined}>
                     <span className="badge" style={{ background: p.color }}>{x.ref}</span><span>{x.title}</span>
-                    {x.conflict ? <b className="fold" style={{ color: "var(--terra)" }} title="conflict">!</b> : frozen.refs.has(x.ref) ? <b className="fold" title={`frozen · Rev ${frozen.baseRev}`}><Icon name="lock" size={12} /></b> : null}
+                    {x.conflict ? <b className="fold" style={{ color: "var(--terra)" }} title="conflict">!</b> : frozen.refs.has(x.ref) ? <b className="fold" title={`frozen, Rev ${frozen.baseRev}`}><Icon name="lock" size={12} /></b> : null}
                   </Link>
                 ))}
               </div>
@@ -188,7 +188,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
           <section className="card flex-1 min-w-0" style={{ borderTop: `4px solid ${active ? colorOf[partOf(active.ref)] : "var(--line)"}` }}>
             {active && activeConflict && (
               <div className="conflict">
-                <div className="ch"><span className="eyebrow" style={{ color: "var(--terra)" }}>Conflict · this chapter was also changed in Rev {activeConflict.base_rev}, now published</span></div>
+                <div className="ch"><span className="eyebrow" style={{ color: "var(--terra)" }}>Conflict, this chapter was also changed in Rev {activeConflict.base_rev}, now published</span></div>
                 <div className="cb">
                   <p className="mini mb-2">Below, the approved text of Rev {activeConflict.base_rev}. Your own text stays in the editor underneath. Choose which one Rev {rev.rev} continues from.</p>
                   <div className="reader basepreview" dangerouslySetInnerHTML={{ __html: activeConflict.base_html }} />
@@ -222,7 +222,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
             </form>
           </section>
           <section className="card pubcard">
-            <div className="ch"><span className="eyebrow">Publication · internal document</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
+            <div className="ch"><span className="eyebrow">Publication, internal document</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
             <div className="cb">
               {rev.step === "draft" && !rev.review && <p className="mini mb-3">Run the review (below) first. Its comments are yours to use or to ignore.</p>}
               {transitions.map((t) => (
@@ -254,14 +254,14 @@ export default async function Editor({ params, searchParams }: { params: Promise
             </form>
           </section>
           <section className="card pubcard">
-            <div className="ch"><span className="eyebrow">Approval and publication · DOC-09</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
+            <div className="ch"><span className="eyebrow">Approval and publication, DOC-09</span><span className="pill">{STEP_LABEL[rev.step]}</span></div>
             <div className="cb">
               <Workflow revisionId={rev.id} current={rev.step} rows={wfRows} transitions={transitions} routeHint={routeHint} blocked={blocked}
-                blockedNote={rev.step === "with_civil_aviation" && returnMissing ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}) — integrate it in the card below first.` : null} />
+                blockedNote={rev.step === "with_civil_aviation" && returnMissing ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}), integrate it in the card below first.` : null} />
               {ownerMissing && <p className="mini mt-2" style={{ color: "#8a5a00" }}>The manual is owned by the <b>{ownerPost}</b> post, which has no holder in NP management for {manual.entity} (posts there: {posts.map((p) => p.code).join(", ") || "none"}). <Link className="underline" href={`/np/over?entity=${manual.entity}`}>Name the holder</Link>, or change the owner post on the manual page.</p>}
               {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
               {(rev.authority_route === "approval" || rev.authority_route === "notification") && (
-                <p className="mini mt-3">CAA application: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code} · {authFile.portal_ref ?? "no reference yet"} · {STAGE_LABEL[authFile.stage]}</Link> : <>none yet — opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
+                <p className="mini mt-3">CAA application: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code}, {authFile.portal_ref ?? "no reference yet"}, {STAGE_LABEL[authFile.stage]}</Link> : <>none yet, opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
               )}
               {rounds.length > 0 && (<>
                 <div className="eyebrow mt-4 mb-2">Exchanges with the authority</div>
@@ -270,17 +270,17 @@ export default async function Editor({ params, searchParams }: { params: Promise
             </div>
           </section>
           <section className={"card" + (cmm ? "" : " locked")}>
-            <div className="ch"><span className="eyebrow">Authority route · DOC-06</span>{!cmm && <span className="lockpill">Compliance</span>}{rev.authority_route && <span className="pill">{rev.authority_route}</span>}</div>
+            <div className="ch"><span className="eyebrow">Authority route, DOC-06</span>{!cmm && <span className="lockpill">Compliance</span>}{rev.authority_route && <span className="pill">{rev.authority_route}</span>}</div>
             <div className="cb">
               {routeOpen
                 ? <RouteProposal revisionId={rev.id} initial={rev.route_proposal ?? null} route={rev.authority_route} authority={auth} />
-                : <p className="mini">Route: <b>{rev.authority_route ?? "not decided"}</b>{rev.authority_ref ? ` · ref. ${rev.authority_ref}` : ""} — fixed once the revision is with the authority.</p>}
+                : <p className="mini">Route: <b>{rev.authority_route ?? "not decided"}</b>{rev.authority_ref ? `, ref. ${rev.authority_ref}` : ""}, fixed once the revision is with the authority.</p>}
             </div>
           </section>
           <section className={"card" + (cmm ? "" : " locked")}>
-            <div className="ch"><span className="eyebrow">Authority return · DOC-03</span>{!cmm && <span className="lockpill">Compliance</span>}<span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
+            <div className="ch"><span className="eyebrow">Authority return, DOC-03</span>{!cmm && <span className="lockpill">Compliance</span>}<span className={"pill " + (returnMissing ? "amber" : "green")}>{returnKind === "none" ? "nothing expected" : rev.return_pdf_path ? "integrated" : "waiting"}</span></div>
             <div className="cb">
-              <p className="mini mb-3">Application / dossier reference: {rev.authority_ref || authFile?.portal_ref ? <b className="mono">{rev.authority_ref ?? authFile?.portal_ref}</b> : <i>none yet</i>} — {authFile ? <>from the <Link className="underline" href={`/proj/auth/${authFile.id}`}>CAA application</Link>, filled when the submission is recorded there</> : "filled automatically from the CAA application when the submission is recorded"}.</p>
+              <p className="mini mb-3">Application / dossier reference: {rev.authority_ref || authFile?.portal_ref ? <b className="mono">{rev.authority_ref ?? authFile?.portal_ref}</b> : <i>none yet</i>}, {authFile ? <>from the <Link className="underline" href={`/proj/auth/${authFile.id}`}>CAA application</Link>, filled when the submission is recorded there</> : "filled automatically from the CAA application when the submission is recorded"}.</p>
               <form action={setReturnKind} className="flex items-center gap-2 mb-3">
                 <input type="hidden" name="revision_id" value={rev.id} />
                 <span className="mini">Expected from {auth}:</span>
@@ -290,8 +290,8 @@ export default async function Editor({ params, searchParams }: { params: Promise
                 {!rev.return_pdf_path && <button className="btn" type="submit">Set</button>}
               </form>
               {rev.return_pdf_path ? (<>
-                <p className="mini mb-2">Received {rev.return_received_at ?? ""} · {retPages.length} page(s) kept in the manual (added to the PDF: approval / signature page as page 0.0{retPages.some((x) => x.role === "lep") ? ", stamped LEP in place of S.A.M.'s list" : ""}).</p>
-                <div className="athumbs">{retPages.map((x) => <div key={x.path} className="athumb on">{retUrls.get(x.path) && <img src={retUrls.get(x.path)} alt={`page ${x.page}`} />}<span className="mini">p. {x.page} · {x.role}</span></div>)}</div>
+                <p className="mini mb-2">Received {rev.return_received_at ?? ""}, {retPages.length} page(s) kept in the manual (added to the PDF: approval / signature page as page 0.0{retPages.some((x) => x.role === "lep") ? ", stamped LEP in place of S.A.M.'s list" : ""}).</p>
+                <div className="athumbs">{retPages.map((x) => <div key={x.path} className="athumb on">{retUrls.get(x.path) && <img src={retUrls.get(x.path)} alt={`page ${x.page}`} />}<span className="mini">p. {x.page}, {x.role}</span></div>)}</div>
                 <div className="flex gap-2 mt-3">
                   <a className="btn" href={`/api/files/manuals/${rev.return_pdf_path}`} target="_blank" rel="noreferrer">Open the authority's PDF</a>
                   {rev.step === "with_civil_aviation" && <form action={clearReturn}><input type="hidden" name="revision_id" value={rev.id} /><button className="btn" type="submit">Remove and upload again</button></form>}
@@ -306,7 +306,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
           <section className="card col-span-2">
             <div className="ch"><span className="eyebrow">Changed chapters in this revision</span><span className="mini">{changedCount}</span></div>
             <div className="cb">
-              {changedCount ? <ul className="list-disc pl-5">{metas.filter((x) => x.changed).map((x) => <li key={x.id}><Link className="underline" href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`}>{x.ref} {x.title}</Link>{x.deleted_at ? <span className="mini"> — deleted</span> : !x.base_ref ? <span className="mini"> — new</span> : x.base_ref !== x.ref ? <span className="mini"> — was {x.base_ref}</span> : null}</li>)}</ul> : <p className="mini">No chapter has been modified yet.</p>}
+              {changedCount ? <ul className="list-disc pl-5">{metas.filter((x) => x.changed).map((x) => <li key={x.id}><Link className="underline" href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`}>{x.ref} {x.title}</Link>{x.deleted_at ? <span className="mini">, deleted</span> : !x.base_ref ? <span className="mini">, new</span> : x.base_ref !== x.ref ? <span className="mini">, was {x.base_ref}</span> : null}</li>)}</ul> : <p className="mini">No chapter has been modified yet.</p>}
             </div>
           </section>
         </div>

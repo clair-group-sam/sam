@@ -31,7 +31,7 @@ export default async function Certificates({ searchParams }: { searchParams: Pro
   const expired = rows.filter((c) => { const d = daysUntil(c.valid_until); return d !== null && d < 0; });
   return (
     <>
-      <PageHeader eyebrow="Documents · Certificates & Validities" title="Certificates & Validities" sub={`Organisation approvals and aircraft documents, with their validity. Alerts at 90 / 30 / 7 days (DOC-10).${qe ? ` · ${qe}` : ""}${qf ? ` › ${qf}` : ""}`}
+      <PageHeader eyebrow="Documents, Certificates & Validities" title="Certificates & Validities" sub={`Organisation approvals and aircraft documents, with their validity. Alerts at 90 / 30 / 7 days (DOC-10).${qe ? `, ${qe}` : ""}${qf ? ` › ${qf}` : ""}`}
         right={<>{superseded > 0 && <Link className="btn" href={all ? "/docs/files" : "/docs/files?all=1"}>{all ? "Hide superseded" : `Show superseded (${superseded})`}</Link>}{canDrop && <Link className="btn primary" href="/docs/drop">+ Drop a document</Link>}</>} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Certificates" value={rows.length} />

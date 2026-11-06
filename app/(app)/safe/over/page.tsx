@@ -64,7 +64,7 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader eyebrow="Safety · Safety assurance" title="Overview" sub={`${ENT[e]?.name ?? e} — where the safety system stands today, and the safety performance indicators (ENR-CM-06) against their targets.`}
+      <PageHeader eyebrow="Safety, Safety assurance" title="Overview" sub={`${ENT[e]?.name ?? e}, where the safety system stands today, and the safety performance indicators (ENR-CM-06) against their targets.`}
         right={<>{yearLinks}{edit && <><Link href={`/safe/over/data?y=${year}`} className="btn">Monthly data</Link><Link href={`/safe/over/set?y=${year}`} className="btn">SPI set &amp; targets</Link></>}</>} />
 
       <div className="grid grid-cols-6 gap-4 mb-5 ov-today">
@@ -77,17 +77,17 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
       </div>
 
       <section className="card mb-5">
-        <div className="ch"><span className="eyebrow">Safety reports — last 24 months</span>
+        <div className="ch"><span className="eyebrow">Safety reports, last 24 months</span>
           <span className="mini ml-auto flex gap-3 items-center"><i className="lg" style={{ background: "var(--navy7)" }} />MOR<i className="lg" style={{ background: "var(--blue2)" }} />voluntary{rate.some((v) => v != null) && <><i className="lg ln" />rate {rb.short}{reportT != null ? ` (target ${reportT})` : ""}</>}</span></div>
         <div className="cb"><MonthBars months={m24} stacks={[{ label: "MOR", values: morN, color: "var(--navy7)" }, { label: "voluntary", values: repN.map((n, i) => n - morN[i]), color: "var(--blue2)" }]} line={rate.some((v) => v != null) ? { label: rb.short.replace("/", "per "), values: rate, color: "var(--cyan6)", target: reportT } : undefined} /></div>
       </section>
 
       <section className="card mb-5">
         <div className="ch"><span className="eyebrow">Safety performance indicators {year}</span>
-          <span className="mini">data up to {monthShort(board.upTo)} · Q{board.quarter}</span>
+          <span className="mini">data up to {monthShort(board.upTo)}, Q{board.quarter}</span>
           <span className="ml-auto flex gap-2"><span className="pill green">{count("ok")} on target</span><span className="pill amber">{count("improve")} to improve</span><span className="pill red">{count("far")} far off</span><span className="pill">{count("nodata") + count("none")} no data / target</span></span></div>
-        {proposed.length > 0 && <div className="cb banner">{proposed.length} SPIs are <b>proposed</b> (taken from the ASJFR set, same MSM family) and counted above as such — {edit ? <Link className="underline" href={`/safe/over/set?y=${year}`}>review and confirm the set</Link> : "the safety desk confirms them at the SRB"}.</div>}
-        {needsHours && <div className="cb banner">No activity hours entered for {year} — the rates per 1000 BH / 100 FH stay empty.{edit && <> <Link className="underline" href={`/safe/over/data?y=${year}`}>Enter the hours</Link>.</>}</div>}
+        {proposed.length > 0 && <div className="cb banner">{proposed.length} SPIs are <b>proposed</b> (taken from the ASJFR set, same MSM family) and counted above as such, {edit ? <Link className="underline" href={`/safe/over/set?y=${year}`}>review and confirm the set</Link> : "the safety desk confirms them at the SRB"}.</div>}
+        {needsHours && <div className="cb banner">No activity hours entered for {year}, the rates per 1000 BH / 100 FH stay empty.{edit && <> <Link className="underline" href={`/safe/over/data?y=${year}`}>Enter the hours</Link>.</>}</div>}
         {!rows.length && <div className="cb mini">No SPI defined for this entity yet.{edit && <> <Link className="underline" href={`/safe/over/set?y=${year}`}>Define the SPI set</Link>.</>}</div>}
         {rows.length > 0 && <table className="tbl spitbl">
           <thead><tr><th>Indicator</th><th style={{ width: 130 }}>Target {year}</th><th style={{ width: 290 }}>{board.months.map((m) => monthShort(m)[0]).join("  ")}</th><th style={{ width: 80 }}>Q{board.quarter}</th><th style={{ width: 80 }}>YTD</th><th style={{ width: 130 }}>Status</th></tr></thead>
@@ -100,11 +100,11 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
       </section>
 
       {(edit || note) && <section className="card mb-5">
-        <div className="ch"><span className="eyebrow">Safety performance — commentary for the SRB</span>{note && <span className="mini">Q{note.quarter} · {note.created_at.slice(0, 10)}{note.model ? " · draft prepared by SAM" : ""}</span>}
+        <div className="ch"><span className="eyebrow">Safety performance, commentary for the SRB</span>{note && <span className="mini">Q{note.quarter}, {note.created_at.slice(0, 10)}{note.model ? ", draft prepared by SAM" : ""}</span>}
           {edit && <form action={draftCommentary} className="ml-auto"><input type="hidden" name="entity" value={e} /><input type="hidden" name="year" value={year} /><button className="btn">{note ? "Draft again" : "Draft the commentary"}</button></form>}</div>
         <div className="cb">
           {edit ? <form action={saveCommentary} className="grid gap-2"><input type="hidden" name="entity" value={e} /><input type="hidden" name="year" value={year} /><input type="hidden" name="quarter" value={board.quarter} />
-            <textarea name="text" className="inp" rows={note ? 12 : 4} defaultValue={note?.text ?? ""} placeholder="SAM drafts a reading of the SPIs (off target, trends, data gaps, proposed decisions) — edit it and keep it for the SRB." />
+            <textarea name="text" className="inp" rows={note ? 12 : 4} defaultValue={note?.text ?? ""} placeholder="SAM drafts a reading of the SPIs (off target, trends, data gaps, proposed decisions), edit it and keep it for the SRB." />
             <div className="flex justify-end"><button className="btn primary">Keep this text</button></div></form>
             : <p style={{ whiteSpace: "pre-wrap" }}>{note?.text}</p>}
         </div>
@@ -115,12 +115,12 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
 
 function SpiLineRow({ r, labels }: { r: SpiRow; labels: string[] }) {
   const vals = r.cells.map((c) => !c ? null : r.basis === "percent" ? (c.den != null ? (c.den ? String(Math.round((c.num / c.den) * 100)) : null) : String(Math.round(c.num))) : fmt(c.num, r.basis === "score" ? "score" : "count"));
-  const v = VERDICT[r.ytdVerdict]; const src = r.metric ? `S.A.M. · ${METRICS[r.metric]?.label ?? r.metric}` : "entered monthly";
+  const v = VERDICT[r.ytdVerdict]; const src = r.metric ? `S.A.M., ${METRICS[r.metric]?.label ?? r.metric}` : "entered monthly";
   return (
     <tr className={r.status === "proposed" ? "proposed" : ""}>
-      <td><Link href={`/safe/over/spi/${r.id}`} className="hover:underline"><span className="mono">{r.code}</span> <b>{r.label}</b></Link><div className="mini">{AREA[r.area] ?? r.area} · {src}{r.status === "proposed" ? " · proposed" : ""}</div></td>
+      <td><Link href={`/safe/over/spi/${r.id}`} className="hover:underline"><span className="mono">{r.code}</span> <b>{r.label}</b></Link><div className="mini">{AREA[r.area] ?? r.area}, {src}{r.status === "proposed" ? ", proposed" : ""}</div></td>
       <td className="mono">{targetText(r, r.t)}{r.t?.alert != null && <div className="mini">alert {fmt(r.t.alert, r.basis)}</div>}</td>
-      <td><MonthCells values={vals} verdicts={r.monthVerdicts} labels={labels} />{BASIS[r.basis].den && <div className="mini">events per month — rate in Q / YTD</div>}</td>
+      <td><MonthCells values={vals} verdicts={r.monthVerdicts} labels={labels} />{BASIS[r.basis].den && <div className="mini">events per month, rate in Q / YTD</div>}</td>
       <td className="mono"><span className={"pill " + VERDICT[r.quarterVerdict][1]}>{fmt(r.quarter, r.basis)}</span></td>
       <td className="mono"><b>{fmt(r.ytd, r.basis)}</b>{r.ytdTarget?.target != null && r.ytdTarget.target !== r.t?.target && <div className="mini">expected {fmt(r.ytdTarget.target, r.basis)}</div>}</td>
       <td><span className={"pill " + v[1]}>{v[0]}</span>{r.offTwice && <div className="mini red">off target 2 months in a row → <Link className="underline" href={`/safe/over/spi/${r.id}#action`}>action</Link></div>}</td>
@@ -135,7 +135,7 @@ async function GroupView({ ents, year, yearLinks }: { ents: string[]; year: numb
   const sum = (c: Record<string, ({ num: number } | null)[]>, k: string) => c[k].reduce((t, x) => t + (x?.num ?? 0), 0);
   return (
     <>
-      <PageHeader eyebrow="Safety · Safety assurance" title="Overview — Group view" sub={`Safety performance ${year} of every entity in your scope (to ${monthShort(upTo)}). Pick an entity in the top bar to work on its SPIs.`} right={yearLinks} />
+      <PageHeader eyebrow="Safety, Safety assurance" title="Overview. Group view" sub={`Safety performance ${year} of every entity in your scope (to ${monthShort(upTo)}). Pick an entity in the top bar to work on its SPIs.`} right={yearLinks} />
       <section className="card">
         <table className="tbl">
           <thead><tr><th>Entity</th><th>Reports</th><th>Reporting rate</th><th>MOR</th><th>ERC ≥ 100</th><th>Acc. + serious inc.</th><th>Open &gt; 90 d</th><th>Actions overdue</th><th>SPIs</th></tr></thead>

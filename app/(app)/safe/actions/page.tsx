@@ -43,11 +43,11 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
   const edit = mayManageActions(s);
   return (
     <>
-      <PageHeader eyebrow="Safety · Safety assurance" title="Actions" sub="Corrective and preventive actions — raised from reports, hazards, assessments and committees; done by their owner with evidence, verified by the safety desk, checked for effectiveness." />
+      <PageHeader eyebrow="Safety, Safety assurance" title="Actions" sub="Corrective and preventive actions, raised from reports, hazards, assessments and committees; done by their owner with evidence, verified by the safety desk, checked for effectiveness." />
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open" value={open.length} />
         <Metric label="Overdue" value={open.filter((a) => isLate(a, today)).length} tone={open.some((a) => isLate(a, today)) ? "red" : undefined} />
-        <Metric label="Done — to verify" value={all.filter((a) => a.status === "done").length} tone={all.some((a) => a.status === "done") ? "amber" : undefined} hint="safety desk" />
+        <Metric label="Done, to verify" value={all.filter((a) => a.status === "done").length} tone={all.some((a) => a.status === "done") ? "amber" : undefined} hint="safety desk" />
         <Metric label="Effectiveness to check" value={all.filter(effDue).length} tone={all.some(effDue) ? "amber" : undefined} />
         <Metric label="Closed this year" value={all.filter((a) => a.status === "verified" && (a.verified_at ?? "").startsWith(today.slice(0, 4))).length} />
       </div>
@@ -65,12 +65,12 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
             {rows.map((a) => (
               <tr key={a.id}>
                 <td className="mono"><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link>{/^SMS-\d+/.test(a.number) && <SourceMark source="centrik" />}{(scope.length > 1 || !scope.includes(a.entity)) && <div><span className={"ent " + a.entity}>{a.entity}</span>{!scope.includes(a.entity) && <span className="mini"> joint meeting</span>}</div>}</td>
-                <td><Link href={`/safe/actions/${a.id}`}><b>{a.title}</b></Link><div className="mini">{ACTION_KINDS[a.kind]} · {ACTION_SOURCES[a.source_kind]}{a.report_id ? ` ${a.report_id}` : ""}</div></td>
+                <td><Link href={`/safe/actions/${a.id}`}><b>{a.title}</b></Link><div className="mini">{ACTION_KINDS[a.kind]}, {ACTION_SOURCES[a.source_kind]}{a.report_id ? ` ${a.report_id}` : ""}</div></td>
                 <td className="mini">{a.owner_person ? nameOf.get(a.owner_person) ?? "—" : <span className="mono">{a.owner_role ?? "—"}</span>}</td>
                 <td className={"mono" + (isLate(a, today) ? " red" : "")}>{a.due ?? "—"}</td>
                 <td><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span>{effDue(a) && <div className="mini">effectiveness to check</div>}{a.effectiveness && <div className="mini">{a.effectiveness === "effective" ? "effective" : "not effective"}</div>}</td>
               </tr>))}
-            {!rows.length && <tr><td colSpan={5} className="p-6 text-slate6">No action{sp.st || sp.src || sp.q || sp.mine ? " matching the filters" : " yet — raise one from a safety report (SAM suggests some), a hazard or below"}.</td></tr>}
+            {!rows.length && <tr><td colSpan={5} className="p-6 text-slate6">No action{sp.st || sp.src || sp.q || sp.mine ? " matching the filters" : " yet, raise one from a safety report (SAM suggests some), a hazard or below"}.</td></tr>}
           </tbody>
         </table>
       </section>

@@ -36,8 +36,8 @@ function TypeForm({ t, isNew }: { t: FileType | null; isNew?: boolean }) {
           </tr>))}</tbody></table>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <label><span className="mini">Dossier checklist — one item per line: <code>Label | ROLE | optional</code></span><textarea name="checklist" className="inp mono" rows={Math.max(6, (t?.checklist.length ?? 0) + 2)} defaultValue={checklist} /></label>
-        <label><span className="mini">Close-out steps — one per line</span><textarea name="closeout" className="inp" rows={Math.max(6, (t?.closeout.length ?? 0) + 2)} defaultValue={(t?.closeout ?? []).join("\n")} /></label>
+        <label><span className="mini">Dossier checklist, one item per line: <code>Label | ROLE | optional</code></span><textarea name="checklist" className="inp mono" rows={Math.max(6, (t?.checklist.length ?? 0) + 2)} defaultValue={checklist} /></label>
+        <label><span className="mini">Close-out steps, one per line</span><textarea name="closeout" className="inp" rows={Math.max(6, (t?.closeout.length ?? 0) + 2)} defaultValue={(t?.closeout ?? []).join("\n")} /></label>
       </div>
       <label><span className="mini">Notes (rules of the portal, key identifier, pitfalls)</span><textarea name="notes" className="inp" rows={2} defaultValue={t?.notes ?? ""} /></label>
       <div className="flex items-center gap-3"><button className="btn primary" type="submit">{isNew ? "+ Create the type" : "Save"}</button><span className="mini">Applies to files opened afterwards; existing files keep their own checklist. Keys of unchanged labels are kept.</span></div>
@@ -65,7 +65,7 @@ export default async function Types() {
               <div key={t.code} className="cb" style={{ borderTop: "1px solid var(--line)", opacity: t.active ? 1 : 0.6 }}>
                 <div className="flex items-start gap-3 flex-wrap">
                   <span className="pill">{t.code}</span><b>{t.name}</b>
-                  <span className="mini ml-auto">owner {t.default_owner_role ?? "—"} · {t.target_days} days at the authority{t.needs_signature ? " · signature" : ""}{!t.active ? " · inactive" : ""}</span>
+                  <span className="mini ml-auto">owner {t.default_owner_role ?? "—"}, {t.target_days} days at the authority{t.needs_signature ? ", signature" : ""}{!t.active ? ", inactive" : ""}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-2">
                   <div>
@@ -76,7 +76,7 @@ export default async function Types() {
                   </div>
                   <div>
                     <div className="eyebrow mb-1">Dossier checklist</div>
-                    <ol className="pl-5 text-[13px] grid gap-1">{t.checklist.map((c) => <li key={c.key}>{c.label} <span className="mini mono">{c.role ?? ""}{c.required === false ? " · optional" : ""}</span></li>)}</ol>
+                    <ol className="pl-5 text-[13px] grid gap-1">{t.checklist.map((c) => <li key={c.key}>{c.label} <span className="mini mono">{c.role ?? ""}{c.required === false ? ", optional" : ""}</span></li>)}</ol>
                   </div>
                 </div>
                 {cmm && <details className="mt-2"><summary className="mini underline cursor-pointer">Edit this type</summary><TypeForm t={t} /></details>}
