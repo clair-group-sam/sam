@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ENT } from "@/lib/nav";
 import { PageHeader, Metric } from "@/components/Page";
-import { STEP_LABEL, listManuals } from "@/lib/docs";
+import { STEP_LABEL, decodeEntities, listManuals } from "@/lib/docs";
 import { mayCreateManual } from "@/lib/create";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENTS4 } from "@/lib/nav";
@@ -84,14 +84,16 @@ export default async function Library({ searchParams }: { searchParams: Promise<
     qq = s.entity === "ALL" ? (s.group ? qq : qq.in("revisions.manuals.entity", s.entities)) : qq.eq("revisions.manuals.entity", s.entity);
     const { data } = await qq.limit(400);
     type Row = { ref: string; title: string | null; body_text: string; revision_id: string; revisions: { manual_id: string; step: string; manuals: { code: string; title: string; entity: string } } };
+    const FRONT = /^(cover|couverture|table des mati|contents|sommaire|liste des pages|list of effective|r[ée]visions?$|record of revisions|liste de diffusion|distribution list)/i;
     const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !/^(or|and|et|ou)$/.test(w)).map((w) => w.replace(/^[-"]+|"+$/g, ""));
     const byM = new Map<string, Group>();
     const currentRev = new Map(rows.map((r) => [r.manual.id, r.current?.id ?? null])); // only the text in force: the current published revision
     for (const h of (data ?? []) as unknown as Row[]) {
       const cr = currentRev.get(h.revisions.manual_id); if (cr && h.revision_id !== cr) continue;
+      if (FRONT.test((h.title ?? "").trim()) || /^0(\.|$)/.test(h.ref)) continue; // FB-033 · cover, contents, LEP… are not search results
       const m = h.revisions.manuals; const low = h.body_text.toLowerCase();
       const i = Math.max(0, Math.min(...words.map((w) => { const k = low.indexOf(w); return k < 0 ? Infinity : k; })));
-      const snippet = h.body_text.slice(Math.max(0, (Number.isFinite(i) ? i : 0) - 80), (Number.isFinite(i) ? i : 0) + 170).replace(/\s+/g, " ");
+      const snippet = decodeEntities(h.body_text.slice(Math.max(0, (Number.isFinite(i) ? i : 0) - 80), (Number.isFinite(i) ? i : 0) + 170)).replace(/\s+/g, " ");
       if (!byM.has(h.revisions.manual_id)) byM.set(h.revisions.manual_id, { manual_id: h.revisions.manual_id, entity: m.entity, code: m.code, title: m.title, titleMatch: false, hits: [] });
       const g = byM.get(h.revisions.manual_id)!;
       if (g.hits.some((x) => x.ref === h.ref)) continue; // the same chapter in another published revision of the manual
@@ -104,7 +106,8 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       const g = byM.get(r.manual.id) ?? { manual_id: r.manual.id, entity: r.manual.entity, code: r.manual.code, title: r.manual.title, titleMatch: true, hits: [] }; g.titleMatch = true; byM.set(r.manual.id, g);
     }
     const nat = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
-    groups = [...byM.values()].map((g) => ({ ...g, hits: g.hits.sort((x, y) => nat(x.ref, y.ref)) })).sort((x, y) => Number(y.titleMatch) - Number(x.titleMatch) || y.hits.length - x.hits.length || nat(x.code, y.code));
+    const tm = (x: Hit) => words.some((w) => (x.stitle ?? "").toLowerCase().includes(w)) ? 1 : 0;
+    groups = [...byM.values()].map((g) => ({ ...g, hits: g.hits.sort((x, y) => tm(y) - tm(x) || nat(x.ref, y.ref)) })).sort((x, y) => Number(y.titleMatch) - Number(x.titleMatch) || y.hits.length - x.hits.length || nat(x.code, y.code));
     nHits = groups.reduce((n, g) => n + g.hits.length, 0);
   }
   const scope = s.entity === "ALL" ? "all entities" : `${ENT[s.entity]?.name} (${s.entity})`;

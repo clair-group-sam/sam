@@ -9,6 +9,7 @@ import { breakdown, history, hintsFor, RESULT_LABEL, RESULT_TONE, RESULTS, textF
 import { LEVEL_LABEL } from "@/lib/findings";
 import { eligibility, type Auditor } from "@/lib/compliance-registers";
 import { RuleText } from "@/components/RuleText";
+import { ruleCodesIn } from "@/lib/regulation-items";
 import { addCheck, raiseFinding, refreshHints, reopenAudit, reportAudit, setCheck, startAudit } from "../actions";
 
 type Sp = { c?: string };
@@ -40,7 +41,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   const b = breakdown(checks);
   const open = checks.find((c) => c.id === sp.c) ?? checks.find((c) => !c.result) ?? checks[0] ?? null;
   const text = open ? await textFor(db, open) : [];
-  const hist = open ? await history(db, a.entity, open.code, a.id) : { previous: [], findings: [] };
+  const hist = open && ruleCodesIn(open.code).length ? await history(db, a.entity, open.code, a.id) : { previous: [], findings: [] };
   const help = open && a.status !== "planned" ? await hintsFor(db, a.entity, open, text, hist.previous) : { hints: null, citations: [] };
   const sections = [...new Set(checks.map((c) => c.section ?? "Checks"))];
   const idx = open ? checks.indexOf(open) : -1;

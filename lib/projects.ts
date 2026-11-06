@@ -149,7 +149,7 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
     const revs = (rs ?? []) as { id: string; manual_id: string; rev: string; issue: number; step: string; created_at: string; published_at: string | null }[];
     for (const t of manualTasks) {
       const m = manuals.find((x) => x.code === t.link_ref);
-      if (!m) { out.set(t.id, { label: `${t.link_ref} — no such manual in ${p.entity}`, href: `/docs/new?entity=${p.entity}&code=${encodeURIComponent(t.link_ref ?? "")}`, state: "create it", tone: "" }); continue; }
+      if (!m) { out.set(t.id, { label: `${t.link_ref} — not in ${p.entity} yet`, href: `/docs/new?entity=${p.entity}&code=${encodeURIComponent(t.link_ref ?? "")}`, state: "create it", tone: "" }); continue; }
       const r = (t.link_id && revs.find((x) => x.id === t.link_id)) || revs.find((x) => x.manual_id === m.id);
       if (!r) { out.set(t.id, { label: `${m.code} — ${m.title}`, href: `/docs/manual/${m.id}`, state: "no revision started", tone: "" }); continue; }
       if (t.link_id !== r.id) await db.from("project_tasks").update({ link_id: r.id, status: t.status === "todo" ? "in_progress" : t.status, started_at: t.started_at ?? r.created_at.slice(0, 10), updated_at: new Date().toISOString() }).eq("id", t.id);

@@ -190,6 +190,8 @@ const workingDaysSince = (iso: string) => { let n = 0; const d = new Date(iso); 
  * Questions / requests the person SENT that are still unanswered: mails sent 3 to 15 working days ago with a question, whose conversation got no
  * later message from someone else; Teams chats whose last message is the person's, with a question, 2 working days or more ago. Read-only.
  */
+/** FB-056 · "ozlem.schafer" or "ozlem.schafer@x.com" shown as "Ozlem Schafer" when Graph gives no display name. */
+const prettyWho = (s: string) => /^[a-z0-9._-]+(@[^\s]+)?$/i.test(s) && !/\s/.test(s) ? s.replace(/@.*$/, "").split(/[._-]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") : s;
 export async function waitingOn(token: string): Promise<WaitItem[]> {
   const out: WaitItem[] = [];
   const from = new Date(Date.now() - 21 * 864e5).toISOString();
@@ -210,7 +212,7 @@ export async function waitingOn(token: string): Promise<WaitItem[]> {
     const pv = (m.bodyPreview ?? "").replace(/https?:\/\/\S+/g, " ").replace(/_{5,}/g, " ").replace(/\s+/g, " "); // a "?" in a link (Teams join URL) is not a question
     if (/r[ée]union microsoft teams|microsoft teams meeting|join the meeting|rejoindre/i.test(pv)) continue;
     if (!/\?/.test(pv) && !/(could you|can you|please (send|confirm|let|advise)|merci de|pouvez-vous|peux-tu|pourrais-tu|est-ce que|thank you in advance)/i.test(pv)) continue;
-    const to = (m.toRecipients ?? []).map((r) => r.emailAddress?.name || r.emailAddress?.address || "").filter(Boolean);
+    const to = (m.toRecipients ?? []).map((r) => prettyWho(r.emailAddress?.name || r.emailAddress?.address || "")).filter(Boolean);
     out.push({ kind: "mail", who: to.length > 2 ? `${to.slice(0, 2).join(", ")} +${to.length - 2}` : to.join(", "), subject: (m.subject ?? "").replace(/^\s*((re|tr|fw|fwd)\s*:\s*)+/gi, ""), since: m.sentDateTime, preview: pv.slice(0, 200), link: m.webLink });
   }
   try {

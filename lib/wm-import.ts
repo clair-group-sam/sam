@@ -23,6 +23,7 @@ export function pageContent(html: string): string {
 /** Removes Web Manuals chrome: wrappers, inline styles, classes; keeps semantic tags, tables and images. */
 export function cleanHtml(h: string, imgSrc: (id: string) => string): string {
   let s = h;
+  s = s.replace(/(<h[1-6][^>]*>(?:\s|&nbsp;|<[^>]+>)*)\*(?:\s|&nbsp;)*/g, "$1"); // FB-057 · WM leaves a "* " in front of sub-chapter headings
   // Web Manuals "changed in this revision" marker: tooltip + warning icon → revision bar on the section
   s = s.replace(/<div class="sectionDifferenceToolTip">[\s\S]*?<\/svg>\s*<\/div>/g, "");
   s = s.replace(/<div class="section-wrapper[^"]*(?:sectionDifference|section-changed|section-new)[^"]*"[^>]*>/g, '<div data-samrev="1">');
@@ -66,8 +67,8 @@ export function buildSections(bundle: WmBundle, imgSrc: (id: string) => string):
     // no numbered chapters (policies, guides): one chapter per top-level heading, numbered 1..n
     const re = /<h([12])[^>]*>([\s\S]*?)<\/h\1>/g;
     let m: RegExpExecArray | null; let n = 0;
-    while ((m = re.exec(stream))) { const text = decode(m[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim(); if (!text) continue; n++; cuts.push({ ref: String(n), title: text, idx: m.index }); }
-    if (!cuts.length) { const re3 = /<h3[^>]*>([\s\S]*?)<\/h3>/g; while ((m = re3.exec(stream))) { const text = decode(m[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim(); if (!text) continue; n++; cuts.push({ ref: String(n), title: text, idx: m.index }); } }
+    while ((m = re.exec(stream))) { const text = decode(m[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").replace(/^\*\s*/, "").trim(); if (!text) continue; n++; cuts.push({ ref: String(n), title: text, idx: m.index }); }
+    if (!cuts.length) { const re3 = /<h3[^>]*>([\s\S]*?)<\/h3>/g; while ((m = re3.exec(stream))) { const text = decode(m[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").replace(/^\*\s*/, "").trim(); if (!text) continue; n++; cuts.push({ ref: String(n), title: text, idx: m.index }); } }
   }
   cuts.sort((a, b) => a.idx - b.idx);
   const pieces: { ref: string; title: string; html: string }[] = [];

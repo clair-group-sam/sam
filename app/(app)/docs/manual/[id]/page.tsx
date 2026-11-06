@@ -260,7 +260,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
 
       {tab === "readers" && office && (<>
         <section className="card mb-4"><div className="ch"><span className="eyebrow">Readers · Rev {current?.rev}</span>
-          <span className="mini">{expected.filter((p) => readings.some((r) => r.person_id === p.id && r.acknowledged_at)).length} / {expected.length} acknowledged</span></div>
+          <span className="mini">{expected.length === 0 ? <>no one attached to {ENT[manual.entity]?.name ?? manual.entity} yet — <Link href="/set/core" className="underline">add people in Settings › Core</Link></> : <>{expected.filter((p) => readings.some((r) => r.person_id === p.id && r.acknowledged_at)).length} / {expected.length} acknowledged</>}</span></div>
           <table className="tbl"><thead><tr><th>Person</th><th>Post</th><th>Acknowledged</th><th>Via</th></tr></thead>
             <tbody>
               {expected.map((p) => { const r = readings.find((x) => x.person_id === p.id); return (

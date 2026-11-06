@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { HowItWorks } from "@/components/HowItWorks";
 import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, listManuals } from "@/lib/docs";
 
@@ -11,11 +12,11 @@ export default async function Drafts() {
   return (
     <>
       <PageHeader eyebrow="Documents · Drafts in progress" title="Drafts in progress" sub="One draft per manual; the whole manual moves through the steps (DOC-09)." />
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <HowItWorks id="drafts"><div className="grid grid-cols-3 gap-4">
         <section className="card"><div className="ch"><span className="eyebrow">The steps</span></div><div className="cb mini">{STEPS.map((st) => STEP_LABEL[st]).join(" → ")}</div></section>
         <section className="card"><div className="ch"><span className="eyebrow">Who does what</span></div><div className="cb mini">Author drafts · NP approves the content · Compliance checks against the requirements · signatures when required (NP + CMM; MSM by the AM + CMM) · Compliance runs the CAA application and publishes.</div></section>
         <section className="card"><div className="ch"><span className="eyebrow">Reading</span></div><div className="cb mini">Reading is not a step: it is tracked per reader on the manual page (Readers tab) and in Communication › Read tracking.</div></section>
-      </div>
+      </div></HowItWorks>
       <section className="card">
         <table className="tbl"><thead><tr><th>Entity</th><th>Manual</th><th>Draft</th><th>Step</th><th>Started</th></tr></thead>
           <tbody>

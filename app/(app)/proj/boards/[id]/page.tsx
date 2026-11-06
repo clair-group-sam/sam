@@ -60,6 +60,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         sub={`${ENT[p.entity]?.name ?? p.entity}${pivotTxt ? ` · ${pivotTxt}` : ""} · owner ${p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"} · started ${fr(p.started_at)}${p.target_date ? ` · target ${fr(p.target_date)}` : ""}`}
         right={<><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")} style={{ alignSelf: "center" }}>{PROJECT_STATUS_LABEL[p.status]}</span><Link href="/proj/boards" className="btn">‹ Projects</Link></>} />
       {p.description && <p className="mini mb-4" style={{ maxWidth: 1000 }}>{p.description}</p>}
+      {(() => { const miss = [...links.values()].filter((l) => l.state === "create it").length; return miss >= 3 ? <div className="lockbar mb-4">{miss} manuals of this template do not exist in {ENT[p.entity]?.name ?? p.entity} yet — each task below offers to create its manual; the rest of the project is not blocked.</div> : null; })()}
 
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Progress" value={`${pr.pct} %`} hint={`${pr.done} / ${pr.total} tasks${tasks.length - pr.total ? ` · ${tasks.length - pr.total} not needed` : ""}`} tone={pr.pct === 100 ? "green" : undefined} />

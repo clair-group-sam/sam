@@ -604,6 +604,7 @@ details.more[open]{z-index:40}
   .topbar{padding:0 12px;gap:10px}.topbar .crumb{display:none}.topbar .enttext small{display:none}.topbar .enttext b{font-size:15px}.topbar .entid{width:auto}.topbar .searchbox{max-width:260px}.topbar .searchbox kbd{display:none}.topbar .who{display:none}.topbar .btn.erp{display:none}
   main.px-8{padding-left:16px;padding-right:16px}
   .grid-cols-4,.grid-cols-3{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+  .grid-cols-3 > .col-span-2 + *{grid-column:1 / -1}
   .groupband{font-size:12px}
 }
 @media (max-width:900px){
@@ -675,9 +676,9 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 .tbl tr.fresh td{background:var(--green-s)}
 .samcard{border-left:4px solid var(--cyan6)}
 /* DASH-CS · tiles */
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
-.tile{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:#fff;min-height:64px}
-.tile .tv{font-size:22px;font-weight:700;color:var(--navy);line-height:1.1}.tile .tl{font-size:11.5px;color:var(--slate6);margin-top:2px}.tile .th{font-size:10.5px;color:var(--slate5);margin-top:3px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;background:#fff;min-height:92px}
+.tile .tv{font-size:28px;font-weight:700;color:var(--navy);line-height:1.1}.tile .tl{font-size:13px;color:var(--slate6);margin-top:4px}.tile .th{font-size:11.5px;color:var(--slate5);margin-top:3px}
 .tile.amber{border-color:var(--amber);background:var(--amber-s)}.tile.red{border-color:var(--terra);background:var(--terra-s)}.tile.green{border-color:#9fd8b3;background:var(--green-s)}
 .tilelink{color:inherit;display:block}.tilelink:hover .tile{box-shadow:0 2px 8px rgba(13,42,63,.12)}
 /* AUD-01 audit programme grid */

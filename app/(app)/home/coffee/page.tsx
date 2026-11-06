@@ -45,7 +45,7 @@ function TierBlock({ tier, items }: { tier: Tier; items: RankItem[] }) {
     <table className="tbl"><tbody>{items.map((it) => (
       <tr key={it.id}>
         <td style={{ width: 70 }}>{it.entity && <span className={"ent " + it.entity}>{it.entity}</span>}</td>
-        <td>{it.badge && <span className={"kind " + (it.badge === "for-you" ? "k-comp" : "k-cert")} style={{ marginRight: 6 }}>{it.badge === "for-you" ? "Waits for you" : "You are waiting"}</span>}<b>{it.title}</b><div className="mini">{it.why}</div>{it.id.startsWith("g:") && it.topic && <div className="mini" style={{ color: "#6b7a8c" }}>{it.topic}</div>}</td>
+        <td>{it.badge && <span className={"kind " + (it.badge === "for-you" ? "k-comp" : "k-cert")} style={{ marginRight: 6 }}>{it.badge === "for-you" ? "Waits for you" : "You are waiting"}</span>}{it.badge && " "}<b>{it.title}</b><div className="mini">{it.why}</div>{it.id.startsWith("g:") && it.topic && <div className="mini" style={{ color: "#6b7a8c" }}>{it.topic}</div>}</td>
         <td style={{ width: 260 }}><span className="mini"><b>→ {it.action}</b></span></td>
         <td style={{ width: 300 }} className="text-right">{uniq(it.sources).map((x, n) => x.link
           ? (x.link.startsWith("/") ? <Link key={n} href={x.link} className={"kind " + (SRC[x.kind] ?? "")} style={{ marginLeft: 4 }}>{x.label}</Link> : <a key={n} href={x.link} target="_blank" rel="noreferrer" className={"kind " + (SRC[x.kind] ?? "")} style={{ marginLeft: 4 }}>{x.label}</a>)

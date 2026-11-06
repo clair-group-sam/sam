@@ -144,6 +144,7 @@ export async function saveAuditPlan(fd: FormData) {
   const s = await me(); const a = await audit(String(fd.get("id")));
   if (!desk(s) && a.lead_auditor !== s.person?.id) throw new Error("Compliance desk or the lead auditor only.");
   const status = str(fd, "status") ?? a.status;
+  if (status === "closed" && (str(fd, "done_on") ?? today()) > today()) throw new Error("An audit cannot be done at a future date."); // FB-059
   const row = { title: str(fd, "title") ?? a.title, planned_on: str(fd, "planned_on"), planned_end: str(fd, "planned_end"), lead_auditor: desk(s) ? str(fd, "lead_auditor") : a.lead_auditor, external_auditor: str(fd, "external_auditor"), scope: str(fd, "scope"),
     status, done_on: status === "closed" ? str(fd, "done_on") ?? a.done_on ?? today() : a.done_on, updated_at: new Date().toISOString() };
   await db().from("audits").update(row).eq("id", a.id);
