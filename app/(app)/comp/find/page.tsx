@@ -57,6 +57,14 @@ export default async function Findings({ searchParams }: { searchParams: Promise
           )}
         </div>
       </section>
+      {(() => { // heatmap of open findings: category × cause (Centrik model), only when the fields are used
+        type FX = Finding & { category?: string | null; cause?: string | null; repeat?: boolean | null };
+        const fx = open as FX[]; const cats = [...new Set(fx.map((f) => f.category).filter(Boolean))] as string[]; const causes = [...new Set(fx.map((f) => f.cause).filter(Boolean))] as string[];
+        if (!cats.length || !causes.length) return null;
+        const n = (c: string, k: string) => fx.filter((f) => f.category === c && f.cause === k).length; const max = Math.max(1, ...cats.flatMap((c) => causes.map((k) => n(c, k))));
+        return <section className="card mt-4"><div className="ch"><span className="eyebrow">Open findings · category × cause</span><span className="mini">{fx.filter((f) => f.repeat).length} repeat</span></div><div className="cb" style={{ overflow: "auto" }}>
+          <table className="matrix"><thead><tr><th></th>{causes.map((k) => <th key={k}>{k}</th>)}<th>Total</th></tr></thead><tbody>{cats.map((c) => <tr key={c}><td style={{ textAlign: "left" }}><b>{c}</b></td>{causes.map((k) => { const v = n(c, k); return <td key={k} style={{ background: v ? `rgba(226,6,18,${0.12 + 0.6 * v / max})` : undefined, color: v / max > 0.5 ? "#fff" : undefined }}>{v || ""}</td>; })}<td><b>{fx.filter((f) => f.category === c).length}</b></td></tr>)}</tbody></table>
+        </div></section>; })()}
     </>
   );
 }

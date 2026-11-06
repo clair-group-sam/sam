@@ -32,6 +32,8 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
   const mods = (rawMods as M[]).map((m) => ({ ...m, requirements: [...new Set([...m.requirements, ...codesOf(m.checklist_id)])] }));
   const c = coverage(p, mods, audits, t0);
   const ms = cycleMonths(p);
+  const { data: fA } = audits.length ? await db.from("findings").select("id,audit_id,level,due,closed_at").in("audit_id", audits.map((a) => a.id)) : { data: [] };
+  const findingsAll = (fA ?? []) as { id: string; audit_id: string | null; level: string; due: string | null; closed_at: string | null }[];
   const [{ data: ppl }, { data: ev }, { data: nx }] = await Promise.all([
     db.from("people").select("id,display_name").limit(500),
     audits.length ? db.from("audit_events").select("*").in("audit_id", audits.map((a) => a.id)).order("at", { ascending: false }).limit(300) : Promise.resolve({ data: [] }),
@@ -142,6 +144,12 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
           <tr><td style={{ textAlign: "left" }}><b>Audited</b></td>{c.reqs.map((r) => <td key={r.req} className={r.modules.length ? "x" : "gap"}>{r.modules.length}</td>)}</tr>
         </tbody></table></div></section>}
 
+      {audits.some((a) => a.status === "closed") && (() => { // the plan's "Overview" tab, computed: per audit done, findings level 1 / 2 / observations, closure on time
+        const F = findingsAll;
+        const rows = audits.filter((a) => a.status === "closed").map((a) => { const fa = F.filter((f) => f.audit_id === a.id); const closedLate = fa.filter((f) => f.closed_at && f.due && f.closed_at.slice(0, 10) > f.due).length; const openLate = fa.filter((f) => !f.closed_at && f.due && f.due < t0).length; const centrik = (a.note ?? "").match(/Centrik findings: (.*)/)?.[1] ?? null; return { a, l1: fa.filter((f) => f.level === "1").length, l2: fa.filter((f) => f.level === "2").length, obs: fa.filter((f) => f.level === "obs" || f.level === "3").length, open: fa.filter((f) => !f.closed_at).length, onTime: fa.length ? (closedLate || openLate ? "late" : "on time") : "—", centrik }; });
+        const tot = rows.reduce((o, r) => ({ l1: o.l1 + r.l1, l2: o.l2 + r.l2, obs: o.obs + r.obs }), { l1: 0, l2: 0, obs: 0 });
+        return <section className="card mb-4"><div className="ch"><span className="eyebrow">Annual overview · audits done</span><span className="mini">{rows.length} audits · {tot.l1} level 1 · {tot.l2} level 2 · {tot.obs} observations</span></div><div className="cb" style={{ padding: 0 }}>
+          <table className="tbl"><thead><tr><th>Audit</th><th>Done</th><th>Level 1</th><th>Level 2</th><th>Obs.</th><th>Open</th><th>Closure</th></tr></thead><tbody>{rows.map(({ a, l1, l2, obs, open, onTime, centrik }) => <tr key={a.id}><td><Link href={`/comp/audits/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link>{centrik && <div className="mini">Centrik: {centrik.slice(0, 120)}</div>}</td><td className="mono mini">{a.done_on ?? "—"}</td><td className={l1 ? "late" : ""}>{l1 || ""}</td><td>{l2 || ""}</td><td>{obs || ""}</td><td className={open ? "late" : ""}>{open || ""}</td><td><span className={"pill " + (onTime === "late" ? "red" : onTime === "on time" ? "green" : "")}>{onTime === "—" ? "no finding" : onTime.toUpperCase()}</span></td></tr>)}</tbody></table></div></section>; })()}
       {events.length > 0 && <section className="card"><div className="ch"><span className="eyebrow">History</span></div><div className="cb" style={{ padding: 0 }}>
         <table className="tbl"><thead><tr><th>When (UTC)</th><th>Audit</th><th>What</th><th>Who</th></tr></thead><tbody>{events.map((e) => {
           const a = audits.find((y) => y.id === e.audit_id);
