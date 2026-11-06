@@ -78,12 +78,17 @@ export async function hintsFor(db: SupabaseClient, entity: string, c: Pick<Check
   if (!process.env.ANTHROPIC_API_KEY) return { hints: null, citations };
   try {
     const { callClaude } = await import("@/lib/ai");
-    const ir = text.filter((t) => t.kind === "ir" || t.kind === "cs").map((t) => `${t.ref} ${t.title ?? ""}\n${t.body.map((b) => b.t).join("\n")}`).join("\n\n").slice(0, 6000);
-    const amc = text.filter((t) => t.kind !== "ir" && t.kind !== "cs").map((t) => `${t.ref} ${t.title ?? ""}\n${t.body.map((b) => b.t).join("\n")}`).join("\n\n").slice(0, 5000);
+    const ir = text.filter((t) => t.kind === "ir" || t.kind === "cs").map((t) => `${t.ref} ${t.title ?? ""}\n${t.body.map((b) => b.t).join("\n")}`).join("\n\n").slice(0, 5000);
+    const amc = text.filter((t) => t.kind !== "ir" && t.kind !== "cs").map((t) => `${t.ref} ${t.title ?? ""}\n${t.body.map((b) => b.t).join("\n")}`).join("\n\n").slice(0, 3500);
     const user = `ENTITY ${entity}\nRULE ${c.code}\n${ir || "(text not loaded)"}\n\nAMC / GM\n${amc || "(none)"}\n\nCHAPTERS OF OUR MANUALS CITING ${c.code}\n${citations.slice(0, 12).map((x) => `${x.code} ${x.ref} ${x.section_title ?? ""}: ${x.snippet}`).join("\n") || "(none found)"}\n\nPREVIOUS RESULTS\n${prev.map((p) => `${RESULT_LABEL[p.result] ?? p.result}${p.comment ? ` — ${p.comment.slice(0, 200)}` : ""}`).join("\n") || "(none)"}`;
-    const { text: out, model } = await callClaude({ agent: "check", personId: null, entity, system: SYSTEM, user, maxTokens: 700 });
+    const { text: out, model } = await callClaude({ agent: "check", personId: null, entity, system: SYSTEM, user, maxTokens: 1400 });
     const m = /\{[\s\S]*\}/.exec(out); if (!m) return { hints: null, citations };
-    const j = JSON.parse(m[0]) as Partial<Hints>;
+    let j: Partial<Hints>;
+    try { j = JSON.parse(m[0]) as Partial<Hints>; }
+    catch { // cut by the token limit: keep the complete arrays only
+      const cut = m[0].slice(0, Math.max(m[0].lastIndexOf("]"), 0) + 1).replace(/,\s*$/, "") + "}";
+      try { j = JSON.parse(cut) as Partial<Hints>; } catch { return { hints: null, citations }; }
+    }
     const hints: Hints = { chapters: (j.chapters ?? []).slice(0, 8).map((x) => ({ manual: String(x.manual ?? ""), ref: String(x.ref ?? ""), why: String(x.why ?? "").slice(0, 200) })), evidence: (j.evidence ?? []).slice(0, 5).map(String), ask: (j.ask ?? []).slice(0, 4).map(String), model, at: new Date().toISOString() };
     await db.from("regulation_hints").upsert({ regulation_id: c.regulation_id, version: c.version, code: c.code, entity, hints }, { onConflict: "regulation_id,version,code,entity" });
     return { hints, citations };

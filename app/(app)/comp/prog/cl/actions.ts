@@ -19,7 +19,10 @@ export async function createChecklist(fd: FormData) {
   const { data: ex } = await db().from("checklists").select("id").eq("entity", entity).eq("code", code).maybeSingle();
   let id = (ex as { id: string } | null)?.id;
   if (!id) {
-    const { data, error } = await db().from("checklists").insert({ entity, code, title: str(fd, "title") ?? code, domain: str(fd, "domain"), regulation_id: str(fd, "regulation"), created_by: s.person?.id ?? null }).select("id").single();
+    const domain = str(fd, "domain");
+    let regulation = str(fd, "regulation");
+    if (!regulation) { const key = domain === "CAMO" || domain === "CAE" ? "continuing-airworthiness" : domain === "ATO" || domain === "FSTD" ? "aircrew" : "air-operations"; const { data: r } = await db().from("regulations").select("id").eq("key", key).maybeSingle(); regulation = (r as { id: string } | null)?.id ?? null; }
+    const { data, error } = await db().from("checklists").insert({ entity, code, title: str(fd, "title") ?? code, domain, regulation_id: regulation, created_by: s.person?.id ?? null }).select("id").single();
     if (error) throw new Error(error.message); id = data.id;
   }
   const moduleId = str(fd, "module");
