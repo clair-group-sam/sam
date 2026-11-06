@@ -42,6 +42,9 @@ export function parseItems(doc: string): Item[] {
     if (style === "Heading1") { push(); inToc = /table of contents/i.test(text); annex = /^ANNEX|^Cover regulation|^Part-|^Subpart/i.test(text) ? text : annex; section = null; continue; }
     if (inToc || /^TOC\d/.test(style)) continue;
     if (/^Heading[23]$/.test(style)) { push(); section = text; continue; }
+    // cover-regulation / Basic Regulation articles: "Article 5 – Scope" under Heading…CR or a plain Heading4/5
+    const art = /^Heading\d(CR)?$/.test(style) && text.match(/^(Article \d+[a-z]?)\s*[–—-]?\s*(.*)$/);
+    if (art) { push(); cur = { ref: art[1], kind: "ir", code: art[1], title: art[2] || null, source: null, annex, section, body: [], ord: ord++ }; continue; }
     const h = style.match(/^Heading\d(IR|AMC|GM|CS|GMtoAMC)$/);
     if (h) {
       push();
