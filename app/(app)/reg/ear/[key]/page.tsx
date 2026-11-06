@@ -19,7 +19,7 @@ export default async function EarPage({ params, searchParams }: { params: Promis
   const v = r.items_version;
   const q = (sp.q ?? "").trim(); const code = (sp.code ?? "").trim();
   let hits: RegItem[] = [], items: RegItem[] = [];
-  if (v && code) { const { data } = await db.from("regulation_items").select("*").eq("regulation_id", r.id).eq("version", v).eq("code", code).neq("change", "removed").order("ord"); items = (data ?? []) as RegItem[]; }
+  if (v && code) { const { data } = await db.from("regulation_items").select("*").eq("regulation_id", r.id).eq("version", v).eq("code", code).or("change.is.null,change.neq.removed").order("ord"); items = (data ?? []) as RegItem[]; }
   else if (v && q) {
     const byCode = /^[A-Z]{2,4}\./.test(q.toUpperCase());
     const { data } = byCode ? await db.from("regulation_items").select("*").eq("regulation_id", r.id).eq("version", v).eq("kind", "ir").ilike("code", `${q.toUpperCase()}%`).order("ord").limit(60)

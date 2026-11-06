@@ -106,6 +106,6 @@ export async function loadItems(db: SupabaseClient, r: Regulation & { items_vers
 
 /** The current text of a rule and its AMC / GM, for the audit screen. */
 export async function itemsForCode(db: SupabaseClient, regulationId: string, version: string, code: string): Promise<RegItem[]> {
-  const { data } = await db.from("regulation_items").select("*").eq("regulation_id", regulationId).eq("version", version).eq("code", code).neq("change", "removed").order("ord");
+  const { data } = await db.from("regulation_items").select("*").eq("regulation_id", regulationId).eq("version", version).eq("code", code).or("change.is.null,change.neq.removed").order("ord");
   return (data ?? []) as RegItem[];
 }
