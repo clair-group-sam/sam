@@ -6,6 +6,7 @@ import { Metric, PageHeader } from "@/components/Page";
 import { ENT_COLOR } from "@/lib/nav";
 import { addMonths, KIND_LABEL, monthLong, STATUS_LABEL, type Audit } from "@/lib/audit-programme";
 import { today } from "@/lib/authority";
+import { AuditImport } from "@/components/AuditImport";
 
 type Sp = { tab?: string };
 /* AUD-02 · Compliance › Audits (PRO-CM-02): the audits of the programme as they run — mine, to start, in progress, reports to close, done. */
@@ -45,7 +46,8 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
             <td>{a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "—"}</td>
             <td><span className={"pill " + (a.status === "closed" ? "green" : a.status === "report" ? "amber" : isLate ? "red" : a.status === "in_progress" ? "amber" : "")}>{STATUS_LABEL[a.status]}</span>{a.done_on && <div className="mini mono">{a.done_on}</div>}</td></tr>;
         })}</tbody></table>)}</div></section>
-      {desk && <p className="mini mt-3">Checklists (the templates behind the audits) are managed from each programme: Compliance › Audit programme › module › checklist.</p>}
+      {desk && <p className="mini mt-3 mb-3">Checklists (the templates behind the audits) are managed from each programme: Compliance › Audit programme › module › checklist.</p>}
+      {desk && s.entity !== "ALL" && <AuditImport entity={s.entity} />}
     </>
   );
 }
