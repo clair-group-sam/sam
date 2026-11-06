@@ -37,18 +37,18 @@ export default async function Mocs({ searchParams }: { searchParams: Promise<{ s
           <button className="btn">Apply</button><span className="mini">only signed MOCs can be ticked (MSM §3.4: assessed before implementation)</span></form>)}
       <section className="card">
         <table className="tbl">
-          <thead><tr>{mayEditRisk(s) && <th style={{ width: 30 }} />}<th style={{ width: 130 }}>Number</th><th style={{ width: 55 }}>Entity</th><th>Change</th><th style={{ width: 120 }}>Residual</th><th style={{ width: 100 }}>Start</th><th style={{ width: 170 }}>Status</th><th style={{ width: 70 }}>MSM</th></tr></thead>
+          <thead><tr>{mayEditRisk(s) && <th style={{ width: 30 }} />}<th style={{ width: 130 }}>Number</th><th className="entcol" style={{ width: 55 }}>Entity</th><th>Change</th><th style={{ width: 120 }}>Residual</th><th style={{ width: 100 }}>Start</th><th style={{ width: 170 }}>Status</th><th style={{ width: 70 }}>MSM</th></tr></thead>
           <tbody>
             {rows.map((r) => { const w = worstTol(r.hazards.filter((h) => !h.proposed && h.status !== "closed").map((h) => tolerability(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, schemeOf(r.entity)))); const ch = msmChecks(r, r.hazards); const ok = ch.filter((c) => c.ok).length; return (
               <tr key={r.id}>
                 {mayEditRisk(s) && <td>{r.status === "accepted" && r.moc_status !== "closed" && <input type="checkbox" name="ids" value={r.id} form="bulk-moc" />}</td>}
                 <td className="mono"><Link className="underline" href={`/safe/risk/a/${r.id}`}>{r.number}</Link><SourceMark source={r.source} /></td>
-                <td><span className={"ent " + r.entity}>{r.entity}</span></td>
+                <td className="entcol"><span className={"ent " + r.entity}>{r.entity}</span></td>
                 <td><Link href={`/safe/risk/a/${r.id}`}><b>{r.name}</b></Link><div className="mini">{MOC_CATEGORIES[r.category ?? ""] ?? r.domain ?? ""}{r.project_id ? " · from a project" : ""} · {r.hazards.filter((h) => !h.proposed).length} hazards ({r.hazards.filter((h) => !h.proposed && h.log_hazard_id).length} in log)</div></td>
                 <td>{w ? <span className={"pill " + tolTone(w)}>{w}</span> : <span className="mini">—</span>}</td>
                 <td className="mono">{r.start_date ?? "—"}</td>
                 <td><span className={"pill " + (RA_STATUS[r.status]?.[1] ?? "")}>{RA_STATUS[r.status]?.[0]}</span>{r.moc_status && r.moc_status !== "assessment" && <div className="mini">{MOC_STATUS[r.moc_status]?.[0]}</div>}</td>
-                <td><span className={"pill " + (ok === ch.length ? "green" : ok >= ch.length - 2 ? "amber" : "red")} title={ch.filter((c) => !c.ok).map((c) => "✕ " + c.label).join("\n")}>{ok}/{ch.length}</span></td>
+                <td><span className={"pill " + (ok === ch.length ? "green" : ok >= ch.length - 2 ? "amber" : "red")} title={ch.filter((c) => !c.ok).map((c) => "Missing: " + c.label).join("\n")}>{ok}/{ch.length}</span></td>
               </tr>); })}
             {!rows.length && <tr><td colSpan={8} className="p-6 text-slate6">No change.</td></tr>}
           </tbody>

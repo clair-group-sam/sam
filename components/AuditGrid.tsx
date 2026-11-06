@@ -1,4 +1,5 @@
 import { addMonths, cycleMonths, KIND_LETTER, monthLabel, STATUS_LABEL, type Audit, type AuditModule, type Programme } from "@/lib/audit-programme";
+import { Icon } from "@/lib/icons";
 
 /* AUD-01 · the cycle month by month: one row per module, one chip per audit (P planned · done in green · C checks · A authority; red = month passed, not done; dashed = replanned). */
 export function AuditGrid({ p, mods, audits, t0 }: { p: Programme; mods: AuditModule[]; audits: Audit[]; t0: string }) {
@@ -20,13 +21,13 @@ export function AuditGrid({ p, mods, audits, t0 }: { p: Programme; mods: AuditMo
               {r.list.filter((a) => a.planned_month === m && a.status !== "cancelled").map((a) => {
                 const late = a.status === "planned" && addMonths(a.planned_month, 1) <= t0;
                 const cls = a.status === "closed" ? "closed" : late ? "late" : a.kind === "authority" ? "authority" : a.kind === "checks" ? "checks" : "";
-                return <a key={a.id} href={`#${a.number}`} className={`au ${cls}${a.replanned ? " repl" : ""}`} title={`${a.number} · ${a.title} · ${STATUS_LABEL[a.status] ?? a.status}${a.replanned ? ` · replanned ×${a.replanned}` : ""}`}>{a.status === "closed" ? "✓" : KIND_LETTER[a.kind] ?? "P"}</a>;
+                return <a key={a.id} href={`#${a.number}`} className={`au ${cls}${a.replanned ? " repl" : ""}`} title={`${a.number} · ${a.title} · ${STATUS_LABEL[a.status] ?? a.status}${a.replanned ? ` · replanned ×${a.replanned}` : ""}`}>{a.status === "closed" ? <Icon name="check" size={11} /> : KIND_LETTER[a.kind] ?? "P"}</a>;
               })}
             </div>
           )),
         ])}
       </div>
-      <div className="mini mt-2"><span className="pill">P</span> planned · <span className="pill green">✓</span> done · <span className="pill amber">C</span> compliance checks · <span className="pill" style={{ background: "var(--purple-s)", color: "var(--purple)" }}>A</span> authority · <span className="pill red">P</span> month passed, not done · dashed = replanned</div>
+      <div className="mini mt-2"><span className="pill">P</span> planned · <span className="pill green"><Icon name="check" size={11} /></span> done · <span className="pill amber">C</span> compliance checks · <span className="pill" style={{ background: "var(--purple-s)", color: "var(--purple)" }}>A</span> authority · <span className="pill red">P</span> month passed, not done · dashed = replanned</div>
     </div>
   );
 }

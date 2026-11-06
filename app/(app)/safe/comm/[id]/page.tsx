@@ -7,6 +7,7 @@ import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
 import { STATUS, entitiesLabel, isJoint, kindName, mayRun, packFor, type Committee } from "@/lib/committees";
 import { ackMinutes, cancelCommittee, draftMinutes, issueMinutes, markHeld, preparePack, saveAttendees, saveItem, saveMinutes, updateCommittee } from "../actions";
+import { Icon } from "@/lib/icons";
 
 const hm = (iso: string | null) => (iso ? iso.slice(11, 16) : "");
 
@@ -51,7 +52,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
                 {f.length > 0 && <ul className="pack">{f.slice(0, 12).map((l, j) => <li key={j} className={j === 0 ? "" : "mini"}>{l}</li>)}{f.length > 12 && <li className="mini">… {f.length - 12} more in the PDF</li>}</ul>}
                 {edit ? <form action={saveItem} className="grid gap-1 mt-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="key" value={x.key} />
                   <textarea name="notes" className="inp" rows={x.notes ? 3 : 1} defaultValue={x.notes ?? ""} placeholder="What was presented and discussed" />
-                  <div className="flex gap-2"><input name="decision" className="inp" defaultValue={x.decision ?? ""} placeholder="Decision (if any)" style={{ marginTop: 0 }} /><button className="btn">Save</button><button className="btn" name="remove" value="1" title="Remove this item">✕</button></div></form>
+                  <div className="flex gap-2"><input name="decision" className="inp" defaultValue={x.decision ?? ""} placeholder="Decision (if any)" style={{ marginTop: 0 }} /><button className="btn">Save</button><button className="btn" name="remove" value="1" title="Remove this item"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></div></form>
                   : <>{x.notes && <p className="mt-1" style={{ whiteSpace: "pre-wrap" }}>{x.notes}</p>}{x.decision && <p className="mt-1"><b>Decision:</b> {x.decision}</p>}</>}
               </div>); })}
             {edit && <form action={saveItem} className="cb flex gap-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="key" value="__new" /><input name="title" className="inp" placeholder="+ Add an agenda item" style={{ marginTop: 0 }} /><button className="btn">Add</button></form>}
@@ -82,7 +83,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
                 <div key={i} className="flex items-center gap-2 att">
                   <span className="flex-1"><b>{a.name}</b> <span className="mini">{a.role}</span></span>
                   {edit ? <><select name={`p${i}`} defaultValue={a.present === true ? "1" : a.present === false ? "0" : ""} className="inp" style={{ width: 110, marginTop: 0 }}><option value="">invited</option><option value="1">present</option><option value="0">apologies</option></select>
-                    <label className="mini"><input type="checkbox" name={`rm${i}`} value="1" /> ✕</label></>
+                    <label className="mini"><input type="checkbox" name={`rm${i}`} value="1" /> Remove</label></>
                     : <span className={"pill " + (a.present ? "green" : a.present === false ? "" : "blue")}>{a.present ? "present" : a.present === false ? "apologies" : "invited"}</span>}
                 </div>))}
               {edit && <><div className="flex gap-1 mt-2"><input name="new_name" className="inp" placeholder="Add: name" style={{ marginTop: 0 }} /><input name="new_role" className="inp" placeholder="role" style={{ marginTop: 0, width: 90 }} /></div><button className="btn mt-1">Save attendance</button></>}

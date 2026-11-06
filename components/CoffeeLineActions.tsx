@@ -16,7 +16,7 @@ export default function CoffeeLineActions({ it }: { it: RankItem }) {
         <input type="hidden" name="title" value={it.title} /><input type="hidden" name="action" value={it.action} /><input type="hidden" name="entity" value={it.entity ?? ""} /><input type="hidden" name="link" value={it.sources.find((x) => x.link?.startsWith("/"))?.link ?? ""} />
         <button className="btn" title="Add it to your Inbox, due today" style={{ padding: "1px 6px", fontSize: 11 }}>To my Inbox</button></form>
       {it.key && <><B op="snooze" label="Tomorrow" title="Hide it until tomorrow" />
-        {it.tier > 2 && <B op="important" label="★ Important" title={`Always at least "Today" from now on: ${it.keyLabel ?? ""}`} />}
+        {it.tier > 2 && <B op="important" label="Important" title={`Always at least "Today" from now on: ${it.keyLabel ?? ""}`} />}
         {it.tier < 4 && <B op="muted" label="Not important" title={`Always "Can wait" from now on: ${it.keyLabel ?? ""}`} />}</>}
       {draft !== null && <div className="card" style={{ flexBasis: "100%", marginTop: 6 }}><div className="cb">
         <textarea className="inp" rows={6} defaultValue={draft} id={`d-${it.id}`} />

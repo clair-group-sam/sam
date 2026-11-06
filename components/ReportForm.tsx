@@ -40,7 +40,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
     <section className="card">
       <div className="cb">
         <h2 className="text-[20px] font-bold mb-2">Thank you — report {sentId} received</h2>
-        <p>The Safety Manager has it now. You will see its status and any question in <Link className="underline" href="/safe/mine">My reports</Link>{r.anonymous ? " — as you sent it anonymously, keep the number " + sentId + " if you want to follow it up" : ""}.</p>
+        <p>The Safety Manager has it now. You will see its status and any question in <Link className="underline" href="/safe/mine">My reports</Link>{r.anonymous ? ". As you sent it anonymously, keep the number " + sentId + " if you want to follow it up" : ""}.</p>
         <p className="mini mt-2">Reports are used to improve safety, never to blame (Regulation (EU) 376/2014, just culture). You will receive feedback on what was done with it.</p>
         <div className="mt-4 flex gap-2"><Link href="/safe/mine" className="btn primary">My reports</Link><button className="btn" onClick={() => { setStep("write"); setR((x) => ({ ...x, headline: "", narrative: "", contributing: "", precisions: {} })); }}>Report another event</button></div>
       </div>
@@ -96,9 +96,11 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
       {step === "write" && (
         <aside className="card rep-help"><div className="ch"><span className="eyebrow">What happens when you send</span></div>
           <div className="cb mini">
-            <p>1 · SAM may suggest 3 to 5 short factual precisions (time, phase, consequences…). Answer, say &quot;I don&apos;t know&quot;, or send as written.</p>
-            <p>2 · Only your final report is stored. It goes to the Safety Manager, who acknowledges it and decides within 72 h whether it must be notified to the authority (MOR).</p>
-            <p>3 · You see its status, possible questions and the feedback in My reports.</p>
+            <ol className="helpsteps">
+              <li>SAM may suggest 3 to 5 short factual precisions (time, phase, consequences). Answer, say &quot;I don&apos;t know&quot;, or send as written.</li>
+              <li>Only your final report is stored. It goes to the Safety Manager, who acknowledges it and decides within 72 h whether it must be notified to the authority (MOR).</li>
+              <li>You see its status, possible questions and the feedback in My reports.</li>
+            </ol>
             <p>Just culture: reports are used to improve safety, never to blame (EU 376/2014).</p>
           </div></aside>
       )}

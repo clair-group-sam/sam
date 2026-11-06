@@ -44,7 +44,7 @@ export async function saveSection(fd: FormData) {
 export async function removeSection(fd: FormData) {
   await me(); const cl = String(fd.get("checklist")); await db().from("checklist_sections").delete().eq("id", String(fd.get("id"))); touch(cl);
 }
-/** Items: one per line — "ORO.GEN.200" · "ORO.GEN.200 | question | guidance" · "AMC1 ORO.GEN.200(a)(3)" (ref kept). */
+/** Items: one per line — "ORO.GEN.200", "ORO.GEN.200 | question | guidance", "AMC1 ORO.GEN.200(a)(3)" (ref kept). */
 export async function addItems(fd: FormData) {
   await me(); const cl = String(fd.get("checklist")); const section = str(fd, "section"); const reg = str(fd, "regulation");
   const { data: last } = await db().from("checklist_items").select("ord").eq("checklist_id", cl).order("ord", { ascending: false }).limit(1);

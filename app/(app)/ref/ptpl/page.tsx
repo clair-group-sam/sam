@@ -51,7 +51,7 @@ export default async function ProjectTemplates({ searchParams }: { searchParams:
       <PageHeader eyebrow="References" title="Project templates" sub="What a kind of project is made of: phases, tasks with their post, duration, dependencies and the S.A.M. object each task calls for. Projects opened from a template copy all of it; lessons learned on a closed project can be pushed back here." right={<Link href="/proj/boards/new" className="btn primary">Open a project</Link>} />
       {templates.map((t) => (
         <section key={t.code} className="card mb-4" id={t.code} style={{ opacity: t.active ? 1 : 0.6 }}>
-          <div className="ch"><span className="pill">{t.code}</span><b>{t.name}</b><span className="mini ml-auto">{t.entities.join(" · ")} · {t.phases.length} phases · {t.tasks.length} tasks{t.pivots.length ? ` · asks ${t.pivots.map((k) => PIVOT_LABEL[k] ?? k).join(", ")}` : ""}{!t.active ? " · inactive" : ""}</span></div>
+          <div className="ch"><span className="pill">{t.code}</span><b>{t.name}</b><span className="mini ml-auto">{t.entities.join(", ")} · {t.phases.length} phases · {t.tasks.length} tasks{t.pivots.length ? ` · asks ${t.pivots.map((k) => PIVOT_LABEL[k] ?? k).join(", ")}` : ""}{!t.active ? " · inactive" : ""}</span></div>
           <div className="cb">
             {t.description && <p className="mini mb-2">{t.description}</p>}
             <div className="grid grid-cols-2 gap-4">

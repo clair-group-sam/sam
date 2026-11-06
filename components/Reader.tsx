@@ -126,7 +126,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
           {active ? (<>
             <div className="chaphead" style={{ background: `${colorOf[active.part]}12` }}>
               <span className="badge big" style={{ background: colorOf[active.part] }}>{active.ref}</span>
-              <div><div className="eyebrow" style={{ color: colorOf[active.part] }}>{parts.find((p) => p.key === active.part)?.label}</div><h2>{active.title}</h2></div>
+              <div title={parts.find((p) => p.key === active.part)?.label}><h2>{active.title}</h2></div>
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
             </div>
             <div className="readscroll">

@@ -25,6 +25,7 @@ import RouteProposal from "@/components/RouteProposal";
 import { ENT } from "@/lib/nav";
 import { frozenRefs } from "@/lib/revisions-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { Icon } from "@/lib/icons";
 
 type Round = { id: string; at: string; direction: string; who: string; note: string };
 type Meta = { id: string; ord: number; ref: string; title: string | null; changed: boolean; conflict: { base_html: string; base_rev: string } | null; deleted_at: string | null; base_ref: string | null; uid: string | null };
@@ -178,7 +179,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
                 {metas.filter((x) => partOf(x.ref) === p.key).map((x) => (
                   <Link key={x.id} href={`/docs/editor/${rev.id}?tab=write&sec=${encodeURIComponent(x.ref)}`} className={"tocch" + (active?.id === x.id ? " on" : "") + (x.changed ? " changed" : "") + (x.deleted_at ? " deleted" : "")} title={x.deleted_at ? "deleted in this revision" : x.base_ref && x.base_ref !== x.ref ? `was ${x.base_ref}` : !x.base_ref && rev.based_on ? "new chapter" : undefined}>
                     <span className="badge" style={{ background: p.color }}>{x.ref}</span><span>{x.title}</span>
-                    {x.conflict ? <b className="fold" style={{ color: "var(--terra)" }} title="conflict">!</b> : frozen.refs.has(x.ref) ? <b className="fold" title={`frozen · Rev ${frozen.baseRev}`}>🔒</b> : null}
+                    {x.conflict ? <b className="fold" style={{ color: "var(--terra)" }} title="conflict">!</b> : frozen.refs.has(x.ref) ? <b className="fold" title={`frozen · Rev ${frozen.baseRev}`}><Icon name="lock" size={12} /></b> : null}
                   </Link>
                 ))}
               </div>

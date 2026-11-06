@@ -58,7 +58,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
   const flag = (k: string, l: string, n: number, tone?: string) => <Link href={qs(sp, { flag: sp.flag === k ? undefined : k })} className={"btn" + (sp.flag === k ? " on" : "")}>{l} <span className={"pill " + (n ? tone ?? "" : "")}>{n}</span></Link>;
   return (
     <>
-      <PageHeader eyebrow="Safety · Risk management" title="Hazard log" sub={`Each lasting hazard once, with its current rating — reviewed at the SRB, reassessed with each new occurrence · ${scope.map((e) => MSM_REF[e] ?? e).join(" · ")}`} />
+      <PageHeader eyebrow="Safety · Risk management" title="Hazard log" sub={`Each lasting hazard once, with its current rating — reviewed at the SRB, reassessed with each new occurrence · ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
       <RiskTabs on="log" toMatch={toMatch} />
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Hazards in the log" value={live.length} hint={`${new Set(live.map((h) => h.assessment_id)).size} entries`} />
@@ -98,19 +98,19 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
         <section key={d} className="card mb-4">
           <div className="ch"><span className="eyebrow">{d}</span><span className="mini">{hs.length} hazard{hs.length === 1 ? "" : "s"}</span></div>
           <table className="tbl">
-            <thead><tr><th style={{ width: 120 }}>Ref</th><th style={{ width: 55 }}>Entity</th><th>Hazard → consequence</th><th style={{ width: 150 }}>Pre → current</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 100 }}>Next review</th><th style={{ width: 110 }}>Fed by</th><th style={{ width: 130 }}>Entry</th></tr></thead>
+            <thead><tr><th style={{ width: 120 }}>Ref</th><th className="entcol" style={{ width: 55 }}>Entity</th><th>Hazard → consequence</th><th style={{ width: 150 }}>Pre → current</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 100 }}>Next review</th><th style={{ width: 110 }}>Fed by</th><th style={{ width: 130 }}>Entry</th></tr></thead>
             <tbody>{hs.map((h) => {
               const a = entries.get(h.assessment_id)!; const sc = schemeOf(h.entity); const pre = tolerability(h.lik_before, h.sev_before, sc), cur = tolerability(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, sc);
               const n = studies.get(h.id) ?? 0, r = h.hazard_reports.length; const dd = due(h);
               return (
                 <tr key={h.id}>
                   <td className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.needs_review && <div className="mini red">to reassess</div>}</td>
-                  <td><span className={"ent " + h.entity}>{h.entity}</span></td>
-                  <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}</td>
+                  <td className="entcol"><span className={"ent " + h.entity}>{h.entity}</span></td>
+                  <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}</td>
                   <td>{pre ? <span className={"pill " + tolTone(pre)}>{riskLabel(h.lik_before, h.sev_before, sc)}</span> : <span className="mini">—</span>} → {cur ? <span className={"pill " + tolTone(cur)}>{riskLabel(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, sc)}</span> : <span className="mini">—</span>}</td>
                   <td className="mono">{h.owner_role ?? a.owner_role ?? "—"}</td>
                   <td className={"mono" + (dd && dd < today ? " red" : "")}>{dd ?? "—"}</td>
-                  <td className="mini">{n ? `${n} stud${n > 1 ? "ies" : "y"}` : ""}{n && r ? " · " : ""}{r ? `${r} report${r > 1 ? "s" : ""}` : ""}{!n && !r ? "—" : ""}</td>
+                  <td className="mini">{n ? `${n} stud${n > 1 ? "ies" : "y"}` : ""}{n && r ? ", " : ""}{r ? `${r} report${r > 1 ? "s" : ""}` : ""}{!n && !r ? "—" : ""}</td>
                   <td><Link className="mono underline mini" href={`/safe/risk/a/${a.id}`}>{a.number}</Link><SourceMark source={(a as { source?: string }).source} /><div><span className={"pill " + (RA_STATUS[a.status]?.[1] ?? "")}>{RA_STATUS[a.status]?.[0] ?? a.status}</span></div></td>
                 </tr>);
             })}</tbody>

@@ -13,14 +13,14 @@ export default function PromoImport({ entity }: { entity: string }) {
     const meta = JSON.parse(await metaFile.text()) as { items: Item[] };
     for (const it of meta.items) {
       const pdf = [...files].find((f) => f.name === it.file);
-      if (!pdf) { out.push(`✕ ${it.name}: PDF not selected (${it.file})`); continue; }
+      if (!pdf) { out.push(`FAILED ${it.name}: PDF not selected (${it.file})`); continue; }
       const call = async (step: string) => { const r = await fetch("/api/import/promotions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ step, meta: it, entity }) }); return { ok: r.ok, j: await r.json().catch(() => ({})) }; };
       const sign = await call("sign");
-      if (!sign.ok) { out.push(`✕ ${it.name}: ${sign.j.error ?? "refused"}`); setLog([...out]); continue; }
+      if (!sign.ok) { out.push(`FAILED ${it.name}: ${sign.j.error ?? "refused"}`); setLog([...out]); continue; }
       const up = await fetch(sign.j.url, { method: "PUT", headers: { "content-type": "application/pdf", "x-upsert": "true" }, body: pdf });
-      if (!up.ok) { out.push(`✕ ${it.name}: upload ${up.status}`); setLog([...out]); continue; }
+      if (!up.ok) { out.push(`FAILED ${it.name}: upload ${up.status}`); setLog([...out]); continue; }
       const { ok, j } = await call("save");
-      out.push(ok ? `✓ ${j.number} — ${j.title}${j.updated ? " (updated)" : ""}` : `✕ ${it.name}: ${j.error ?? "refused"}`);
+      out.push(ok ? `OK ${j.number} — ${j.title}${j.updated ? " (updated)" : ""}` : `FAILED ${it.name}: ${j.error ?? "refused"}`);
       setLog([...out]);
     }
     setBusy(false); router.refresh();

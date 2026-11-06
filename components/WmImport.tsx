@@ -43,7 +43,7 @@ export default function WmImport({ manuals, entities }: Props) {
       } else { text = await f.text(); setFileName(f.name); setLog([]); }
       const b = JSON.parse(text) as WmBundle;
       if (b.format !== "sam-wm-export/1" && b.format !== "sam-wm-export/2") { say("This file is not a S.A.M. Web Manuals export."); return; }
-      if (b.manual.composite) say(`Composite manual: ${b.manual.parts?.length ?? 0} Web Manuals documents → one S.A.M. manual (${b.manual.parts?.map((x) => x.name).join(" · ")})`);
+      if (b.manual.composite) say(`Composite manual: ${b.manual.parts?.length ?? 0} Web Manuals documents → one S.A.M. manual (${b.manual.parts?.map((x) => x.name).join(", ")})`);
       setBundle(b);
       const guess = /_([A-Z]{3,5})_([A-Z0-9-]+)_/.exec(f.name);
       if (guess) { if (entities.includes(guess[1])) setEntity(guess[1]); setCode(guess[2]); }

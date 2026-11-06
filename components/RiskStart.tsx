@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { similarStudies, templatesFor, type Base, type Question } from "@/lib/risk-start";
 import { applyBase, chooseBase, resetBase } from "@/app/(app)/safe/risk/start-actions";
+import { Icon } from "@/lib/icons";
 
 type A = { id: string; entity: string; kind: string; name: string; description: string | null; prefill: { base?: Base; questions?: Question[]; applied?: boolean; blank?: boolean } | null };
 
@@ -15,7 +16,7 @@ export default async function RiskStart({ a }: { a: A }) {
         {(p.questions ?? []).map((q) => (
           <label key={q.id} className="grid gap-1"><span>{q.label}</span>
             <span className="flex gap-2 items-center"><input name={q.id} className="inp flex-1" style={{ marginTop: 0 }} placeholder={q.hint ?? ""} /><label className="mini flex gap-1 items-center"><input type="checkbox" name={`${q.id}_dk`} /> I don&apos;t know</label></span></label>))}
-        <div className="flex gap-2 items-center"><button className="btn primary">🤝 Prepare the draft</button><span className="mini">takes up to a minute — every hazard then arrives “proposed”, with what changed from the base, to review and keep one by one</span></div>
+        <div className="flex gap-2 items-center"><button className="btn primary"><Icon name="bulb" size={14} /> Prepare the draft</button><span className="mini">takes up to a minute — every hazard then arrives “proposed”, with what changed from the base, to review and keep one by one</span></div>
       </form>
       <form action={resetBase} className="cb pt-0"><input type="hidden" name="id" value={a.id} /><button className="linkbtn">Choose another starting point</button></form>
     </section>

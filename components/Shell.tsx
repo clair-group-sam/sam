@@ -65,7 +65,7 @@ export default function Shell({ session, children }: Props) {
   );
 
   return (
-    <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")}>
+    <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")} data-ent={session.entity}>
       <div className={"sidewrap" + (compact ? " compact-w" : "")} style={compact ? { width: subs.length > 0 ? 88 : 62 } : undefined}
         onMouseLeave={() => { rail.leave(); subH.leave(); }}>
       <nav className={"rail" + (compact ? (rail.on ? " mini hover" : " mini") : "")} onMouseEnter={() => { if (compact) { rail.enter(); subH.leave(); } }}>
@@ -107,7 +107,7 @@ export default function Shell({ session, children }: Props) {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar session={session} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
-        {session.entity === "ALL" && <div className="groupband"><b>Group view</b> — lists show every entity in your scope ({session.entities.join(" · ")}). Pick an entity at the top-left to work on its documents, projects and files.</div>}
+        {session.entity === "ALL" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
         <main className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
@@ -141,19 +141,22 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   // the working entity: one at a time, always shown in full at the top-left; group view only for group functions
   const [entOpen, setEntOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  // DA v3 (06/11): the search is a button until used, so the bar holds at 1440 px; Ctrl / ⌘ K opens it
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => { if (searchOpen) { searchRef.current?.focus(); searchRef.current?.select(); } }, [searchOpen]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // FB-028 · Ctrl / ⌘ K focuses the search (full text of the published manuals) instead of doing nothing
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen(true); searchRef.current?.focus(); searchRef.current?.select(); }
       // FB-021 · Escape closes the open menus
-      if (e.key === "Escape") { setCreate(false); setMenu(false); setEntOpen(false); }
+      if (e.key === "Escape") { setCreate(false); setMenu(false); setEntOpen(false); setSearchOpen(false); }
     };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   const choices = session.entities;
   const cur = session.entity;
   const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
-  const curSub = cur === "ALL" ? `lists across every entity · ${choices.join(" · ")}` : `${ENT[cur]?.qual ?? ""} · ${ENT[cur]?.auth ?? ""}`;
+  const curSub = cur === "ALL" ? `lists across every entity · ${choices.join(", ")}` : `${ENT[cur]?.qual ?? ""} · ${ENT[cur]?.auth ?? ""}`;
   async function pick(ent: string) {
     setEntOpen(false);
     await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });
@@ -169,14 +172,18 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
       </div>
       {(choices.length > 1 || session.group) && (
         <nav className="entswitch" aria-label="Entity you work in">
-          {choices.map((e) => <button key={e} type="button" className={cur === e ? "on" : ""} aria-pressed={cur === e} title={`${ENT[e]?.name ?? e} — ${ENT[e]?.qual ?? ""} · ${ENT[e]?.auth ?? ""}`} onClick={() => cur !== e && pick(e)}>{e}</button>)}
-          {session.group && <button type="button" className={cur === "ALL" ? "on" : ""} aria-pressed={cur === "ALL"} title="Group view — lists across every entity" onClick={() => cur !== "ALL" && pick("ALL")}>Group</button>}
+          {choices.map((e) => <button key={e} type="button" className={cur === e ? "on" : ""} aria-pressed={cur === e} title={`${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`} onClick={() => cur !== e && pick(e)}>{e}</button>)}
+          {session.group && <button type="button" className={cur === "ALL" ? "on" : ""} aria-pressed={cur === "ALL"} title="Group view: lists across every entity" onClick={() => cur !== "ALL" && pick("ALL")}>Group</button>}
         </nav>
       )}
       <div className="topsearch">
-      <form className="searchbox" action="/docs/lib" method="get" role="search" title="Search the published manuals (title, chapter or text)">
-        <Icon name="search" size={14} /><input ref={searchRef} name="q" placeholder="Search manuals" aria-label="Search the manuals" /><kbd>Ctrl K</kbd>
-      </form>
+      {searchOpen ? (
+        <form className="searchbox" action="/docs/lib" method="get" role="search" title="Search the published manuals (title, chapter or text)" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !searchRef.current?.value) setSearchOpen(false); }}>
+          <Icon name="search" size={14} /><input ref={searchRef} name="q" placeholder="Search manuals" aria-label="Search the manuals" /><kbd>Ctrl K</kbd>
+        </form>
+      ) : (
+        <button type="button" className="searchbtn" onClick={() => setSearchOpen(true)} title="Search the published manuals (title, chapter or text)"><Icon name="search" size={14} /> Search <kbd>Ctrl K</kbd></button>
+      )}
       </div>
       {session.role !== "user" && (
         <div className="relative">
@@ -195,14 +202,14 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
       <Link href="/erp/activate" className="btn erp">ERP</Link>
       <div className="relative">
         <button type="button" className="user" onClick={() => setMenu((v) => !v)}>
-          <span className="avatar">{session.initials}</span>
-          <span className="who"><b>{session.name}</b><small>{session.person?.job_title ?? roleTitle(session)}</small></span>
-          <span className="caret">▾</span>
+          <span className="avatar" title={`${session.name}, ${session.person?.job_title ?? roleTitle(session)}`}>{session.initials}</span>
+          <span className="sr-only">{session.name}</span>
         </button>
         {menu && (
           <div className="menu" onMouseLeave={() => setMenu(false)}>
+            <div className="mi" style={{ cursor: "default" }}><b>{session.name}</b><small style={{ display: "block", color: "var(--slate6)" }}>{session.person?.job_title ?? roleTitle(session)}</small></div>
             <div className="mi muted">{session.email}</div>
-            <div className="mi muted">Scope: {session.group ? "Group function" : session.entities.join(", ") || "none"} · roles: {session.roles.join(", ") || "none"}</div>
+            <div className="mi muted">Scope: {session.group ? "Group function" : session.entities.join(", ") || "none"}. Roles: {session.roles.join(", ") || "none"}</div>
             <Link href="/api/me" className="mi" target="_blank">My access (JSON)</Link>
             <form action="/auth/signout" method="post"><button type="submit" className="mi">Sign out</button></form>
           </div>

@@ -46,7 +46,7 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
           return (
             <section key={r.id} className="card">
               <div className="ch" style={{ alignItems: "flex-start" }}>
-                <span><Link href={`/reg/ear/${r.key}`}><b>{r.short}</b></Link><div className="mini">{r.number}{r.number ? " · " : ""}{r.entities.filter((e) => !desk ? scope.includes(e) : true).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</div></span>
+                <span><Link href={`/reg/ear/${r.key}`}><b>{r.short}</b></Link><div className="mini">{r.number}{r.number ? ", " : ""}{r.entities.filter((e) => !desk ? scope.includes(e) : true).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</div></span>
                 <span style={{ textAlign: "right" }}><span className={"pill " + (r.current_version ? "green" : "amber")}>{r.current_version ?? "version not read yet"}</span>{r.version_since && <div className="mini">in S.A.M. since {r.version_since}</div>}</span>
               </div>
               <div className="cb">
@@ -83,7 +83,7 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
         <table className="tbl"><thead><tr><th>Text</th><th>Sections citing it</th><th>Manuals</th><th>In this menu</th></tr></thead><tbody>
           {cited.filter((c) => c.count > 0).sort((a, b) => b.count - a.count).map((c) => {
             const inMenu = !!c.key && regs.some((r) => r.key === c.key);
-            return <tr key={c.pattern}><td><b>{c.label}</b><div className="mini mono">“{c.pattern}”</div></td><td>{c.count}</td><td className="mini">{c.manuals.slice(0, 8).map((m) => `${m.entity} ${m.code} (${m.sections})`).join(" · ")}{c.manuals.length > 8 ? " …" : ""}</td><td>{inMenu ? <span className="pill green">yes</span> : <span className="pill amber">not yet</span>}</td></tr>;
+            return <tr key={c.pattern}><td><b>{c.label}</b><div className="mini mono">“{c.pattern}”</div></td><td>{c.count}</td><td className="mini">{c.manuals.slice(0, 8).map((m) => `${m.entity} ${m.code} (${m.sections})`).join(", ")}{c.manuals.length > 8 ? " …" : ""}</td><td>{inMenu ? <span className="pill green">yes</span> : <span className="pill amber">not yet</span>}</td></tr>;
           })}
           {!cited.some((c) => c.count > 0) && <tr><td colSpan={4} className="mini">No published manual text found in this scope.</td></tr>}
         </tbody></table></div></section>}

@@ -91,7 +91,7 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
                   <select name="verdict" className="inp" defaultValue="accept"><option value="accept">Verified — close the action</option><option value="back">Not complete — send back to the owner</option></select>
                   <button className="btn primary">Confirm</button></form>
               ) : <p className="mini">Done — waiting for the safety desk&apos;s verification.</p>)}
-              {a.status === "verified" && <p className="mini">✓ Verified by {a.verified_by ? nameOf.get(a.verified_by) ?? "" : ""} · {a.verified_at?.slice(0, 10)}{a.verified_note ? ` — ${a.verified_note}` : ""}</p>}
+              {a.status === "verified" && <p className="mini">Verified by {a.verified_by ? nameOf.get(a.verified_by) ?? "" : ""} · {a.verified_at?.slice(0, 10)}{a.verified_note ? ` — ${a.verified_note}` : ""}</p>}
               {effDue && (verify ? (
                 <form action={checkEffectiveness} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
                   <span className="mini"><b>Effectiveness</b>{a.effectiveness_due ? ` — planned on ${a.effectiveness_due}` : ""}: did the action remove or reduce the problem (new reports, audits, SPI)?</span>
@@ -99,7 +99,7 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
                   <textarea name="effectiveness_note" className="inp" rows={2} placeholder="What shows it (required if not effective)" />
                   <button className="btn">Record</button></form>
               ) : <p className="mini">Effectiveness to check{a.effectiveness_due ? ` on ${a.effectiveness_due}` : ""}.</p>)}
-              {a.effectiveness && <p className="mini">{a.effectiveness === "effective" ? "✓ Effective" : "✕ Not effective"} · {a.effectiveness_at?.slice(0, 10)}{a.effectiveness_note ? ` — ${a.effectiveness_note}` : ""}</p>}
+              {a.effectiveness && <p className="mini">{a.effectiveness === "effective" ? "Effective" : "Not effective"} · {a.effectiveness_at?.slice(0, 10)}{a.effectiveness_note ? ` — ${a.effectiveness_note}` : ""}</p>}
               {a.status === "cancelled" && <p className="mini">Cancelled.</p>}
             </div>
           </section>

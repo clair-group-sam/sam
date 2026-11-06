@@ -36,13 +36,13 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
       <div className="flex gap-2 mb-3">{[["", "Open"], ["closed", "Closed"], ["all", "All"]].map(([k, l]) => <Link key={k} href={k ? `/safe/reports?st=${k}` : "/safe/reports"} className={"btn" + ((st ?? "") === k ? " on" : "")}>{l}</Link>)}</div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th style={{ width: 90 }}>Report</th><th style={{ width: 70 }}>Entity</th><th>What</th><th style={{ width: 150 }}>Status</th><th style={{ width: 170 }}>MOR</th><th style={{ width: 80 }}>ERC</th></tr></thead>
+          <thead><tr><th style={{ width: 90 }}>Report</th><th className="entcol" style={{ width: 70 }}>Entity</th><th>What</th><th style={{ width: 150 }}>Status</th><th style={{ width: 170 }}>MOR</th><th style={{ width: 80 }}>ERC</th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
                 <td className="mono"><Link href={`/safe/reports/${r.id}`} className="underline">{r.id}</Link><SourceMark source={r.source} id={r.external_no} /></td>
-                <td><span className={"ent " + r.entity}>{r.entity}</span></td>
-                <td><Link href={`/safe/reports/${r.id}`}><b>{r.headline_en || r.headline}</b></Link><div className="mini">{new Date(r.received_at).toLocaleString("en-GB", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}{r.source && r.source !== "sam" ? ` · ${r.source === "flightlogger" ? "FlightLogger" : "Centrik"} ${r.external_no ?? ""}${r.report_type ? " " + r.report_type : ""}` : ""}{r.aircraft ? " · " + r.aircraft : ""}{r.anonymous ? " · anonymous" : ""}{r.a?.adrep?.length ? " · " + r.a.adrep.join(", ") : ""}</div></td>
+                <td className="entcol"><span className={"ent " + r.entity}>{r.entity}</span></td>
+                <td><Link href={`/safe/reports/${r.id}`}><b>{r.headline_en || r.headline}</b></Link><div className="mini">{new Date(r.received_at).toLocaleString("en-GB", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}{r.source && r.source !== "sam" ? ` · ${r.source === "flightlogger" ? "FlightLogger" : "Centrik"} ${r.external_no ?? ""}${r.report_type ? " " + r.report_type : ""}` : ""}{r.aircraft ? ", " + r.aircraft : ""}{r.anonymous ? " · anonymous" : ""}{r.a?.adrep?.length ? ", " + r.a.adrep.join(", ") : ""}</div></td>
                 <td><span className={"pill " + (STATUS[r.status]?.[1] ?? "")}>{STATUS[r.status]?.[0] ?? r.status}</span></td>
                 <td><span className={"pill " + (r.clock.state === "late" ? "red" : r.clock.state === "running" ? (r.clock.left <= 24 ? "red" : "amber") : "green")}>{r.clock.label}</span></td>
                 <td>{r.a?.erc_value != null ? <span className={"pill " + ercTone(r.a.erc_value)}>{r.a.erc_value}</span> : r.source_erc != null ? <span className={"pill " + (r.source_erc >= 300 ? "red" : r.source_erc >= 20 ? "amber" : "green")} title="ERC as scored in Centrik">{r.source_erc}</span> : <span className="mini">—</span>}</td>

@@ -7,6 +7,7 @@ import { ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { AUDITOR_DOMAINS, AUDITOR_STATUS, daysTo, type Auditor, type AuditorDoc, type AuditorItem } from "@/lib/compliance-registers";
 import { today } from "@/lib/authority";
 import { removeDoc, saveAuditor, saveItem, setStatus, uploadDoc } from "./actions";
+import { Icon } from "@/lib/icons";
 
 type Sp = { a?: string };
 /* COMP-05 · Internal auditors (ENR-CM-09 / PRO-CM-04): who may audit what, the qualification path, the approval and its validity, the certificates. */
@@ -49,7 +50,7 @@ export default async function Auditors({ searchParams }: { searchParams: Promise
         <table className="tbl"><thead><tr><th>Auditor</th><th>Entities</th><th>Domains · cannot audit</th><th>Approval</th><th>Audits</th><th>Status</th></tr></thead><tbody>{all.map((a) => { const au = auditsOf(a.person_id); const last = au.map((x) => x.done_on ?? "").sort().pop();
           return <tr key={a.id}><td><Link href={`/comp/auditors?a=${a.id}#auditor`}><b>{name(a.person_id)}</b></Link>{a.lead && <span className="pill" style={{ marginLeft: 6 }}>Lead</span>}{a.external && <div className="mini">{a.external}</div>}</td>
             <td>{a.entities.map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</td>
-            <td className="mini">{a.domains.join(" · ") || "—"}{a.exclusions.length > 0 && <div style={{ color: "#8a5a00" }}>Not: {a.exclusions.join(" · ")}</div>}</td>
+            <td className="mini">{a.domains.join(", ") || "—"}{a.exclusions.length > 0 && <div style={{ color: "#8a5a00" }}>Not: {a.exclusions.join(", ")}</div>}</td>
             <td className="mini">{a.approved_on ? `${a.approved_on} → ${a.valid_until ?? "—"}` : "—"}{a.approved_by && <div>by {name(a.approved_by)}</div>}</td>
             <td className="mini">{au.length}{last ? ` · last ${last}` : ""}</td>
             <td><span className={"pill " + tone(a)}>{AUDITOR_STATUS[a.status]}{a.status === "approved" && expiring(a) ? ` · ends ${a.valid_until}` : ""}</span></td></tr>; })}</tbody></table>)}</div></section>
@@ -63,7 +64,7 @@ export default async function Auditors({ searchParams }: { searchParams: Promise
             {(desk || am) && open.status === "approved" && <form action={setStatus} className="flex gap-1"><input type="hidden" name="id" value={open.id} /><input type="hidden" name="status" value="suspended" /><input name="note" className="inp" placeholder="Why" style={{ width: 160 }} required /><button className="btn sm">Suspend</button></form>}</span></div>
           <div className="cb">
             <div className="mini mb-2">PRO-CM-04 qualification path</div>
-            <table className="tbl"><tbody>{((items ?? []) as AuditorItem[]).map((it) => <tr key={it.id}><td style={{ width: 24 }}>{it.done ? <span className="pill green">✓</span> : <span className="pill">·</span>}</td><td>{it.label}{(it.evidence || it.on_date) && <div className="mini">{it.evidence}{it.on_date ? ` · ${it.on_date}` : ""}{it.valid_until ? ` → ${it.valid_until}` : ""}</div>}</td>
+            <table className="tbl"><tbody>{((items ?? []) as AuditorItem[]).map((it) => <tr key={it.id}><td style={{ width: 24 }}>{it.done ? <span className="pill green"><Icon name="check" size={12} /></span> : <span className="pill">open</span>}</td><td>{it.label}{(it.evidence || it.on_date) && <div className="mini">{it.evidence}{it.on_date ? ` · ${it.on_date}` : ""}{it.valid_until ? ` → ${it.valid_until}` : ""}</div>}</td>
               {desk && <td style={{ width: 60 }}><details className="inlineedit" style={{ position: "relative" }}><summary className="btn sm">Edit</summary><form action={saveItem} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 30, width: 360, zIndex: 5 }}><input type="hidden" name="id" value={it.id} /><input type="hidden" name="auditor" value={open.id} />
                 <label className="mini"><input type="checkbox" name="done" value="1" defaultChecked={it.done} /> Done</label><input name="evidence" className="inp" defaultValue={it.evidence ?? ""} placeholder="Course, reference, who" /><div className="grid grid-cols-2 gap-2"><input type="date" name="on_date" className="inp" defaultValue={it.on_date ?? ""} /><input type="date" name="valid_until" className="inp" defaultValue={it.valid_until ?? ""} /></div><div className="flex justify-end"><button className="btn primary sm">Save</button></div></form></details></td>}</tr>)}</tbody></table>
             {desk && <details className="mt-3"><summary className="mini">Scope and settings</summary><form action={saveAuditor} className="grid gap-2 mt-2"><input type="hidden" name="id" value={open.id} />

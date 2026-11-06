@@ -82,8 +82,8 @@ export function groupProjects(items: InboxItem[], today: string): InboxItem[] {
     ts.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
     const late = ts.filter((t) => t.due && t.due < today).length;
     const blocked = ts.filter((t) => t.detail === "blocked").length;
-    const parts = [`${ts.length} task${ts.length > 1 ? "s" : ""} for you`, late && `${late} late`, blocked && `${blocked} blocked`, `next: ${ts[0].title}`].filter(Boolean);
-    out.push({ ...ts[0], id: "proj:" + link, title: ts[0].ctx ?? "Project", ctx: undefined, ctxLink: undefined, link, detail: parts.join(" · ") });
+    const parts = [`${ts.length} task${ts.length > 1 ? "s" : ""} for you`, late && `${late} late`, blocked && `${blocked} blocked`].filter(Boolean);
+    out.push({ ...ts[0], id: "proj:" + link, title: ts[0].ctx ?? "Project", ctx: undefined, ctxLink: undefined, link, detail: `${parts.join(", ")}. Next: ${ts[0].title}` });
   }
   // FB-040 · safety actions: from 3 per entity, one line (count, late, next two) that opens the Actions list — never a wall of actions
   const acts = new Map<string, InboxItem[]>();
@@ -93,9 +93,9 @@ export function groupProjects(items: InboxItem[], today: string): InboxItem[] {
     if (ts.length < 3) { rest.push(...ts); continue; }
     ts.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
     const late = ts.filter((t) => t.due && t.due < today).length;
-    const next = ts.slice(0, 2).map((t) => t.title.replace(/^[A-Z]+-\d+\s+—\s+/, "")).join(" · ");
-    const parts = [`${ts.length} actions for you`, late && `${late} late`, `next: ${next}`].filter(Boolean);
-    rest.push({ ...ts[0], id: "acts:" + entity, title: "Safety actions", ctx: undefined, ctxLink: undefined, link: `/safe/actions?mine=1`, detail: parts.join(" · ") });
+    const next = ts.slice(0, 2).map((t) => t.title.replace(/^[A-Z]+-\d+\s+—\s+/, "")).join("; ");
+    const parts = [`${ts.length} actions for you`, late && `${late} late`].filter(Boolean);
+    rest.push({ ...ts[0], id: "acts:" + entity, title: "Safety actions", ctx: undefined, ctxLink: undefined, link: `/safe/actions?mine=1`, detail: `${parts.join(", ")}. Next: ${next}` });
   }
   return rest.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
 }

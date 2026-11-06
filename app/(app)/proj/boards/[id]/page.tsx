@@ -10,6 +10,7 @@ import { DEPARTMENTS, LINK_LABEL, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABE
 import { addTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startDraftForTask, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
 import EntityBand from "@/components/EntityBand";
+import { Icon } from "@/lib/icons";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "not_needed", "blocked"];
 
@@ -50,7 +51,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const personIds = [...new Set([p.owner_person, ...tasks.map((t) => t.done_by), ...tasks.map((t) => t.owner_person)].filter((x): x is string => !!x))];
   const { data: people } = personIds.length ? await db.from("people").select("id,display_name").in("id", personIds) : { data: [] };
   const nameOf = new Map(((people ?? []) as { id: string; display_name: string }[]).map((x) => [x.id, x.display_name]));
-  const pivotTxt = Object.entries(p.pivot ?? {}).map(([k, v]) => `${PIVOT_LABEL[k] ?? k} ${v}`).join(" · ");
+  const pivotTxt = Object.entries(p.pivot ?? {}).map(([k, v]) => `${PIVOT_LABEL[k] ?? k} ${v}`).join(", ");
   const groups = DEPARTMENTS.map((d) => ({ dept: d, tasks: work.filter((t) => departmentOf(t.owner_role) === d).sort((a, b) => (proj.get(a.id)!.start < proj.get(b.id)!.start ? -1 : proj.get(a.id)!.start > proj.get(b.id)!.start ? 1 : a.ord - b.ord)) })).filter((g) => g.tasks.length);
 
   return (
@@ -71,7 +72,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       <div className="grid grid-cols-3 gap-4 items-start">
         <div className="col-span-2 grid gap-4">
-          <div className="tabs"><Link href={`/proj/boards/${p.id}`} className={"tab" + (view === "tasks" ? " on" : "")}>Tasks by department</Link><Link href={`/proj/boards/${p.id}?view=gantt`} className={"tab" + (view === "gantt" ? " on" : "")}>Timeline</Link><span className="mini ml-auto">⚡ critical path · dates projected from durations and dependencies</span></div>
+          <div className="tabs"><Link href={`/proj/boards/${p.id}`} className={"tab" + (view === "tasks" ? " on" : "")}>Tasks by department</Link><Link href={`/proj/boards/${p.id}?view=gantt`} className={"tab" + (view === "gantt" ? " on" : "")}>Timeline</Link><span className="mini ml-auto"><Icon name="bolt" size={13} /> critical path. Dates are projected from durations and dependencies.</span></div>
           {view === "gantt" && <section className="card"><div className="ch"><span className="eyebrow">Timeline</span><span className="mini">projected · {fr(p.started_at)} → {end ? fr(end) : "—"}</span></div><div className="cb"><Gantt projectId={p.id} phases={phases} tasks={tasks} proj={proj} startedAt={p.started_at} target={p.target_date} /></div></section>}
           {view === "tasks" && groups.map((g) => {
             const done = g.tasks.filter((t) => t.status === "done").length, counted = g.tasks.filter((t) => t.status !== "not_needed").length;
@@ -83,22 +84,22 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     <tr key={t.id} id={`t-${t.id}`} className={"prow" + (t.status === "done" ? " isdone" : t.status === "not_needed" ? " muted" : "")}>
                       <td style={{ width: 34 }}>
                         <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
-                          <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!canWork || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? "✓" : ""}</button></form>
+                          <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!canWork || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done — click to reopen" : "Mark as done"}>{t.status === "done" ? <Icon name="check" size={14} /> : ""}</button></form>
                       </td>
                       <td style={{ width: 96 }}>
-                        {t.status === "todo" && pj.openDeps.length > 0 ? <span className="pill later" title={`After: ${openDs.map((d) => d.title).join(" · ")}`}>Later</span>
+                        {t.status === "todo" && pj.openDeps.length > 0 ? <span className="pill later" title={`After: ${openDs.map((d) => d.title).join(", ")}`}>Later</span>
                           : t.status === "todo" && canWork ? <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start now — it also starts by itself when the linked manual or a document is touched">To do ▸</button></form>
                           : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
                       </td>
                       <td>
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          {pj.critical && open && <span title="critical path">⚡</span>}
+                          {pj.critical && open && <span title="critical path"><Icon name="bolt" size={13} /></span>}
                           <b>{t.title}</b>
                           {lk && t.status === "done" && !t.link_id && (lk.tone === "" || lk.tone === "amber") && lk.state !== "filed" ? ( // FB-031 · ticked done by hand, object not in S.A.M.: no call to action
                             <span className="objlink" title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> done outside S.A.M.{t.link_kind === "certificate" ? <> · <Link className="underline" href={lk.href}>attach the certificate</Link></> : t.link_kind === "manual" && lk.state === "create it" ? <> · {t.link_ref} not in S.A.M. yet</> : null}</span>
                           ) : lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label} · <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? ` · ${t.link_ref}` : ""}</span> : null}
-                          {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}>📎 {tf.length}</span>}
-                          {openDs.length > 0 && t.status !== "todo" && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(" · ")}`}>waits for {openDs.length}</span>}
+                          {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}><Icon name="clip" size={13} /> {tf.length}</span>}
+                          {openDs.length > 0 && t.status !== "todo" && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(", ")}`}>waits for {openDs.length}</span>}
                         </div>
                         {t.detail && open && <div className="mini">{t.detail}</div>}
                         {t.status === "not_needed" && t.not_needed_reason && <div className="mini">Not needed: {t.not_needed_reason}</div>}
@@ -112,10 +113,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                               {t.link_kind === "manual" && !t.link_id && canWork && open && (
                                 <form action={startDraftForTask} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button className="btn" type="submit">Start the draft of {t.link_ref} now</button><span className="mini">{pj.openDeps.length ? "otherwise S.A.M. opens it once the previous tasks are done" : ""}</span></form>
                               )}
-                              {ds.length > 0 && <div className="mini">After: {ds.map((d) => `${d.title}${d.status === "done" ? " ✓" : ""}`).join(" · ")}</div>}
+                              {ds.length > 0 && <div className="mini">After: {ds.map((d) => `${d.title}${d.status === "done" ? " (done)" : ""}`).join(", ")}</div>}
                               {t.source && <div className="mini">{/^https?:/.test(t.source) ? <a className="underline" href={t.source} target="_blank" rel="noreferrer">Source</a> : t.source}</div>}
-                              {t.note && <div className="mini">✎ {t.note}</div>}
-                              {tf.map((f) => <div key={f.id} className="mini flex items-center gap-2">📎 {f.path ? <a className="underline" href={`/api/files/${f.path}`} target="_blank" rel="noreferrer">{f.name}</a> : <>{f.name} <span>(on the server)</span></>}{f.size ? <span>{Math.round(f.size / 1024)} KB</span> : null}<span>{fr(f.at)}</span>{mayEdit && <form action={removeTaskFile}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="file_id" value={f.id} /><button className="linkbtn" type="submit">remove</button></form>}</div>)}
+                              {t.note && <div className="mini"><Icon name="pencil" size={12} /> {t.note}</div>}
+                              {tf.map((f) => <div key={f.id} className="mini flex items-center gap-2"><Icon name="clip" size={13} /> {f.path ? <a className="underline" href={`/api/files/${f.path}`} target="_blank" rel="noreferrer">{f.name}</a> : <>{f.name} <span>(on the server)</span></>}{f.size ? <span>{Math.round(f.size / 1024)} KB</span> : null}<span>{fr(f.at)}</span>{mayEdit && <form action={removeTaskFile}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="file_id" value={f.id} /><button className="linkbtn" type="submit">remove</button></form>}</div>)}
                               {canWork && open && (
                                 <form action={uploadTaskFile} className="flex items-center gap-2 flex-wrap" encType="multipart/form-data"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
                                   <input type="file" name="file" className="inp" style={{ maxWidth: 280 }} /><input name="name" className="inp" style={{ maxWidth: 240 }} placeholder="or the name of a file kept on the server" /><button className="btn" type="submit">Attach a document</button></form>
@@ -135,7 +136,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                                   <label className="col-span-2"><span className="mini">Note</span><input name="note" className="inp" defaultValue={t.note ?? ""} /></label>
                                   <label><span className="mini">Status</span><select name="status" className="inp" defaultValue={t.status}>{STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}</select></label>
                                   <label className="col-span-4"><span className="mini">If not needed — why (kept for the authority)</span><input name="not_needed_reason" className="inp" defaultValue={t.not_needed_reason ?? ""} /></label>
-                                  <div className="col-span-2 flex gap-2 items-end"><button className="btn primary" type="submit">Save</button><button className="btn" type="submit" formAction={deleteTask} title="Delete this task">✕ Delete</button></div>
+                                  <div className="col-span-2 flex gap-2 items-end"><button className="btn primary" type="submit">Save</button><button className="btn" type="submit" formAction={deleteTask} title="Delete this task">Delete</button></div>
                                 </form>
                               )}
                             </div>
@@ -184,7 +185,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                       {cmm && a.status !== "done" && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1" title="Application already granted outside S.A.M. (project taken over from Monday / Centrik)"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="done" /><input name="done_at" type="date" className="inp" style={{ height: 22, fontSize: 11, width: 130 }} /><button className="linkbtn" type="submit">already done</button></form>}
                       {cmm && a.status === "done" && !a.link_id && active && <form action={updateTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="todo" /><button className="linkbtn" type="submit">reopen</button></form>}
                     </div>
-                    {up.length > 0 && !f && <div className="mini" style={{ color: "var(--slate5)" }} title={up.map((t) => `${t.status === "done" ? "✓" : "·"} ${t.title}`).join("\n")}>{up.filter((t) => t.status !== "done").slice(0, 3).map((t) => t.title).join(" · ")}{up.filter((t) => t.status !== "done").length > 3 ? " · …" : ""}</div>}
+                    {up.length > 0 && !f && <div className="mini" style={{ color: "var(--slate5)" }} title={up.map((t) => `${t.title}${t.status === "done" ? " (done)" : ""}`).join("\n")}>{up.filter((t) => t.status !== "done").slice(0, 3).map((t) => t.title).join(", ")}{up.filter((t) => t.status !== "done").length > 3 ? " · …" : ""}</div>}
                   </div>);
               })}
               {!apps.length && <p className="mini text-slate6">No application in this project.</p>}

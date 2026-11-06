@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { linkTargets } from "@/app/(app)/docs/editor/[rev]/actions";
+import { Icon } from "@/lib/icons";
 
 export type Chap = { ref: string; title: string | null; uid: string };
 type Man = { id: string; entity: string; code: string; title: string };
@@ -23,7 +24,7 @@ export default function LinkPicker({ manualId, chapters, initialUrl, onPick, onR
         {([["self", "This manual"], ["other", "Another manual"], ["web", "Web address"]] as const).map(([k, l]) => <button key={k} type="button" className={"tab" + (tab === k ? " on" : "")} onClick={() => setTab(k)}>{l}</button>)}
         <span className="flex-1" />
         {initialUrl && <button type="button" className="btn" onClick={onRemove}>Remove the link</button>}
-        <button type="button" className="btn" onClick={onClose}>✕</button>
+        <button type="button" className="btn" onClick={onClose}><Icon name="x" size={14} /><span className="sr-only">Remove</span></button>
       </div>
       {tab !== "web" && <input className="inp mb-2" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter chapters…" />}
       {tab === "self" && <div className="lplist">{chapters.filter(f).map((c) => <button key={c.uid} type="button" onClick={() => onPick(`/docs/link/ch/${manualId}/${c.uid}`, `${c.ref} ${c.title ?? ""}`.trim())}><span className="mono">{c.ref}</span> {c.title}</button>)}</div>}

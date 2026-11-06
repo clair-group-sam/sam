@@ -31,28 +31,28 @@ export default async function Inbox() {
       <PageHeader eyebrow="S.A.M. · Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
       <CoffeeBox recap={recap} connected={connected} />
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? ` · + ${testCount} test` : "") + (tasks.length !== all.length ? ` · ${tasks.length} lines (a project = one line)` : "")} />
-        <Metric label="Overdue tasks" value={late} tone={late ? "red" : undefined} hint="past due date" />
-        <Metric label="Scope" value={s.group ? "Group" : s.entities.join(" · ") || "—"} hint={s.roles.join(", ") || "no role yet"} />
+        <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? `, + ${testCount} test` : "") + (tasks.length !== all.length ? `, ${tasks.length} lines (a project = one line)` : "")} />
+        <Metric label="Overdue tasks" value={late} tone={late ? "red" : "green"} hint={late ? "past due date" : "nothing late"} />
+        <Metric label="Scope" value={s.group ? "Group" : s.entities.join(", ") || "—"} hint={s.roles.join(", ") || "no role yet"} />
       </div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th style={{ width: 70 }}>Entity</th><th style={{ width: 160 }}>What</th><th style={{ width: 110 }}>Due</th><th>Item</th></tr></thead>
+          <thead><tr><th className="entcol" style={{ width: 70 }}>Entity</th><th style={{ width: 160 }}>What</th><th style={{ width: 110 }}>Due</th><th>Item</th></tr></thead>
           <tbody>
             {tasks.map((t) => (
               <tr key={t.id}>
-                <td><span className={"ent " + t.entity}>{t.entity}</span></td>
+                <td className="entcol"><span className={"ent " + t.entity}>{t.entity}</span></td>
                 <td><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span>{isTest(t) && <span className="pill ml-1" title={TEST_PILL_TITLE}>test</span>}</td>
-                <td className={"mono" + (t.due && t.due < today ? " red" : "")}>{t.due ?? "—"}</td>
+                <td className={"due" + (t.due && t.due < today ? " red" : "")}>{t.due ?? ""}{t.due && t.due < today && <small> late</small>}</td>
                 <td>
-                  {t.ctx && <div className="ctx">{t.kind === "project" ? "Project · " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
+                  {t.ctx && <div className="ctx">{t.kind === "project" ? "Project: " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
                   {t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}
                 </td>
               </tr>
             ))}
             {!tasks.length && (
               <tr><td colSpan={4} className="p-6 text-slate6">
-                {s.person ? "Nothing to do." : "Your account is not yet attached to a person in S.A.M. — ask the CMM to add you."}
+                {s.person ? "Nothing to do." : "Your account is not yet attached to a person in S.A.M. Ask the CMM to add you."}
               </td></tr>
             )}
           </tbody>

@@ -18,10 +18,10 @@ export default async function Drafts() {
         <section className="card"><div className="ch"><span className="eyebrow">Reading</span></div><div className="cb mini">Reading is not a step: it is tracked per reader on the manual page (Readers tab) and in Communication › Read tracking.</div></section>
       </div></HowItWorks>
       <section className="card">
-        <table className="tbl"><thead><tr><th>Entity</th><th>Manual</th><th>Draft</th><th>Step</th><th>Started</th></tr></thead>
+        <table className="tbl"><thead><tr><th className="entcol">Entity</th><th>Manual</th><th>Draft</th><th>Step</th><th>Started</th></tr></thead>
           <tbody>
             {rows.map(({ manual, working }) => (
-              <tr key={working.id}><td><span className={"ent " + manual.entity}>{manual.entity}</span></td>
+              <tr key={working.id}><td className="entcol"><span className={"ent " + manual.entity}>{manual.entity}</span></td>
                 <td><Link href={working.step === "draft" || working.step === "approved_np" ? `/docs/editor/${working.id}` : `/docs/manual/${manual.id}?rev=${working.id}`}><b>{manual.code} — {manual.title}</b></Link></td>
                 <td className="mono">Iss {working.issue} Rev {working.rev}</td><td><span className="pill amber">{STEP_LABEL[working.step]}</span></td><td className="mono">{working.created_at.slice(0, 10)}</td></tr>
             ))}

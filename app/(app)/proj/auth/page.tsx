@@ -56,14 +56,14 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
       </div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th>Entity</th><th>Type</th><th>File</th><th>Stage</th><th>Reference</th><th>Owner</th><th>At authority</th><th>Target</th><th>Next action</th></tr></thead>
+          <thead><tr><th className="entcol">Entity</th><th>Type</th><th>File</th><th>Stage</th><th>Reference</th><th>Owner</th><th>At authority</th><th>Target</th><th>Next action</th></tr></thead>
           <tbody>
             {files.map((f) => {
               const d = daysAtAuthority(f);
               const late = AT_AUTHORITY.includes(f.stage) && f.target_date && f.target_date < t0;
               return (
                 <tr key={f.id}>
-                  <td><span className={"ent " + f.entity}>{f.entity}</span></td>
+                  <td className="entcol"><span className={"ent " + f.entity}>{f.entity}</span></td>
                   <td className="mono"><Link className="underline" href={link({ type: f.type_code })} title={typeMap.get(f.type_code)?.name}>{f.type_code}</Link></td>
                   <td><Link href={`/proj/auth/${f.id}`} className="underline"><b>{f.title}</b></Link><div className="mini">{f.portal ?? f.authority}{f.trigger_note ? ` · ${f.trigger_note}` : ""}</div></td>
                   <td><span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{f.rounds > 0 && <div className="mini">{f.rounds} round{f.rounds > 1 ? "s" : ""}</div>}</td>

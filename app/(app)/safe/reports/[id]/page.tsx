@@ -12,6 +12,7 @@ import { createAssessment, dismissMatch, linkReport, suggestForReport } from "..
 import type { Suggestion } from "@/lib/risk-match";
 import { ACTION_STATUS } from "@/lib/actions-shared";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
+import { Icon } from "@/lib/icons";
 
 export const maxDuration = 60;
 type Rep = { id: string; entity: string; received_at: string; event_date: string | null; event_time_utc: string | null; aircraft: string | null; flight_ref: string | null; phase: string | null; location: string | null; headline: string; headline_en: string | null; narrative: string; narrative_en: string | null; complements: Record<string, string>; contributing: string | null; anonymous: boolean; reporter_person: string | null; status: string; language: string | null; feedback: string | null; mor_ref: string | null; mor_filed_at: string | null; source?: string; external_no?: string | null; report_type?: string | null; reporter_name?: string | null; source_erc?: number | null; occurrence_class?: string | null; risk_category?: string | null; event_type?: string | null; investigation?: string | null; findings?: string | null; closed_by_name?: string | null; hazard_label?: string | null };
@@ -66,7 +67,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <div className="repgrid2">
         <div>
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">The report, as sent</span><span className="mini">{r.source && r.source !== "sam" ? (seesReporter(s) ? (r.reporter_name ?? (r.anonymous ? "anonymous" : "—")) + " · " : "") + `imported from ${r.source === "flightlogger" ? "FlightLogger" : "Centrik"} · ${r.external_no ?? ""}` : r.anonymous ? "anonymous" : who ? `${who.display_name}${who.job_title ? " · " + who.job_title : ""}` : seesReporter(s) ? "reporter not found" : "reporter identity: SM / FSO only"}</span></div>
+            <div className="ch"><span className="eyebrow">The report, as sent</span><span className="mini">{r.source && r.source !== "sam" ? (seesReporter(s) ? (r.reporter_name ?? (r.anonymous ? "anonymous" : "—")) + ", " : "") + `imported from ${r.source === "flightlogger" ? "FlightLogger" : "Centrik"} · ${r.external_no ?? ""}` : r.anonymous ? "anonymous" : who ? `${who.display_name}${who.job_title ? ", " + who.job_title : ""}` : seesReporter(s) ? "reporter not found" : "reporter identity: SM / FSO only"}</span></div>
             <div className="cb">
               <table className="tbl mb-3"><tbody>
                 <tr><td className="mini" style={{ width: 130 }}>When</td><td>{r.event_date ?? "—"} {r.event_time_utc ? r.event_time_utc.slice(0, 5) + " UTC" : ""}</td></tr>
@@ -101,8 +102,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           )}
 
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">Journal</span><span className="mini">append-only · ✉ = seen by the reporter</span></div>
-            <div className="cb"><ul className="journal">{events.map((e) => <li key={e.id}><span className="mini mono mr-2">{when(e.at)}</span>{e.to_reporter && <span title="seen by the reporter">✉ </span>}<b>{e.kind}</b> — {e.note}</li>)}</ul></div>
+            <div className="ch"><span className="eyebrow">Journal</span><span className="mini">append-only. <Icon name="mail" size={12} /> means seen by the reporter</span></div>
+            <div className="cb"><ul className="journal">{events.map((e) => <li key={e.id}><span className="mini mono mr-2">{when(e.at)}</span>{e.to_reporter && <span title="seen by the reporter"><Icon name="mail" size={13} /> </span>}<b>{e.kind}</b> — {e.note}</li>)}</ul></div>
           </section>
 
           {!closed && (
@@ -166,7 +167,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               <div className="ch"><span className="eyebrow">Suggestions</span></div>
               <div className="cb">
                 {a?.questions?.length ? <><div className="eyebrow mb-1">Questions for the reporter</div><ul className="mini mb-3">{a.questions.map((q, i) => <li key={i}>· {q}</li>)}</ul></> : null}
-                {a?.suggested_actions?.length ? <><div className="eyebrow mb-1">Actions to consider</div><ul className="mini">{a.suggested_actions.map((q, i) => <li key={i} className="flex gap-2 items-start mb-1"><span className="flex-1">· {q}</span>{isSafetyDesk(s) && (actions.some((x) => x.title === q) ? <span className="mini">✓ raised</span> : <Link className="btn" href={`/safe/actions/new?entity=${r.entity}&report=${r.id}&title=${encodeURIComponent(q)}`}>Raise</Link>)}</li>)}</ul></> : null}
+                {a?.suggested_actions?.length ? <><div className="eyebrow mb-1">Actions to consider</div><ul className="mini">{a.suggested_actions.map((q, i) => <li key={i} className="flex gap-2 items-start mb-1"><span className="flex-1">{q}</span>{isSafetyDesk(s) && (actions.some((x) => x.title === q) ? <span className="mini">Raised</span> : <Link className="btn" href={`/safe/actions/new?entity=${r.entity}&report=${r.id}&title=${encodeURIComponent(q)}`}>Raise</Link>)}</li>)}</ul></> : null}
               </div>
             </section>
           ) : null}
@@ -176,10 +177,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <div className="cb grid gap-3">
               {linked.length > 0 && <div className="mini">Linked to: {linked.map((l) => <Link key={l.id} className="underline mr-2" href={`/safe/risk/${l.id}`}>{l.ref} {l.title}</Link>)}</div>}
               {isSafetyDesk(s) && (mt ? sugg.filter((x) => !linked.some((l) => l.id === x.id)).map((x) => (
-                <div key={x.id} className="flex gap-2 items-center"><span className="flex-1">🤝 <Link className="underline mono" href={`/safe/risk/${x.id}`}>{x.ref}</Link> {x.title} <span className={"pill " + (x.score >= 0.8 ? "green" : "amber")}>{Math.round(x.score * 100)}%</span>{x.why && <div className="mini">{x.why}</div>}</span>
+                <div key={x.id} className="flex gap-2 items-center"><span className="flex-1"><Icon name="bulb" size={14} /> <Link className="underline mono" href={`/safe/risk/${x.id}`}>{x.ref}</Link> {x.title} <span className={"pill " + (x.score >= 0.8 ? "green" : "amber")}>{Math.round(x.score * 100)}%</span>{x.why && <div className="mini">{x.why}</div>}</span>
                   <form action={linkReport}><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="hazard_id" value={x.id} /><button className="btn">Link</button></form>
-                  <form action={dismissMatch}><input type="hidden" name="kind" value="report" /><input type="hidden" name="subject" value={r.id} /><input type="hidden" name="other" value={x.id} /><button className="btn" title="Not this hazard">✕</button></form></div>))
-                : hazOpts.length > 0 && <form action={suggestForReport}><input type="hidden" name="report_id" value={r.id} /><button className="btn">🤝 Which hazard of the log?</button></form>)}
+                  <form action={dismissMatch}><input type="hidden" name="kind" value="report" /><input type="hidden" name="subject" value={r.id} /><input type="hidden" name="other" value={x.id} /><button className="btn" title="Not this hazard"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></div>))
+                : hazOpts.length > 0 && <form action={suggestForReport}><input type="hidden" name="report_id" value={r.id} /><button className="btn"><Icon name="bulb" size={14} /> Which hazard of the log?</button></form>)}
               {mt && !sugg.length && !linked.length && <p className="mini">SAM found no hazard of the log for this occurrence — create a new entry if it is a lasting hazard.</p>}
               {hazOpts.length > 0 && (
                 <form action={linkReport} className="flex gap-2"><input type="hidden" name="report_id" value={r.id} />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SOURCES, hhmm, type Recap } from "@/lib/coffee";
 import { brewCoffee } from "@/app/(app)/home/coffee/actions";
 import { BrewButton } from "@/components/BrewButton";
+import { Icon } from "@/lib/icons";
 
 /** Same sources as the last recap when brewing again. */
 export function SameSources({ recap }: { recap: Recap }) {
@@ -14,11 +15,11 @@ export function CoffeeBox({ recap, connected }: { recap: Recap | null; connected
     <section className="card coffee-box mb-5">
       <div className="cb">
         <div className="cf-head">
-          <span className="cf-cup" aria-hidden>☕</span>
+          <span className="cf-cup" aria-hidden><Icon name="coffee" size={26} /></span>
           <div className="flex-1 min-w-0">
             <b>Morning coffee</b>
-            {recap ? <div className="mini">Today&apos;s recap was prepared at {hhmm(recap.at)}{(() => { const h = Math.floor((Date.now() - new Date(recap.at).getTime()) / 36e5); return h >= 3 ? <b> — {h} h ago; the list below is live, brew again for a fresh recap</b> : null; })()}.{recap.synthesis ? " " + recap.synthesis : ""}</div>
-              : <div className="mini">Your agenda, unread mail and Teams since yesterday evening, and what is due in S.A.M. — prepared only when you ask, read-only, deleted tonight.</div>}
+            {recap ? <div className="mini">Today&apos;s recap was prepared at {hhmm(recap.at)}{(() => { const h = Math.floor((Date.now() - new Date(recap.at).getTime()) / 36e5); return h >= 3 ? <b>, {h} h ago. The list below is live; brew again for a fresh recap</b> : null; })()}.{recap.synthesis ? " " + recap.synthesis : ""}</div>
+              : <div className="mini">Your agenda, unread mail and Teams since yesterday evening, and what is due in S.A.M. Prepared only when you ask, read-only, deleted tonight.</div>}
           </div>
           {recap ? (
             <form action={brewCoffee} className="flex gap-2 shrink-0">
@@ -41,7 +42,7 @@ export function CoffeeBox({ recap, connected }: { recap: Recap | null; connected
               })}
             </div>
             <div className="flex flex-col items-end gap-1">
-              <BrewButton label="☕ Start my morning coffee" />
+              <BrewButton label="Start my morning coffee" />
               {!connected && <span className="mini">Outlook &amp; Teams: sign out of S.A.M. and sign in again once to connect them.</span>}
             </div>
           </form>

@@ -13,6 +13,7 @@ import { OrgChartNode } from "@/components/OrgChartNode";
 import LinkPicker, { type Chap } from "@/components/LinkPicker";
 import { saveSection, revertSection, uploadImage, orgSnapshot } from "@/app/(app)/docs/editor/[rev]/actions";
 import AiPanel from "@/components/AiPanel";
+import { Icon } from "@/lib/icons";
 
 type Props = { revisionId: string; sectionId: string; refCode: string; title: string; html: string; changed: boolean; editable: boolean; frozenBy?: string | null; baseRevLabel?: string; manualId?: string; chapters?: Chap[]; aiRequest?: string };
 
@@ -166,24 +167,24 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
           <B label="+ Col" act={() => editor.chain().focus().addColumnAfter().run()} />
           <B label="− Row" act={() => editor.chain().focus().deleteRow().run()} />
           <B label="− Col" act={() => editor.chain().focus().deleteColumn().run()} />
-          <B label="✕ Table" act={() => editor.chain().focus().deleteTable().run()} />
+          <B label="Delete table" act={() => editor.chain().focus().deleteTable().run()} />
           <span className="sep" />
-          <B label="🔗 Link" title="Link to a chapter, another manual or a web address" on={editor.isActive("link") || linking} act={() => setLinking((v) => !v)} />
-          <B label="🖼 Image" title="Insert an image (PNG, JPG…)" act={() => fileRef.current?.click()} />
-          <B label="🏢 Org chart" title="Insert the organisation chart from NP management (frozen with this revision)" act={() => void addChart()} />
+          <B label="Link" title="Link to a chapter, another manual or a web address" on={editor.isActive("link") || linking} act={() => setLinking((v) => !v)} />
+          <B label="Image" title="Insert an image (PNG, JPG…)" act={() => fileRef.current?.click()} />
+          <B label="Org chart" title="Insert the organisation chart from NP management (frozen with this revision)" act={() => void addChart()} />
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void addImage(e.target.files?.[0] ?? null)} />
           <span className="sep" />
           <B label="↶" title="Undo" act={() => editor.chain().focus().undo().run()} />
           <B label="↷" title="Redo" act={() => editor.chain().focus().redo().run()} />
           <span className="sep" />
-          <button type="button" className={"tb ai" + (ai ? " on" : "")} onClick={() => setAi((v) => !v)} title="Work with SAM: draft, rewrite, translate or check this chapter">🤝 Work with SAM</button>
+          <button type="button" className={"tb ai" + (ai ? " on" : "")} onClick={() => setAi((v) => !v)} title="Work with SAM: draft, rewrite, translate or check this chapter"><Icon name="bulb" size={14} /> Work with SAM</button>
           <span className="flex-1" />
           <span className={"mini" + (dirty ? " savestate dirty" : "")}>{dirty ? "● Unsaved changes" : msg}</span>
           {dirty && <button type="button" className="btn" onClick={discard} disabled={saving} title="Back to the last saved state of this chapter">Cancel changes</button>}
           {changed && !dirty && <button type="button" className="btn" onClick={revert} disabled={saving} title="Back to the text of the base revision">Revert chapter</button>}
           <button type="button" className={"btn save " + (saving ? "busy" : dirty ? "dirty" : "clean")} onClick={() => void save()} disabled={saving || !dirty}
             title={dirty ? "Save this chapter (⌘S)" : "Everything is saved"}>
-            {saving ? "Saving…" : dirty ? "Save changes (⌘S)" : savedAt ? `✓ Saved ${savedAt}` : "✓ Up to date"}
+            {saving ? "Saving…" : dirty ? "Save changes (⌘S)" : savedAt ? `Saved ${savedAt}` : "Up to date"}
           </button>
         </div>
       )}

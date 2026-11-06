@@ -56,11 +56,11 @@ export default async function Projects({ searchParams }: { searchParams: Promise
       <div className="tabs mb-4">{[["open", "Open & on hold"], ["closed", "Closed & cancelled"], ["all", "All"]].map(([k, l]) => <Link key={k} href={`/proj/boards?status=${k}`} className={"tab" + (status === k ? " on" : "")}>{l}</Link>)}</div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th style={{ width: 60 }}>Entity</th><th>Project</th><th style={{ width: 120 }}>Owner</th><th style={{ width: 170 }}>Progress</th><th>Next</th><th style={{ width: 120 }}>Projected end</th><th style={{ width: 110 }}>Status</th>{superadmin && <th style={{ width: 150 }} />}</tr></thead>
+          <thead><tr><th className="entcol" style={{ width: 60 }}>Entity</th><th>Project</th><th style={{ width: 120 }}>Owner</th><th style={{ width: 170 }}>Progress</th><th>Next</th><th style={{ width: 120 }}>Projected end</th><th style={{ width: 110 }}>Status</th>{superadmin && <th style={{ width: 150 }} />}</tr></thead>
           <tbody>
             {rows.map(({ p, pr, late, blocked, end, next }) => (
               <tr key={p.id}>
-                <td><span className={"ent " + p.entity}>{p.entity}</span></td>
+                <td className="entcol"><span className={"ent " + p.entity}>{p.entity}</span></td>
                 <td><Link href={`/proj/boards/${p.id}`}><b>{p.title}</b></Link>{isTestData(p.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}<div className="mini">{p.template_code ?? "blank project"} · started {fr(p.started_at)}{p.target_date ? ` · target ${fr(p.target_date)}` : ""}</div></td>
                 <td className="mini">{p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"}</td>
                 <td><div className="bar"><i style={{ width: `${pr.pct}%` }} /></div><div className="mini">{pr.done} / {pr.total} · {pr.pct} %{late ? <span className="red"> · {late} late</span> : ""}{blocked ? <span className="amber"> · {blocked} blocked</span> : ""}</div></td>

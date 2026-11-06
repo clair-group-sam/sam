@@ -9,8 +9,9 @@ import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
 import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
 import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, removeAttachment, saveFile, toggleItem } from "../actions";
+import { Icon } from "@/lib/icons";
 
-const KIND_ICON: Record<string, string> = { created: "＋", stage: "→", note: "✎", item: "☑", submitted: "⇧", remarks: "✉", reply: "↩", decision: "✔", attachment: "📎", link: "🔗", task: "⏰", mail: "✉" };
+const KIND_ICON: Record<string, string> = { created: "plus", stage: "arrow", note: "pencil", item: "check", submitted: "send", remarks: "mail", reply: "reply", decision: "check", attachment: "clip", link: "link", task: "clock", mail: "mail" };
 
 export default async function AuthorityFilePage({ params }: { params: Promise<{ id: string }> }) {
   const s = await getSession();
@@ -104,7 +105,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                 <tr key={it.id}>
                   <td style={{ width: 40 }}>
                     <form action={toggleItem}><input type="hidden" name="file_id" value={f.id} /><input type="hidden" name="item_id" value={it.id} />
-                      <button type="submit" className={"chk" + (it.done ? " on" : "")} disabled={!mayEdit} aria-label={it.done ? "Reopen" : "Mark as done"}>{it.done ? "✓" : ""}</button></form>
+                      <button type="submit" className={"chk" + (it.done ? " on" : "")} disabled={!mayEdit} aria-label={it.done ? "Reopen" : "Mark as done"}>{it.done ? <Icon name="check" size={14} /> : ""}</button></form>
                   </td>
                   <td className={it.done ? "text-slate6" : ""}>{it.label}{it.note && <div className="mini">{it.note}</div>}</td>
                   <td className="mono" style={{ width: 80 }}>{it.role ?? ""}</td>
@@ -152,7 +153,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                   <td className="mono" style={{ width: 90 }}>{a.kind ?? ""}</td>
                   <td className="mini" style={{ width: 100 }}>{a.size ? `${Math.round(a.size / 1024)} KB` : ""}</td>
                   <td className="mini" style={{ width: 110 }}>{fr(a.at)}</td>
-                  {cmm && <td style={{ width: 50 }}><form action={removeAttachment}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="attachment_id" value={a.id} /><button className="btn" type="submit" title="Remove">✕</button></form></td>}
+                  {cmm && <td style={{ width: 50 }}><form action={removeAttachment}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="attachment_id" value={a.id} /><button className="btn" type="submit" title="Remove"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></td>}
                 </tr>))}
               {!attachments.length && <tr><td className="p-5 text-slate6">Nothing attached yet.</td></tr>}
             </tbody></table>
@@ -171,7 +172,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
               <select name="kind" className="inp" style={{ maxWidth: 140 }} defaultValue="note"><option value="note">note</option><option value="mail">mail exchanged</option><option value="remarks">authority remark</option><option value="reply">our reply</option></select>
               <input name="note" className="inp" placeholder="What happened (who, what, where)" required /><button className="btn" type="submit">Add</button></form>
             <table className="tbl"><tbody>
-              {events.map((e) => <tr key={e.id}><td className="mono" style={{ width: 130 }}>{e.at.slice(0, 16).replace("T", " ")}</td><td style={{ width: 30 }}>{KIND_ICON[e.kind] ?? "·"}</td><td>{e.note}<div className="mini">{e.kind} · {e.who ?? ""}</div></td></tr>)}
+              {events.map((e) => <tr key={e.id}><td className="mono" style={{ width: 130 }}>{e.at.slice(0, 16).replace("T", " ")}</td><td style={{ width: 30 }}><Icon name={KIND_ICON[e.kind] ?? "dot"} size={14} /></td><td>{e.note}<div className="mini">{e.kind} · {e.who ?? ""}</div></td></tr>)}
             </tbody></table>
           </section>
         </div>

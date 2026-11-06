@@ -8,6 +8,7 @@ import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
 import { CHANGE_LABEL, LEVEL_LABEL, loadFinding, plan, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, stepOf, STEPS_PATH, type Assistant, type Point, type Round } from "@/lib/findings";
 import { addChange, checkPlan, decideClosure, gotoStep, openDossier, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, updateFinding, verifyChange } from "../actions";
+import { Icon } from "@/lib/icons";
 
 /* FND-03 · the finding sheet. The NP writes in order — ① root cause, read by S.A.M. with them; ② corrective action plan, read by S.A.M.
  * with them; ③ send both — then Compliance accepts both (the plan starts) or sends back with the points to address. S.A.M.'s reading
@@ -88,7 +89,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
       <PageHeader eyebrow={`Compliance · Findings · ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? ` · ${f.authority}` : ""}`} title={`${f.number} — ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? ` · ${f.requirement}` : ""}${f.audit_ref ? ` · ${f.audit_ref}` : ""} · raised ${f.notified ?? "—"} · answer due ${f.due ?? "—"} · answered by ${who}`}
         right={<span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>} />
 
-      <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? "✓" : i + 1}</i><span>{l}</span></div>)}</div>
+      <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? <Icon name="check" size={12} /> : i + 1}</i><span>{l}</span></div>)}</div>
 
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Where" value={STATUS_LABEL[f.status] ?? f.status} hint={["review", "closure_requested"].includes(f.status) ? "Compliance's turn" : closedOrCancelled ? "" : `${who}'s turn`} />

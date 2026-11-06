@@ -11,6 +11,7 @@ import CoffeeLineActions from "@/components/CoffeeLineActions";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addRule, unmark } from "./actions";
 import { brewCoffee } from "./actions";
+import { Icon } from "@/lib/icons";
 
 export const maxDuration = 60;
 
@@ -60,7 +61,7 @@ async function Rules({ personId }: { personId: string }) {
   const { data } = await supabaseAdmin().from("coffee_prefs").select("important,muted").eq("person_id", personId).maybeSingle();
   const p = (data as { important: string[]; muted: string[] } | null) ?? { important: [], muted: [] };
   const show = (v: string) => v.replace(/^(mail|teams|sam|agenda|wait):/, "");
-  const Chip = ({ v }: { v: string }) => <form action={unmark} style={{ display: "inline" }}><input type="hidden" name="value" value={v} /><button className="pill" title="Forget this rule" style={{ margin: "2px 4px 2px 0" }}>{show(v)} ✕</button></form>;
+  const Chip = ({ v }: { v: string }) => <form action={unmark} style={{ display: "inline" }}><input type="hidden" name="value" value={v} /><button className="pill" title="Forget this rule" style={{ margin: "2px 4px 2px 0" }}>{show(v)} <Icon name="x" size={11} /></button></form>;
   return (
     <details className="card mb-4"><summary className="ch cursor-pointer"><span className="eyebrow">Your ranking rules</span><span className="mini">{p.important.length} important · {p.muted.length} not important — learnt from the buttons, or added here</span></summary>
       <div className="cb grid gap-2">
@@ -90,7 +91,7 @@ export default async function MorningCoffee() {
         right={<form action={brewCoffee} className="flex gap-2"><SameSources recap={r} /><Link href="/home/tasks" className="btn">Inbox</Link><BrewButton label="Brew again" primary={false} /></form>} />
 
       <section className={"card coffee-syn mb-4" + (urgent ? " hot" : "")}>
-        <div className="cb"><span className="cf-cup" aria-hidden>☕</span>{r.ranked?.top.length
+        <div className="cb"><span className="cf-cup" aria-hidden><Icon name="coffee" size={24} /></span>{r.ranked?.top.length
           ? <div><div className="eyebrow mb-1">First three things today</div><ol style={{ margin: 0, paddingLeft: 18, listStyle: "decimal" }}>{r.ranked.top.map((t, i) => <li key={i}><b>{t}</b></li>)}</ol></div>
           : <p>{r.synthesis}</p>}</div>
       </section>
@@ -111,7 +112,7 @@ export default async function MorningCoffee() {
 
       {(r.agenda || err.calendar) && (
         <section className="card mb-4">
-          <div className="ch"><span className="eyebrow">Today&apos;s agenda</span><span className="mini">{r.agenda?.free.length ? "free: " + r.agenda.free.map((f) => `${f.from}–${f.to}`).join(" · ") : ""}</span></div>
+          <div className="ch"><span className="eyebrow">Today&apos;s agenda</span><span className="mini">{r.agenda?.free.length ? "free: " + r.agenda.free.map((f) => `${f.from}–${f.to}`).join(", ") : ""}</span></div>
           <Err k="calendar" />
           {r.agenda && (r.agenda.items.length ? (
             <table className="tbl"><tbody>{r.agenda.items.map((i, n) => (

@@ -11,6 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENTS4 } from "@/lib/nav";
 import FolderTree, { type TNode } from "@/components/FolderTree";
 import { isTestData, TEST_PILL_TITLE } from "@/lib/testdata";
+import { Icon } from "@/lib/icons";
 
 const FAMILY_COLORS: Record<string, string> = { "1": "#7d166d", "2": "#0e8cc4", "3": "#248a3d", "4": "#b86e00", "5": "#b43a0f", "6": "#6b5bd2" };
 type Row = Awaited<ReturnType<typeof listManuals>>[number];
@@ -152,11 +153,11 @@ export default async function Library({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <PageHeader eyebrow="Documents · Library" title="Document library" sub={`Manuals as the unit of revision and approval (DOC-01) · ${scope}`}
+      <PageHeader eyebrow="Documents · Library" title="Document library" sub="Each manual is revised and approved as a whole."
         right={canCreate ? <><Link href="/docs/drop" className="btn">+ Drop a document</Link><Link href={`/docs/new${s.entity !== "ALL" ? `?entity=${s.entity}` : ""}`} className="btn primary">+ New manual</Link></> : undefined} />
       <form className="card mb-5" action="/docs/lib" method="get">
         <div className="p-3 flex gap-2">
-          <input name="q" defaultValue={q} placeholder="Search the manuals — title, chapter or text (e.g. sous-traitance, MEL, dégivrage)…" className="flex-1 border border-line rounded-lg px-4 py-2.5 text-sm" />
+          <input name="q" defaultValue={q} placeholder="Search the manuals by title, chapter or text, e.g. sous-traitance, MEL, dégivrage" className="flex-1 border border-line rounded-lg px-4 py-2.5 text-sm" />
           <button className="btn primary" type="submit">Search</button>
           {q && <Link href="/docs/lib" className="btn">Clear</Link>}
         </div>
@@ -184,9 +185,9 @@ export default async function Library({ searchParams }: { searchParams: Promise<
           <section className="card"><div className="ch"><span className="eyebrow">To acknowledge</span><span className="mini">{toRead.length}</span></div>
             {toRead.map((t, i) => <div key={i} className="row"><span className={"ent " + t.entity}>{t.entity}</span><Link href={t.link} className="underline">{t.title}</Link></div>)}
             {!toRead.length && <div className="row mini">Nothing to read.</div>}</section>
-          <section className="card"><div className="ch"><span className="eyebrow">★ Favourites</span><span className="mini">{favs.length}</span></div>
+          <section className="card"><div className="ch"><span className="eyebrow"><Icon name="star" size={13} /> Favourites</span><span className="mini">{favs.length}</span></div>
             {favs.map((r) => <div key={r.manual.id} className="row"><span className={"ent " + r.manual.entity}>{r.manual.entity}</span><Link href={`/docs/manual/${r.manual.id}`}><b className="mono">{r.manual.code}</b> {r.manual.title}</Link></div>)}
-            {!favs.length && <div className="row mini">Open a manual and click ☆ to add it here.</div>}</section>
+            {!favs.length && <div className="row mini">Open a manual and click its star to add it here.</div>}</section>
           <section className="card"><div className="ch"><span className="eyebrow">Recently opened</span></div>
             {recent.map((r) => <div key={r.manual.id} className="row"><span className={"ent " + r.manual.entity}>{r.manual.entity}</span><Link href={`/docs/manual/${r.manual.id}`}><b className="mono">{r.manual.code}</b> {r.manual.title}</Link><span className="mini">{r.current ? `Rev ${r.current.rev}` : ""}</span></div>)}
             {!recent.length && <div className="row mini">—</div>}</section>
@@ -207,11 +208,11 @@ export default async function Library({ searchParams }: { searchParams: Promise<
         <section className="card flex-1 min-w-0">
           <div className="ch"><span className="eyebrow">{folder || "All documents"}</span><span className="mini">{inFolder.length} document{inFolder.length > 1 ? "s" : ""}</span></div>
           <table className="tbl">
-            <thead><tr><th style={{ width: 70 }}>Entity</th><th style={{ width: 150 }}>Code</th><th>Title</th><th style={{ width: 100 }}>Owner</th><th style={{ width: 120 }}>Current</th><th style={{ width: 190 }}>Status</th></tr></thead>
+            <thead><tr><th className="entcol" style={{ width: 70 }}>Entity</th><th style={{ width: 150 }}>Code</th><th>Title</th><th style={{ width: 100 }}>Owner</th><th style={{ width: 120 }}>Current</th><th style={{ width: 190 }}>Status</th></tr></thead>
             <tbody>
               {inFolder.map(({ manual, current, workings }) => (
                 <tr key={manual.id}>
-                  <td><span className={"ent " + manual.entity}>{manual.entity}</span></td>
+                  <td className="entcol"><span className={"ent " + manual.entity}>{manual.entity}</span></td>
                   <td className="mono">{manual.code}{fromWm.has(manual.id) && <SourceMark source="webmanuals" />}</td>
                   <td><Link href={`/docs/manual/${manual.id}`}><b>{manual.title}</b></Link>{(manual as typeof manual & { internal?: boolean }).internal && <span className="nature ml-2">internal</span>}{isTestData(manual.code, manual.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}{!folder && <div className="mini">{manual.path}</div>}</td>
                   <td className="mini">{manual.owner_role}</td>
@@ -219,7 +220,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
                   <td>{current ? <span className="pill green">Published</span> : <span className="pill red">Never published</span>}{workings.map((w) => <span key={w.id} className="pill amber ml-1">Rev {w.rev} · {STEP_LABEL[w.step]}</span>)}</td>
                 </tr>
               ))}
-              {!inFolder.length && <tr><td colSpan={6} className="p-6 text-slate6">No document here.</td></tr>}
+              {!inFolder.length && <tr><td colSpan={6} className="p-6 text-slate6">No manual in this folder yet. Add one with <b>Drop a document</b> or <b>New manual</b>.</td></tr>}
             </tbody>
           </table>
         </section>

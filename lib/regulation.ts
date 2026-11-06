@@ -17,7 +17,7 @@ const decode = (t: string) => t.replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;/
 /** Version and links from an EASA EAR page. */
 export function parseEarPage(html: string): { version: string | null; pdf: string | null; online: string | null; xml: string | null; title: string | null } {
   const title = decode(html.match(/<title>([^<]*)<\/title>/i)?.[1] ?? "") || null;
-  // "… - Revision 24, March 2026 — Available …" · "… - Revision from October 2026 — Available …" · "… - Initial issue …"
+  // "… - Revision 24, March 2026 — Available …", "… - Revision from October 2026 — Available …", "… - Initial issue …"
   const m = title?.match(/\s[-–—]\s*((?:Revision|Initial issue|Issue|Amendment)[^—|]*?)\s*(?:[-–—]\s*Available|\||$)/i);
   const version = m ? m[1].replace(/[,\s]+$/, "") : null;
   const link = (label: string) => { const r = new RegExp(`<a[^>]+href="([^"]+)"[^>]*>(?:(?!</a>).)*?\\(${label}\\)`, "is"); const h = html.match(r)?.[1]; return h ? abs(decode(h)) : null; };

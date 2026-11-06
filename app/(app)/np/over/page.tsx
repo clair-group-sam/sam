@@ -8,6 +8,7 @@ import { isCmm } from "@/lib/revisions";
 import { postsOf, snapshotOf } from "@/lib/np";
 import { chartKey, chartsIn, orgChartSvg } from "@/lib/orgchart";
 import { savePost, deletePost } from "./actions";
+import { Icon } from "@/lib/icons";
 
 const STATUS: Record<string, [string, string]> = { accepted: ["green", "accepted by the authority"], pending: ["amber", "acceptance pending"], not_required: ["", "no acceptance required"] };
 
@@ -91,7 +92,7 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
                     <input name="since" type="date" defaultValue={p.since ?? ""} className="inp" style={{ width: 140 }} />
                     <input type="hidden" name="ord" value={p.ord} /><input type="hidden" name="regulatory" value={p.regulatory ?? ""} />
                     <button className="btn" type="submit">Save</button>
-                    <button className="btn" formAction={deletePost} type="submit" title="Delete this post">✕</button>
+                    <button className="btn" formAction={deletePost} type="submit" title="Delete this post"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button>
                   </form>
                 </td>
               </tr>

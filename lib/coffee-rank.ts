@@ -24,7 +24,7 @@ const cap = (t: number, max: Tier): Tier => Math.max(1, Math.min(max, t)) as Tie
 /** Every element of the recap becomes a candidate with its rule tier (= the worst tier it may get). */
 export function candidates(r: Omit<Recap, "synthesis">, nowHm: string): Cand[] {
   const c: Cand[] = [];
-  const sam = (l: Line, id: string, tier: Tier, why: string, action: string) => c.push({ id, tier, max: tier, key: `sam:${l.link ?? l.title}`, keyLabel: l.title, title: `${l.ctx ? l.ctx + " › " : ""}${l.title}`, why, action, entity: l.entity, sources: [{ kind: "sam", label: l.label, link: l.link }], text: `${l.label} · ${l.ctx ?? ""} ${l.title}${l.due ? " · due " + l.due : ""}${l.note ? " · " + l.note : ""}` });
+  const sam = (l: Line, id: string, tier: Tier, why: string, action: string) => c.push({ id, tier, max: tier, key: `sam:${l.link ?? l.title}`, keyLabel: l.title, title: `${l.ctx ? l.ctx + " › " : ""}${l.title}`, why, action, entity: l.entity, sources: [{ kind: "sam", label: l.label, link: l.link }], text: `${l.label} · ${l.ctx ?? ""} ${l.title}${l.due ? " · due " + l.due : ""}${l.note ? ", " + l.note : ""}` });
   r.mor.forEach((l, i) => sam(l, `mor${i}`, 1, `MOR clock — ${l.label}`, "Decide mandatory / voluntary, file if needed"));
   r.overdue.forEach((l, i) => sam(l, `ov${i}`, 1, `Overdue since ${l.due}`, "Do it or move the date"));
   r.today.forEach((l, i) => sam(l, `td${i}`, 2, "Due today", "Do it today"));
@@ -94,7 +94,7 @@ export function mergeTopics(items: RankItem[]): RankItem[] {
     if (g.length === 1) { out.push(g[0]); continue; }
     const best = [...g].sort((a, b) => a.tier - b.tier || Number(!!b.badge) - Number(!!a.badge))[0];
     out.push({ ...best, id: `g:${best.id}`, title: best.topic!, why: best.why, sources: g.flatMap((x) => x.sources), entity: g.find((x) => x.entity)?.entity, badge: g.some((x) => x.badge === "for-you") ? "for-you" : g.some((x) => x.badge === "you-wait") ? "you-wait" : undefined,
-      topic: g.map((x) => x.title).join(" · ").slice(0, 300) });
+      topic: g.map((x) => x.title).join(", ").slice(0, 300) });
   }
   return out;
 }

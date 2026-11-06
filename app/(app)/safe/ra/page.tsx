@@ -51,7 +51,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
   const old = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10); // pre-ticked for closing: conducted more than 2 weeks ago
   return (
     <>
-      <PageHeader eyebrow="Safety · Risk management" title="Risk assessments" sub={`One-off, dated assessments — their lasting hazards are linked to the hazard log · ${scope.map((e) => MSM_REF[e] ?? e).join(" · ")}`} />
+      <PageHeader eyebrow="Safety · Risk management" title="Risk assessments" sub={`One-off, dated assessments — their lasting hazards are linked to the hazard log · ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
       <RiskTabs on="ra" toMatch={toMatch} />
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open assessments" value={openRa.filter((a) => a.status !== "accepted").length} hint={`${openRa.length} current`} />
@@ -86,7 +86,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
 
       <section className="card mb-5">
         <table className="tbl">
-          <thead><tr>{edit && sp.st !== "archived" && <th style={{ width: 30 }} title="Select to close" />}<th style={{ width: 120 }}>Number</th><th style={{ width: 55 }}>Entity</th><th>Assessment</th><th style={{ width: 70 }}>Hazards</th><th style={{ width: 150 }}>Highest pre → post</th><th style={{ width: 100 }}>Next due</th><th style={{ width: 150 }}>Status</th><th style={{ width: 80 }}>MSM</th></tr></thead>
+          <thead><tr>{edit && sp.st !== "archived" && <th style={{ width: 30 }} title="Select to close" />}<th style={{ width: 120 }}>Number</th><th className="entcol" style={{ width: 55 }}>Entity</th><th>Assessment</th><th style={{ width: 70 }}>Hazards</th><th style={{ width: 150 }}>Highest pre → post</th><th style={{ width: 100 }}>Next due</th><th style={{ width: 150 }}>Status</th><th style={{ width: 80 }}>MSM</th></tr></thead>
           <tbody>
             {rows.map((a) => {
               const hs = (byRa.get(a.id) ?? []).filter(live); const sc = schemeOf(a.entity);
@@ -97,13 +97,13 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
                 <tr key={a.id}>
                   {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" defaultChecked={!!a.conducted_on && a.conducted_on < old && a.status !== "validated"} title="Close — case over" /></td>}
                   <td className="mono"><Link className="underline" href={`/safe/risk/a/${a.id}`}>{a.number}</Link><SourceMark source={a.source} /></td>
-                  <td><span className={"ent " + a.entity}>{a.entity}</span></td>
-                  <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? ` · ${a.domain}` : ""}{a.top_risk ? " · top risk" : ""}{hs.some((h) => h.needs_review) ? " · ⚠ to reassess" : ""}</div></td>
+                  <td className="entcol"><span className={"ent " + a.entity}>{a.entity}</span></td>
+                  <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? ` · ${a.domain}` : ""}{a.top_risk ? " · top risk" : ""}{hs.some((h) => h.needs_review) ? ", to reassess" : ""}</div></td>
                   <td>{hs.length}<div className="mini">{hs.filter((h) => h.log_hazard_id).length} in log</div></td>
                   <td>{pre && pre[0] ? <span className={"pill " + tolTone(tolerability(pre[0], pre[1], sc))}>{riskLabel(pre[0], pre[1], sc)}</span> : <span className="mini">—</span>} → {po && po[0] ? <span className={"pill " + tolTone(tolerability(po[0], po[1], sc))}>{riskLabel(po[0], po[1], sc)}</span> : <span className="mini">—</span>}</td>
                   <td className={"mono" + (a.kind !== "moc" && a.next_due && a.next_due < today ? " red" : "")}>{a.kind === "moc" ? (a.start_date ?? "—") : (a.next_due ?? "—")}</td>
                   <td><span className={"pill " + (RA_STATUS[a.status]?.[1] ?? "")}>{RA_STATUS[a.status]?.[0] ?? a.status}</span></td>
-                  <td><span className={"pill " + (okN === ch.length ? "green" : okN >= ch.length - 2 ? "amber" : "red")} title={ch.filter((c) => !c.ok).map((c) => "✕ " + c.label).join("\n")}>{okN}/{ch.length}</span></td>
+                  <td><span className={"pill " + (okN === ch.length ? "green" : okN >= ch.length - 2 ? "amber" : "red")} title={ch.filter((c) => !c.ok).map((c) => "Missing: " + c.label).join("\n")}>{okN}/{ch.length}</span></td>
                 </tr>);
             })}
             {!rows.length && <tr><td colSpan={8} className="p-6 text-slate6">No risk assessment{sp.cell || sp.q || sp.tol || sp.domain ? " matching the filters" : " yet — create one below, or import Centrik in Settings › Integrations"}.</td></tr>}

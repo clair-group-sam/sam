@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { aiPropose } from "@/app/(app)/docs/editor/[rev]/actions";
 import type { AiAgent } from "@/lib/ai";
+import { Icon } from "@/lib/icons";
 
 type Note = { where: string; change: string; why: string };
 type Props = { editor: Editor; revisionId: string; sectionId: string; onInserted: () => void; onClose: () => void; initialRequest?: string };
@@ -47,7 +48,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
 
   return (
     <aside className="aipanel">
-      <div className="ch"><span className="eyebrow">🤝 Work with SAM</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
+      <div className="ch"><span className="eyebrow"><Icon name="bulb" size={14} /> Work with SAM</span><button type="button" className="clr" onClick={onClose} aria-label="Close">×</button></div>
       <div className="p-3">
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
         <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language — the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "explain" ? "The requirement to explain (ORO.GEN.200(a)(3), CAMO.A.305…) or paste its text — default: the references cited in this chapter" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />

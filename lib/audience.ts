@@ -44,5 +44,5 @@ export function describeTokens(tokens: string[], entityName: string, names: Map<
   if (posts.length) parts.push(posts.join(", ") + " (and deputies)");
   const people = tokens.filter((t) => t.startsWith("PERSON:")).map((t) => names.get(t.slice(7)) ?? "someone");
   if (people.length) parts.push(people.join(", "));
-  return parts.join(" · ") || "nobody";
+  return parts.join(", ") || "nobody";
 }

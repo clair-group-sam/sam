@@ -103,6 +103,6 @@ export async function flagChangedItems(db: SupabaseClient, regulationId: string,
   if (!by.size) return 0;
   const { data: items } = await db.from("checklist_items").select("id,code").eq("regulation_id", regulationId).in("code", [...by.keys()]);
   let n = 0;
-  for (const it of (items ?? []) as { id: string; code: string }[]) { await db.from("checklist_items").update({ review_flag: true, review_note: `${version}: ${by.get(it.code)!.slice(0, 6).join(" · ")}` }).eq("id", it.id); n++; }
+  for (const it of (items ?? []) as { id: string; code: string }[]) { await db.from("checklist_items").update({ review_flag: true, review_note: `${version}: ${by.get(it.code)!.slice(0, 6).join(", ")}` }).eq("id", it.id); n++; }
   return n;
 }

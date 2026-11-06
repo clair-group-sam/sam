@@ -11,6 +11,7 @@ import { saveAsTemplate } from "../../start-actions";
 import { keepLocal, linkToLog, promoteToLog, recordAmDecision, referToAm, suggestMatches, unlinkLog } from "../../actions";
 import type { Suggestion } from "@/lib/risk-match";
 import { acceptAssessment, createHazard, discardHazard, keepHazard, mocStep, proposeHazards, reopenAssessment, updateAssessment, validateAssessment } from "../../actions";
+import { Icon } from "@/lib/icons";
 
 export const maxDuration = 300; // SAM prepares a draft from a base
 type E = { id: number; at: string; kind: string; note: string | null };
@@ -66,14 +67,14 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 return (
                   <tr key={h.id} className={(h.proposed ? "hz-proposed" : "") + (h.status === "closed" ? " muted" : "")}>
                     <td style={{ width: 105 }} className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.proposed && <div className="mini">proposed</div>}{h.needs_review && <div className="mini red">to reassess</div>}</td>
-                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}{h.proposed && h.prefill_note && <div className="mini">🤝 {h.prefill_note}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
-                      {study && !h.proposed && h.status !== "closed" && (h.log_hazard_id ? <div className="mini">📒 Hazard log: <Link className="underline mono" href={`/safe/risk/${h.log_hazard_id}`}>{logOf.get(h.log_hazard_id)?.ref ?? "linked"}</Link> {logOf.get(h.log_hazard_id)?.title}{canLink && <form action={unlinkLog} className="inline ml-2"><input type="hidden" name="id" value={h.id} /><button className="linkbtn mini">unlink</button></form>}</div>
+                    <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}{h.proposed && h.prefill_note && <div className="mini"><Icon name="bulb" size={14} /> {h.prefill_note}</div>}<div className="mini">{cur} current · {plan.length} planned mitigation{plan.length === 1 ? "" : "s"}{plan.some((m) => !m.done_at && m.due && m.due < new Date().toISOString().slice(0, 10)) ? " · overdue" : ""}{h.hazard_reports.length ? ` · ${h.hazard_reports.length} report${h.hazard_reports.length > 1 ? "s" : ""}` : ""}</div>
+                      {study && !h.proposed && h.status !== "closed" && (h.log_hazard_id ? <div className="mini"><Icon name="book" size={12} /> Hazard log: <Link className="underline mono" href={`/safe/risk/${h.log_hazard_id}`}>{logOf.get(h.log_hazard_id)?.ref ?? "linked"}</Link> {logOf.get(h.log_hazard_id)?.title}{canLink && <form action={unlinkLog} className="inline ml-2"><input type="hidden" name="id" value={h.id} /><button className="linkbtn mini">unlink</button></form>}</div>
                         : h.local_only ? <div className="mini">Kept local to this study (temporary)</div>
                         : <div className="mini mt-1">{(sugOf.get(h.id) ?? []).slice(0, 2).map((x) => <form key={x.id} action={linkToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="log_id" value={x.id} /><button className="btn" disabled={!canLink} title={x.why}>Link to {x.ref} · {x.title.slice(0, 40)} ({Math.round(x.score * 100)}%)</button></form>)}
-                            {canLink && <><form action={promoteToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">+ Add to the log</button></form><form action={keepLocal} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">Keep local</button></form>{!sugOf.has(h.id) && <form action={suggestMatches} className="inline"><input type="hidden" name="entity" value={a.entity} /><input type="hidden" name="hazard_id" value={h.id} /><input type="hidden" name="assessment_id" value={a.id} /><button className="btn">🤝 In the log?</button></form>}</>}</div>)}
+                            {canLink && <><form action={promoteToLog} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">+ Add to the log</button></form><form action={keepLocal} className="inline mr-2"><input type="hidden" name="id" value={h.id} /><button className="btn">Keep local</button></form>{!sugOf.has(h.id) && <form action={suggestMatches} className="inline"><input type="hidden" name="entity" value={a.entity} /><input type="hidden" name="hazard_id" value={h.id} /><input type="hidden" name="assessment_id" value={a.id} /><button className="btn"><Icon name="bulb" size={14} /> In the log?</button></form>}</>}</div>)}
                     </td>
                     <td style={{ width: 165 }}>{pre ? <span className={"pill " + tolTone(pre)}>{riskLabel(h.lik_before, h.sev_before, sch)}</span> : <span className="mini">—</span>} → {po ? <span className={"pill " + tolTone(po)}>{riskLabel(h.lik_after, h.sev_after, sch)}</span> : <span className="mini">—</span>}</td>
-                    <td style={{ width: 120 }} className="text-right">{h.proposed && edit && <span className="flex gap-1 justify-end"><form action={keepHazard}><input type="hidden" name="id" value={h.id} /><button className="btn">Keep</button></form><form action={discardHazard}><input type="hidden" name="id" value={h.id} /><button className="btn" title="Discard">✕</button></form></span>}</td>
+                    <td style={{ width: 120 }} className="text-right">{h.proposed && edit && <span className="flex gap-1 justify-end"><form action={keepHazard}><input type="hidden" name="id" value={h.id} /><button className="btn">Keep</button></form><form action={discardHazard}><input type="hidden" name="id" value={h.id} /><button className="btn" title="Discard"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></span>}</td>
                   </tr>);
               })}
               {!hazards.length && <tr><td className="p-4 mini">No hazard yet.</td></tr>}
@@ -82,7 +83,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
               <div className="cb">
                 <form action={createHazard} className="grid gap-2 mb-3" style={{ gridTemplateColumns: "1fr 1fr auto" }}><input type="hidden" name="assessment_id" value={a.id} /><input type="hidden" name="stay" value="1" />
                   <input name="title" className="inp" placeholder="Hazard" required style={{ marginTop: 0 }} /><input name="consequence" className="inp" placeholder="Consequence (reasonably worst case)" style={{ marginTop: 0 }} /><button className="btn">Add</button></form>
-                <form action={proposeHazards}><input type="hidden" name="id" value={a.id} /><button className="btn">🤝 Ask SAM to propose hazards</button> <span className="mini">rated pre / post with mitigations and owners — each stays “proposed” until you keep it</span></form>
+                <form action={proposeHazards}><input type="hidden" name="id" value={a.id} /><button className="btn"><Icon name="bulb" size={14} /> Ask SAM to propose hazards</button> <span className="mini">rated pre / post with mitigations and owners — each stays “proposed” until you keep it</span></form>
               </div>
             )}
           </section>
@@ -118,14 +119,14 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Decision &amp; sign-off</span></div>
             <div className="cb">
-              {draft && (mayValidate(s) ? (signBlock.length ? <p className="mini">Sign-off possible once: {signBlock.join(" · ")}.</p> : (
+              {draft && (mayValidate(s) ? (signBlock.length ? <p className="mini">Sign-off possible once: {signBlock.join(", ")}.</p> : (
                 <form action={validateAssessment} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
                   <select name="decision" className="inp" defaultValue={a.decision ?? (worstPost === "intolerable" ? "stop" : "continue")}>{Object.entries(DECISIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
                   <textarea name="decision_comment" className="inp" rows={2} defaultValue={a.decision_comment ?? ""} placeholder="Comments (e.g. hazards reviewed, related reports do not change the values…)" />
                   <button className="btn primary">Sign off — {s.name.split(" ")[0]}</button>
                   <span className="mini">Validation by the most relevant nominated person, his/her deputy or the SM.</span>
                 </form>)) : <p className="mini">Waiting for the sign-off of the most relevant nominated person (or deputy / SM).</p>)}
-              {a.validated_at && <p className="mb-2">✓ Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""} · {a.validated_at.slice(0, 10)}{a.decision ? ` · ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
+              {a.validated_at && <p className="mb-2">Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""} · {a.validated_at.slice(0, 10)}{a.decision ? ` · ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
               {a.status === "validated" && (mayAccept(s) ? (
                 <form action={acceptAssessment} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
                   <p className="mini">The residual risk stays red. Approve the activity anyway (justification required) or stop it.</p>
@@ -150,7 +151,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                     <button className="btn">Record the AM&apos;s decision</button></form></details>
                 </div>)}
               {a.status === "accepted" && !a.accepted_at && <p className="mini mb-2">Accepted by the sign-off (green / yellow residual risk) — the AM may overrule it by opening a new version.</p>}
-              {a.accepted_at && <p className="mb-2">✓ Decided by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
+              {a.accepted_at && <p className="mb-2">Decided by the AM <b>{a.accepted_name}</b> · {a.accepted_at.slice(0, 10)}</p>}
               {moc && a.status === "accepted" && a.moc_status === "approved" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="implemented" /><button className="btn primary">Mark the change as implemented</button></form>}
               {moc && a.moc_status === "implemented" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="closed" /><button className="btn primary">Close the MOC</button></form>}
               {a.kind !== "hazard_log" && ["accepted", "archived"].includes(a.status) && mayEditRisk(s) && <form action={saveAsTemplate} className="mt-3 flex gap-2"><input type="hidden" name="id" value={a.id} /><input name="name" className="inp flex-1" style={{ marginTop: 0 }} placeholder="Template name (e.g. Ferry flight)" /><button className="btn">Save as a template</button></form>}
@@ -160,7 +161,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
 
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">MSM conformity</span><span className="mini">{checks.filter((c) => c.ok).length}/{checks.length} · {MSM_REF[a.entity]}</span></div>
-            <div className="cb"><ul className="checks">{checks.map((c, i) => <li key={i}><span className={c.ok ? "ok" : "ko"}>{c.ok ? "✓" : "✕"}</span><span className="flex-1">{c.label}{c.detail ? <span className="mini"> — {c.detail}</span> : null}</span><span className="mini mono">{c.ref}</span></li>)}</ul></div>
+            <div className="cb"><ul className="checks">{checks.map((c, i) => <li key={i}><span className={c.ok ? "ok" : "ko"}>{c.ok ? <Icon name="check" size={14} /> : <Icon name="x" size={14} />}</span><span className="flex-1">{c.label}{c.detail ? <span className="mini"> — {c.detail}</span> : null}</span><span className="mini mono">{c.ref}</span></li>)}</ul></div>
           </section>
 
           <section className="card mb-4">

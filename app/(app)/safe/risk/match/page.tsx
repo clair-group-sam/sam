@@ -7,6 +7,7 @@ import { KINDS, mayEditRisk, riskLabel, schemeOf, tolerability, tolTone } from "
 import { RiskTabs } from "@/components/RiskTabs";
 import type { Suggestion } from "@/lib/risk-match";
 import { checkDuplicates, dismissMatch, keepLocal, linkToLog, promoteToLog, suggestMatches } from "../actions";
+import { Icon } from "@/lib/icons";
 
 export const maxDuration = 300;
 type H = { id: string; ref: string; title: string; consequence: string | null; entity: string; lik_after: number | null; sev_after: string | null; risk_assessments: { id: string; kind: string; number: string; name: string; status: string } };
@@ -40,9 +41,9 @@ export default async function MatchPage() {
       <RiskTabs on="match" toMatch={hs.length} />
       {edit && (
         <div className="flex gap-2 mb-4 flex-wrap items-center">
-          <form action={suggestMatches}><button className="btn primary" disabled={!pending}>🤝 Ask SAM to suggest matches{pending ? ` (${pending} not checked)` : ""}</button></form>
+          <form action={suggestMatches}><button className="btn primary" disabled={!pending}><Icon name="bulb" size={14} /> Ask SAM to suggest matches{pending ? ` (${pending} not checked)` : ""}</button></form>
           <form action={suggestMatches}><input type="hidden" name="force" value="1" /><button className="btn" disabled={!hs.length}>Check them all again</button></form>
-          <form action={checkDuplicates} className="ml-auto"><button className="btn">🤝 Look for duplicates in the log</button></form>
+          <form action={checkDuplicates} className="ml-auto"><button className="btn"><Icon name="bulb" size={14} /> Look for duplicates in the log</button></form>
         </div>
       )}
       <section className="card mb-5">
@@ -52,7 +53,7 @@ export default async function MatchPage() {
             {hs.map((h) => { const m = sug.get(h.id); const sc = schemeOf(h.entity); const t = tolerability(h.lik_after, h.sev_after, sc); return (
               <tr key={h.id}>
                 <td className="mono"><Link className="underline" href={`/safe/risk/a/${h.risk_assessments.id}`}>{h.risk_assessments.number}</Link><div className="mini">{KINDS[h.risk_assessments.kind]}</div></td>
-                <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">→ {h.consequence}</div>}<div className="mini">{h.risk_assessments.name}</div></td>
+                <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}<div className="mini">{h.risk_assessments.name}</div></td>
                 <td>{t ? <span className={"pill " + tolTone(t)}>{riskLabel(h.lik_after, h.sev_after, sc)}</span> : <span className="mini">—</span>}</td>
                 <td>
                   {!m && <p className="mini">Not checked by SAM yet.</p>}
@@ -61,7 +62,7 @@ export default async function MatchPage() {
                     <div key={x.id} className="flex gap-2 items-center mb-1">
                       <span className="flex-1"><Link className="underline mono" href={`/safe/risk/${x.id}`}>{x.ref}</Link> {x.title} <span className={"pill " + (x.score >= 0.8 ? "green" : "amber")}>{Math.round(x.score * 100)}%</span>{x.why && <div className="mini">{x.why}</div>}</span>
                       {edit && <><form action={linkToLog}><input type="hidden" name="id" value={h.id} /><input type="hidden" name="log_id" value={x.id} /><button className="btn">Link</button></form>
-                        <form action={dismissMatch}><input type="hidden" name="kind" value="hazard" /><input type="hidden" name="subject" value={h.id} /><input type="hidden" name="other" value={x.id} /><button className="btn" title="Not the same hazard">✕</button></form></>}
+                        <form action={dismissMatch}><input type="hidden" name="kind" value="hazard" /><input type="hidden" name="subject" value={h.id} /><input type="hidden" name="other" value={x.id} /><button className="btn" title="Not the same hazard"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></>}
                     </div>))}
                   {edit && <div className="flex gap-2 mt-1"><form action={promoteToLog}><input type="hidden" name="id" value={h.id} /><button className="btn">+ Add to the log</button></form><form action={keepLocal}><input type="hidden" name="id" value={h.id} /><button className="btn">Keep local (temporary)</button></form></div>}
                 </td>

@@ -132,7 +132,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
       for (const e of (ev ?? []) as { file_id: string; at: string; kind: string; note: string | null }[]) {
         const f = mine.find((x) => x.id === e.file_id)!;
         const g = perFile.get(e.file_id) ?? { at: e.at, notes: [] };
-        g.notes.unshift(`${e.kind === "stage" ? "now " + f.stage : e.kind}${e.note ? " · " + e.note.slice(0, 70) : ""}`);
+        g.notes.unshift(`${e.kind === "stage" ? "now " + f.stage : e.kind}${e.note ? ", " + e.note.slice(0, 70) : ""}`);
         perFile.set(e.file_id, g);
       }
       for (const [fid, g] of perFile) {
@@ -158,7 +158,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
       }
       for (const [pid, g] of per) {
         const p = ps.find((x) => x.id === pid)!;
-        const note = [g.done.length && `${g.done.length} task${g.done.length > 1 ? "s" : ""} done (${g.done.slice(0, 2).join(", ")}${g.done.length > 2 ? "…" : ""})`, g.blocked && `${g.blocked} blocked`].filter(Boolean).join(" · ");
+        const note = [g.done.length && `${g.done.length} task${g.done.length > 1 ? "s" : ""} done (${g.done.slice(0, 2).join(", ")}${g.done.length > 2 ? "…" : ""})`, g.blocked && `${g.blocked} blocked`].filter(Boolean).join(", ");
         moved.push({ at: g.at, l: { kind: "project", label: "Project", cls: "k-proj", title: p.title, note, entity: p.entity, link: `/proj/boards/${p.id}` } });
       }
     }
@@ -227,7 +227,7 @@ export async function brew(s: Session, wanted: string[] = SOURCES.map((x) => x.i
   const np = parisParts(); const nowHm = `${String(np.hour).padStart(2, "0")}:${String(np.minute).padStart(2, "0")}`;
   const { data: pf } = await supabaseAdmin().from("coffee_prefs").select("important,muted,snoozed").eq("person_id", s.person!.id).maybeSingle();
   const ranked = await rank(s, r, nowHm, (pf as Prefs | null) ?? null);
-  const recap: Recap = { ...r, ranked, synthesis: ranked.top.length ? ranked.top.join(" · ") : await synthesise(s, r) };
+  const recap: Recap = { ...r, ranked, synthesis: ranked.top.length ? ranked.top.join(", ") : await synthesise(s, r) };
   const db = supabaseAdmin();
   await db.from("coffee_recaps").upsert({ person_id: s.person!.id, day: recap.day, data: recap, created_at: recap.at }, { onConflict: "person_id,day" });
   await db.from("coffee_recaps").delete().eq("person_id", s.person!.id).lt("day", recap.day);

@@ -270,7 +270,7 @@ async function journal(db: ReturnType<typeof supabaseAdmin>, task: TaskRow & { r
 /** "Done" on "Prepare the dossier" by its owner hands the file over to Compliance (the same move as in S.A.M.). */
 async function handoverIfDraft(db: ReturnType<typeof supabaseAdmin>, task: TaskRow & { ref_id?: string | null }, p: { id: string; display_name: string }) {
   const refId = (task as { ref_id?: string | null }).ref_id;
-  if (!refId || task.kind !== "authority" || !/^Prepare the dossier/.test(task.title)) return;
+  if (!refId || task.kind !== "authority" || !/(^Prepare the dossier|: prepare the dossier$)/.test(task.title)) return;
   const { data } = await db.from("authority_files").select("*").eq("id", refId).maybeSingle();
   const f = data as AuthorityFile | null;
   if (!f || f.stage !== "draft") return;

@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { AUDIENCE, PROMO_KIND, PROMO_STATUS, SCALE, mayPublish, mayWrite, type Promotion } from "@/lib/promotion";
 import { ackPromotion, answerSurvey, closePromotion, draftPromotion, publishPromotion, savePromotion, saveQuestion } from "../actions";
+import { Icon } from "@/lib/icons";
 
 export const maxDuration = 60;
 type Rd = { person_id: string; sent_at: string; read_at: string | null; acknowledged_at: string | null; answered_at: string | null };
@@ -54,7 +55,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
 
           {p.kind === "survey" && <section className="card mb-5"><div className="ch"><span className="eyebrow">Questions</span>{p.anonymous && <span className="mini">anonymous — answers are not linked to you</span>}</div>
             {edit ? <div className="cb grid gap-2">
-                {p.questions.map((q, k) => <div key={q.key} className="flex gap-2 items-center"><span className="flex-1">{k + 1}. {q.label} <span className="mini">· {q.type}{q.options?.length ? `: ${q.options.join(" / ")}` : ""}</span></span><form action={saveQuestion}><Hid /><input type="hidden" name="remove" value={q.key} /><button className="btn">✕</button></form></div>)}
+                {p.questions.map((q, k) => <div key={q.key} className="flex gap-2 items-center"><span className="flex-1">{k + 1}. {q.label} <span className="mini">· {q.type}{q.options?.length ? `: ${q.options.join(" / ")}` : ""}</span></span><form action={saveQuestion}><Hid /><input type="hidden" name="remove" value={q.key} /><button className="btn"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></div>)}
                 <form action={saveQuestion} className="grid grid-cols-6 gap-2"><Hid />
                   <input name="label" className="inp col-span-3" placeholder="+ Question (e.g. I can report an error without fear of blame)" style={{ marginTop: 0 }} />
                   <select name="type" className="inp" style={{ marginTop: 0 }} defaultValue="scale"><option value="scale">Scale 1–5</option><option value="choice">Choice</option><option value="text">Free text</option></select>

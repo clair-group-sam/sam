@@ -7,6 +7,7 @@ import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
 import { FACTOR_CAT, INV_LEVEL, INV_STATUS, INV_STEPS, invLate, mayEdit, mayRead, type Investigation } from "@/lib/investigations";
 import { cancelInvestigation, closeInvestigation, draftInvReport, saveAnalysis, saveConclusions, saveFacts, saveScope, saveTeam } from "../actions";
+import { Icon } from "@/lib/icons";
 
 export const maxDuration = 60;
 
@@ -42,7 +43,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
       <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)" }}>
         <div>
           {r && <section className="card mb-5"><div className="ch"><span className="eyebrow">Report</span><Link className="mini underline ml-auto" href={`/safe/reports/${r.id}`}>{r.id} ↗</Link></div>
-            <div className="cb"><b>{r.headline_en ?? r.headline}</b><div className="mini">{[r.event_date, r.aircraft, r.phase, r.location].filter(Boolean).join(" · ")}</div><p className="mt-2" style={{ whiteSpace: "pre-wrap" }}>{(r.narrative_en ?? r.narrative).slice(0, 1500)}</p></div></section>}
+            <div className="cb"><b>{r.headline_en ?? r.headline}</b><div className="mini">{[r.event_date, r.aircraft, r.phase, r.location].filter(Boolean).join(", ")}</div><p className="mt-2" style={{ whiteSpace: "pre-wrap" }}>{(r.narrative_en ?? r.narrative).slice(0, 1500)}</p></div></section>}
 
           <section className="card mb-5"><div className="ch"><span className="eyebrow">1 · Terms of reference</span></div>
             <div className="cb">{edit ? <form action={saveScope} className="grid grid-cols-3 gap-2"><Hid />
@@ -56,7 +57,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
           <section className="card mb-5"><div className="ch"><span className="eyebrow">2 · Facts</span><span className="mini">interviews, flight data, documents, records — facts only</span></div>
             <div className="cb">
               <table className="tbl mb-2"><thead><tr><th style={{ width: 150 }}>When (UTC)</th><th>Sequence of events</th>{edit && <th style={{ width: 40 }} />}</tr></thead>
-                <tbody>{i.timeline.map((t, k) => <tr key={k}><td className="mono">{t.at.replace("T", " ")}</td><td>{t.text}</td>{edit && <td><form action={saveFacts}><Hid /><input type="hidden" name={`trm${k}`} value="1" /><button className="btn" title="Remove">✕</button></form></td>}</tr>)}
+                <tbody>{i.timeline.map((t, k) => <tr key={k}><td className="mono">{t.at.replace("T", " ")}</td><td>{t.text}</td>{edit && <td><form action={saveFacts}><Hid /><input type="hidden" name={`trm${k}`} value="1" /><button className="btn" title="Remove"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form></td>}</tr>)}
                   {!i.timeline.length && <tr><td colSpan={3} className="mini">No event in the timeline yet.</td></tr>}</tbody></table>
               {edit ? <form action={saveFacts} className="grid gap-2"><Hid />
                 <div className="flex gap-2"><input type="datetime-local" name="t_at" className="inp" style={{ width: 220, marginTop: 0 }} /><input name="t_text" className="inp" placeholder="+ Add an event to the timeline" style={{ marginTop: 0 }} /></div>
@@ -67,7 +68,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
           <section className="card mb-5"><div className="ch"><span className="eyebrow">3 · Analysis</span><span className="mini">contributing factors, then causes</span></div>
             <div className="cb">
               {Object.entries(FACTOR_CAT).map(([cat, l]) => { const f = i.factors.map((x, k) => ({ ...x, k })).filter((x) => x.cat === cat); return f.length ? (
-                <div key={cat} className="mb-2"><div className="mini"><b>{l}</b></div><ul style={{ margin: "2px 0 0 16px", listStyle: "disc" }}>{f.map((x) => <li key={x.k} className="flex gap-2 items-start"><span style={{ flex: 1 }}>{x.text}</span>{edit && <form action={saveAnalysis}><Hid /><input type="hidden" name={`frm${x.k}`} value="1" /><button className="btn" title="Remove">✕</button></form>}</li>)}</ul></div>) : null; })}
+                <div key={cat} className="mb-2"><div className="mini"><b>{l}</b></div><ul style={{ margin: "2px 0 0 16px", listStyle: "disc" }}>{f.map((x) => <li key={x.k} className="flex gap-2 items-start"><span style={{ flex: 1 }}>{x.text}</span>{edit && <form action={saveAnalysis}><Hid /><input type="hidden" name={`frm${x.k}`} value="1" /><button className="btn" title="Remove"><Icon name="x" size={14} /><span className="sr-only">Remove</span></button></form>}</li>)}</ul></div>) : null; })}
               {!i.factors.length && <p className="mini mb-2">No contributing factor recorded.</p>}
               {edit ? <form action={saveAnalysis} className="grid gap-2"><Hid />
                 <div className="flex gap-2"><select name="f_cat" className="inp" style={{ width: 260, marginTop: 0 }} defaultValue="human">{Object.entries(FACTOR_CAT).map(([k, l]) => <option key={k} value={k}>{l.split(" (")[0]}</option>)}</select><input name="f_text" className="inp" placeholder="+ Add a contributing factor" style={{ marginTop: 0 }} /></div>

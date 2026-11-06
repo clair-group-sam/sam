@@ -77,7 +77,7 @@ export function nextAction(f: AuthorityFile, items: Pick<FileItem, "required" | 
   const missing = items.filter((i) => i.required && !i.done);
   switch (f.stage) {
     case "draft": return missing.length ? `Dossier: ${missing.length} required item(s) to complete` : "Hand over to Compliance";
-    case "compliance": return missing.length ? `Compliance check — ${missing.length} required item(s) still open` : "Compliance check — all items done, confirm";
+    case "compliance": return missing.length ? `Compliance check: ${missing.length} required item(s) still open` : "Compliance check: all items done, confirm";
     case "signing": return "Signatures to collect";
     case "ready": return "Submit on the portal (CMM)";
     case "submitted": { const d = daysAtAuthority(f); const late = f.target_date && f.target_date < today(); return late ? `Waiting for the authority — target date passed (${d} days), follow up` : `Waiting for the authority (${d ?? 0} days)`; }
@@ -128,16 +128,16 @@ export async function syncTasks(db: SupabaseClient, f: AuthorityFile): Promise<v
   const cmm = { owner_role: "CMM" };
   const rows: ReturnType<typeof t>[] = [];
   switch (f.stage) {
-    case "draft": rows.push(t(`Prepare the dossier — ${f.title}`, `${f.portal ?? f.authority ?? ""}. Complete the checklist, then hand over to Compliance.`, owner, f.target_date ? addDays(f.target_date, -14) : null)); break;
-    case "compliance": rows.push(t(`Compliance check — ${f.title}`, "Route, forms and attachments: confirm every required item.", cmm, addDays(today(), 3))); break;
-    case "signing": rows.push(t(`Signatures — ${f.title}`, "Collect the signatures, then mark the file ready.", cmm, addDays(today(), 5))); break;
-    case "ready": rows.push(t(`Submit — ${f.title}`, `Dossier complete: submit on ${f.portal ?? "the portal"} and record the reference.`, cmm, addDays(today(), 1))); break;
-    case "submitted": rows.push(t(`Follow up — ${f.title}`, `At ${f.authority ?? "the authority"} since ${fr(f.submitted_at)}${f.portal_ref ? ` (${f.portal_ref})` : ""}.`, cmm, f.target_date)); break;
-    case "remarks": rows.push(t(`Answer the remarks — ${f.title}`, "Reply in the same application with the corrected version.", cmm, addDays(today(), 5)), t(`Correct the dossier after remarks — ${f.title}`, "See the authority's remarks in the file journal.", owner, addDays(today(), 3))); break;
+    case "draft": rows.push(t(`${f.title}: prepare the dossier`, `${f.portal ?? f.authority ?? ""}. Complete the checklist, then hand over to Compliance.`, owner, f.target_date ? addDays(f.target_date, -14) : null)); break;
+    case "compliance": rows.push(t(`${f.title}: compliance check`, "Route, forms and attachments: confirm every required item.", cmm, addDays(today(), 3))); break;
+    case "signing": rows.push(t(`${f.title}: signatures`, "Collect the signatures, then mark the file ready.", cmm, addDays(today(), 5))); break;
+    case "ready": rows.push(t(`${f.title}: submit`, `Dossier complete: submit on ${f.portal ?? "the portal"} and record the reference.`, cmm, addDays(today(), 1))); break;
+    case "submitted": rows.push(t(`${f.title}: follow up`, `At ${f.authority ?? "the authority"} since ${fr(f.submitted_at)}${f.portal_ref ? ` (${f.portal_ref})` : ""}.`, cmm, f.target_date)); break;
+    case "remarks": rows.push(t(`${f.title}: answer the remarks`, "Reply in the same application with the corrected version.", cmm, addDays(today(), 5)), t(`${f.title}: correct the dossier after remarks`, "See the authority's remarks in the file journal.", owner, addDays(today(), 3))); break;
     case "approved": rows.push(/CERT/i.test(f.type_code ?? "") // FB-032 · a certificate file has nothing to publish
-      ? t(`File the certificate — ${f.title}`, "Certificate received: file it in Certificates & Validities with its expiry, then close the file.", cmm, addDays(today(), 5))
-      : t(`Integrate and publish — ${f.title}`, "Letter and signed pages to file, manual to publish.", cmm, addDays(today(), 5))); break;
-    case "published": rows.push(t(`Close-out — ${f.title}`, "Repository deposit, APP - Approvals, fee form, linked finding or NP record.", cmm, addDays(today(), 5))); break;
+      ? t(`${f.title}: file the certificate`, "Certificate received: file it in Certificates & Validities with its expiry, then close the file.", cmm, addDays(today(), 5))
+      : t(`${f.title}: integrate and publish`, "Letter and signed pages to file, manual to publish.", cmm, addDays(today(), 5))); break;
+    case "published": rows.push(t(`${f.title}: close-out`, "Repository deposit, APP - Approvals, fee form, linked finding or NP record.", cmm, addDays(today(), 5))); break;
     default: break;
   }
   if (rows.length) {

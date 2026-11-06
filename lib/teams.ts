@@ -402,7 +402,7 @@ export async function morningDigest(db: SupabaseClient): Promise<number> {
     const mine = tasks.filter((t) => isFor(p, t));
     const overdue = mine.filter((t) => t.due && t.due < t0); const week = mine.filter((t) => t.due && t.due >= t0 && t.due <= horizon);
     if (!overdue.length && !week.length) continue;
-    const title = `${overdue.length ? `${overdue.length} overdue` : ""}${overdue.length && week.length ? " · " : ""}${week.length ? `${week.length} due this week` : ""}`;
+    const title = `${overdue.length ? `${overdue.length} overdue` : ""}${overdue.length && week.length ? ", " : ""}${week.length ? `${week.length} due this week` : ""}`;
     const r = await sendCard(c, listCard(`Good morning ${p.display_name.split(" ")[0]} — ${title}`, `${mine.length} item${mine.length > 1 ? "s" : ""} in your Inbox in all.`, [...overdue, ...week]), "Your day in S.A.M.");
     if (r.ok) { n++; await db.from("teams_conversations").update({ digest_sent_on: t0 }).eq("person_id", c.person_id); }
   }

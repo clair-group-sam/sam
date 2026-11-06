@@ -18,6 +18,7 @@ import { linkIndex, rewriteLinks } from "@/lib/links";
 import { renderCharts } from "@/lib/orgchart";
 import { startRevision } from "@/app/(app)/docs/editor/[rev]/actions";
 import { isCmm, ownsManual } from "@/lib/revisions";
+import { Icon } from "@/lib/icons";
 
 type Reading = { person_id: string; acknowledged_at: string | null; via: string | null; people: { display_name: string; job_title: string | null } | null };
 
@@ -147,10 +148,15 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   return (
     <>
       <EntityBand entity={manual.entity} current={s.entity} multi={multi} />
-      <PageHeader eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
+      <PageHeader stacked eyebrow={`Documents · ${manual.entity} · ${manual.code}`} title={manual.title}
         tag={<ManualClass internal={!!(manual as Manual & { internal?: boolean }).internal} entity={manual.entity} />}
-        sub={current ? `owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${manual.path ? ` · ${manual.path}` : ""}${published.length ? ` · ${published.length} published revision${published.length > 1 ? "s" : ""}` : ""}` : "No revision yet"}
+        sub={current ? `${manual.code}, owner ${(manual as Manual & { owner_name?: string | null }).owner_name ?? manual.owner_role}${manual.path ? `, folder ${manual.path}` : ""}${published.length ? `, ${published.length} published revision${published.length > 1 ? "s" : ""}` : ""}` : "No revision yet"}
         right={<>
+          {current && !mine?.acknowledged_at && (
+            <form action={acknowledge}><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
+              <button className="btn primary" type="submit">I have read Rev {current.rev}</button></form>
+          )}
+          {mine?.acknowledged_at && <span className="pill green">Read on {mine.acknowledged_at.slice(0, 10)}</span>}
           {isCmm(s) ? (
             <form action={setNature} className="flex items-center" title="Nature of the document (Compliance): a regulated manual follows the DOC-09 cycle with an authority route; an internal document is reviewed and published by its author">
               <input type="hidden" name="manual_id" value={manual.id} />
@@ -160,7 +166,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
               <button type="submit" className="btn" style={{ height: 24, padding: "0 8px", fontSize: 11, marginLeft: 4 }}>Set</button>
             </form>
           ) : <span className="nature" style={{ alignSelf: "center" }}>{(manual as Manual & { internal?: boolean }).internal ? "internal document" : "regulated manual"}</span>}
-          <form action={toggleFavourite}><input type="hidden" name="manual_id" value={manual.id} /><button type="submit" className={"star" + (fav ? "" : " off")} title={fav ? "Remove from my favourites" : "Add to my favourites (Library shortcuts)"}>{fav ? "★" : "☆"}</button></form>
+          <form action={toggleFavourite}><input type="hidden" name="manual_id" value={manual.id} /><button type="submit" className={"star" + (fav ? "" : " off")} title={fav ? "Remove from my favourites" : "Add to my favourites (Library shortcuts)"}><Icon name="star" size={18} filled={fav} /></button></form>
           {canDownloadPdf(s.roles) && revs.length > 0 && (
             <DownloadMenu manualId={manual.id}
               published={published[0] ? { id: published[0].id, label: `Iss ${published[0].issue} Rev ${published[0].rev}`, sub: published[0].published_at ? `effective ${published[0].published_at}` : "published" } : null}
@@ -171,11 +177,6 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
           {(isCmm(s) || ownsManual(s, manual.owner_role)) && !editing && (published[0] || working) && (
             <form action={startRevision}><input type="hidden" name="from_revision" value={(published[0] ?? working)!.id} /><button className="btn" type="submit">{working ? `Start Rev ${String(parseInt(working.rev, 10) + 1).padStart(working.rev.length, "0")} (parallel)` : "Start a new revision"}</button></form>
           )}
-          {current && !mine?.acknowledged_at && (
-            <form action={acknowledge}><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
-              <button className="btn primary" type="submit">I have read this revision</button></form>
-          )}
-          {mine?.acknowledged_at && <span className="pill green">Read · {mine.acknowledged_at.slice(0, 10)}</span>}
         </>} />
 
       {current && !(current.step === "published" || current.step === "repository") && (
@@ -230,7 +231,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
               </div>
             ))}
             {changes.some((c) => isFront(c)) && (
-              <details className="mt-3"><summary className="mini" style={{ cursor: "pointer" }}>Front matter also revised — cover, table of contents, list of effective pages… ({changes.filter((c) => isFront(c)).length} chapter{changes.filter((c) => isFront(c)).length > 1 ? "s" : ""})</summary>
+              <details className="mt-3"><summary className="mini" style={{ cursor: "pointer" }}>Front matter also revised: cover, table of contents, list of effective pages… ({changes.filter((c) => isFront(c)).length} chapter{changes.filter((c) => isFront(c)).length > 1 ? "s" : ""})</summary>
                 {changes.filter((c) => isFront(c)).map((c) => (
                   <div key={c.id} className="wchg">
                     <div className="wchg-h"><span className="mono">{c.ref}</span> <b>{c.title}</b>{c.note && <span className="pill amber">{c.note}</span>}<Link className="mini underline ml-auto" href={`/docs/manual/${manual.id}?rev=${current?.id}&sec=${encodeURIComponent(c.ref)}`}>Open the chapter ›</Link></div>
@@ -260,7 +261,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
 
       {tab === "readers" && office && (<>
         <section className="card mb-4"><div className="ch"><span className="eyebrow">Readers · Rev {current?.rev}</span>
-          <span className="mini">{expected.length === 0 ? <>no one attached to {ENT[manual.entity]?.name ?? manual.entity} yet — <Link href="/set/core" className="underline">add people in Settings › Core</Link></> : <>{expected.filter((p) => readings.some((r) => r.person_id === p.id && r.acknowledged_at)).length} / {expected.length} acknowledged</>}</span></div>
+          <span className="mini">{expected.length === 0 ? <>no one attached to {ENT[manual.entity]?.name ?? manual.entity} yet. <Link href="/set/core" className="underline">add people in Settings › Core</Link></> : <>{expected.filter((p) => readings.some((r) => r.person_id === p.id && r.acknowledged_at)).length} / {expected.length} acknowledged</>}</span></div>
           <table className="tbl"><thead><tr><th>Person</th><th>Post</th><th>Acknowledged</th><th>Via</th></tr></thead>
             <tbody>
               {expected.map((p) => { const r = readings.find((x) => x.person_id === p.id); return (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { STEPS } from "@/lib/docs";
 import type { Transition } from "@/lib/revisions";
 import { moveStep } from "@/app/(app)/docs/editor/[rev]/actions";
+import { Icon } from "@/lib/icons";
 
 /** What the workflow card needs to know about one step: who does it, when it was done, and whether it applies. */
 export type StepRow = { step: string; label: string; who: string; detail?: string; skipped?: string; done?: { at: string; by: string | null } | null; /** validated by Compliance: shown with a lock to the others */ locked?: boolean };
@@ -32,7 +33,7 @@ export default function Workflow({ revisionId, current, rows, transitions, block
         const forward = state === "now" ? transitions.filter((t) => t.to === r.step) : [];
         return (
           <div key={r.step} className={"wfrow " + state + (r.locked && state !== "done" ? " locked" : "")}>
-            <div className="wfdot"><i />{state === "done" ? "✓" : ""}</div>
+            <div className="wfdot"><i />{state === "done" ? <Icon name="check" size={11} /> : ""}</div>
             <div className="wfbody">
               <div className="wfhead"><b>{r.label}</b>{r.locked && state !== "done" && <span className="lockpill">Compliance</span>}<span className="mini">{r.skipped ?? r.who}</span></div>
               {r.detail && state !== "skip" && <div className="mini">{r.detail}</div>}
