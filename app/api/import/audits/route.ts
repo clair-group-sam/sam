@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
   const reg = (key: string) => ((regs ?? []) as { id: string; key: string; items_version: string | null }[]).find((r) => r.key === key) ?? null;
   const { data: ppl } = await db.from("people").select("id,display_name").limit(800);
   const people = (ppl ?? []) as { id: string; display_name: string }[];
-  const person = (raw?: string | null) => { if (!raw) return null; const t = raw.toLowerCase().replace(/\(.*?\)/g, "").split(/[\s,]+/).filter((x) => x.length > 2); return people.find((p) => { const n = p.display_name.toLowerCase(); return t.length >= 2 && t.every((x) => n.includes(x)); })?.id ?? null; };
+  // Centrik writes "JPJanssens, Pierre-Franck (Compliance and Safety)": initials glued to the surname, then first name(s)
+  const person = (raw?: string | null) => { if (!raw) return null; const s0 = raw.replace(/\(.*?\)/g, "").trim().replace(/^[A-Z]{1,3}(?=[A-Z][a-z])/, ""); const [last, first] = s0.split(",").map((x) => x.trim().toLowerCase()); if (!last) return null;
+    const firstTok = (first ?? "").split(/[\s-]+/).filter((x) => x.length > 2); return people.find((p) => { const n = p.display_name.toLowerCase(); return n.includes(last) && (!firstTok.length || firstTok.some((x) => n.includes(x))); })?.id ?? null; };
   const kindOf = (sub: string) => /authority|external/i.test(sub) ? "authority" : /third|subcontract|supplier/i.test(sub) ? "subcontractor" : /survey/i.test(sub) ? "checks" : "internal";
   const domainOf = (sub: string) => /CAMO/i.test(sub) ? "CAMO" : /OPS/i.test(sub) ? "OPS" : /ATO|FSTD/i.test(sub) ? "ATO" : null;
   const defRegKey = (sub: string) => (domainOf(sub) === "CAMO" ? "continuing-airworthiness" : "air-operations");
