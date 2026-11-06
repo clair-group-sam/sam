@@ -70,13 +70,13 @@ export async function planNextCycle(fd: FormData) {
   if (error) throw new Error(error.message);
   const map = new Map<string, string>();
   for (const m of mods.filter((m) => m.active)) {
-    const { data } = await db().from("audit_modules").insert({ programme_id: np.id, code: m.code, title: m.title, domain: m.domain, kind: m.kind, requirements: m.requirements, sort: m.sort }).select("id").single();
+    const { data } = await db().from("audit_modules").insert({ programme_id: np.id, code: m.code, title: m.title, domain: m.domain, kind: m.kind, requirements: m.requirements, sort: m.sort, checklist_id: (m as { checklist_id?: string | null }).checklist_id ?? null }).select("id").single();
     if (data) map.set(m.id, data.id);
   }
   for (const a of audits.filter((a) => a.status !== "cancelled" && a.kind !== "authority")) {
     const month = addMonths(start, monthsBetween(monthStart(p.starts_on), a.planned_month));
     const number = await nextAuditNumber(db(), p.entity, Number(month.slice(0, 4)));
-    const { data } = await db().from("audits").insert({ entity: p.entity, number, programme_id: np.id, module_id: a.module_id ? map.get(a.module_id) ?? null : null, kind: a.kind, domain: a.domain, title: a.title, planned_month: month, lead_auditor: a.lead_auditor, auditors: a.auditors, external_auditor: a.external_auditor, subcontractor: a.subcontractor, scope: a.scope, created_by: s.person?.id ?? null }).select("id").single();
+    const { data } = await db().from("audits").insert({ entity: p.entity, number, programme_id: np.id, module_id: a.module_id ? map.get(a.module_id) ?? null : null, checklist_id: (a as { checklist_id?: string | null }).checklist_id ?? null, kind: a.kind, domain: a.domain, title: a.title, planned_month: month, lead_auditor: a.lead_auditor, auditors: a.auditors, external_auditor: a.external_auditor, subcontractor: a.subcontractor, scope: a.scope, created_by: s.person?.id ?? null }).select("id").single();
     if (data) await db().from("audit_events").insert({ audit_id: data.id, by: s.person?.id ?? null, kind: "planned", to_month: month, reason: `Carried over from ${a.number}` });
   }
   await log(s, p.entity, "audit_programme", np.id, "audit_programme_next_cycle", { from: p.id });
@@ -104,11 +104,11 @@ export async function addAudit(fd: FormData) {
   const p = await prog(String(fd.get("programme")));
   const month = monthStart(str(fd, "month") ?? p.starts_on);
   const moduleId = str(fd, "module");
-  const { data: m } = moduleId ? await db().from("audit_modules").select("code,title,domain,kind").eq("id", moduleId).maybeSingle() : { data: null };
-  const mod = m as { code: string; title: string; domain: string | null; kind: string } | null;
+  const { data: m } = moduleId ? await db().from("audit_modules").select("code,title,domain,kind,checklist_id").eq("id", moduleId).maybeSingle() : { data: null };
+  const mod = m as { code: string; title: string; domain: string | null; kind: string; checklist_id: string | null } | null;
   const kind = str(fd, "kind") ?? mod?.kind ?? "internal";
   const number = await nextAuditNumber(db(), p.entity, Number(month.slice(0, 4)));
-  const row = { entity: p.entity, number, programme_id: p.id, module_id: moduleId, kind, domain: str(fd, "domain") ?? mod?.domain ?? null, title: str(fd, "title") ?? (mod ? `${mod.code} — ${mod.title}` : "Audit"), planned_month: month,
+  const row = { entity: p.entity, number, programme_id: p.id, module_id: moduleId, checklist_id: mod?.checklist_id ?? null, kind, domain: str(fd, "domain") ?? mod?.domain ?? null, title: str(fd, "title") ?? (mod ? `${mod.code} — ${mod.title}` : "Audit"), planned_month: month,
     planned_on: str(fd, "planned_on"), lead_auditor: str(fd, "lead_auditor"), external_auditor: str(fd, "external_auditor"), authority: kind === "authority" ? str(fd, "authority") ?? PROG_REF[p.entity]?.authority ?? null : null, subcontractor: str(fd, "subcontractor"), scope: str(fd, "scope"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("audits").insert(row).select("id").single();
   if (error) throw new Error(error.message);

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ path: strin
   const s = await getSession();
   if (!s) return new Response("unauthorized", { status: 401 });
   const [bucket, entity, ...rest] = path;
-  if (!["manuals", "certificates", "evidence"].includes(bucket) || !entity || !rest.length) return new Response("not found", { status: 404 });
+  if (!["manuals", "certificates", "evidence", "audits"].includes(bucket) || !entity || !rest.length) return new Response("not found", { status: 404 });
   if (!s.group && !s.entities.includes(entity)) return new Response("forbidden", { status: 403 });
   const key = [entity, ...rest].join("/");
   const { data, error } = await supabaseAdmin().storage.from(bucket).createSignedUrl(key, 120);

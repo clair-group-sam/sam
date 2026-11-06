@@ -696,3 +696,8 @@ form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([
 /* REG-03 rule text */
 .ruletext p{margin:4px 0;font-size:13px;line-height:1.5}.ruletext .rt-h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate6);margin:10px 0 4px;font-weight:700}
 .ruletext .rt-src{margin:6px 0 2px;font-style:italic}.ruletext .rt-appl{color:#8a5a00;font-style:italic}
+/* AUD-02 audit run */
+.chk{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink)}.chk:hover{background:var(--blue05)}.chk.on{background:var(--blue1);box-shadow:inset 3px 0 0 var(--cyan)}
+.chk .dot{width:9px;height:9px;border-radius:50%;flex:none;background:#d5dde3}.chk .dot.green{background:var(--green)}.chk .dot.amber{background:var(--amber)}.chk .dot.red{background:var(--terra)}.chk .dot.grey{background:var(--slate3)}.chk .dot.none{background:transparent;border:1px solid var(--slate3)}
+.radio-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;background:#fff}.radio-pill:has(input:checked){border-color:var(--navy);background:var(--blue1);font-weight:700}
+.radio-pill.green:has(input:checked){background:var(--green-s);border-color:var(--green)}.radio-pill.amber:has(input:checked){background:var(--amber-s);border-color:var(--amber)}.radio-pill.red:has(input:checked){background:var(--terra-s);border-color:var(--terra)}

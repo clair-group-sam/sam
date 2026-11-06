@@ -2,7 +2,8 @@ import type { RegItem } from "@/lib/regulation-items";
 /* REG-03 · the official text of a rule with its AMC / GM, as loaded from the EASA export (version shown). Read-only. */
 export function RuleText({ items, version, onlineUrl, compact }: { items: RegItem[]; version: string; onlineUrl?: string | null; compact?: boolean }) {
   const ir = items.filter((i) => i.kind === "ir" || i.kind === "cs"), rest = items.filter((i) => i.kind === "amc" || i.kind === "gm");
-  const Body = ({ it }: { it: RegItem }) => <div className="ruletext">{it.body.map((b, i) => b.l === -1 ? <div key={i} className="rt-h">{b.t}</div> : b.l === -2 ? <div key={i} className="mini rt-src">{b.t}</div> : <p key={i} style={{ marginLeft: Math.max(0, b.l) * 18 }} className={/^\[applicable/i.test(b.t) ? "mini rt-appl" : ""}>{b.t}</p>)}</div>;
+  const sp = (t: string) => t.replace(/^((?:\([a-z0-9]+\))+)(?=\S)/i, "$1 ");
+  const Body = ({ it }: { it: RegItem }) => <div className="ruletext">{it.body.map((b, i) => b.l === -1 ? <div key={i} className="rt-h">{b.t}</div> : b.l === -2 ? <div key={i} className="mini rt-src">{b.t}</div> : <p key={i} style={{ marginLeft: Math.max(0, b.l) * 18 }} className={/^\[applicable/i.test(b.t) ? "mini rt-appl" : ""}>{sp(b.t)}</p>)}</div>;
   return (
     <div className="grid gap-3">
       {ir.map((it) => <section key={it.id} className="card"><div className="ch"><span><b className="mono">{it.ref}</b> {it.title}</span><span className="mini">{it.source} · {version}{it.change && it.change !== "unchanged" ? <span className="pill amber" style={{ marginLeft: 8 }}>{it.change}</span> : null}</span></div><div className="cb"><Body it={it} />{!compact && <div className="mini">{it.annex}{it.section ? ` · ${it.section}` : ""}</div>}</div></section>)}

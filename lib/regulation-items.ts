@@ -99,6 +99,7 @@ export async function loadItems(db: SupabaseClient, r: Regulation & { items_vers
     removed = gone.length;
     if (gone.length) await db.from("regulation_items").insert(gone.map((ref, i) => ({ regulation_id: r.id, version, ref, kind: "other", code: ref.replace(/^(AMC|GM|CS)\d*\s+/, "").replace(/\(.*$/, ""), title: null, body: [], body_text: null, hash: "", ord: 100000 + i, change: "removed" })));
   }
+  if (prevVersion && (nNew || nMod || removed)) { const { flagChangedItems } = await import("@/lib/audit-run"); await flagChangedItems(db, r.id, version); }
   await db.from("regulations").update({ items_version: version, items_count: rows.length, items_loaded_at: new Date().toISOString(), items_note: prevVersion ? `vs ${prevVersion}: ${nNew} new · ${nMod} modified · ${removed} removed` : null }).eq("id", r.id);
   await db.from("audit_log").insert({ actor: by, entity: r.entities[0] ?? null, object_type: "regulation", object_id: r.id, action: "regulation_items_loaded", after: { version, count: rows.length, new: nNew, modified: nMod, removed } });
   return { count: rows.length, version, new: nNew, modified: nMod, removed };

@@ -5,9 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type Programme = { id: string; entity: string; title: string; reference: string | null; domains: string[]; cycle_months: number; starts_on: string; ends_on: string; requirements: string[];
   status: string; approved_by: string | null; approved_at: string | null; approval_note: string | null; previous_id: string | null; note: string | null; created_at: string };
-export type AuditModule = { id: string; programme_id: string; code: string; title: string; domain: string | null; kind: string; requirements: string[]; sort: number; active: boolean };
+export type AuditModule = { id: string; programme_id: string; code: string; title: string; domain: string | null; kind: string; requirements: string[]; sort: number; active: boolean; checklist_id?: string | null };
 export type Audit = { id: string; entity: string; number: string; programme_id: string | null; module_id: string | null; kind: string; domain: string | null; title: string; planned_month: string; planned_on: string | null; planned_end: string | null;
-  lead_auditor: string | null; auditors: string[]; external_auditor: string | null; authority: string | null; subcontractor: string | null; scope: string | null; status: string; replanned: number; done_on: string | null; note: string | null; created_at: string };
+  lead_auditor: string | null; auditors: string[]; external_auditor: string | null; authority: string | null; subcontractor: string | null; scope: string | null; status: string; replanned: number; done_on: string | null; note: string | null; created_at: string; checklist_id?: string | null };
 export type AuditEvent = { id: number; audit_id: string; at: string; by: string | null; kind: string; from_month: string | null; to_month: string | null; status: string | null; reason: string | null };
 
 /** MSM references of the programme, per entity (claude/msm-references.md). */

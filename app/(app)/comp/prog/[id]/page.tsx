@@ -8,6 +8,7 @@ import { ENT, ENT_COLOR } from "@/lib/nav";
 import { addMonths, coverage, cycleMonths, elapsedPct, KIND_LABEL, loadProgramme, monthLong, PROG_REF, PROG_STATUS, STATUS_LABEL, type AuditEvent } from "@/lib/audit-programme";
 import { today } from "@/lib/authority";
 import { addAudit, approveProgramme, archiveModule, cancelAudit, closeProgramme, planNextCycle, replanAudit, saveAuditPlan, saveModule, saveProgramme } from "../actions";
+import { createChecklist } from "../cl/actions";
 
 /* AUD-01 · one audit programme: the grid, the audits (move with a reason, cancel with a reason, dates and auditor), the modules and the requirements they cover, the coverage, the history. */
 export default async function ProgrammePage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,10 +18,18 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
   const db = supabaseAdmin();
   const x = await loadProgramme(db, id);
   if (!x) notFound();
-  const { p, mods, audits } = x;
+  const { p, mods: rawMods, audits } = x;
   if (!s.group && !s.entities.includes(p.entity)) notFound();
   const desk = s.role === "cmm";
   const t0 = today();
+  // a module's requirements = the rule codes of its checklist (when it has one) + those typed on the module
+  type M = typeof rawMods[number] & { checklist_id?: string | null };
+  const clIds = (rawMods as M[]).map((m) => m.checklist_id).filter(Boolean) as string[];
+  const { data: clItems } = clIds.length ? await db.from("checklist_items").select("checklist_id,code").in("checklist_id", clIds).eq("active", true) : { data: [] };
+  const { data: clRows } = clIds.length ? await db.from("checklists").select("id,code,title").in("id", clIds) : { data: [] };
+  const clOf = (id: string | null | undefined) => ((clRows ?? []) as { id: string; code: string; title: string }[]).find((c) => c.id === id);
+  const codesOf = (id: string | null | undefined) => [...new Set(((clItems ?? []) as { checklist_id: string; code: string }[]).filter((i) => i.checklist_id === id).map((i) => i.code))];
+  const mods = (rawMods as M[]).map((m) => ({ ...m, requirements: [...new Set([...m.requirements, ...codesOf(m.checklist_id)])] }));
   const c = coverage(p, mods, audits, t0);
   const ms = cycleMonths(p);
   const [{ data: ppl }, { data: ev }, { data: nx }] = await Promise.all([
@@ -69,7 +78,7 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
             const mayMove = desk || a.lead_auditor === s.person?.id;
             return (
               <tr key={a.id} id={a.number}>
-                <td><b className="mono">{a.number}</b> {a.title}<div className="mini">{KIND_LABEL[a.kind]}{a.subcontractor ? ` · ${a.subcontractor}` : ""}{a.authority ? ` · ${a.authority}` : ""}{a.scope ? ` · ${a.scope}` : ""}</div></td>
+                <td><Link href={`/comp/audits/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini">{KIND_LABEL[a.kind]}{a.subcontractor ? ` · ${a.subcontractor}` : ""}{a.authority ? ` · ${a.authority}` : ""}{a.scope ? ` · ${a.scope}` : ""}</div></td>
                 <td className="mono">{modCode(a.module_id)}</td>
                 <td className={late ? "late" : ""}>{monthLong(a.planned_month)}{a.planned_on && <div className="mini mono">{a.planned_on}{a.planned_end ? ` → ${a.planned_end}` : ""}</div>}{a.replanned > 0 && <div className="mini" style={{ color: "#8a5a00" }}>replanned ×{a.replanned}</div>}</td>
                 <td>{a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "—"}{a.lead_auditor && a.external_auditor && <div className="mini">{a.external_auditor}</div>}</td>
@@ -95,8 +104,9 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <section className="card"><div className="ch"><span className="eyebrow">Modules · areas to audit</span></div><div className="cb" style={{ padding: 0 }}>
-          <table className="tbl"><thead><tr><th>Module</th><th>Type</th><th>Requirements</th><th>Audits</th>{desk && <th></th>}</tr></thead><tbody>{active.map((m) => (
-            <tr key={m.id}><td><b className="mono">{m.code}</b> {m.title}{m.domain && <div className="mini">{m.domain}</div>}</td><td className="mini">{KIND_LABEL[m.kind]}</td><td className="mini mono">{m.requirements.join(" · ") || "—"}</td>
+          <table className="tbl"><thead><tr><th>Module</th><th>Type</th><th>Checklist</th><th>Audits</th>{desk && <th></th>}</tr></thead><tbody>{active.map((m) => (
+            <tr key={m.id}><td><b className="mono">{m.code}</b> {m.title}{m.domain && <div className="mini">{m.domain}</div>}</td><td className="mini">{KIND_LABEL[m.kind]}</td>
+              <td className="mini">{m.checklist_id && clOf(m.checklist_id) ? <><Link href={`/comp/prog/cl/${m.checklist_id}`}><b className="mono">{clOf(m.checklist_id)!.code}</b></Link> · {codesOf(m.checklist_id).length} rules</> : m.kind === "authority" ? "—" : desk ? <form action={createChecklist} className="flex gap-1"><input type="hidden" name="entity" value={p.entity} /><input type="hidden" name="programme" value={p.id} /><input type="hidden" name="module" value={m.id} /><input type="hidden" name="code" value={m.code} /><input type="hidden" name="title" value={m.title} /><input type="hidden" name="domain" value={m.domain ?? ""} /><button className="btn sm">Create / link {m.code}</button></form> : <span style={{ color: "#8a5a00" }}>no checklist</span>}{m.requirements.length > codesOf(m.checklist_id).length && <div className="mono" style={{ color: "var(--slate5)" }}>+ {m.requirements.filter((r) => !codesOf(m.checklist_id).includes(r)).join(" · ")}</div>}</td>
               <td className={c.modulesWithout.some((x) => x.id === m.id) ? "late" : ""}>{audits.filter((a) => a.module_id === m.id && a.status !== "cancelled").length}</td>
               {desk && <td><details className="inlineedit" style={{ position: "relative" }}><summary className="btn sm">Edit</summary>
                 <div className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 30, width: 400, zIndex: 5 }}>
