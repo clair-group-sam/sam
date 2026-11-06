@@ -7,7 +7,7 @@ import { addMonths, monthStart, nextAuditNumber, PROG_REF } from "@/lib/audit-pr
  * audits placed month by month; a row with a Centrik number attaches the imported audit instead of creating one. Compliance desk. */
 type SeedAudit = { month: string; centrik_no?: string; planned_on?: string; kind?: string; title?: string; subcontractor?: string };
 type SeedModule = { code: string; title: string; kind?: string; domain?: string; checklist?: string; audits?: SeedAudit[] };
-type Body = { entity: string; title: string; reference?: string; starts_on: string; cycle_months: number; approve?: boolean; modules: SeedModule[] };
+type Body = { entity: string; title: string; reference?: string; starts_on: string; cycle_months: number; approve?: boolean; attach_imported?: boolean; modules: SeedModule[] };
 export async function POST(req: NextRequest) {
   const s = await getSession();
   if (!s) return Response.json({ error: "unauthenticated" }, { status: 401 });
@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
   for (const m of b.modules) {
     const checklist = clId(m.checklist ?? m.code);
     const { data: md } = await db.from("audit_modules").insert({ programme_id: p.id, code: m.code, title: m.title, domain: m.domain ?? null, kind: m.kind ?? "internal", checklist_id: checklist, sort: sort++ }).select("id").single();
+    if (b.attach_imported && checklist) { // the imported audits run with this checklist inside the cycle belong to this programme
+      const { data: got } = await db.from("audits").update({ programme_id: p.id, module_id: md?.id ?? null, kind: m.kind ?? "internal", domain: m.domain ?? null }).eq("entity", b.entity).eq("checklist_id", checklist).is("programme_id", null).gte("planned_month", start).lte("planned_month", end).select("number");
+      for (const g of (got ?? []) as { number: string }[]) out.push(`${m.code}: ${g.number} attached`);
+    }
     for (const a of m.audits ?? []) {
       const month = monthStart(a.month);
       if (a.centrik_no) {
