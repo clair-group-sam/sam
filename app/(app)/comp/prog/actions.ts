@@ -108,8 +108,10 @@ export async function addAudit(fd: FormData) {
   const mod = m as { code: string; title: string; domain: string | null; kind: string; checklist_id: string | null } | null;
   const kind = str(fd, "kind") ?? mod?.kind ?? "internal";
   const number = await nextAuditNumber(db(), p.entity, Number(month.slice(0, 4)));
-  const row = { entity: p.entity, number, programme_id: p.id, module_id: moduleId, checklist_id: mod?.checklist_id ?? null, kind, domain: str(fd, "domain") ?? mod?.domain ?? null, title: str(fd, "title") ?? (mod ? `${mod.code} — ${mod.title}` : "Audit"), planned_month: month,
-    planned_on: str(fd, "planned_on"), lead_auditor: str(fd, "lead_auditor"), external_auditor: str(fd, "external_auditor"), authority: kind === "authority" ? str(fd, "authority") ?? PROG_REF[p.entity]?.authority ?? null : null, subcontractor: str(fd, "subcontractor"), scope: str(fd, "scope"), created_by: s.person?.id ?? null };
+  const subName = str(fd, "subcontractor") ?? (kind === "subcontractor" ? mod?.title ?? null : null);
+  const { data: subRow } = subName ? await db().from("subcontractors").select("id").eq("entity", p.entity).eq("active", true).ilike("name", `%${subName.split(" (")[0]}%`).limit(1).maybeSingle() : { data: null };
+  const row = { entity: p.entity, number, programme_id: p.id, module_id: moduleId, checklist_id: mod?.checklist_id ?? null, subcontractor_id: (subRow as { id: string } | null)?.id ?? null, kind, domain: str(fd, "domain") ?? mod?.domain ?? null, title: str(fd, "title") ?? (mod ? `${mod.code} — ${mod.title}` : "Audit"), planned_month: month,
+    planned_on: str(fd, "planned_on"), lead_auditor: str(fd, "lead_auditor"), external_auditor: str(fd, "external_auditor"), authority: kind === "authority" ? str(fd, "authority") ?? PROG_REF[p.entity]?.authority ?? null : null, subcontractor: subName, scope: str(fd, "scope"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("audits").insert(row).select("id").single();
   if (error) throw new Error(error.message);
   await db().from("audit_events").insert({ audit_id: data.id, by: s.person?.id ?? null, kind: "planned", to_month: month });

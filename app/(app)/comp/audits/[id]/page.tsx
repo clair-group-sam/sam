@@ -7,6 +7,7 @@ import { ENT, ENT_COLOR } from "@/lib/nav";
 import { KIND_LABEL, monthLong, STATUS_LABEL, type Audit, type AuditEvent } from "@/lib/audit-programme";
 import { breakdown, history, hintsFor, RESULT_LABEL, RESULT_TONE, RESULTS, textFor, type Check, type Checklist } from "@/lib/audit-run";
 import { LEVEL_LABEL } from "@/lib/findings";
+import { eligibility, type Auditor } from "@/lib/compliance-registers";
 import { RuleText } from "@/components/RuleText";
 import { addCheck, raiseFinding, refreshHints, reopenAudit, reportAudit, setCheck, startAudit } from "../actions";
 
@@ -45,6 +46,8 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   const idx = open ? checks.indexOf(open) : -1;
   const prevC = idx > 0 ? checks[idx - 1] : null, nextC = idx >= 0 && idx < checks.length - 1 ? checks[idx + 1] : null;
   const checklists = (cls ?? []) as Checklist[];
+  const { data: ar } = a.lead_auditor ? await db.from("auditors").select("*").eq("person_id", a.lead_auditor).maybeSingle() : { data: null };
+  const elig = a.lead_auditor && a.kind !== "authority" ? eligibility(ar as Auditor | null, a.entity, a.domain) : { ok: true, why: [] as string[] };
   const live = ["in_progress", "report"].includes(a.status) && team;
   return (
     <>
@@ -53,7 +56,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
         tag={<span className={"pill " + (a.status === "closed" ? "green" : a.status === "planned" ? "" : "amber")}>{STATUS_LABEL[a.status]}</span>}
         right={<div className="flex gap-2"><Link className="btn" href="/comp/audits">All audits</Link>{a.programme_id && <Link className="btn" href={`/comp/prog/${a.programme_id}`}>Programme</Link>}
           {a.status === "planned" && team && <form action={startAudit} className="flex gap-2"><input type="hidden" name="id" value={a.id} />
-            <select name="checklist" className="inp" defaultValue={a.checklist_id ?? ""}><option value="">no checklist (free audit)</option>{checklists.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}</select><button className="btn primary">Start the audit</button></form>}
+            <select name="checklist" className="inp" defaultValue={a.checklist_id ?? ""}><option value="">no checklist (free audit)</option>{checklists.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}</select>{!elig.ok && desk && <input name="override" className="inp" placeholder="Override reason (lead not eligible)" style={{ width: 220 }} />}<button className="btn primary">Start the audit</button></form>}
           {a.status === "in_progress" && team && <details className="inlineedit" style={{ position: "relative" }}><summary className="btn primary">Close the checks → report</summary>
             <form action={reportAudit} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 36, width: 460, zIndex: 5 }}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="report" />
               <p className="mini">{b.done} / {b.total} checks have a result{b.done < b.total ? ` — ${b.total - b.done} missing` : ""}. The report freezes the results; findings keep their own life.</p>
@@ -67,6 +70,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
         <Metric label="Not conforming" value={b.non_conforming} hint={`${findings.length} finding${findings.length === 1 ? "" : "s"} raised`} tone={b.non_conforming ? "red" : undefined} />
         <Metric label="N/A · not covered" value={`${b.not_applicable} · ${b.not_covered}`} />
       </div>
+      {!elig.ok && <section className="card mb-4" style={{ borderColor: "var(--amber)" }}><div className="cb mini" style={{ color: "#8a5a00" }}>Lead auditor {name(a.lead_auditor)}: {elig.why.join(", ")} — <Link href="/comp/auditors">Internal auditors</Link>.</div></section>}
       {a.status === "planned" && <section className="card mb-4"><div className="cb mini">{team ? "Pick the checklist and start: its items become the checks of this audit, with the official text of the rules in the version loaded today." : "Not started yet."}{!checklists.length && desk ? <> No checklist for {a.entity} yet — create one from the programme (module › checklist).</> : null}</div></section>}
       {a.report_summary && <section className="card mb-4"><div className="ch"><span className="eyebrow">Report</span><span className="mini">{a.report_at ? `issued ${a.report_at.slice(0, 10)}` : ""}{a.closed_at ? ` · closed ${a.closed_at.slice(0, 10)} by ${name(a.closed_by)}` : ""}</span></div><div className="cb" style={{ whiteSpace: "pre-wrap" }}>{a.report_summary}</div></section>}
 

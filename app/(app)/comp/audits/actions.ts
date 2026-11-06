@@ -7,6 +7,7 @@ import { today } from "@/lib/authority";
 import { breakdown, hintsFor, history, instantiateChecks, RESULTS, textFor, type Check } from "@/lib/audit-run";
 import { nextFindingNumber, syncFindingTasks, type Finding } from "@/lib/findings";
 import type { Audit } from "@/lib/audit-programme";
+import { eligibility, type Auditor } from "@/lib/compliance-registers";
 
 /* AUD-02 · the audit run: start, check by check (result, comment, evidence), finding from a check, report, close. Lead auditor / auditors / Compliance desk. */
 const db = () => supabaseAdmin();
@@ -24,6 +25,12 @@ export async function startAudit(fd: FormData) {
   const s = await me(); const a = await audit(String(fd.get("id")));
   if (!team(s, a)) throw new Error("Lead auditor, auditors or Compliance desk only.");
   if (a.status !== "planned") throw new Error("Already started.");
+  // ENR-CM-09: the lead auditor must be approved for the entity and the domain (the desk may override with a reason, kept in the history)
+  if (a.lead_auditor && a.kind !== "authority") {
+    const { data: ar } = await db().from("auditors").select("*").eq("person_id", a.lead_auditor).maybeSingle();
+    const el = eligibility(ar as Auditor | null, a.entity, a.domain);
+    if (!el.ok) { const why = str(fd, "override"); if (!why || !desk(s)) throw new Error(`Lead auditor not eligible: ${el.why.join(", ")}. Change the auditor, update the register, or (desk) start with an override reason.`); await db().from("audit_events").insert({ audit_id: a.id, by: s.person?.id ?? null, kind: "note", reason: `Started with a non-eligible lead auditor (${el.why.join(", ")}): ${why}` }); }
+  }
   const checklistId = str(fd, "checklist") ?? a.checklist_id;
   if (checklistId && checklistId !== a.checklist_id) await db().from("audits").update({ checklist_id: checklistId }).eq("id", a.id);
   const n = await instantiateChecks(db(), { ...a, checklist_id: checklistId });

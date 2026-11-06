@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
   const { data: cls } = await db.from("checklists").select("id,code").eq("entity", b.entity).eq("active", true);
   const clId = (code?: string) => ((cls ?? []) as { id: string; code: string }[]).find((c) => c.code.toUpperCase() === (code ?? "").toUpperCase())?.id ?? null;
   const out: string[] = []; let sort = 0;
+  const { data: subsAll } = await db.from("subcontractors").select("id,name").eq("entity", b.entity).eq("active", true);
+  const subId = (title: string) => ((subsAll ?? []) as { id: string; name: string }[]).find((x) => x.name.toLowerCase().split(" (")[0] === title.toLowerCase().split(" (")[0] || title.toLowerCase().includes(x.name.toLowerCase().split(" (")[0]))?.id ?? null;
   for (const m of b.modules) {
     const checklist = clId(m.checklist ?? m.code);
     const { data: md } = await db.from("audit_modules").insert({ programme_id: p.id, code: m.code, title: m.title, domain: m.domain ?? null, kind: m.kind ?? "internal", checklist_id: checklist, sort: sort++ }).select("id").single();
@@ -34,11 +36,11 @@ export async function POST(req: NextRequest) {
       const month = monthStart(a.month);
       if (a.centrik_no) {
         const { data: au } = await db.from("audits").select("id,status").eq("entity", b.entity).eq("number", a.centrik_no).maybeSingle();
-        if (au) { await db.from("audits").update({ programme_id: p.id, module_id: md?.id ?? null, checklist_id: checklist ?? undefined, planned_month: month, kind: a.kind ?? m.kind ?? "internal", domain: m.domain ?? null, subcontractor: a.subcontractor ?? (m.kind === "subcontractor" ? m.title : null) }).eq("id", au.id); out.push(`${m.code}: ${a.centrik_no} attached`); continue; }
+        if (au) { await db.from("audits").update({ programme_id: p.id, module_id: md?.id ?? null, checklist_id: checklist ?? undefined, planned_month: month, kind: a.kind ?? m.kind ?? "internal", domain: m.domain ?? null, subcontractor: a.subcontractor ?? (m.kind === "subcontractor" ? m.title : null), subcontractor_id: m.kind === "subcontractor" ? subId(a.subcontractor ?? m.title) : null }).eq("id", au.id); out.push(`${m.code}: ${a.centrik_no} attached`); continue; }
         out.push(`${m.code}: ${a.centrik_no} not found — planned instead`);
       }
       const number = await nextAuditNumber(db, b.entity, Number(month.slice(0, 4)));
-      const { data: na } = await db.from("audits").insert({ entity: b.entity, number, programme_id: p.id, module_id: md?.id ?? null, checklist_id: checklist, kind: a.kind ?? m.kind ?? "internal", domain: m.domain ?? null, title: a.title ?? `${m.code} — ${m.title}`, planned_month: month, planned_on: a.planned_on ?? null, subcontractor: m.kind === "subcontractor" ? m.title : null, authority: (a.kind ?? m.kind) === "authority" ? PROG_REF[b.entity]?.authority ?? null : null, created_by: s.person?.id ?? null }).select("id").single();
+      const { data: na } = await db.from("audits").insert({ entity: b.entity, number, programme_id: p.id, module_id: md?.id ?? null, checklist_id: checklist, kind: a.kind ?? m.kind ?? "internal", domain: m.domain ?? null, title: a.title ?? `${m.code} — ${m.title}`, planned_month: month, planned_on: a.planned_on ?? null, subcontractor: m.kind === "subcontractor" ? m.title : null, subcontractor_id: m.kind === "subcontractor" ? subId(m.title) : null, authority: (a.kind ?? m.kind) === "authority" ? PROG_REF[b.entity]?.authority ?? null : null, created_by: s.person?.id ?? null }).select("id").single();
       if (na) await db.from("audit_events").insert({ audit_id: na.id, by: s.person?.id ?? null, kind: "planned", to_month: month, reason: `From the audit plan ${b.reference ?? ""}`.trim() });
       out.push(`${m.code}: ${number} planned ${month.slice(0, 7)}`);
     }
