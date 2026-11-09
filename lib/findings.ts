@@ -207,3 +207,38 @@ export async function sweepFindings(db: SupabaseClient): Promise<number> {
   }
   return n;
 }
+
+/* ---------- FND-05 · the short answer from the Teams card ---------- */
+export type TeamsAnswer = { root_cause: string | null; factors: string | null; immediate: string | null; plan: string | null };
+/** The NP answers from the card: the root cause draft is saved and read by S.A.M. for the author; each line of the plan becomes a
+ * corrective action of the finding (owner = the finding's owner, due = the finding's due date); "send" files the round for Compliance
+ * exactly as the app does. Returns S.A.M.'s reading and what was created. */
+export async function answerFromTeams(db: SupabaseClient, f: Finding, actor: { id: string; name: string }, a: TeamsAnswer, send: boolean): Promise<{ assistant: Assistant; actions: number; sent: boolean; error?: string }> {
+  if (!["open", "back"].includes(f.status)) return { assistant: { verdict: "complete", points: [], model: "rules", at: new Date().toISOString() }, actions: 0, sent: false, error: "This finding is not being answered." };
+  const draft = { draft_root_cause: a.root_cause ?? f.draft_root_cause, draft_factors: a.factors ?? f.draft_factors, draft_immediate: a.immediate ?? f.draft_immediate };
+  if (!draft.draft_root_cause) return { assistant: { verdict: "incomplete", points: [{ code: "RC_EMPTY", label: "Root cause missing", detail: "Say why the organisation let this happen.", part: "rca" }], model: "rules", at: new Date().toISOString() }, actions: 0, sent: false, error: "Write the root cause." };
+  let created = 0;
+  const planLines = (a.plan ?? "").split(/\n+/).map((x) => x.replace(/^[-•*\d.)\s]+/, "").trim()).filter((x) => x.length > 3);
+  for (const line of planLines) {
+    const { nextActionNumber } = await import("@/lib/actions");
+    const { ownerTaskRow } = await import("@/lib/actions-core");
+    const number = await nextActionNumber(db, f.entity);
+    const row = { entity: f.entity, number, module: "compliance", finding_id: f.id, kind: "corrective", title: line.slice(0, 300), owner_role: f.owner_person ? null : f.owner_role ?? "CMM", owner_person: f.owner_person, due: f.due, source_kind: "finding", created_by: actor.id };
+    const { data } = await db.from("safety_actions").insert(row).select("*").single();
+    if (data) { created++; await db.from("tasks").insert(ownerTaskRow(data as Action)); }
+  }
+  const [{ data: c }, { data: ac }] = await Promise.all([db.from("finding_changes").select("*").eq("finding_id", f.id).neq("status", "removed"), db.from("safety_actions").select("*").eq("finding_id", f.id).neq("status", "cancelled")]);
+  const changes = (c ?? []) as Change[], actions = (ac ?? []) as Action[];
+  const n = f.current_round + 1;
+  const assistant = await preRead(f, { root_cause: draft.draft_root_cause, factors: draft.draft_factors, immediate: draft.draft_immediate, comment: null, n }, changes, actions, send ? "full" : "rca", !send);
+  await db.from("findings").update({ ...draft, rca_check: send ? f.rca_check : assistant, draft_step: Math.max(f.draft_step, actions.length || changes.length ? 2 : 1), updated_at: new Date().toISOString() }).eq("id", f.id);
+  if (!send) return { assistant, actions: created, sent: false };
+  if (!changes.length && !actions.length) return { assistant, actions: created, sent: false, error: "Add at least one action (one per line in the plan) or an expected manual change before sending." };
+  const { data: r } = await db.from("finding_rounds").insert({ finding_id: f.id, stage: "full", n, root_cause: draft.draft_root_cause, factors: draft.draft_factors, immediate: draft.draft_immediate, comment: null, answered_by: actor.id, via: "teams", assistant }).select("*").single();
+  if (!r) return { assistant, actions: created, sent: false, error: "Answer not sent." };
+  await db.from("findings").update({ status: "review", current_round: n, draft_step: 3, updated_at: new Date().toISOString() }).eq("id", f.id);
+  const { data: nf } = await db.from("findings").select("*").eq("id", f.id).single();
+  if (nf) await syncFindingTasks(db, nf as Finding);
+  await db.from("audit_log").insert({ actor: actor.id, entity: f.entity, object_type: "finding", object_id: f.id, action: "finding_analysis_sent", after: { round: n, via: "teams", verdict: assistant.verdict, points: assistant.points.length, changes: changes.length, actions: actions.length } });
+  return { assistant, actions: created, sent: true };
+}

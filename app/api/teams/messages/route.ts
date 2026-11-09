@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost } from "@/lib/session";
-import { ANSWERABLE_KINDS, cardFor, ensureConversation, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type TaskRow, promoCard } from "@/lib/teams";
+import { ANSWERABLE_KINDS, cardFor, ensureConversation, findingCard, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type FindingLite, type TaskRow, promoCard } from "@/lib/teams";
+import { answerFromTeams, type Finding } from "@/lib/findings";
 import { applyMove } from "@/lib/authority-moves";
 import { completeAction, verifyActionCore } from "@/lib/actions-core";
 import type { Action } from "@/lib/actions";
@@ -141,6 +142,31 @@ export async function POST(req: NextRequest) {
         await refreshCards(db, { ...task, status: "done" }, state, ref.conversation_id);
         return cardResponse(taskCard(task, state));
       } catch (e) { return msgResponse(e instanceof Error ? e.message : "Refused"); }
+    }
+    // FND-05 · the NP answers a finding from the card (check = draft + S.A.M.'s reading; send = the round goes to Compliance)
+    if (verb === "finding_check" || verb === "finding_send") {
+      const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();
+      const task = t as (TaskRow & { ref_id?: string | null }) | null;
+      if (!task) return msgResponse("This task no longer exists.");
+      if (task.status !== "open") return cardResponse(taskCard(task, stateOf(task)));
+      const mine = task.owner_person ? task.owner_person === p.id : task.owner_role ? p.roles.map(basePost).includes(basePost(task.owner_role)) : true;
+      const cmm = p.roles.map(basePost).some((r) => ["CMM", "SUPERADMIN"].includes(r));
+      if (!mine && !cmm) return msgResponse("This finding is not addressed to you.");
+      const { data: fd } = await db.from("findings").select("*").eq("id", String(data.findingId ?? task.ref_id ?? "")).maybeSingle();
+      if (!fd) return msgResponse("The finding no longer exists.");
+      const f = fd as Finding;
+      const g = (k: string) => { const v = String((a.value?.action?.data as Record<string, unknown> | undefined)?.[k] ?? (a.value as Record<string, unknown> | undefined)?.[k] ?? "").trim(); return v || null; };
+      const res = await answerFromTeams(db, f, { id: p.id, name: p.display_name }, { root_cause: g("root_cause"), factors: g("factors"), immediate: g("immediate"), plan: g("plan") }, verb === "finding_send");
+      await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: res.error ?? (res.sent ? `sent round ${f.current_round + 1}` : `draft checked · ${res.assistant.verdict}`), meta: { finding: f.id, actions: res.actions } });
+      const { data: nf } = await db.from("findings").select("*").eq("id", f.id).single();
+      const lite = nf as FindingLite;
+      if (res.sent) {
+        await db.from("tasks").update({ answered_via: "teams", answered_at: now(), answer: `Round ${f.current_round + 1} sent from Teams` }).eq("id", task.id);
+        const state = { answered: "done" as const, by: p.display_name, at: hhmm(), comment: `root cause, ${res.actions ? `${res.actions} action${res.actions > 1 ? "s" : ""} created, ` : ""}Compliance reads it` };
+        await refreshCards(db, { ...task, status: "done" }, state, ref.conversation_id);
+        return cardResponse(findingCard(task, lite, undefined, state));
+      }
+      return cardResponse(findingCard(task, lite, { verdict: res.assistant.verdict, points: res.assistant.points, created: res.actions, note: res.error }));
     }
     if (verb === "file_submit_prep" || verb === "file_submit_confirm" || verb === "file_submit_cancel") {
       const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();

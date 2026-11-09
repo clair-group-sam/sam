@@ -177,7 +177,7 @@ export type TaskRow = { id: string; title: string; detail: string | null; due: s
 const KIND_LABEL: Record<string, string> = { authority: "CAA application", authority_followup: "Authority follow-up", reading: "Read & acknowledge", certificate_validity: "Validity", finding: "Finding", action: "Action", action_verify: "Verify an action", action_effectiveness: "Effectiveness", mitigation: "Mitigation", signature: "Signature", project: "Project", risk_acceptance: "Risk acceptance", risk_review: "Risk review", risk_intolerable: "Intolerable risk", safety_report: "Safety report", safety_question: "Question on your report", status_review: "Status review", escalation: "Escalation", finding_review: "Finding — answer to review", finding_closure: "Finding — closure proposed", watch: "Regulatory watch", watch_check: "Regulatory watch — check due", promo_read: "Safety promotion", investigation: "Investigation" };
 /** Kinds that can be answered from the card. The others need the app (a manual to read, evidence to attach, a decision to record, a signature). */
 export const ANSWERABLE_KINDS = new Set(["action", "action_verify", "mitigation", "authority", "authority_followup", "project", "status_review", "escalation"]);
-const NEEDS_APP: Record<string, string> = { investigation: "Lead the investigation in S.A.M.", promo_read: "Answer the survey in S.A.M.", watch: "Decide in S.A.M. (applicability, impact, what to do).", watch_check: "Open the sources and tick them in S.A.M.", finding: "Answer in S.A.M.: root cause, factors, plan.", finding_review: "Review the answer in S.A.M.", finding_closure: "Request the closure from the finding in S.A.M.", reading: "Open the manual in S.A.M. and acknowledge it there.", certificate_validity: "Drop the renewed document in S.A.M.", safety_report: "Acknowledge and classify the report in S.A.M.", safety_question: "Answer in S.A.M. (My reports).", risk_acceptance: "Record the decision in S.A.M.", risk_review: "Reassess the hazard in S.A.M.", risk_intolerable: "Decide in S.A.M.", action_effectiveness: "Record the effectiveness in S.A.M.", signature: "Sign in S.A.M." };
+const NEEDS_APP: Record<string, string> = { investigation: "Lead the investigation in S.A.M.", promo_read: "Answer the survey in S.A.M.", watch: "Decide in S.A.M. (applicability, impact, what to do).", watch_check: "Open the sources and tick them in S.A.M.", finding: "Answer from this card or in S.A.M.: root cause, factors, plan.", finding_review: "Review the answer in S.A.M.", finding_closure: "Request the closure from the finding in S.A.M.", reading: "Open the manual in S.A.M. and acknowledge it there.", certificate_validity: "Drop the renewed document in S.A.M.", safety_report: "Acknowledge and classify the report in S.A.M.", safety_question: "Answer in S.A.M. (My reports).", risk_acceptance: "Record the decision in S.A.M.", risk_review: "Reassess the hazard in S.A.M.", risk_intolerable: "Decide in S.A.M.", action_effectiveness: "Record the effectiveness in S.A.M.", signature: "Sign in S.A.M." };
 const fr = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "");
 const todayISO = () => new Date().toISOString().slice(0, 10);
 export function origin(): string { return (process.env.SAM_ORIGIN ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://sam-jet-sigma.vercel.app")).replace(/\/$/, ""); }
@@ -246,6 +246,12 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
       { type: "Action.Execute", title: "Accept & close", verb: "action_verify", style: "positive", data: { taskId: t.id, verdict: "accept" } },
       { type: "Action.Execute", title: "Send back", verb: "action_verify", data: { taskId: t.id, verdict: "back" } }] });
     if (t.kind === "action") return taskCard(t, undefined, { doneTitle: "Done — with this note as evidence", commentHint: "What was done, and where the evidence is (required for Done)" });
+    // FND-05 · a finding is answered from the card: root cause, factors, immediate action, plan (one action per line); S.A.M. reads it first
+    if (t.kind === "finding" && t.ref_id) {
+      const { data: fd } = await db.from("findings").select("*").eq("id", t.ref_id).maybeSingle();
+      const f = fd as FindingLite | null;
+      if (f && ["open", "back"].includes(f.status)) return findingCard(t, f);
+    }
     // SAF-09 · a bulletin / notice is read on the card and acknowledged there; a survey is answered in S.A.M.
     if (t.kind === "promo_read" && t.ref_id) {
       const { data: pr } = await db.from("safety_promotions").select("id,kind,number,title,summary,body,ack_required,status").eq("id", t.ref_id).maybeSingle();
@@ -254,6 +260,42 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
     }
   } catch { /* fall through to the plain card */ }
   return taskCard(t);
+}
+/** FND-05 · the finding on the card with the short answer: root cause · factors · immediate action · plan. "Check with S.A.M." saves the draft
+ *  and shows the reading; "Send to Compliance" files the round. The full editor (expected manual changes, S.A.M. per step) stays in the app. */
+export type FindingLite = { id: string; entity: string; number: string; title: string; description: string | null; requirement: string | null; level: string; status: string; due: string | null; draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; current_round: number };
+export function findingCard(t: TaskRow, f: FindingLite, reading?: { verdict: string; points: { label: string; detail: string; part?: string }[]; created?: number; note?: string }, state?: CardState): unknown {
+  const url = `${origin()}/comp/find/${f.id}`;
+  const LEVEL: Record<string, string> = { "1": "Level 1", "2": "Level 2", "3": "Level 3", obs: "Observation" };
+  const body: unknown[] = [
+    { type: "TextBlock", text: `${t.entity} · Finding · ${f.number}${f.status === "back" ? ` · sent back (round ${f.current_round})` : ""}`, size: "Small", weight: "Bolder", color: f.status === "back" ? "Attention" : "Accent", spacing: "None" },
+    { type: "TextBlock", text: f.title, size: "Medium", weight: "Bolder", wrap: true },
+    { type: "TextBlock", text: `${LEVEL[f.level] ?? f.level}${f.requirement ? ` · ${f.requirement}` : ""}${f.due ? ` · answer due ${fr(f.due)}${f.due < todayISO() ? " — overdue" : ""}` : ""}`, size: "Small", isSubtle: true, spacing: "None" },
+  ];
+  if (f.description) body.push({ type: "TextBlock", text: f.description.length > 900 ? `${f.description.slice(0, 900)}… (continued in S.A.M.)` : f.description, wrap: true, spacing: "Small" });
+  if (state) {
+    body.push({ type: "TextBlock", text: `${state.answered === "done" ? "✓ Sent to Compliance" : state.answered === "closed" ? "✓ Done" : "No longer needed"} — ${state.by}, ${state.at}${state.comment ? ` · ${state.comment}` : ""}`, wrap: true, color: "Good", weight: "Bolder", spacing: "Medium" });
+    return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions: [{ type: "Action.OpenUrl", title: "Open in S.A.M.", url }], msteams: { width: "Full" } };
+  }
+  if (reading) {
+    const pts = reading.points.slice(0, 6);
+    body.push({ type: "TextBlock", text: `S.A.M. read this with you${reading.created ? ` · ${reading.created} action${reading.created > 1 ? "s" : ""} created from your plan` : ""}`, weight: "Bolder", spacing: "Medium", color: reading.note ? "Attention" : pts.length ? "Default" : "Good" });
+    if (reading.note) body.push({ type: "TextBlock", text: reading.note, wrap: true, color: "Attention" });
+    body.push({ type: "TextBlock", text: pts.length ? "Points that would strengthen it — your call:" : "Nothing to point out: the cause explains, the factors are there, the plan answers it.", wrap: true, isSubtle: true, spacing: "Small" });
+    for (const q of pts) body.push({ type: "TextBlock", text: `• **${q.label}**${q.detail && q.detail !== q.label ? ` — ${q.detail}` : ""}`, wrap: true, spacing: "None" });
+  }
+  body.push(
+    { type: "Input.Text", id: "root_cause", label: "Root cause — why did the organisation let this happen?", isMultiline: true, value: f.draft_root_cause ?? "", maxLength: 3000, spacing: "Medium" },
+    { type: "Input.Text", id: "factors", label: "Contributing factors (procedure, training, resources, supervision, tools…)", isMultiline: true, value: f.draft_factors ?? "", maxLength: 2000 },
+    { type: "Input.Text", id: "immediate", label: "Immediate action taken", isMultiline: true, value: f.draft_immediate ?? "", maxLength: 1000 },
+    { type: "Input.Text", id: "plan", label: "Corrective action plan — one action per line (each becomes an action with you as owner and the finding's due date; manual changes are added in S.A.M.)", isMultiline: true, maxLength: 3000 },
+  );
+  const actions: unknown[] = [
+    { type: "Action.Execute", title: "Check with S.A.M.", verb: "finding_check", data: { taskId: t.id, findingId: f.id } },
+    { type: "Action.Execute", title: "Send to Compliance", verb: "finding_send", style: "positive", data: { taskId: t.id, findingId: f.id } },
+    { type: "Action.OpenUrl", title: "Open in S.A.M.", url },
+  ];
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions, msteams: { width: "Full" } };
 }
 /** SAF-09 · the bulletin / notice itself on the card (summary + text, cut at ~1 800 characters) and one button: read / acknowledged. */
 export function promoCard(t: TaskRow, p: { id: string; kind: string; number: string; title: string; summary: string | null; body: string | null; ack_required: boolean }, state?: CardState): unknown {
