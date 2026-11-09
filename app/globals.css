@@ -107,7 +107,9 @@ button.ent.on.ASJMT{background:var(--blue05);color:var(--cyan-ink)}button.ent.on
 .findbar input{flex:1;max-width:520px;border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;font-size:13px;outline:none}
 .findbar input:focus{border-color:var(--navy);outline:2px solid var(--focus);outline-offset:1px}
 .findbar .clr{border:0;background:var(--blue1);border-radius:50%;width:24px;height:24px;cursor:pointer;color:var(--slate6)}
-.seg{display:flex;background:var(--blue1);border-radius:var(--r);padding:3px}
+.seg{display:inline-flex;background:var(--blue1);border-radius:var(--r);padding:3px}
+.seg a{padding:5px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:700;color:var(--slate6)}
+.seg a.on{background:var(--white);color:var(--navy);box-shadow:0 1px 2px rgba(13,42,63,.12)}
 .seg button{border:0;background:transparent;padding:5px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:700;color:var(--slate6);cursor:pointer}
 .seg button.on{background:var(--white);color:var(--navy);box-shadow:0 1px 2px rgba(13,42,63,.12)}
 .toc{width:340px;padding:6px}
@@ -773,3 +775,16 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 .askm-c .badge{flex:0 0 auto;background:var(--cyan-ink)}
 .askm-c q{display:block;color:var(--slate6);font-size:12.5px;margin-top:2px}
 @media (max-width:700px){.askm-f{grid-template-columns:minmax(0,1fr)}}
+/* ERP · activation mode */
+.erp-banner{background:var(--terra-s);border-color:var(--red-line)}
+.erp-banner .cb{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+.erp-banner b{color:var(--state-red);font-size:15px}
+.erp-banner.ex{background:var(--amber-s);border-color:var(--amber-line)}.erp-banner.ex b{color:var(--amber-ink)}
+.erp-todo,.erp-done{display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13.5px}
+.erp-done s{color:var(--slate6)}
+@media (max-width:900px){.erp-live{grid-template-columns:minmax(0,1fr) !important}}
+/* Part-IS risk matrix */
+.ismx{border-collapse:separate;border-spacing:3px}
+.ismx th{font-size:12px;color:var(--slate6);font-weight:600;width:28px}
+.ismx td{width:56px;height:34px;text-align:center;border-radius:var(--r-xs);font-weight:700;font-variant-numeric:tabular-nums}
+.ismx .lv-green{background:var(--green-s);color:var(--green-ink)}.ismx .lv-amber{background:var(--amber-s);color:var(--amber-ink)}.ismx .lv-red{background:var(--terra-s);color:var(--state-red)}

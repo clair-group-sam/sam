@@ -27,7 +27,10 @@ export function roleModules(role: RoleKey): Module[] {
 export const BUILT: Record<string, string[]> = {
   home: ["tasks", "coffee"], docs: ["lib", "mine", "drafts", "files", "drop", "editor", "manual", "new", "link"],
   comp: ["over", "prog", "checks", "audits", "auditors", "find", "watch", "subs"], reg: ["ear"], dash: ["cs"], np: ["over"], proj: ["boards", "auth", "rex"], ref: ["ptpl", "types"],
-  safe: ["over", "reports", "actions", "new", "mine", "risk", "moc", "ra", "inv", "comm", "mor", "promo"], set: ["integ", "notif", "core"],
+  safe: ["over", "reports", "actions", "new", "mine", "risk", "moc", "ra", "inv", "comm", "mor", "promo"],
+  set: ["integ", "notif", "core", "ent", "param", "levels", "cat", "newac", "groups"],
+  comm: ["camp", "track", "new"], admin: ["signreg", "signrules", "comms", "ai", "log"], users: ["book", "fleet"],
+  erp: ["plans", "contacts", "check", "activate", "exer"], is: ["over", "map", "systems", "flows", "risks", "inc"],
 };
 export const isBuilt = (mod: string, sub: string) => (BUILT[mod] ?? []).includes(sub);
 /** The first screen of a module that is actually built — never a placeholder when a real one exists. */
