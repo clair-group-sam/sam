@@ -32,6 +32,8 @@ function useSlidePill(key: string, dep: string, sel: string) {
       const r = measure();
       if (!r) { b.classList.remove("pilled"); PILL_LAST.delete(key); return; }
       const prev = PILL_LAST.get(key);
+      // a resize that leaves the item where it is must not cut a slide in progress
+      if (!animate && prev && prev.y === r.y && prev.h === r.h && prev.x === r.x && prev.w === r.w && b.classList.contains("pilled")) return;
       const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (animate && prev && !still && (prev.y !== r.y || prev.h !== r.h)) {
         p.style.transition = "none"; set(prev); void p.offsetWidth; p.style.transition = "";
