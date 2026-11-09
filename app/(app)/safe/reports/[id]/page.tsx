@@ -12,6 +12,7 @@ import { createAssessment, dismissMatch, linkReport, suggestForReport } from "..
 import type { Suggestion } from "@/lib/risk-match";
 import { ACTION_STATUS } from "@/lib/actions-shared";
 import { acknowledge, askReporter, classify, recordMor, rerunAnalysis, sendFeedback, setErc, setReportStatus } from "./actions";
+import { eccairsConfig, eccairsEnv } from "@/lib/eccairs";
 import { Icon } from "@/lib/icons";
 
 export const maxDuration = 60;
@@ -158,6 +159,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                 <form action={recordMor} className="flex gap-2 mt-3"><input type="hidden" name="id" value={r.id} /><input name="ref" className="inp flex-1" placeholder="ECCAIRS / authority reference once filed" required /><button className="btn primary">Record as filed</button></form>
               )}
               {r.mor_filed_at && <p className="mt-2"><span className="pill green">Filed</span> {r.mor_ref}, {when(r.mor_filed_at)}</p>}
+              {eccairsConfig(r.entity) && !closed && (a?.mor_status === "mandatory" || (r as { e2_id?: string | null }).e2_id) && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap"><Link className={"btn " + (r.mor_filed_at ? "" : "primary")} href={`/safe/reports/${r.id}/e2`}>{(r as { e2_id?: string | null }).e2_id ? `ECCAIRS 2: ${(r as { e2_id?: string | null }).e2_id} · ${(r as { e2_status?: string | null }).e2_status ?? ""} — open` : "Prepare the ECCAIRS 2 report with S.A.M."}</Link><span className="mini">{eccairsEnv(r.entity)} · reviewed by you before anything leaves</span></div>)}
               {a?.mor_draft && <details className="mt-3" open={a.mor_status !== "voluntary" && !r.mor_filed_at}><summary className="mini underline cursor-pointer">De-identified MOR draft (for ECCAIRS / E5X)</summary><div className="narr mini mt-2">{a.mor_draft}</div></details>}
             </div>
           </section>

@@ -4,6 +4,9 @@ import { leonConfigured } from "@/lib/leon";
 import { syncLeonHours } from "@/lib/leon-hours";
 import { flConfigured, syncFlightLogger } from "@/lib/flightlogger-sms";
 import { checkAll } from "@/lib/regulation";
+import { eccairsConfig } from "@/lib/eccairs";
+import { syncE2 } from "@/lib/eccairs-map";
+import { ENTS4 } from "@/lib/nav";
 // Evening (19:00 UTC = 20:00 / 21:00 Paris): Morning coffee recaps are deleted — they hold mail and Teams summaries (UX-02).
 export const maxDuration = 60;
 export async function GET(req: NextRequest) {
@@ -19,5 +22,8 @@ export async function GET(req: NextRequest) {
   // REG-02 · Easy Access Rules: the EASA pages are read every evening; a new revision becomes current and is raised in the watch
   let regulations: unknown;
   try { regulations = (await checkAll(supabaseAdmin())).map((r) => `${r.key}: ${r.result}${r.version ? ` (${r.version})` : ""}`); } catch (e) { regulations = (e as Error).message; }
-  return Response.json({ ran: new Date().toISOString(), coffee_recaps_deleted: count ?? 0, leon, flightlogger, regulations });
+  // ECC-02 · the status of the reports S.A.M. holds in ECCAIRS 2, mirrored (a few proxy calls per entity, only where configured and reports exist)
+  const eccairs: Record<string, unknown> = {};
+  for (const e of ENTS4) if (eccairsConfig(e)) { try { eccairs[e] = await syncE2(supabaseAdmin(), e); } catch (err) { eccairs[e] = (err as Error).message; } }
+  return Response.json({ ran: new Date().toISOString(), coffee_recaps_deleted: count ?? 0, leon, flightlogger, regulations, eccairs });
 }

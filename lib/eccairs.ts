@@ -6,6 +6,7 @@
 // Methods used by S.A.M.: occurrences/create (taxonomy-code JSON) · occurrences/edit · occurrences/change-status ·
 // occurrences/reporter/original-report/search (all reports of the organisation) · occurrences/fields/{e2Id} · frontfile-api/files/migrate (E5X).
 import { proxyFetch } from "@/lib/proxy-fetch";
+import type { SupabaseClient } from "@supabase/supabase-js";
 type Cfg = { base: string; id: string; secret: string };
 const cache = new Map<string, { token: string; until: number }>();
 
@@ -49,10 +50,81 @@ export async function listReports(entity: string, status = ["DRAFT", "SENT", "PR
   }
   return out;
 }
-/** Selected attributes of one report, e.g. ["24.ATTRIBUTES.452"] (report identification), as taxonomy codes. */
+/** Selected attributes of one report, e.g. ["24.ATTRIBUTES.438"] (report identification), as taxonomy codes. */
 export const reportFields = (entity: string, e2Id: string, fields: string[]) => e2(entity, `/occurrences/fields/${encodeURIComponent(e2Id)}`, { method: "POST", body: fields });
 
 /** v1.2 · the autofilled attributes of the organisation (connection check without touching any report). */
 export const autofilledAttributes = (entity: string) => e2(entity, "/usermgmt/autofilled-attributes?taxonomyReferenceId=1");
 /** The released taxonomy of the authority (ECCAIRS Aviation 5.1.0.0 in the general case). */
 export const taxonomyVersion = (entity: string) => e2(entity, "/taxonomy-service/released-taxonomy");
+
+/* ---------- ECC-01 · original reports: create / edit / status / read ---------- */
+export type TaxonomyCodes = { "24": { ATTRIBUTES?: Record<string, unknown[]>; ENTITIES?: Record<string, { ID: string; ATTRIBUTES?: Record<string, unknown[]>; ENTITIES?: Record<string, unknown[]>; LINKS?: Record<string, string[]> }[]> } };
+export type E2Created = { e2Id: string; status: string; version: string; orInitialDate?: string };
+/** POST occurrences/create — a new original report, SENT (default of E2) or DRAFT. The caller decides; nothing is sent without it. */
+export async function createOccurrence(entity: string, taxonomyCodes: TaxonomyCodes, status: "DRAFT" | "SENT"): Promise<E2Created> {
+  const j = await e2(entity, "/occurrences/create", { method: "POST", body: { type: "REPORT", status, taxonomyCodes } });
+  return j.data as E2Created;
+}
+/** PUT occurrences/edit — only the attributes given change; the rest stays in E2. versionType MINOR keeps a SENT report sent. */
+export async function editOccurrence(entity: string, e2Id: string, taxonomyCodes: TaxonomyCodes, versionType: "DRAFT" | "MINOR" = "MINOR"): Promise<E2Created> {
+  const j = await e2(entity, "/occurrences/edit", { method: "PUT", body: { e2Id, versionType, taxonomyCodes } });
+  return j.data as E2Created;
+}
+/** POST occurrences/change-status — DRAFT → SENT (the report reaches the authority) or back. */
+export async function changeOccurrenceStatus(entity: string, e2Id: string, status: "DRAFT" | "SENT"): Promise<E2Created> {
+  const j = await e2(entity, "/occurrences/change-status", { method: "POST", body: { e2Id, status, versionType: "MINOR" } });
+  return j.data as E2Created;
+}
+export const occurrenceExists = async (entity: string, e2Id: string) => (await e2(entity, `/occurrences/exists/${encodeURIComponent(e2Id)}`)).data;
+export const getOccurrence = async (entity: string, e2Id: string) => (await e2(entity, `/occurrences/get/${encodeURIComponent(e2Id)}`)).data;
+
+/* ---------- ECC-01 · taxonomy cache (the authority's released taxonomy, read through the API) ---------- */
+/** The entities S.A.M. fills and the attributes it reads the lists of (ECCAIRS Aviation 5.1 codes, ECG chapter 2 / DGAC guide). */
+export const E2_ENTITIES = { OCCURRENCE: 24, AIRCRAFT: 4, AERODROME: 1, EVENTS: 14, NARRATIVE: 22, REPORTER_TEXT: 53 } as const;
+export const E2_ATTR = {
+  REPORT_ID: 438, HEADLINE: 601, UTC_DATE: 477, LOCAL_DATE: 433, LOCATION: 440, STATE: 454, OCC_CLASS: 431, OCC_CATEGORY: 430,
+  NARRATIVE_LANG: 424, NARRATIVE: 425, REPORTER_LANG: 1091, REPORTER_TEXT: 1092, REPORTING_ENTITY: 447, REPORT_STATUS: 800,
+  DAMAGE: 432, INJURY: 451, WEATHER_RELEVANT: 606, AVIATION_SECTOR: 1088, ATTACHMENTS: 793, DETECTION: 746,
+  AC_REGISTRATION: 244, AC_TYPE: 21, AC_MSN: 254, AC_CALLSIGN: 54, AC_OPERATOR: 215, AC_OPERATION_TYPE: 214, AC_CATEGORY: 32, AC_STATE_OF_REGISTRY: 281,
+  AC_LAST_DEPARTURE: 167, AC_DESTINATION: 228, AC_FLIGHT_PHASE: 121, AD_INDICATOR: 5, AD_LOCATION: 641, EVENT_TYPE: 390,
+} as const;
+/** Attributes whose value lists S.A.M. caches (the long lists — aircraft types, aerodromes — are read on demand instead). */
+export const E2_LISTS_TO_CACHE: { entity: number; attributes: number[] }[] = [
+  { entity: 24, attributes: [E2_ATTR.STATE, E2_ATTR.OCC_CLASS, E2_ATTR.OCC_CATEGORY, E2_ATTR.NARRATIVE_LANG, E2_ATTR.REPORTER_LANG, E2_ATTR.DAMAGE, E2_ATTR.INJURY, E2_ATTR.WEATHER_RELEVANT, E2_ATTR.AVIATION_SECTOR, E2_ATTR.DETECTION, E2_ATTR.REPORT_STATUS] },
+  { entity: 4, attributes: [E2_ATTR.AC_OPERATION_TYPE, E2_ATTR.AC_CATEGORY, E2_ATTR.AC_STATE_OF_REGISTRY, E2_ATTR.AC_FLIGHT_PHASE] },
+  { entity: 14, attributes: [E2_ATTR.EVENT_TYPE] },
+  { entity: 1, attributes: [E2_ATTR.AD_LOCATION] },
+];
+type TaxAttr = { taxonomyCode: number; description: string; detailed?: string; explanation?: string; minInstance?: number | null; maxInstance?: number | null; attributeDataType?: { name?: string } | string | null; dataType?: { name?: string } | string | null; valueList?: { id?: number } | null; attributeValueListId?: number | null; valueListId?: number | null };
+type TaxEntity = { taxonomyCode: number; description: string; attributesList?: { childrenAttributes?: TaxAttr[] } };
+const dtName = (a: TaxAttr) => { const d = a.attributeDataType ?? a.dataType; return typeof d === "string" ? d : d?.name ?? null; };
+const vlId = (a: TaxAttr) => a.valueList?.id ?? a.attributeValueListId ?? a.valueListId ?? null;
+
+/** Reads the released taxonomy of the entity's authority: the entities we fill with all their attributes, then the value lists we need.
+ *  Idempotent; a few dozen API calls (Fixie free plan: 500 / month — run it when the taxonomy changes, not every day). */
+export async function loadTaxonomy(db: SupabaseClient, entity: string): Promise<{ taxonomyId: number; name: string; version: string; attributes: number; values: number }> {
+  const tv = (await taxonomyVersion(entity)).data as { id: number; name: string; version: string }[] | { id: number; name: string; version: string };
+  const t = Array.isArray(tv) ? tv[0] : tv; if (!t?.id) throw new Error("ECCAIRS returned no released taxonomy.");
+  let nA = 0, nV = 0; const lists = new Map<number, number>(); // value list id → first attribute (for the log)
+  for (const ent of [E2_ENTITIES.OCCURRENCE, E2_ENTITIES.AIRCRAFT, E2_ENTITIES.AERODROME, E2_ENTITIES.EVENTS, E2_ENTITIES.NARRATIVE, E2_ENTITIES.REPORTER_TEXT]) {
+    const j = await e2(entity, `/taxonomy-service/external/entity/${ent}?taxonomyId=${t.id}`);
+    const en = j.data as TaxEntity | null; const attrs = en?.attributesList?.childrenAttributes ?? [];
+    for (const a of attrs) {
+      const vl = vlId(a);
+      await db.from("eccairs_attributes").upsert({ taxonomy_id: t.id, entity_code: ent, attribute_code: a.taxonomyCode, description: a.description ?? a.detailed ?? String(a.taxonomyCode), explanation: a.explanation ?? null, data_type: dtName(a), value_list_id: vl, min_instance: a.minInstance ?? null, max_instance: a.maxInstance ?? null, loaded_at: new Date().toISOString() }, { onConflict: "taxonomy_id,entity_code,attribute_code" });
+      nA++;
+      const wanted = E2_LISTS_TO_CACHE.find((x) => x.entity === ent)?.attributes.includes(a.taxonomyCode);
+      if (vl && wanted && !lists.has(vl)) lists.set(vl, a.taxonomyCode);
+    }
+  }
+  for (const [vl] of lists) {
+    const j = await e2(entity, `/taxonomy-service/external/value-lists/${vl}?taxonomyId=${t.id}`);
+    const d = j.data as { valueListModels?: { identifier: number; description: string; detailed?: string; parent?: number; level?: number; active?: boolean }[] } | null;
+    const rows = (d?.valueListModels ?? []).map((v) => ({ taxonomy_id: t.id, value_list_id: vl, value_id: v.identifier, description: v.description ?? v.detailed ?? String(v.identifier), detailed: v.detailed ?? null, parent: v.parent ?? null, level: v.level ?? null, active: v.active !== false }));
+    for (let i = 0; i < rows.length; i += 500) await db.from("eccairs_values").upsert(rows.slice(i, i + 500), { onConflict: "taxonomy_id,value_list_id,value_id" });
+    nV += rows.length;
+  }
+  await db.from("eccairs_taxonomies").upsert({ entity, taxonomy_id: t.id, name: t.name, version: t.version, env: eccairsEnv(entity), loaded_at: new Date().toISOString(), attributes: nA, values: nV }, { onConflict: "entity" });
+  return { taxonomyId: t.id, name: t.name, version: t.version, attributes: nA, values: nV };
+}

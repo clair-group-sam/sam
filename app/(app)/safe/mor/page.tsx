@@ -60,10 +60,10 @@ export default async function Mor({ searchParams }: { searchParams: Promise<{ t?
         </table>
       </section>
       <section className="card">
-        <div className="ch"><span className="eyebrow">ECCAIRS 2, machine-to-machine link</span><span className="mini">EASA E2 API Guide for Organisations v1.1</span></div>
+        <div className="ch"><span className="eyebrow">ECCAIRS 2, machine-to-machine link</span><span className="mini">EASA E2 API Guide for Organisations v1.2 · <Link className="underline" href="/safe/mor/e2">test, taxonomy, correspondences</Link></span></div>
         <table className="tbl"><tbody>{scope.map((e) => { const ok = !!eccairsConfig(e); const env = eccairsEnv(e); return (
           <tr key={e}><td style={{ width: 80 }}><span className={"ent " + e}>{e}</span></td><td><b>{ENT[e]?.name ?? e}</b><div className="mini">{AUTHORITY[e]?.account}, {AUTHORITY[e]?.route}, <a className="underline" href={E2_PORTAL} target="_blank" rel="noreferrer">E2 portal ↗</a></div>{AUTHORITY[e]?.note && <div className="mini">{AUTHORITY[e]?.note}</div>}</td>
-            <td style={{ width: 260 }}>{ok ? <span className="pill green">Connected, {env}</span> : <span className="pill">Not connected, reports filed in the E2 portal</span>}</td></tr>); })}</tbody></table>
+            <td style={{ width: 260 }}>{ok ? <span className="pill green">Configured, {env}</span> : <span className="pill">Not connected, reports filed in the E2 portal</span>}</td></tr>); })}</tbody></table>
         <div className="cb mini">To connect: (1) sandbox M2M user from EASA (ECCAIRS2@easa.europa.eu) and a fixed outgoing IP whitelisted by EASA; (2) UAT user, first machine-to-machine reports checked by the regulator; (3) production user. Each user is an e-mail account created by the IT for this purpose. Until then, reports are filed in the E2 portal and the reference is recorded on the report.</div>
       </section>
     </>
