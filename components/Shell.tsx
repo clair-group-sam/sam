@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ENT, ENT_COLOR, entMode, singleEntity, type EntMode, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
@@ -12,6 +12,41 @@ type Props = { session: Session; children: React.ReactNode };
 // the reload waits for both the request and the animation, whichever ends last.
 const ENT_ANIM_MS = 420;
 const ENT_ARRIVE = `try{var d=sessionStorage.getItem("sam_entdir");if(d){sessionStorage.removeItem("sam_entdir");if(!matchMedia("(prefers-reduced-motion: reduce)").matches){var s=document.createElement("style");s.textContent="main{animation:entarrive-"+(d==="l"?"l":"r")+" 300ms cubic-bezier(.2,.8,.3,1) both}";document.head.appendChild(s);setTimeout(function(){s.remove()},700)}}}catch(e){}`;
+
+// Menu pill (09/11): the highlight of the current menu / sub-menu item slides up or down to the new one, frosted on the way,
+// like the entity switch. Last positions live outside React because the sub-menu is re-mounted on every render.
+const PILL_LAST = new Map<string, { y: number; h: number; x: number; w: number }>();
+function useSlidePill(key: string, dep: string, sel: string) {
+  const box = useRef<HTMLDivElement | null>(null);
+  const pill = useRef<HTMLSpanElement | null>(null);
+  useLayoutEffect(() => {
+    const b = box.current, p = pill.current; if (!b || !p) return;
+    let timer = 0;
+    const measure = () => {
+      const on = b.querySelector<HTMLElement>(sel); if (!on) return null;
+      const br = b.getBoundingClientRect(), r = on.getBoundingClientRect();
+      return { y: r.top - br.top + b.scrollTop, h: r.height, x: r.left - br.left, w: r.width };
+    };
+    const set = (r: { y: number; h: number; x: number; w: number }) => { p.style.transform = `translate(${r.x}px,${r.y}px)`; p.style.width = r.w + "px"; p.style.height = r.h + "px"; };
+    const place = (animate: boolean) => {
+      const r = measure();
+      if (!r) { b.classList.remove("pilled"); PILL_LAST.delete(key); return; }
+      const prev = PILL_LAST.get(key);
+      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (animate && prev && !still && (prev.y !== r.y || prev.h !== r.h)) {
+        p.style.transition = "none"; set(prev); void p.offsetWidth; p.style.transition = "";
+        p.classList.add("moving"); b.classList.add("sliding"); set(r);
+        window.clearTimeout(timer); timer = window.setTimeout(() => { p.classList.remove("moving"); b.classList.remove("sliding"); }, 300);
+      } else { p.style.transition = "none"; set(r); void p.offsetWidth; p.style.transition = ""; }
+      b.classList.add("pilled");
+      PILL_LAST.set(key, r);
+    };
+    place(true);
+    const ro = new ResizeObserver(() => place(false)); ro.observe(b);
+    return () => { ro.disconnect(); window.clearTimeout(timer); };
+  }, [key, dep]);
+  return { box, pill };
+}
 
 export default function Shell({ session, children }: Props) {
   const path = usePathname();
@@ -57,13 +92,17 @@ export default function Shell({ session, children }: Props) {
   const subs = subsFor(role, mod).filter((s) => !s.hidden || s.id === sub);
   const curMod = mods.find((m) => m.id === mod);
   const curSub = subs.find((s) => s.id === sub);
+  const railPill = useSlidePill("rail", mod + "|" + more, ".rl.on"), bottomPill = useSlidePill("railb", mod, ".rl.on");
   // 09/11 · Group only where it means something (lib/nav.ts entMode): on a one-entity page a group user works in their home entity
   const eMode = entMode(path);
   const entAuto = session.entityPref === "ALL" && eMode === "single";
   const ent = entAuto ? singleEntity(session.person?.home_entity, session.entities) : session.entityPref;
 
-  const SubMenu = ({ cls, onEnter }: { cls: string; onEnter?: () => void }) => (
-    <aside className={cls} onMouseEnter={onEnter}>
+  const SubMenu = ({ cls, onEnter }: { cls: string; onEnter?: () => void }) => {
+    const sp = useSlidePill("sub:" + mod, sub, ".sl.on");
+    return (
+    <aside className={cls + " menupills"} onMouseEnter={onEnter} ref={sp.box}>
+      <span className="spill" ref={sp.pill} aria-hidden />
       <div className="h">{curMod ? modLabel(role, curMod) : mod}</div>
       {subs.map((s) => (
         <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "") + (isBuilt(mod, s.id) ? "" : " soon")} title={isBuilt(mod, s.id) ? undefined : "Not built yet, exists in the prototype"}>
@@ -71,7 +110,8 @@ export default function Shell({ session, children }: Props) {
         </Link>
       ))}
     </aside>
-  );
+    );
+  };
 
   return (
     <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")} data-ent={ent}>
@@ -83,7 +123,8 @@ export default function Shell({ session, children }: Props) {
           {/* the three words in a column: their initials spell S·A·M */}
           <span className="acro" aria-hidden="true"><span><b>S</b>afety</span><span><b>A</b>ssurance</span><span><b>M</b>anagement</span></span>
         </Link>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto menupills" ref={railPill.box}>
+          <span className="mpill" ref={railPill.pill} aria-hidden />
           {daily.map((m) => <RailLink key={m.id} m={m} role={role} on={mod === m.id} />)}
           {erp && <RailLink m={erp} role={role} on={mod === "erp"} />}
           {rare.length > 0 && (
@@ -95,7 +136,8 @@ export default function Shell({ session, children }: Props) {
             </div>
           )}
         </div>
-        <div className="railbottom">
+        <div className="railbottom menupills" ref={bottomPill.box}>
+          <span className="mpill" ref={bottomPill.pill} aria-hidden />
           <button type="button" className={"rl lockrow" + (compact ? "" : " locked")} onClick={toggleCompact} aria-pressed={!compact}
             title={compact ? "Menus collapse automatically, click to lock them open  [" : "Menus locked open, click to let them collapse automatically  ["}>
             <LockIcon locked={!compact} /><span>Lock menus</span><i className={"tgl" + (compact ? "" : " on")} aria-hidden />
