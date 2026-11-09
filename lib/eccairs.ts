@@ -20,11 +20,11 @@ export const eccairsEnv = (entity: string) => { const b = process.env[`ECCAIRS_$
 async function token(entity: string, c: Cfg): Promise<string> {
   const k = `${entity}:${c.base}`; const hit = cache.get(k); if (hit && hit.until > Date.now() + 60e3) return hit.token;
   const url = `${c.base}/idp/oauth2/token`; const form = "application/x-www-form-urlencoded";
-  // v1.2: client_id / client_secret in the body (client_secret_post); some servers want them as HTTP Basic (client_secret_basic) — try both.
-  let r = await proxyFetch(url, { method: "POST", headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret, scope: "openid" }).toString() });
+  // v1.2: client_id / client_secret in the body (client_secret_post), NO scope (the sandbox answers invalid_scope to "openid", 09/11/2026); fallback HTTP Basic.
+  let r = await proxyFetch(url, { method: "POST", headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret }).toString() });
   if (r.status === 401 || r.status === 400) {
     const basic = Buffer.from(`${encodeURIComponent(c.id)}:${encodeURIComponent(c.secret)}`).toString("base64");
-    const r2 = await proxyFetch(url, { method: "POST", headers: { "content-type": form, authorization: `Basic ${basic}` }, body: new URLSearchParams({ grant_type: "client_credentials", scope: "openid" }).toString() });
+    const r2 = await proxyFetch(url, { method: "POST", headers: { "content-type": form, authorization: `Basic ${basic}` }, body: new URLSearchParams({ grant_type: "client_credentials" }).toString() });
     if (r2.ok || r2.status !== 401) r = r2;
   }
   const raw = await r.text(); let j: { access_token?: string; expires_in?: number; error?: string; error_description?: string } | null = null; try { j = JSON.parse(raw); } catch { /* not JSON */ }
