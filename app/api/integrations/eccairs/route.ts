@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     try { const j = await e2(dump, `/taxonomy-service/external/entity/${code}?taxonomyId=${tid}`); const d = j.data as { attributesList?: { childrenAttributes?: { taxonomyCode: number; valueList?: { id?: number; identifier?: number } | null }[] } } & Record<string, unknown>; const attrs = d?.attributesList?.childrenAttributes ?? [];
       const a = attrs.find((x) => x.taxonomyCode === attr) ?? null; const withList = attrs.filter((x) => x.valueList).map((x) => ({ code: x.taxonomyCode, vl: x.valueList }));
       let list: unknown = null; const vid = a?.valueList?.id;
-      if (vid) { try { const r = await e2(dump, `/taxonomy-service/external/value-lists/${vid}?taxonomyId=${tid}`); const dd = r.data as Record<string, unknown>; list = { keys: Object.keys(dd ?? {}), sample: JSON.stringify(dd).slice(0, 1500) }; } catch (e) { list = { error: (e as Error).message }; } }
+      if (vid) { try { const r = await e2(dump, `/taxonomy-service/external/value-lists/${vid}?taxonomyId=${tid}`); const dd = r.data as Record<string, unknown>; list = { keys: Object.keys(dd ?? {}), first: ((dd?.listOfValues ?? dd?.valueListModels ?? []) as unknown[]).slice(0, 3), n: ((dd?.listOfValues ?? dd?.valueListModels ?? []) as unknown[]).length }; } catch (e) { list = { error: (e as Error).message }; } }
       return NextResponse.json({ n: attrs.length, attribute: a, lists_in_entity: withList.slice(0, 40), list }); }
     catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 502 }); } }
   const ent = req.nextUrl.searchParams.get("test");

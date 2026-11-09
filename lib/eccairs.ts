@@ -140,8 +140,10 @@ export async function loadTaxonomy(db: SupabaseClient, entity: string): Promise<
   }
   for (const [vl] of lists) {
     const j = await e2(entity, `/taxonomy-service/external/value-lists/${vl}?taxonomyId=${t.id}`);
-    const d = j.data as { valueListModels?: { identifier: number; description: string; detailed?: string; parent?: number; level?: number; active?: boolean }[] } | null;
-    const rows = (d?.valueListModels ?? []).map((v) => ({ taxonomy_id: t.id, value_list_id: vl, value_id: v.identifier, description: v.description ?? v.detailed ?? String(v.identifier), detailed: v.detailed ?? null, parent: v.parent ?? null, level: v.level ?? null, active: v.active !== false }));
+    // 9.0.0.2 (sandbox, 09/11/2026): the values come as `listOfValues`; older servers used `valueListModels`
+    type VLV = { identifier?: number; valueId?: number; id?: number; description?: string; detailed?: string; parent?: number | null; parentIdentifier?: number | null; level?: number | null; active?: boolean | number | null };
+    const d = j.data as { listOfValues?: VLV[]; valueListModels?: VLV[] } | null;
+    const rows = (d?.listOfValues ?? d?.valueListModels ?? []).map((v) => ({ taxonomy_id: t.id, value_list_id: vl, value_id: v.identifier ?? v.valueId ?? v.id ?? 0, description: v.description ?? v.detailed ?? String(v.identifier ?? v.id), detailed: v.detailed ?? null, parent: v.parent ?? v.parentIdentifier ?? null, level: v.level ?? null, active: v.active !== false && v.active !== 0 })).filter((r) => r.value_id);
     for (let i = 0; i < rows.length; i += 500) await db.from("eccairs_values").upsert(rows.slice(i, i + 500), { onConflict: "taxonomy_id,value_list_id,value_id" });
     nV += rows.length;
   }
