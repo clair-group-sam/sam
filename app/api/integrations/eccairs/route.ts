@@ -14,6 +14,11 @@ export async function GET(req: NextRequest) {
   if (!s || !isSafetyDesk(s)) return NextResponse.json({ error: "Safety desk only." }, { status: 403 });
   const diag = req.nextUrl.searchParams.get("diag");
   if (diag) return NextResponse.json(await tokenDiagnostic(diag));
+  // raw look at the taxonomy answer for one entity (first attributes only) — to map the field names of the API
+  const dump = req.nextUrl.searchParams.get("taxdump");
+  if (dump) { const { e2 } = await import("@/lib/eccairs"); const tid = req.nextUrl.searchParams.get("tid") ?? "708"; const code = req.nextUrl.searchParams.get("code") ?? "24";
+    try { const j = await e2(dump, `/taxonomy-service/external/entity/${code}?taxonomyId=${tid}`); const d = j.data as { attributesList?: { childrenAttributes?: unknown[] } } & Record<string, unknown>; const attrs = d?.attributesList?.childrenAttributes ?? []; return NextResponse.json({ keys: Object.keys(d ?? {}), n: attrs.length, sample: attrs.slice(0, 2), withList: attrs.find((a) => JSON.stringify(a).includes("alueList")) }); }
+    catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 502 }); } }
   const ent = req.nextUrl.searchParams.get("test");
   if (ent) {
     if (!eccairsConfig(ent)) return NextResponse.json({ entity: ent, configured: false });
