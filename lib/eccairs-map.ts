@@ -19,12 +19,17 @@ export async function e2Context(db: SupabaseClient, entity: string) {
   const { data: tx } = await db.from("eccairs_taxonomies").select("*").eq("entity", entity).maybeSingle();
   const t = tx as { taxonomy_id: number; name: string; version: string; loaded_at: string; env: string | null } | null;
   if (!t) return { taxonomy: null, attrs: [] as Attr[], values: [] as Val[], maps: [] as Map[] };
-  const [{ data: at }, { data: va }, { data: mp }] = await Promise.all([
-    db.from("eccairs_attributes").select("entity_code,attribute_code,description,data_type,value_list_id,min_instance").eq("taxonomy_id", t.taxonomy_id).limit(5000),
-    db.from("eccairs_values").select("value_list_id,value_id,description,parent,level").eq("taxonomy_id", t.taxonomy_id).eq("active", true).limit(50000),
+  const [{ data: at }, { data: mp }] = await Promise.all([
+    db.from("eccairs_attributes").select("entity_code,attribute_code,description,data_type,value_list_id,min_instance").eq("taxonomy_id", t.taxonomy_id).range(0, 4999),
     db.from("eccairs_value_maps").select("field,our_value,attribute_code,value_id").eq("entity", entity),
   ]);
-  return { taxonomy: t, attrs: (at ?? []) as Attr[], values: (va ?? []) as Val[], maps: (mp ?? []) as Map[] };
+  // PostgREST caps a page at 1 000 rows: the values are read page by page
+  const values: Val[] = [];
+  for (let from = 0; from < 60000; from += 1000) {
+    const { data } = await db.from("eccairs_values").select("value_list_id,value_id,description,parent,level").eq("taxonomy_id", t.taxonomy_id).eq("active", true).order("value_list_id").order("value_id").range(from, from + 999);
+    const page = (data ?? []) as Val[]; values.push(...page); if (page.length < 1000) break;
+  }
+  return { taxonomy: t, attrs: (at ?? []) as Attr[], values, maps: (mp ?? []) as Map[] };
 }
 export type E2Context = Awaited<ReturnType<typeof e2Context>>;
 const listOf = (ctx: E2Context, entity: number, attribute: number) => ctx.attrs.find((a) => a.entity_code === entity && a.attribute_code === attribute)?.value_list_id ?? null;

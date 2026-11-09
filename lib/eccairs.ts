@@ -116,7 +116,7 @@ export const E2_LISTS_TO_CACHE: { entity: number; attributes: number[] }[] = [
   { entity: 14, attributes: [E2_ATTR.EVENT_TYPE] },
   { entity: 1, attributes: [E2_ATTR.AD_LOCATION] },
 ];
-type TaxAttr = { taxonomyCode: number; description: string; detailed?: string; explanation?: string; minInstance?: number | null; maxInstance?: number | null; attributeDataType?: { name?: string } | string | null; dataType?: { name?: string } | string | null; valueList?: { id?: number } | null; attributeValueListId?: number | null; valueListId?: number | null };
+type TaxAttr = { taxonomyCode: number; description: string; detailed?: string; explanation?: string; minInstance?: number | string | null; maxInstance?: number | string | null; attributeDataType?: { name?: string } | string | null; dataType?: { name?: string } | string | null; valueList?: { id?: number } | null; attributeValueListId?: number | null; valueListId?: number | null };
 type TaxEntity = { taxonomyCode: number; description: string; attributesList?: { childrenAttributes?: TaxAttr[] } };
 const dtName = (a: TaxAttr) => { const d = a.attributeDataType ?? a.dataType; return typeof d === "string" ? d : d?.name ?? null; };
 const vlId = (a: TaxAttr) => a.valueList?.id ?? a.attributeValueListId ?? a.valueListId ?? null;
@@ -132,7 +132,8 @@ export async function loadTaxonomy(db: SupabaseClient, entity: string): Promise<
     const en = j.data as TaxEntity | null; const attrs = en?.attributesList?.childrenAttributes ?? [];
     for (const a of attrs) {
       const vl = vlId(a);
-      await db.from("eccairs_attributes").upsert({ taxonomy_id: t.id, entity_code: ent, attribute_code: a.taxonomyCode, description: a.description ?? a.detailed ?? String(a.taxonomyCode), explanation: a.explanation ?? null, data_type: dtName(a), value_list_id: vl, min_instance: a.minInstance ?? null, max_instance: a.maxInstance ?? null, loaded_at: new Date().toISOString() }, { onConflict: "taxonomy_id,entity_code,attribute_code" });
+      const { error } = await db.from("eccairs_attributes").upsert({ taxonomy_id: t.id, entity_code: ent, attribute_code: a.taxonomyCode, description: a.description ?? a.detailed ?? String(a.taxonomyCode), explanation: a.explanation ?? null, data_type: dtName(a), value_list_id: vl, min_instance: a.minInstance == null ? null : String(a.minInstance), max_instance: a.maxInstance == null ? null : String(a.maxInstance), loaded_at: new Date().toISOString() }, { onConflict: "taxonomy_id,entity_code,attribute_code" });
+      if (error) throw new Error(`eccairs_attributes ${ent}.${a.taxonomyCode}: ${error.message}`);
       nA++;
       const wanted = E2_LISTS_TO_CACHE.find((x) => x.entity === ent)?.attributes.includes(a.taxonomyCode);
       if (vl && wanted && !lists.has(vl)) lists.set(vl, a.taxonomyCode);
@@ -144,7 +145,7 @@ export async function loadTaxonomy(db: SupabaseClient, entity: string): Promise<
     type VLV = { identifier?: number; valueId?: number; id?: number; description?: string; detailed?: string; parent?: number | null; parentIdentifier?: number | null; level?: number | null; active?: boolean | number | null };
     const d = j.data as { listOfValues?: VLV[]; valueListModels?: VLV[] } | null;
     const rows = (d?.listOfValues ?? d?.valueListModels ?? []).map((v) => ({ taxonomy_id: t.id, value_list_id: vl, value_id: v.identifier ?? v.valueId ?? v.id ?? 0, description: v.description ?? v.detailed ?? String(v.identifier ?? v.id), detailed: v.detailed ?? null, parent: v.parent ?? v.parentIdentifier ?? null, level: v.level ?? null, active: v.active !== false && v.active !== 0 })).filter((r) => r.value_id);
-    for (let i = 0; i < rows.length; i += 500) await db.from("eccairs_values").upsert(rows.slice(i, i + 500), { onConflict: "taxonomy_id,value_list_id,value_id" });
+    for (let i = 0; i < rows.length; i += 500) { const { error } = await db.from("eccairs_values").upsert(rows.slice(i, i + 500), { onConflict: "taxonomy_id,value_list_id,value_id" }); if (error) throw new Error(`eccairs_values list ${vl}: ${error.message}`); }
     nV += rows.length;
   }
   await db.from("eccairs_taxonomies").upsert({ entity, taxonomy_id: t.id, name: t.name, version: t.version, env: eccairsEnv(entity), loaded_at: new Date().toISOString(), attributes: nA, values: nV }, { onConflict: "entity" });
