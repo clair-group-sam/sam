@@ -1,8 +1,8 @@
 import { cache } from "react";
 import { normEntity } from "@/lib/entity-codes";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/supabase-server";
-import { ENTS4, homeFor, type RoleKey } from "@/lib/nav";
+import { ENTS4, entMode, homeFor, singleEntity, type RoleKey } from "@/lib/nav";
 
 export type Person = {
   id: string; email: string; display_name: string; home_entity: string | null; entities: string[]; roles: string[];
@@ -13,6 +13,9 @@ export type Session = {
   role: RoleKey; roles: string[]; entities: string[]; group: boolean;
   /** Current entity filter: an entity code, or "ALL" for group functions. */
   entity: string; home: string;
+  /** The entity chosen in the top bar ("ALL" stays "ALL" even on a page that works on one entity). The layout's Shell
+   *  is not re-rendered on client navigation, so it works from this and the path, not from `entity`. */
+  entityPref: string;
 };
 
 export const NP_ROLES = ["NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "NP", "SMD", "QM"];
@@ -57,5 +60,10 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const wanted = (() => { const v = store.get("sam_ent")?.value; return v && v !== "ALL" ? normEntity(v) : v; })(); // old cookies (AJD…) still work
   let entity = group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL");
   if (wanted && (wanted === "ALL" ? group : entities.includes(wanted))) entity = wanted;
-  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, home: homeFor(role) };
+  // 09/11 · the Group view only on overviews and lists: a page that works on one entity gets the home entity instead
+  // (the cookie keeps "ALL", so the overviews show the group again). x-sam-path is set by the middleware.
+  const path = (await headers()).get("x-sam-path") ?? "";
+  const entityPref = entity;
+  if (entity === "ALL" && path && entMode(path) === "single") entity = singleEntity(person?.home_entity, entities);
+  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role) };
 });

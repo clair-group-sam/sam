@@ -59,3 +59,29 @@ export function findSub(mod: string, sub: string): SubItem | undefined {
 export function findModule(mod: string): Module | undefined {
   return MODULES.find((m) => m.id === mod);
 }
+
+/**
+ * What the entity switch means on a page (09/11):
+ *  - "group":  overviews, dashboards, inbox and lists — the Group view (every entity) makes sense here;
+ *  - "single": the page works on one entity (creating, entering data, running a desk) — no Group: a group user lands on
+ *              their home entity there, the Group view comes back on the overviews;
+ *  - "none":   the page does not depend on the entity (settings, registers, references, a record's own page, which
+ *              carries its entity) — the switch is shown greyed.
+ * Unknown pages default to "group", i.e. the behaviour before this rule.
+ */
+export type EntMode = "group" | "single" | "none";
+const ENT_SINGLE = ["safe/over/data", "safe/over/set", "safe/inv", "safe/comm", "safe/promo", "erp/activate", "docs/drop"];
+const ENT_NONE = ["set", "admin", "ref", "is", "erp", "users/fleet", "home/coffee", "docs/mine", "docs/drafts", "docs/link", "docs/editor", "docs/manual"];
+const ENT_DEEP_LISTS = ["safe/risk/match", "safe/risk/templates", "dash/cs/overdue"]; // three segments, still lists
+export function entMode(path: string): EntMode {
+  const seg = path.split("?")[0].split("/").filter(Boolean);
+  const p = seg.join("/");
+  if (seg.includes("new") || ENT_SINGLE.includes(p)) return "single";
+  if (ENT_NONE.some((x) => p === x || p.startsWith(x + "/"))) return "none";
+  if (seg.length >= 3 && !ENT_DEEP_LISTS.includes(p)) return "none"; // a record's own page
+  return "group";
+}
+/** The entity a group user works in on a "single" page: their home entity, else the first in scope. */
+export function singleEntity(home: string | null | undefined, entities: string[]): string {
+  return home && entities.includes(home) ? home : entities[0] ?? "ALL";
+}

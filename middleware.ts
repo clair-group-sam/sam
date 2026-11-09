@@ -9,9 +9,11 @@ const OPEN = ["/login", "/auth", "/api/health", "/api/cron", "/api/import", "/ap
  * prefetches are let through untouched and the auth call is capped at 5 s (Vercel kills the function at 25 s).
  */
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next({ request: req });
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const path = req.nextUrl.pathname;
+  // the page's path for getSession (the Group view is only kept on overviews and lists, lib/nav.ts entMode)
+  const fwd = new Headers(req.headers); fwd.set("x-sam-path", path);
+  const res = NextResponse.next({ request: { headers: fwd } });
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (OPEN.some((p) => path.startsWith(p))) return res;
   if (!url || !key) return NextResponse.redirect(new URL("/login?setup=1", req.url));
   const hasAuthCookie = req.cookies.getAll().some((c) => /^sb-.*-auth-token/.test(c.name));

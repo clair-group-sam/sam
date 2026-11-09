@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
-import { ENT, ENT_COLOR, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
+import { ENT, ENT_COLOR, entMode, singleEntity, type EntMode, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
 
 type Props = { session: Session; children: React.ReactNode };
@@ -57,6 +57,10 @@ export default function Shell({ session, children }: Props) {
   const subs = subsFor(role, mod).filter((s) => !s.hidden || s.id === sub);
   const curMod = mods.find((m) => m.id === mod);
   const curSub = subs.find((s) => s.id === sub);
+  // 09/11 · Group only where it means something (lib/nav.ts entMode): on a one-entity page a group user works in their home entity
+  const eMode = entMode(path);
+  const entAuto = session.entityPref === "ALL" && eMode === "single";
+  const ent = entAuto ? singleEntity(session.person?.home_entity, session.entities) : session.entityPref;
 
   const SubMenu = ({ cls, onEnter }: { cls: string; onEnter?: () => void }) => (
     <aside className={cls} onMouseEnter={onEnter}>
@@ -70,7 +74,7 @@ export default function Shell({ session, children }: Props) {
   );
 
   return (
-    <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")} data-ent={session.entity}>
+    <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")} data-ent={ent}>
       <div className={"sidewrap" + (compact ? " compact-w" : "")} style={compact ? { width: subs.length > 0 ? 88 : 62 } : undefined}
         onMouseLeave={() => { rail.leave(); subH.leave(); }}>
       <nav className={"rail" + (compact ? (rail.on ? " mini hover" : " mini") : "")} onMouseEnter={() => { if (compact) { rail.enter(); subH.leave(); } }}>
@@ -112,8 +116,9 @@ export default function Shell({ session, children }: Props) {
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <TopBar session={session} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
-        {session.entity === "ALL" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
+        <TopBar session={session} ent={ent} mode={eMode} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
+        {ent === "ALL" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
+        {entAuto && <div className="groupband"><b>{ENT[ent]?.name ?? ent} ({ent})</b>: this page works one entity at a time, so the group view gives way to your home entity here. Pick another entity at the top if needed; the overviews and lists stay in group view.</div>}
         {/* entity switch, after the reload: the new page slides in from the side the click went to. Runs while the HTML is parsed,
             before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
         <script dangerouslySetInnerHTML={{ __html: ENT_ARRIVE }} />
@@ -131,7 +136,7 @@ function RailLink({ m, role, on, small }: { m: Module; role: RoleKey; on: boolea
   );
 }
 
-function TopBar({ session, crumb }: { session: Session; crumb: [string, string] }) {
+function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; mode: EntMode; crumb: [string, string] }) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   // UX-03 §7: one "+ Create" for the office — what exists opens, what is not built yet is listed greyed with its step
@@ -163,7 +168,10 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   const choices = session.entities;
-  const cur = session.entity;
+  const cur = ent;
+  // the buttons: Group only where the page can show every entity; none of them on a page that does not depend on the entity
+  const list = [...choices, ...(session.group && mode !== "single" ? ["ALL"] : [])];
+  const idle = mode === "none";
   const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
   const curSub = cur === "ALL" ? `lists across every entity, ${choices.join(", ")}` : `${ENT[cur]?.qual ?? ""}, ${ENT[cur]?.auth ?? ""}`;
   // the switch in motion: the white pill slides (frosted on the way), the new colour sweeps the bar, the page leaves sideways
@@ -172,7 +180,7 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   async function pick(ent: string) {
     if (going) return;
     setEntOpen(false);
-    const order = [...choices, ...(session.group ? ["ALL"] : [])];
+    const order = list;
     const dir = order.indexOf(ent) >= order.indexOf(cur) ? "r" : "l";
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const btns = switchRef.current ? [...switchRef.current.querySelectorAll<HTMLButtonElement>("button")] : [];
@@ -201,13 +209,14 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
         )}
       </div>
       {(choices.length > 1 || session.group) && (
-        <nav ref={switchRef} className={"entswitch" + (going ? " moving" : "")} aria-label="Entity you work in" aria-busy={going ? true : undefined}>
+        <nav ref={switchRef} className={"entswitch" + (going ? " moving" : "") + (idle ? " idle" : "")} aria-label="Entity you work in" aria-busy={going ? true : undefined}
+          title={idle ? "This page does not depend on the entity" : undefined}>
           {going && <span className="entpill" aria-hidden style={{ ["--x0" as string]: going.x0 + "px", ["--w0" as string]: going.w0 + "px", ["--x1" as string]: going.x1 + "px", ["--w1" as string]: going.w1 + "px" } as React.CSSProperties} />}
-          {[...choices, ...(session.group ? ["ALL"] : [])].map((e) => {
+          {list.map((e) => {
             const on = going ? going.ent === e : cur === e;
             return <button key={e} type="button" className={on ? "on" : ""} aria-pressed={on}
               style={going && on ? { ["--entc" as string]: ENT_COLOR[e] ?? "var(--navy-ink)" } as React.CSSProperties : undefined}
-              title={e === "ALL" ? "Group view: lists across every entity" : `${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`}
+              disabled={idle} title={idle ? "This page does not depend on the entity" : e === "ALL" ? "Group view: overviews and lists across every entity" : `${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`}
               onClick={() => cur !== e && pick(e)}>{e === "ALL" ? "Group" : e}</button>;
           })}
         </nav>

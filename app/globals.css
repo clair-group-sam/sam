@@ -19,7 +19,7 @@ a{color:inherit;text-decoration:none}
 .rail .brand{display:flex;align-items:center;gap:14px;padding:6px 16px 22px 18px;color:var(--navy)}
 .rail .brand img{display:block;width:64px;height:auto;flex:0 0 auto}
 .rail .brand .acro{display:flex;flex-direction:column;gap:2px;padding-left:14px;border-left:1px solid var(--line);white-space:nowrap}
-.rail .brand .acro>span{font-size:13px;line-height:1.3;font-weight:600;color:var(--slate6);letter-spacing:.08em;text-transform:uppercase}
+.rail .brand .acro>span{font-size:12.5px;line-height:1.3;font-weight:700;color:var(--slate6);letter-spacing:.08em;text-transform:uppercase} /* = .rl */
 .rail .brand .acro b{color:var(--navy);font-weight:800}
 .rl{height:42px;margin:0 10px;display:flex;align-items:center;gap:14px;padding:0 10px 0 14px;border-radius:var(--r-sm);color:var(--navy);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;background:none;border:0;width:calc(100% - 20px);cursor:pointer;text-align:left}
 .rl svg{color:var(--slate5);flex:0 0 auto}
@@ -595,6 +595,8 @@ details.more[open]{z-index:40}
 .entswitch button{border:0;background:transparent;color:var(--white);font:600 12px/1 inherit;padding:7px 10px;border-radius:var(--r-sm);cursor:pointer}
 .entswitch button:hover{background:rgba(255,255,255,.16);color:var(--white)}
 .entswitch button.on{background:var(--white);color:var(--entc,var(--navy-ink));cursor:default;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+/* a page that does not depend on the entity: the switch stays in place, greyed */
+.entswitch.idle{opacity:.5}.entswitch.idle button{cursor:default}.entswitch.idle button:hover{background:transparent}.entswitch.idle button.on:hover{background:var(--white)}
 /* Entity switch in motion (09/11), ~0.4 s, everything in the direction of travel; then the page reloads (FB-048).
    1 · one white pill slides under the buttons, frosted and half see-through on the way, solid when it lands */
 .topbar{position:relative;isolation:isolate}
