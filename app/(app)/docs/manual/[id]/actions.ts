@@ -81,11 +81,22 @@ export type ManualAnswer = { answer: string; notFound: boolean; cites: { ref: st
 
 const STOP = new Set("the and for are with that this what when who how does must shall which from into have has been can may our your their about there where les des une est que qui pour dans par sur pas aux avec sont doit quoi comment quand quel quelle quels quelles nous vous elle ils leur plus".split(" "));
 const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-const plain = (b: { html?: string; text?: string } | null) => (b?.html ?? b?.text ?? "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
+const ENTS: Record<string, string> = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", laquo: "«", raquo: "»", hellip: "…", ndash: "–", mdash: "—", deg: "°", sect: "§", euro: "€", oelig: "œ", aelig: "æ" };
+const MARKS: Record<string, string> = { acute: "́", grave: "̀", circ: "̂", uml: "̈", cedil: "̧", tilde: "̃", ring: "̊" };
+/** HTML entities to text: named (é, «, …), accented letters (&eacute; &Agrave;…) and numeric. */
+const decode = (x: string) => x
+  .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+  .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
+  .replace(/&([a-z]+);/gi, (m: string, n: string) => {
+    if (ENTS[n.toLowerCase()]) return ENTS[n.toLowerCase()];
+    const k = /^([a-z])(acute|grave|circ|uml|cedil|tilde|ring)$/i.exec(n);
+    return k ? (k[1] + MARKS[k[2].toLowerCase()]).normalize("NFC") : m;
+  });
+const plain = (b: { html?: string; text?: string } | null) => decode((b?.html ?? b?.text ?? "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 
 const ASK_SYSTEM = `You answer a reader's question about ONE aviation organisation manual, using ONLY the chapter excerpts given.
 Rules:
-- Answer in the language of the question, in plain professional words, at most 120 words. Lead with the answer itself.
+- Answer in the language of the QUESTION, even when the manual is written in another language (quotes stay in the manual's language). Plain professional words, at most 120 words. Lead with the answer itself.
 - Use only what the excerpts say. Never use outside knowledge, never invent a rule, a delay, a post or a reference. If the excerpts do not answer, say so and set not_found to true.
 - Cite every chapter you rely on by its reference (e.g. "A.3"), with one short verbatim quote (at most 25 words) from that chapter.
 - Answer ONLY with a JSON object: {"answer": "...", "not_found": false, "cites": [{"ref": "A.3", "quote": "..."}]}`;
