@@ -5,7 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type Programme = { id: string; entity: string; title: string; reference: string | null; domains: string[]; cycle_months: number; starts_on: string; ends_on: string; requirements: string[];
   status: string; approved_by: string | null; approved_at: string | null; approval_note: string | null; previous_id: string | null; note: string | null; created_at: string };
-export type AuditModule = { id: string; programme_id: string; code: string; title: string; domain: string | null; kind: string; requirements: string[]; sort: number; active: boolean; checklist_id?: string | null };
+export type AuditModule = { id: string; programme_id: string; code: string; title: string; domain: string | null; kind: string; requirements: string[]; sort: number; active: boolean; checklist_id?: string | null; subcontractor_id?: string | null; check_ids: string[] };
+/** AUD-03 · a recurring check shown in the programme: its passages in the cycle and the next due date. */
+export type ProgCheck = { id: string; code: string; title: string; every_months: number; last_done_on: string | null; next_due: string | null; owner_role: string | null; runs: { id: string; done_on: string; result: string }[] };
 export type Audit = { id: string; entity: string; number: string; programme_id: string | null; module_id: string | null; kind: string; domain: string | null; title: string; planned_month: string; planned_on: string | null; planned_end: string | null;
   lead_auditor: string | null; auditors: string[]; external_auditor: string | null; authority: string | null; subcontractor: string | null; scope: string | null; status: string; replanned: number; done_on: string | null; note: string | null; created_at: string; checklist_id?: string | null };
 export type AuditEvent = { id: number; audit_id: string; at: string; by: string | null; kind: string; from_month: string | null; to_month: string | null; status: string | null; reason: string | null };
@@ -46,6 +48,7 @@ export type Coverage = { done: number; planned: number; replanned: number; cance
 export function coverage(p: Programme, mods: AuditModule[], audits: Audit[], t0: string): Coverage {
   const live = audits.filter((a) => LIVE.includes(a.status));
   const audited = new Set(live.map((a) => a.module_id).filter(Boolean) as string[]);
+  for (const m of mods) if (m.kind === "checks" && m.check_ids?.length) audited.add(m.id); // a linked recurring check covers its module
   const active = mods.filter((m) => m.active);
   const reqs = p.requirements.map((req) => ({ req, modules: active.filter((m) => audited.has(m.id) && m.requirements.some((r) => r.toLowerCase() === req.toLowerCase())).map((m) => m.code) }));
   return {
@@ -66,7 +69,19 @@ export async function loadProgramme(db: SupabaseClient, id: string) {
     db.from("audit_modules").select("*").eq("programme_id", id).order("sort").order("code"),
     db.from("audits").select("*").eq("programme_id", id).order("planned_month").order("number"),
   ]);
-  return { p: p as Programme, mods: (m ?? []) as AuditModule[], audits: (a ?? []) as Audit[] };
+  const mods = (m ?? []) as AuditModule[];
+  // AUD-03 · the recurring checks linked to the "checks" modules, with their passages inside the cycle
+  const ids = [...new Set(mods.flatMap((x) => x.check_ids ?? []))];
+  let checks: ProgCheck[] = [];
+  if (ids.length) {
+    const pr = p as Programme;
+    const [{ data: cs }, { data: rs }] = await Promise.all([
+      db.from("compliance_checks").select("id,code,title,every_months,last_done_on,next_due,owner_role").in("id", ids),
+      db.from("compliance_check_runs").select("id,check_id,done_on,result").in("check_id", ids).gte("done_on", pr.starts_on).lte("done_on", pr.ends_on).order("done_on"),
+    ]);
+    checks = ((cs ?? []) as Omit<ProgCheck, "runs">[]).map((c) => ({ ...c, runs: ((rs ?? []) as { id: string; check_id: string; done_on: string; result: string }[]).filter((r) => r.check_id === c.id) }));
+  }
+  return { p: p as Programme, mods, audits: (a ?? []) as Audit[], checks };
 }
 
 /** The programme in force per entity: the one whose cycle contains today, else the latest. */

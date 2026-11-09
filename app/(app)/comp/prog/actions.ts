@@ -70,10 +70,11 @@ export async function planNextCycle(fd: FormData) {
   if (error) throw new Error(error.message);
   const map = new Map<string, string>();
   for (const m of mods.filter((m) => m.active)) {
-    const { data } = await db().from("audit_modules").insert({ programme_id: np.id, code: m.code, title: m.title, domain: m.domain, kind: m.kind, requirements: m.requirements, sort: m.sort, checklist_id: (m as { checklist_id?: string | null }).checklist_id ?? null }).select("id").single();
+    const { data } = await db().from("audit_modules").insert({ programme_id: np.id, code: m.code, title: m.title, domain: m.domain, kind: m.kind, requirements: m.requirements, sort: m.sort, checklist_id: (m as { checklist_id?: string | null }).checklist_id ?? null, check_ids: m.check_ids ?? [], subcontractor_id: m.subcontractor_id ?? null }).select("id").single();
     if (data) map.set(m.id, data.id);
   }
-  for (const a of audits.filter((a) => a.status !== "cancelled" && a.kind !== "authority")) {
+  const recurring = new Set(mods.filter((m) => m.kind === "checks" && m.check_ids?.length).map((m) => m.id)); // AUD-03: recurring checks carry their own cadence
+  for (const a of audits.filter((a) => a.status !== "cancelled" && a.kind !== "authority" && !(a.module_id && recurring.has(a.module_id)))) {
     const month = addMonths(start, monthsBetween(monthStart(p.starts_on), a.planned_month));
     const number = await nextAuditNumber(db(), p.entity, Number(month.slice(0, 4)));
     const { data } = await db().from("audits").insert({ entity: p.entity, number, programme_id: np.id, module_id: a.module_id ? map.get(a.module_id) ?? null : null, checklist_id: (a as { checklist_id?: string | null }).checklist_id ?? null, kind: a.kind, domain: a.domain, title: a.title, planned_month: month, lead_auditor: a.lead_auditor, auditors: a.auditors, external_auditor: a.external_auditor, subcontractor: a.subcontractor, scope: a.scope, created_by: s.person?.id ?? null }).select("id").single();
@@ -90,6 +91,17 @@ export async function saveModule(fd: FormData) {
   const id = str(fd, "id");
   const row = { programme_id: p.id, code: (str(fd, "code") ?? "MOD").toUpperCase(), title: str(fd, "title") ?? "Module", domain: str(fd, "domain"), kind: str(fd, "kind") ?? "internal", requirements: lines(str(fd, "requirements")), sort: Number(fd.get("sort") ?? 0) || 0 };
   if (id) await db().from("audit_modules").update(row).eq("id", id); else await db().from("audit_modules").insert(row);
+  touch(p.id);
+}
+/** AUD-03 · links a recurring check (Compliance › Compliance checks) to a "checks" module: the programme then shows its passages and next due date. */
+export async function linkModuleChecks(fd: FormData) {
+  const s = await me(); if (!desk(s)) throw new Error("Compliance desk only.");
+  const p = await prog(String(fd.get("id")));
+  const { data: m } = await db().from("audit_modules").select("id,check_ids").eq("id", String(fd.get("module"))).eq("programme_id", p.id).maybeSingle();
+  if (!m) throw new Error("Module not found");
+  const check = str(fd, "check"); if (!check) return;
+  const ids = str(fd, "what") === "unlink" ? ((m.check_ids ?? []) as string[]).filter((x) => x !== check) : [...new Set([...((m.check_ids ?? []) as string[]), check])];
+  await db().from("audit_modules").update({ check_ids: ids, kind: "checks" }).eq("id", m.id);
   touch(p.id);
 }
 export async function archiveModule(fd: FormData) {

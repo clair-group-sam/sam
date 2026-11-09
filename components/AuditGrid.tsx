@@ -1,13 +1,19 @@
-import { addMonths, cycleMonths, KIND_LETTER, monthLabel, STATUS_LABEL, type Audit, type AuditModule, type Programme } from "@/lib/audit-programme";
+import { addMonths, cycleMonths, KIND_LETTER, monthLabel, STATUS_LABEL, type Audit, type AuditModule, type ProgCheck, type Programme } from "@/lib/audit-programme";
+import { nextDueOf } from "@/lib/compliance-registers";
 import { Icon } from "@/lib/icons";
 
 /* AUD-01 · the cycle month by month: one row per module, one chip per audit (P planned · done in green · C checks · A authority; red = month passed, not done; dashed = replanned). */
-export function AuditGrid({ p, mods, audits, t0 }: { p: Programme; mods: AuditModule[]; audits: Audit[]; t0: string }) {
+export function AuditGrid({ p, mods, audits, checks = [], t0 }: { p: Programme; mods: AuditModule[]; audits: Audit[]; checks?: ProgCheck[]; t0: string }) {
   const ms = cycleMonths(p);
   const nowM = t0.slice(0, 7) + "-01";
-  const rows: { key: string; code: string; title: string; list: Audit[] }[] = mods.filter((m) => m.active).map((m) => ({ key: m.id, code: m.code, title: m.title, list: audits.filter((a) => a.module_id === m.id) }));
+  // AUD-03 · a "checks" module linked to recurring checks shows their passages (✓ by result) and the next due date; its planned one-off audits are not drawn twice
+  const rows: { key: string; code: string; title: string; list: Audit[]; checks: ProgCheck[] }[] = mods.filter((m) => m.active).map((m) => {
+    const cks = checks.filter((c) => m.check_ids?.includes(c.id));
+    return { key: m.id, code: m.code, title: m.title, list: audits.filter((a) => a.module_id === m.id && (!cks.length || a.status === "closed")), checks: cks };
+  });
   const loose = audits.filter((a) => !a.module_id || !mods.some((m) => m.id === a.module_id && m.active));
-  if (loose.length) rows.push({ key: "none", code: "Other", title: "audits without module", list: loose });
+  if (loose.length) rows.push({ key: "none", code: "Other", title: "audits without module", list: loose, checks: [] });
+  const RESULT_CLS: Record<string, string> = { conforming: "closed", partial: "checks", non_conforming: "late" };
   if (!rows.length) return <p className="mini p-4">No module yet, add the areas to audit below.</p>;
   return (
     <div style={{ overflow: "auto" }}>
@@ -23,6 +29,8 @@ export function AuditGrid({ p, mods, audits, t0 }: { p: Programme; mods: AuditMo
                 const cls = a.status === "closed" ? "closed" : late ? "late" : a.kind === "authority" ? "authority" : a.kind === "checks" ? "checks" : "";
                 return <a key={a.id} href={`#${a.number}`} className={`au ${cls}${a.replanned ? " repl" : ""}`} title={`${a.number}, ${a.title}, ${STATUS_LABEL[a.status] ?? a.status}${a.replanned ? `, replanned ×${a.replanned}` : ""}`}>{a.status === "closed" ? <Icon name="check" size={11} /> : KIND_LETTER[a.kind] ?? "P"}</a>;
               })}
+              {r.checks.flatMap((c) => c.runs.filter((x) => x.done_on.slice(0, 7) + "-01" === m).map((x) => <a key={x.id} href="/comp/checks" className={`au ${RESULT_CLS[x.result] ?? "closed"}`} title={`${c.code} · ${c.title} · ${x.done_on} · ${x.result.replace("_", " ")}`}>✓</a>))}
+              {r.checks.map((c) => { const nd = nextDueOf(c); if (!nd || nd.slice(0, 7) + "-01" !== m) return null; const late = nd < t0; return <a key={c.id + "nd"} href="/comp/checks" className={`au ${late ? "late" : "checks"}`} title={`${c.code} · ${c.title} · next due ${nd}${late ? " · past due" : ""}`}>C</a>; })}
             </div>
           )),
         ])}

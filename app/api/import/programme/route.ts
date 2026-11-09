@@ -21,13 +21,15 @@ export async function POST(req: NextRequest) {
   const { data: p, error } = await db.from("audit_programmes").insert({ entity: b.entity, title: b.title, reference: b.reference ?? PROG_REF[b.entity]?.reference ?? null, domains: PROG_REF[b.entity]?.domains ?? [], cycle_months: b.cycle_months, starts_on: start, ends_on: end, status: b.approve ? "approved" : "draft", approved_by: b.approve ? s.person?.id ?? null : null, approved_at: b.approve ? new Date().toISOString() : null, created_by: s.person?.id ?? null }).select("id").single();
   if (error || !p) return Response.json({ error: error?.message }, { status: 500 });
   const { data: cls } = await db.from("checklists").select("id,code").eq("entity", b.entity).eq("active", true);
+  const { data: cks } = await db.from("compliance_checks").select("id,code").eq("entity", b.entity).eq("active", true);
+  const checkIds = (code: string) => ((cks ?? []) as { id: string; code: string }[]).filter((c) => c.code.toUpperCase() === code.toUpperCase() || c.code.toUpperCase().startsWith(code.toUpperCase() + "-")).map((c) => c.id);
   const clId = (code?: string) => ((cls ?? []) as { id: string; code: string }[]).find((c) => c.code.toUpperCase() === (code ?? "").toUpperCase())?.id ?? null;
   const out: string[] = []; let sort = 0;
   const { data: subsAll } = await db.from("subcontractors").select("id,name").eq("entity", b.entity).eq("active", true);
   const subId = (title: string) => ((subsAll ?? []) as { id: string; name: string }[]).find((x) => x.name.toLowerCase().split(" (")[0] === title.toLowerCase().split(" (")[0] || title.toLowerCase().includes(x.name.toLowerCase().split(" (")[0]))?.id ?? null;
   for (const m of b.modules) {
     const checklist = clId(m.checklist ?? m.code);
-    const { data: md } = await db.from("audit_modules").insert({ programme_id: p.id, code: m.code, title: m.title, domain: m.domain ?? null, kind: m.kind ?? "internal", checklist_id: checklist, requirements: m.requirements ?? [], sort: sort++ }).select("id").single();
+    const { data: md } = await db.from("audit_modules").insert({ programme_id: p.id, code: m.code, title: m.title, domain: m.domain ?? null, kind: m.kind ?? "internal", checklist_id: checklist, requirements: m.requirements ?? [], sort: sort++, check_ids: m.kind === "checks" ? checkIds(m.code) : [] }).select("id").single();
     if (b.attach_imported && checklist) { // the imported audits run with this checklist inside the cycle belong to this programme
       const { data: got } = await db.from("audits").update({ programme_id: p.id, module_id: md?.id ?? null, kind: m.kind ?? "internal", domain: m.domain ?? null }).eq("entity", b.entity).eq("checklist_id", checklist).is("programme_id", null).gte("planned_month", start).lte("planned_month", end).select("number");
       for (const g of (got ?? []) as { number: string }[]) out.push(`${m.code}: ${g.number} attached`);

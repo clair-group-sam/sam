@@ -4,10 +4,11 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { AuditGrid } from "@/components/AuditGrid";
+import { nextDueOf } from "@/lib/compliance-registers";
 import { ENT, ENT_COLOR } from "@/lib/nav";
 import { addMonths, coverage, cycleMonths, elapsedPct, KIND_LABEL, loadProgramme, monthLong, PROG_REF, PROG_STATUS, STATUS_LABEL, type AuditEvent } from "@/lib/audit-programme";
 import { today } from "@/lib/authority";
-import { addAudit, approveProgramme, archiveModule, cancelAudit, closeProgramme, planNextCycle, replanAudit, saveAuditPlan, saveModule, saveProgramme } from "../actions";
+import { addAudit, approveProgramme, archiveModule, cancelAudit, closeProgramme, linkModuleChecks, planNextCycle, replanAudit, saveAuditPlan, saveModule, saveProgramme } from "../actions";
 import { createChecklist } from "../cl/actions";
 
 /* AUD-01 · one audit programme: the grid, the audits (move with a reason, cancel with a reason, dates and auditor), the modules and the requirements they cover, the coverage, the history. */
@@ -18,7 +19,9 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
   const db = supabaseAdmin();
   const x = await loadProgramme(db, id);
   if (!x) notFound();
-  const { p, mods: rawMods, audits } = x;
+  const { p, mods: rawMods, audits, checks } = x;
+  const { data: entChecks } = await db.from("compliance_checks").select("id,code,title").eq("entity", p.entity).eq("active", true).order("code");
+  const allChecks = (entChecks ?? []) as { id: string; code: string; title: string }[];
   if (!s.group && !s.entities.includes(p.entity)) notFound();
   const desk = s.role === "cmm";
   const t0 = today();
@@ -61,7 +64,7 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
         <Metric label="Coverage gaps" value={c.modulesWithout.length + c.gaps.length} hint={`${c.modulesWithout.length} module(s), ${c.gaps.length} requirement(s)`} tone={c.modulesWithout.length + c.gaps.length ? "amber" : "green"} />
       </div>
 
-      <section className="card mb-4"><div className="ch"><span className="eyebrow">The cycle month by month</span></div><div className="cb"><AuditGrid p={p} mods={mods} audits={audits} t0={t0} /></div></section>
+      <section className="card mb-4"><div className="ch"><span className="eyebrow">The cycle month by month</span></div><div className="cb"><AuditGrid p={p} mods={mods} audits={audits} checks={checks} t0={t0} /></div></section>
 
       <section className="card mb-4"><div className="ch"><span className="eyebrow">Audits, {audits.length}</span>
         {desk && <details className="inlineedit" style={{ position: "relative" }}><summary className="btn sm">+ Audit</summary>
@@ -108,7 +111,10 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
         <section className="card"><div className="ch"><span className="eyebrow">Modules, areas to audit</span></div><div className="cb" style={{ padding: 0 }}>
           <table className="tbl"><thead><tr><th>Module</th><th>Type</th><th>Checklist</th><th>Audits</th>{desk && <th></th>}</tr></thead><tbody>{active.map((m) => (
             <tr key={m.id}><td><b className="mono">{m.code}</b> {m.title}{m.domain && <div className="mini">{m.domain}</div>}</td><td className="mini">{KIND_LABEL[m.kind]}</td>
-              <td className="mini">{m.checklist_id && clOf(m.checklist_id) ? <><Link href={`/comp/prog/cl/${m.checklist_id}`}><b className="mono">{clOf(m.checklist_id)!.code}</b></Link>, {codesOf(m.checklist_id).length} rules</> : m.kind === "authority" ? "—" : desk ? <form action={createChecklist} className="flex gap-1"><input type="hidden" name="entity" value={p.entity} /><input type="hidden" name="programme" value={p.id} /><input type="hidden" name="module" value={m.id} /><input type="hidden" name="code" value={m.code} /><input type="hidden" name="title" value={m.title} /><input type="hidden" name="domain" value={m.domain ?? ""} /><button className="btn sm">Create / link {m.code}</button></form> : <span style={{ color: "var(--amber-ink)" }}>no checklist</span>}{m.requirements.length > codesOf(m.checklist_id).length && <div className="mono" style={{ color: "var(--slate5)" }}>+ {m.requirements.filter((r) => !codesOf(m.checklist_id).includes(r)).join(", ")}</div>}</td>
+              <td className="mini">{m.kind === "checks" ? (() => { const cks = checks.filter((c) => m.check_ids?.includes(c.id)); return <>
+                  {cks.length ? <div>{cks.map((c) => { const nd = nextDueOf(c); return <div key={c.id}><Link href="/comp/checks"><b className="mono">{c.code}</b></Link> every {c.every_months} mo · {c.runs.length} passage{c.runs.length === 1 ? "" : "s"} in the cycle{nd ? <> · next <span className={nd < t0 ? "late" : ""}>{nd}</span></> : " · no due date"}</div>; })}</div> : <span style={{ color: "#8a5a00" }}>no recurring check linked</span>}
+                  {desk && allChecks.some((c) => !m.check_ids?.includes(c.id)) && <form action={linkModuleChecks} className="flex gap-1 mt-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="module" value={m.id} /><select name="check" className="inp" style={{ marginTop: 0 }} defaultValue="">{allChecks.filter((c) => !m.check_ids?.includes(c.id)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</select><button className="btn sm">Link</button></form>}
+                </>; })() : {m.checklist_id && clOf(m.checklist_id) ? <><Link href={`/comp/prog/cl/${m.checklist_id}`}><b className="mono">{clOf(m.checklist_id)!.code}</b></Link>, {codesOf(m.checklist_id).length} rules</> : m.kind === "authority" ? "—" : desk ? <form action={createChecklist} className="flex gap-1"><input type="hidden" name="entity" value={p.entity} /><input type="hidden" name="programme" value={p.id} /><input type="hidden" name="module" value={m.id} /><input type="hidden" name="code" value={m.code} /><input type="hidden" name="title" value={m.title} /><input type="hidden" name="domain" value={m.domain ?? ""} /><button className="btn sm">Create / link {m.code}</button></form> : <span style={{ color: "var(--amber-ink)" }}>no checklist</span>}{m.requirements.length > codesOf(m.checklist_id).length && <div className="mono" style={{ color: "var(--slate5)" }}>+ {m.requirements.filter((r) => !codesOf(m.checklist_id).includes(r)).join(", ")}</div>}</td>
               <td className={c.modulesWithout.some((x) => x.id === m.id) ? "late" : ""}>{audits.filter((a) => a.module_id === m.id && a.status !== "cancelled").length}</td>
               {desk && <td><details className="inlineedit" style={{ position: "relative" }}><summary className="btn sm">Edit</summary>
                 <div className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 30, width: 400, zIndex: 5 }}>
