@@ -1,7 +1,8 @@
 -- ERP and Part-IS built from the MSMs and the "Cartographie Part-IS" (10/11/2026).
 -- ERP: one plan per entity read from its MSM (AJD MSM Iss 01 Rev 09 ch. 9, ASJ MSM Iss 10 Rev 07 ch. 8, ASF MSM Iss 10 Rev 01 ch. 6),
 -- the response cell by scenario, timed milestones, the MSM checklists, the crisis directory (ENR-CM-15) and a primary information
--- sheet captured at activation. Personal mobile numbers are NOT seeded: they are entered once in the Crisis directory.
+-- sheet captured at activation. Personal mobile numbers and e-mails are NOT seeded (public repository): they are entered once
+-- in the Crisis directory.
 -- Part-IS: the systems register gets the cartography fields (department, zone, responsibility, contract, operational impact,
 -- attention level, status, source) and is seeded with the 35 systems and 4 departments awaiting reply of the Cartographie V7.1 (22/07/2026).
 
@@ -349,15 +350,15 @@ where not exists (select 1 from erp_checklists where entity = e::entity_code and
 insert into erp_contacts (entity, kind, post, crisis_role, name, deputy, organisation, phone, email, available, ord, note)
 select 'ASJMT', x.kind, x.post, x.role, x.name, x.deputy, x.org, x.phone, x.email, x.av, x.ord, x.note
 from (values
-('internal','AM','Accountable Manager, leads the unit','Charles CLAIR',null,'Astonjet Ltd',null,'charles.clair@clair-group.com','24/7',10,null),
-('internal','NPGO','Nominated person ground operations, leads if the AM is unavailable','Maxime BABILLOT','Haifa HOSNI','Astonjet Ltd',null,'maxime.babillot@astonjet.com','24/7',20,'MSM 9.2 gives a number, ENR-CM-15 none: enter the right one.'),
-('internal','NPCT','NPCT and Security Manager','Christophe WARNKE DHERINES','Luca BANDINI','Astonjet Ltd',null,'christophe.warnke-dherines@astonjet.com','24/7',30,null),
-('internal','NPFO','Nominated person flight operations','Federico SERMARINI','Akrit KALWAR JAISWAL','Astonjet Ltd',null,'federico.sermarini@astonjet.com','24/7',40,'MSM 9.2 and ENR-CM-15 give two different numbers: confirm.'),
-('internal','SM','CMM and Safety Manager','Guillaume FOURNIE','Donato RUSSO (SM), Pierre-Franck JANSSENS (CMM)','Astonjet Ltd',null,'guillaume.fournie@clair-group.com','24/7',50,null),
-('internal','NPCA','Nominated person continuing airworthiness','Kevin MARTIN','Filip ALEXANDRIS','Astonjet Ltd',null,'kevin.martin@astonjet.com','24/7',60,null),
-('internal','ISM','Information Security Manager','Steve ASSOUVIE','Donato RUSSO','IOR System',null,'s.assouvie@ior-system.com','24/7',70,null),
-('internal',null,'General Manager','Mélanie VAILLANT',null,'Astonjet',null,'melanie.vaillant@astonjet.com',null,80,'In ENR-CM-15, not in MSM 9.2.'),
-('internal',null,'Head of HR','Marlene AQUILINA',null,'Clair Group',null,'marlene.aquilina@clair-group.com',null,90,null),
+('internal','AM','Accountable Manager, leads the unit','Charles CLAIR',null,'Astonjet Ltd',null,null,'24/7',10,null),
+('internal','NPGO','Nominated person ground operations, leads if the AM is unavailable','Maxime BABILLOT','Haifa HOSNI','Astonjet Ltd',null,null,'24/7',20,'MSM 9.2 gives a number, ENR-CM-15 none: enter the right one.'),
+('internal','NPCT','NPCT and Security Manager','Christophe WARNKE DHERINES','Luca BANDINI','Astonjet Ltd',null,null,'24/7',30,null),
+('internal','NPFO','Nominated person flight operations','Federico SERMARINI','Akrit KALWAR JAISWAL','Astonjet Ltd',null,null,'24/7',40,'MSM 9.2 and ENR-CM-15 give two different numbers: confirm.'),
+('internal','SM','CMM and Safety Manager','Guillaume FOURNIE','Donato RUSSO (SM), Pierre-Franck JANSSENS (CMM)','Astonjet Ltd',null,null,'24/7',50,null),
+('internal','NPCA','Nominated person continuing airworthiness','Kevin MARTIN','Filip ALEXANDRIS','Astonjet Ltd',null,null,'24/7',60,null),
+('internal','ISM','Information Security Manager','Steve ASSOUVIE','Donato RUSSO','IOR System',null,null,'24/7',70,null),
+('internal',null,'General Manager','Mélanie VAILLANT',null,'Astonjet',null,null,null,80,'In ENR-CM-15, not in MSM 9.2.'),
+('internal',null,'Head of HR','Marlene AQUILINA',null,'Clair Group',null,null,null,90,null),
 ('internal',null,'ERP mailbox: primary information sheet, manifests',null,null,'Astonjet','','erp@astonjet.com',null,95,null),
 ('authority',null,'Director General for Civil Aviation','Charles PACE','Safety Management Unit','Transport Malta CAD','+356 77429549','charles.pace@transport.gov.mt','24/7',100,'ERP-AJD-05 prints +356 7942 9549: wrong, corrected here. Safety Management Unit: aviationsafety.tm@transport.gov.mt'),
 ('investigation',null,'Accident investigation (hot-line 24/7)',null,null,'BAAI Malta','+356 99382725',null,'24/7',110,null),
@@ -370,12 +371,12 @@ where not exists (select 1 from erp_contacts where entity = 'ASJMT');
 insert into erp_contacts (entity, kind, post, crisis_role, name, deputy, organisation, phone, email, available, ord, note)
 select 'ASJFR', x.kind, x.post, x.role, x.name, x.deputy, x.org, x.phone, x.email, x.av, x.ord, x.note
 from (values
-('internal','AM','Accountable Manager, leads the unit','Charles CLAIR',null,'Astonjet',null,'charles.clair@clair-group.com','24/7',10,null),
-('internal','NPGO','Nominated person ground operations, leads if the AM is unavailable','Mélanie VAILLANT',null,'Astonjet',null,'melanie.vaillant@astonjet.com','24/7',20,null),
+('internal','AM','Accountable Manager, leads the unit','Charles CLAIR',null,'Astonjet',null,null,'24/7',10,null),
+('internal','NPGO','Nominated person ground operations, leads if the AM is unavailable','Mélanie VAILLANT',null,'Astonjet',null,null,'24/7',20,null),
 ('internal','NPFO','NPFO, NPCT and Security Manager','Laurent HEIM',null,'Astonjet',null,null,'24/7',30,null),
-('internal','SM','CMM and Safety Manager','Guillaume FOURNIE',null,'Astonjet',null,'guillaume.fournie@clair-group.com','24/7',50,null),
-('internal','NPCA','Nominated person continuing airworthiness','Kevin MARTIN',null,'Astonjet',null,'kevin.martin@astonjet.com','24/7',60,null),
-('internal','ISM','Information Security Manager','Steve ASSOUVIE',null,'IOR System',null,'s.assouvie@ior-system.com','24/7',70,null),
+('internal','SM','CMM and Safety Manager','Guillaume FOURNIE',null,'Astonjet',null,null,'24/7',50,null),
+('internal','NPCA','Nominated person continuing airworthiness','Kevin MARTIN',null,'Astonjet',null,null,'24/7',60,null),
+('internal','ISM','Information Security Manager','Steve ASSOUVIE',null,'IOR System',null,null,'24/7',70,null),
 ('internal',null,'ERP mailbox: primary information sheet, manifests',null,null,'Astonjet',null,'erp@astonjet.com',null,95,null),
 ('authority',null,'DSAC on-call structure, Nord',null,null,'DGAC / DSAC','06 07 33 87 03',null,'24/7',100,null),
 ('authority',null,'DSAC on-call structure, Sud',null,null,'DGAC / DSAC','06 26 09 57 02',null,'24/7',105,null),
