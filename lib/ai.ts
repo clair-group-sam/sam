@@ -50,12 +50,14 @@ export async function callClaude(opts: { agent: AiAgent; personId: string | null
   return { text, model: MODEL };
 }
 
-export function parseJsonBlock(text: string): { html: string; notes: { where: string; change: string; why: string }[] } {
+export function parseJsonBlock(text: string, opts?: { allowEmptyHtml?: boolean }): { html: string; notes: { where: string; change: string; why: string }[] } {
   const m = /\{[\s\S]*\}/.exec(text);
   if (!m) throw new Error("The assistant did not return a proposal.");
-  const j = JSON.parse(m[0]) as { html?: string; notes?: { where: string; change: string; why: string }[] };
-  if (!j.html) throw new Error("Empty proposal.");
-  return { html: j.html, notes: j.notes ?? [] };
+  let j: { html?: string; notes?: { where: string; change: string; why: string }[] };
+  try { j = JSON.parse(m[0]); }
+  catch { throw new Error("SAM's answer was cut before the end (chapter too long for one pass). Ask again on a sub-chapter, or with a narrower request."); } // FB-069 · a truncated answer said "Expected ',' or ']' in JSON"
+  if (!j.html && !opts?.allowEmptyHtml) throw new Error("Empty proposal.");
+  return { html: j.html ?? "", notes: j.notes ?? [] };
 }
 
 export function userPromptFor(agent: AiAgent, ctx: { manual: string; entity: string; chapterRef: string; chapterTitle: string; chapterHtml: string; neighbours: string[]; request: string; officialTexts?: string }): string {
@@ -65,8 +67,8 @@ export function userPromptFor(agent: AiAgent, ctx: { manual: string; entity: str
     case "draft": return head + `REQUEST FROM THE NOMINATED PERSON (may be in another language than the manual; the chapter keeps its own language):\n${ctx.request}\n\nIntegrate this request into the chapter and return the full revised chapter.`;
     case "rewrite": return head + `Rewrite the passages the nominated person typed quickly so they read like the rest of the manual (style, terminology, formatting), without changing their meaning. ${ctx.request ? "Focus: " + ctx.request : ""} Return the full chapter.`;
     case "translate": return head + `Translate into the manual's language (${ctx.request.trim() || "the language of the rest of the chapter"}) every passage written in another language, in the manual's style; keep the other passages unchanged. Return the full chapter.`;
-    case "check": return head + `Do not rewrite. Review this chapter for internal consistency (posts, references to other chapters, delays, contradictions, missing cross-references, terminology) ${ctx.request ? "with attention to: " + ctx.request : ""}. Return the chapter html UNCHANGED and put every finding in "notes" (where / change = the issue / why = suggestion).`;
-    case "explain": return head + `Do not rewrite. The nominated person asks what a requirement means for this chapter: "${ctx.request.trim() || "the regulatory references cited in this chapter"}". Explain, in plain professional English, what the requirement (EASA / national rule, AMC/GM) actually asks for, how this chapter answers it today and where it falls short or is silent. Return the chapter html UNCHANGED and put the explanation in the notes: one note per point, where = the requirement or sub-chapter, change = what it requires, why = how the chapter stands against it. No invented references: cite only what the request or the chapter names.`;
+    case "check": return head + `Do not rewrite. Review this chapter for internal consistency (posts, references to other chapters, delays, contradictions, missing cross-references, terminology) ${ctx.request ? "with attention to: " + ctx.request : ""}. Do NOT return the chapter: answer {"html": "", "notes": [...]} with every finding in "notes" (where / change = the issue / why = suggestion), 12 findings at most, the most important first.`;
+    case "explain": return head + `Do not rewrite. The nominated person asks what a requirement means for this chapter: "${ctx.request.trim() || "the regulatory references cited in this chapter"}". Explain, in plain professional English, what the requirement (EASA / national rule, AMC/GM) actually asks for, how this chapter answers it today and where it falls short or is silent. Do NOT return the chapter: answer {"html": "", "notes": [...]} with the explanation in the notes (12 notes at most): one note per point, where = the requirement or sub-chapter, change = what it requires, why = how the chapter stands against it. No invented references: cite only what the request or the chapter names.`;
     default: return head + ctx.request;
   }
 }

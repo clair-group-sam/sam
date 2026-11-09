@@ -196,8 +196,9 @@ export async function aiPropose(input: { revisionId: string; sectionId: string; 
     }
     const user = userPromptFor(input.agent, { manual: manual.title, entity: manual.entity, chapterRef: cur.ref as string, chapterTitle: (cur.title as string) ?? "", chapterHtml: html, neighbours: ((others ?? []) as { ref: string; title: string | null }[]).map((o) => `${o.ref} ${o.title ?? ""}`).slice(0, 80), request: input.request, officialTexts });
     const { text, model } = await callClaude({ agent: input.agent, personId: s.person?.id ?? null, entity: manual.entity, user, maxTokens: 12000 });
-    const parsed = parseJsonBlock(text);
-    return { ok: true, html: parsed.html, notes: parsed.notes, model };
+    const readOnly = input.agent === "check" || input.agent === "explain"; // FB-069 · these two never change the chapter: no html back, so a long chapter no longer overflows the answer
+    const parsed = parseJsonBlock(text, { allowEmptyHtml: readOnly });
+    return { ok: true, html: readOnly ? html : parsed.html, notes: parsed.notes, model };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 }
 
