@@ -31,6 +31,24 @@ async function token(entity: string, c: Cfg): Promise<string> {
   if (!r.ok || !j?.access_token) throw new Error(`ECCAIRS token refused (${r.status}${j?.error ? ` ${j.error}` : ""}${j?.error_description ? `: ${j.error_description}` : ""}) — check the M2M user (activated, password) and that the IP is whitelisted by EASA.`.slice(0, 300));
   cache.set(k, { token: j.access_token, until: Date.now() + (j.expires_in ?? 3600) * 1000 }); return j.access_token;
 }
+/** Diagnostic of the token step only (no secret leaves): what is configured and how the authorization server answers each client-auth variant. */
+export async function tokenDiagnostic(entity: string): Promise<Record<string, unknown>> {
+  const c = eccairsConfig(entity); if (!c) return { configured: false };
+  const url = `${c.base}/idp/oauth2/token`; const form = "application/x-www-form-urlencoded";
+  const out: Record<string, unknown> = { base: c.base, client_id: c.id, client_id_length: c.id.length, secret_length: c.secret.length, secret_has_spaces: /\s/.test(c.secret), secret_has_quotes: /["']/.test(c.secret) };
+  const tryOne = async (name: string, init: { headers: Record<string, string>; body: string }) => {
+    try { const r = await proxyFetch(url, { method: "POST", ...init }); const txt = await r.text(); out[name] = { status: r.status, body: txt.slice(0, 200), www_authenticate: r.headers.get("www-authenticate") }; } catch (e) { out[name] = { error: (e as Error).message }; }
+  };
+  await tryOne("post_body_openid", { headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret, scope: "openid" }).toString() });
+  await tryOne("post_body_noscope", { headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret }).toString() });
+  const basic = Buffer.from(`${c.id}:${c.secret}`).toString("base64");
+  await tryOne("basic_raw", { headers: { "content-type": form, authorization: `Basic ${basic}` }, body: new URLSearchParams({ grant_type: "client_credentials" }).toString() });
+  const basicEnc = Buffer.from(`${encodeURIComponent(c.id)}:${encodeURIComponent(c.secret)}`).toString("base64");
+  await tryOne("basic_urlencoded", { headers: { "content-type": form, authorization: `Basic ${basicEnc}` }, body: new URLSearchParams({ grant_type: "client_credentials" }).toString() });
+  try { const r = await proxyFetch(`${c.base}/idp/.well-known/openid-configuration`); out.well_known = { status: r.status, body: (await r.text()).slice(0, 600) }; } catch (e) { out.well_known = { error: (e as Error).message }; }
+  try { const r = await proxyFetch(`${c.base}/auth/api/token`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ grant_type: "password", username: c.id, password: c.secret }) }); out.legacy_password_grant = { status: r.status, body: (await r.text()).slice(0, 200) }; } catch (e) { out.legacy_password_grant = { error: (e as Error).message }; }
+  return out;
+}
 type E2 = { data?: unknown; errorDetails?: string; returnCode?: number };
 export async function e2(entity: string, path: string, init: { method?: string; body?: unknown } = {}): Promise<E2> {
   const c = eccairsConfig(entity); if (!c) throw new Error(`ECCAIRS is not configured for ${entity}.`);
