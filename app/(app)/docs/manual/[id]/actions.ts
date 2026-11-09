@@ -116,8 +116,18 @@ export async function askManual(input: { manualId: string; revisionId: string; q
     const { text } = await callClaude({ agent: "ask", personId: s.person.id, entity: m.entity, system: ASK_SYSTEM, maxTokens: 900,
       user: `Manual: ${m.code}, ${m.title} (${m.entity}).\n\nQUESTION: ${question}\n\nEXCERPTS (the chapters that mention the question's words):\n${excerpts.join("\n\n")}` });
     const j = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { answer?: string; not_found?: boolean; cites?: { ref: string; quote?: string }[] };
-    const byRef = new Map(secs.map((x) => [x.ref, x.title]));
-    const cites = (j.cites ?? []).filter((c) => byRef.has(c.ref)).slice(0, 5).map((c) => ({ ref: c.ref, title: byRef.get(c.ref) ?? "", quote: (c.quote ?? "").slice(0, 220) }));
+    const byRef = new Map(secs.map((x) => [x.ref.toLowerCase(), x]));
+    // the model may write "Chapter A.5", "§A.5" or a sub-chapter "A.5.2": bring each cite back to a chapter of this revision
+    const resolve = (raw: string) => {
+      let r = String(raw ?? "").replace(/^(chapter|chapitre|section|§)\s*/i, "").trim().toLowerCase();
+      while (r && !byRef.has(r)) { const cut = r.lastIndexOf("."); if (cut <= 0) break; r = r.slice(0, cut); }
+      return byRef.get(r) ?? null;
+    };
+    const seen = new Set<string>();
+    let cites = (j.cites ?? []).map((c) => ({ x: resolve(c.ref), quote: (c.quote ?? "").slice(0, 220) }))
+      .filter((c) => c.x && !seen.has(c.x.ref) && seen.add(c.x.ref)).slice(0, 5).map((c) => ({ ref: c.x!.ref, title: c.x!.title, quote: c.quote }));
+    // no usable cite: show where SAM looked first, so the reader can check
+    if (!cites.length && !j.not_found) cites = scored.slice(0, 2).map((x) => ({ ref: x.ref, title: x.title, quote: "" }));
     return { ok: true, a: { answer: (j.answer ?? "").trim() || "No answer.", notFound: !!j.not_found, cites, searched: secs.length } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "SAM could not answer, try again." };
