@@ -594,6 +594,39 @@ details.more[open]{z-index:40}
 .entswitch button{border:0;background:transparent;color:var(--white);font:600 12px/1 inherit;padding:7px 10px;border-radius:var(--r-sm);cursor:pointer}
 .entswitch button:hover{background:rgba(255,255,255,.16);color:var(--white)}
 .entswitch button.on{background:var(--white);color:var(--entc,var(--navy-ink));cursor:default;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+/* Entity switch in motion (09/11), ~0.4 s, everything in the direction of travel; then the page reloads (FB-048).
+   1 · one white pill slides under the buttons, frosted and half see-through on the way, solid when it lands */
+.topbar{position:relative;isolation:isolate}
+.entswitch{position:relative}
+.entswitch button{position:relative;z-index:1}
+.entswitch.moving button,.entswitch.moving button.on{background:transparent;box-shadow:none;transition:color .2s ease}
+.entswitch.moving button:not(.on){color:var(--white)}
+.entpill{position:absolute;top:3px;bottom:3px;left:0;border-radius:var(--r-sm);background:var(--white);box-shadow:0 1px 2px rgba(0,0,0,.15);
+  animation:entpill 420ms cubic-bezier(.3,1.2,.4,1) both}
+@keyframes entpill{
+  0%{transform:translateX(var(--x0));width:var(--w0);background:var(--white)}
+  25%{background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(3px) saturate(1.4);backdrop-filter:blur(3px) saturate(1.4)}
+  70%{background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(3px) saturate(1.4);backdrop-filter:blur(3px) saturate(1.4)}
+  100%{transform:translateX(var(--x1));width:var(--w1);background:var(--white)}}
+/* 2 · the new entity's colour sweeps the bar from the side of travel; its leading edge is see-through, so the colours blend */
+.entwipe{position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--entc) 90%,var(--black)) 0%,var(--entc) 30%,color-mix(in srgb,var(--entc) 55%,var(--white)) 52%,color-mix(in srgb,var(--entc) 12%,var(--white)) 72%,color-mix(in srgb,var(--entc) 5%,var(--white)) 100%);
+  -webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+.entwipe.r{-webkit-mask-image:linear-gradient(to right,#000 0%,#000 40%,rgba(0,0,0,.35) 52%,transparent 64%);mask-image:linear-gradient(to right,#000 0%,#000 40%,rgba(0,0,0,.35) 52%,transparent 64%);animation:entwipe-r 420ms cubic-bezier(.45,.05,.25,1) both}
+.entwipe.l{-webkit-mask-image:linear-gradient(to left,#000 0%,#000 40%,rgba(0,0,0,.35) 52%,transparent 64%);mask-image:linear-gradient(to left,#000 0%,#000 40%,rgba(0,0,0,.35) 52%,transparent 64%);animation:entwipe-l 420ms cubic-bezier(.45,.05,.25,1) both}
+@keyframes entwipe-r{from{-webkit-mask-position:100% 0;mask-position:100% 0}to{-webkit-mask-position:0% 0;mask-position:0% 0}}
+@keyframes entwipe-l{from{-webkit-mask-position:0% 0;mask-position:0% 0}to{-webkit-mask-position:100% 0;mask-position:100% 0}}
+/* the entity name arrives from the side of travel */
+.enttext.entin-r{animation:entin-r 320ms cubic-bezier(.3,.9,.3,1) both}
+.enttext.entin-l{animation:entin-l 320ms cubic-bezier(.3,.9,.3,1) both}
+@keyframes entin-r{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+@keyframes entin-l{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:none}}
+/* 3 · the page leaves the other way, and after the reload the new one comes in from the side of travel (sessionStorage carries it) */
+main[data-entleave]{transition:transform 260ms cubic-bezier(.4,0,.6,1),opacity 260ms ease;opacity:.15}
+main[data-entleave="r"]{transform:translateX(-16px)}
+main[data-entleave="l"]{transform:translateX(16px)}
+@keyframes entarrive-r{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes entarrive-l{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
 .topsearch{flex:1 1 auto;display:flex;justify-content:center;min-width:0}
 .topbar .searchbox{width:100%;max-width:440px;background:var(--white);border-color:color-mix(in srgb,var(--entc,var(--navy-ink)) 25%,var(--white));color:var(--slate5);padding:8px 12px;box-shadow:0 1px 2px rgba(13,42,63,.06)}
 .topbar .searchbox input{color:var(--navy);flex:1;width:auto;min-width:0}.topbar .searchbox:focus-within{border-color:var(--entc,var(--navy-ink));box-shadow:0 0 0 3px color-mix(in srgb,var(--entc,var(--navy-ink)) 18%,transparent)}

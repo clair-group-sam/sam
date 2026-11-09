@@ -8,6 +8,11 @@ import type { Session } from "@/lib/session";
 
 type Props = { session: Session; children: React.ReactNode };
 
+// Entity switch animation (09/11): ~0.4 s, all three moves in the direction of travel. The switch still reloads the page (FB-048);
+// the reload waits for both the request and the animation, whichever ends last.
+const ENT_ANIM_MS = 420;
+const ENT_ARRIVE = `try{var d=sessionStorage.getItem("sam_entdir");if(d){sessionStorage.removeItem("sam_entdir");if(!matchMedia("(prefers-reduced-motion: reduce)").matches){var s=document.createElement("style");s.textContent="main{animation:entarrive-"+(d==="l"?"l":"r")+" 300ms cubic-bezier(.2,.8,.3,1) both}";document.head.appendChild(s);setTimeout(function(){s.remove()},700)}}}catch(e){}`;
+
 export default function Shell({ session, children }: Props) {
   const path = usePathname();
   const [, mod = "home", sub = ""] = path.split("/");
@@ -109,6 +114,9 @@ export default function Shell({ session, children }: Props) {
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar session={session} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
         {session.entity === "ALL" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
+        {/* entity switch, after the reload: the new page slides in from the side the click went to. Runs while the HTML is parsed,
+            before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
+        <script dangerouslySetInnerHTML={{ __html: ENT_ARRIVE }} />
         <main className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
@@ -158,23 +166,50 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
   const cur = session.entity;
   const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
   const curSub = cur === "ALL" ? `lists across every entity, ${choices.join(", ")}` : `${ENT[cur]?.qual ?? ""}, ${ENT[cur]?.auth ?? ""}`;
+  // the switch in motion: the white pill slides (frosted on the way), the new colour sweeps the bar, the page leaves sideways
+  const switchRef = useRef<HTMLElement | null>(null);
+  const [going, setGoing] = useState<null | { ent: string; dir: "l" | "r"; x0: number; w0: number; x1: number; w1: number }>(null);
   async function pick(ent: string) {
+    if (going) return;
     setEntOpen(false);
-    await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) });
+    const order = [...choices, ...(session.group ? ["ALL"] : [])];
+    const dir = order.indexOf(ent) >= order.indexOf(cur) ? "r" : "l";
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const btns = switchRef.current ? [...switchRef.current.querySelectorAll<HTMLButtonElement>("button")] : [];
+    const from = btns[order.indexOf(cur)], to = btns[order.indexOf(ent)];
+    if (!still && from && to) {
+      setGoing({ ent, dir, x0: from.offsetLeft, w0: from.offsetWidth, x1: to.offsetLeft, w1: to.offsetWidth });
+      const main = document.querySelector("main"); if (main) main.dataset.entleave = dir;
+      try { sessionStorage.setItem("sam_entdir", dir); } catch {}
+    }
+    const wait = new Promise((r) => setTimeout(r, still ? 0 : ENT_ANIM_MS));
+    await Promise.all([fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ent }) }), wait]);
     // FB-048 · a full reload: router.refresh() only re-renders the current route, and pages prefetched or cached under the
     // previous entity were served later (the entity "flipped" after a server action). Nothing of the old entity may survive.
     window.location.reload();
   }
   return (
     <header className={"topbar ent-" + cur} style={{ ["--entc" as string]: ENT_COLOR[cur] ?? "var(--navy-ink)" } as React.CSSProperties}>
+      {going && <span className={"entwipe " + going.dir} aria-hidden style={{ ["--entc" as string]: ENT_COLOR[going.ent] ?? "var(--navy-ink)" } as React.CSSProperties} />}
       <div className="entid" title={curSub}>
         {!(choices.length > 1 || session.group) && <span className="entcode">{cur}</span>}
-        <span className="enttext"><b>{curName}</b><small>{curSub}</small></span>
+        {going ? (
+          <span key="to" className={"enttext entin-" + going.dir}><b>{going.ent === "ALL" ? "Group view" : ENT[going.ent]?.name ?? going.ent}</b>
+            <small>{going.ent === "ALL" ? `lists across every entity, ${choices.join(", ")}` : `${ENT[going.ent]?.qual ?? ""}, ${ENT[going.ent]?.auth ?? ""}`}</small></span>
+        ) : (
+          <span key="cur" className="enttext"><b>{curName}</b><small>{curSub}</small></span>
+        )}
       </div>
       {(choices.length > 1 || session.group) && (
-        <nav className="entswitch" aria-label="Entity you work in">
-          {choices.map((e) => <button key={e} type="button" className={cur === e ? "on" : ""} aria-pressed={cur === e} title={`${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`} onClick={() => cur !== e && pick(e)}>{e}</button>)}
-          {session.group && <button type="button" className={cur === "ALL" ? "on" : ""} aria-pressed={cur === "ALL"} title="Group view: lists across every entity" onClick={() => cur !== "ALL" && pick("ALL")}>Group</button>}
+        <nav ref={switchRef} className={"entswitch" + (going ? " moving" : "")} aria-label="Entity you work in" aria-busy={going ? true : undefined}>
+          {going && <span className="entpill" aria-hidden style={{ ["--x0" as string]: going.x0 + "px", ["--w0" as string]: going.w0 + "px", ["--x1" as string]: going.x1 + "px", ["--w1" as string]: going.w1 + "px" } as React.CSSProperties} />}
+          {[...choices, ...(session.group ? ["ALL"] : [])].map((e) => {
+            const on = going ? going.ent === e : cur === e;
+            return <button key={e} type="button" className={on ? "on" : ""} aria-pressed={on}
+              style={going && on ? { ["--entc" as string]: ENT_COLOR[e] ?? "var(--navy-ink)" } as React.CSSProperties : undefined}
+              title={e === "ALL" ? "Group view: lists across every entity" : `${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`}
+              onClick={() => cur !== e && pick(e)}>{e === "ALL" ? "Group" : e}</button>;
+          })}
         </nav>
       )}
       <div className="topsearch">
