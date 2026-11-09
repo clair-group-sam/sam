@@ -46,9 +46,21 @@ export async function saveProgramme(fd: FormData) {
 export async function approveProgramme(fd: FormData) {
   const s = await me(); if (!desk(s)) throw new Error("Compliance desk only.");
   const p = await prog(String(fd.get("id")));
-  const row = { status: "approved", approved_by: s.person?.id ?? null, approved_at: new Date().toISOString(), approval_note: str(fd, "note") };
+  const row = { status: "approved", approved_by: s.person?.id ?? null, approved_at: new Date().toISOString(), approval_note: str(fd, "note"), next_review_on: addMonths(today(), 12).slice(0, 7) + today().slice(7) };
   await db().from("audit_programmes").update(row).eq("id", p.id);
   await log(s, p.entity, "audit_programme", p.id, "audit_programme_approved", row);
+  touch(p.id);
+}
+/** AUD-04 · Annual review of the programme (DSAC #1416100): recorded on the programme, next review in 12 months, task closed. */
+export async function reviewProgramme(fd: FormData) {
+  const s = await me(); if (!desk(s)) throw new Error("Compliance desk only.");
+  const p = await prog(String(fd.get("id")));
+  const on = str(fd, "reviewed_on") ?? today(); const note = str(fd, "note");
+  if (!note) throw new Error("Say what the review looked at and concluded (audits done / moved, findings, changes, new rules).");
+  const next = addMonths(on, 12).slice(0, 7) + on.slice(7);
+  await db().from("audit_programmes").update({ reviewed_on: on, review_note: note, next_review_on: next }).eq("id", p.id);
+  await db().from("tasks").update({ status: "done" }).eq("ref_id", p.id).eq("kind", "programme_review").eq("status", "open");
+  await log(s, p.entity, "audit_programme", p.id, "audit_programme_reviewed", { reviewed_on: on, note, next_review_on: next });
   touch(p.id);
 }
 export async function closeProgramme(fd: FormData) {

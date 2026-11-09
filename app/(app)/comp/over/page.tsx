@@ -9,6 +9,7 @@ import { controlOf, daysTo, nextDueOf, type Auditor, type CCheck, type Subcontra
 import { OPEN_STATUSES as FND_OPEN } from "@/lib/findings";
 import { OPEN_STATUSES as WATCH_OPEN } from "@/lib/watch";
 import { today } from "@/lib/authority";
+import { computeKpis } from "@/lib/compliance-kpi";
 
 /* COMP-00 · Compliance overview: one card per entity of the scope, every number computed live and clickable — programme, audits, checks, findings, watch, regulation, auditors, subcontractors. */
 type Tile = { label: string; value: string | number; hint?: string; tone?: "red" | "amber" | "green"; href: string };
@@ -33,7 +34,9 @@ export default async function ComplianceOverview() {
   const regs = (rd ?? []) as { id: string; entities: string[]; check_result: string | null; items_count: number | null }[];
   const auditors = (aud ?? []) as Auditor[], subs = (sd ?? []) as Subcontractor[], mods = (md ?? []) as AuditModule[];
   const cur = current(progs, t0);
+  const kpis = Object.fromEntries(await Promise.all(scope.map(async (e) => [e, (await computeKpis(db, e, t0)).values] as const)));
   const cards = scope.map((e) => {
+    const kv = kpis[e] ?? []; const kOn = kv.filter((v) => v.status === "on_target").length, kOff = kv.filter((v) => v.status === "off_target").length, kAl = kv.filter((v) => v.status === "alert").length, kNa = kv.filter((v) => v.status === "n_a").length;
     const p = cur.find((x) => x.entity === e) ?? null;
     const pa = p ? audits.filter((a) => a.programme_id === p.id) : [];
     const cov = p ? coverage(p, mods.filter((m) => m.programme_id === p.id), pa, t0) : null;
@@ -47,6 +50,7 @@ export default async function ComplianceOverview() {
     const sc = subs.filter((x) => x.entity === e).map((x) => controlOf(x, audits, t0).status);
     const tiles: Tile[] = [
       { label: "Audit programme", value: p ? `${cov!.done} / ${cov!.done + cov!.planned}` : "—", hint: p ? `${p.title}, ${cov!.late ? `${cov!.late} month passed, ` : ""}${cov!.modulesWithout.length + cov!.gaps.length} coverage gap${cov!.modulesWithout.length + cov!.gaps.length === 1 ? "" : "s"}` : "no programme in force", tone: !p ? "amber" : cov!.late ? "red" : cov!.modulesWithout.length + cov!.gaps.length ? "amber" : "green", href: p ? `/comp/prog/${p.id}` : "/comp/prog" },
+      { label: "Indicators ENR-CM-06", value: `${kOn} / ${kv.length - kNa}`, hint: `on target, ${kAl} alert, ${kOff} off target${kNa ? `, ${kNa} not measurable` : ""}${p && p.next_review_on && p.next_review_on < t0 ? ", programme review past due" : ""}`, tone: kOff || (p && p.next_review_on && p.next_review_on < t0) ? "red" : kAl ? "amber" : "green", href: `/comp/kpi?ent=${e}` },
       { label: "Audits", value: `${ea.filter((a) => a.status === "in_progress").length}, ${ea.filter((a) => a.status === "report").length}`, hint: `in progress, reports to close${late ? `, ${late} to start, month passed` : ""}`, tone: late ? "red" : ea.some((a) => a.status === "report") ? "amber" : undefined, href: "/comp/audits" },
       { label: "Compliance checks", value: `${ch.filter((d) => d !== null && d <= 30).length} / ${ch.length}`, hint: `due ≤ 30 d${ch.some((d) => d !== null && d < 0) ? `, ${ch.filter((d) => d !== null && d < 0).length} past due` : ""}`, tone: ch.some((d) => d !== null && d < 0) ? "red" : ch.some((d) => d !== null && d <= 30) ? "amber" : "green", href: "/comp/checks" },
       { label: "Open findings", value: fo.length, hint: `${fo.filter((f) => f.due && f.due < t0).length} past due, ${fo.filter((f) => f.source === "authority").length} authority, ${fo.filter((f) => f.level === "1").length} level 1`, tone: fo.some((f) => f.due && f.due < t0) || fo.some((f) => f.level === "1") ? "red" : fo.length ? "amber" : "green", href: "/comp/find" },

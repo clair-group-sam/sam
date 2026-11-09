@@ -4,11 +4,11 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { AuditGrid } from "@/components/AuditGrid";
-import { nextDueOf } from "@/lib/compliance-registers";
+import { daysTo, nextDueOf } from "@/lib/compliance-registers";
 import { ENT, ENT_COLOR } from "@/lib/nav";
 import { addMonths, coverage, cycleMonths, elapsedPct, KIND_LABEL, loadProgramme, monthLong, PROG_REF, PROG_STATUS, STATUS_LABEL, type AuditEvent } from "@/lib/audit-programme";
 import { today } from "@/lib/authority";
-import { addAudit, approveProgramme, archiveModule, cancelAudit, closeProgramme, linkModuleChecks, planNextCycle, replanAudit, saveAuditPlan, saveModule, saveProgramme } from "../actions";
+import { addAudit, approveProgramme, archiveModule, cancelAudit, closeProgramme, linkModuleChecks, planNextCycle, replanAudit, reviewProgramme, saveAuditPlan, saveModule, saveProgramme } from "../actions";
 import { createChecklist } from "../cl/actions";
 
 /* AUD-01 · one audit programme: the grid, the audits (move with a reason, cancel with a reason, dates and auditor), the modules and the requirements they cover, the coverage, the history. */
@@ -64,6 +64,17 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
         <Metric label="Coverage gaps" value={c.modulesWithout.length + c.gaps.length} hint={`${c.modulesWithout.length} module(s), ${c.gaps.length} requirement(s)`} tone={c.modulesWithout.length + c.gaps.length ? "amber" : "green"} />
       </div>
 
+      {p.status === "approved" && (() => { const late = !!p.next_review_on && p.next_review_on < t0; const soon = !!p.next_review_on && !late && daysTo(p.next_review_on, t0)! <= 30; return (
+        <section className={"card mb-4" + (late ? " late" : "")}><div className="ch"><span className="eyebrow">Annual review of the programme</span><span className={"mini " + (late ? "late" : "")}>{p.reviewed_on ? `last review ${p.reviewed_on}` : "never reviewed"}{p.next_review_on ? ` · next ${p.next_review_on}${late ? " — past due" : soon ? " — within 30 days" : ""}` : ""}</span></div>
+          <div className="cb">
+            {p.review_note && <p className="mini mb-2" style={{ whiteSpace: "pre-wrap" }}>{p.review_note}</p>}
+            {desk ? <details open={late || soon}><summary className="mini">Record the annual review (MSM §2.2.3 · DSAC #1416100)</summary>
+              <form action={reviewProgramme} className="grid gap-2 mt-2" style={{ gridTemplateColumns: "160px 1fr auto" }}><input type="hidden" name="id" value={p.id} />
+                <label><span className="mini">Reviewed on</span><input type="date" name="reviewed_on" className="inp" defaultValue={t0} /></label>
+                <label><span className="mini">What was looked at and concluded</span><textarea name="note" className="inp" rows={2} required placeholder="Audits done / moved and why, findings of the year, changes in the organisation, new rules, modules kept / added / removed; presented to the CODIR of …" /></label>
+                <div className="flex items-end"><button className="btn primary">Record</button></div></form></details>
+              : <p className="mini">Reviewed once a year by the Compliance desk and presented to the CODIR.</p>}
+          </div></section>); })()}
       <section className="card mb-4"><div className="ch"><span className="eyebrow">The cycle month by month</span></div><div className="cb"><AuditGrid p={p} mods={mods} audits={audits} checks={checks} t0={t0} /></div></section>
 
       <section className="card mb-4"><div className="ch"><span className="eyebrow">Audits, {audits.length}</span>

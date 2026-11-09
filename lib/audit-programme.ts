@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * audits planned month by month. Replanning keeps its reason. S.A.M. computes the coverage; it does not judge it. */
 
 export type Programme = { id: string; entity: string; title: string; reference: string | null; domains: string[]; cycle_months: number; starts_on: string; ends_on: string; requirements: string[];
-  status: string; approved_by: string | null; approved_at: string | null; approval_note: string | null; previous_id: string | null; note: string | null; created_at: string };
+  status: string; approved_by: string | null; approved_at: string | null; approval_note: string | null; previous_id: string | null; note: string | null; created_at: string;
+  reviewed_on: string | null; review_note: string | null; next_review_on: string | null };
 export type AuditModule = { id: string; programme_id: string; code: string; title: string; domain: string | null; kind: string; requirements: string[]; sort: number; active: boolean; checklist_id?: string | null; subcontractor_id?: string | null; check_ids: string[] };
 /** AUD-03 · a recurring check shown in the programme: its passages in the cycle and the next due date. */
 export type ProgCheck = { id: string; code: string; title: string; every_months: number; last_done_on: string | null; next_due: string | null; owner_role: string | null; runs: { id: string; done_on: string; result: string }[] };

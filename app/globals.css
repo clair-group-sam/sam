@@ -831,3 +831,6 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 .wbar i.green { background: var(--green); }
 .wbar i.amber { background: var(--amber); }
 .wbar i.red { background: var(--terra, #c0603a); }
+
+/* KPI-01 · snapshot cells */
+.matrix td.k-on_target{background:var(--green-s);color:#0b6b32}.matrix td.k-alert{background:var(--amber-s);color:#8a5a00}.matrix td.k-off_target{background:var(--terra-s);color:#9a1a1a}
