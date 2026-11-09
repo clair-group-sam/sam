@@ -118,7 +118,7 @@ function drawNebula(){
   placed.forEach((p,i)=>{
     const col = p.d.risk ? `var(${RISK[p.d.risk][0]})` : 'var(--baseline)';
     el('line',{x1:CX,y1:CY,x2:p.x,y2:p.y,stroke:col,'stroke-width':p.d.risk==='critical'?2:1.4,
-      class:'spoke','stroke-dasharray':p.d.contract==='tbc'?'5 4':'none'},nebsvg);
+      class:'cz-spoke','stroke-dasharray':p.d.contract==='tbc'?'5 4':'none'},nebsvg);
     if(animate){
       const sz=p.d.risk==='critical'?4.6:3.8, dur=3.2+(i%7)*0.55, b=-(i%9)*0.6;
       const dir=FLOWDIR[p.d.id]||'both';
@@ -138,9 +138,9 @@ function drawNebula(){
     const g=el('g',{class:'neb-node','data-id':d.id,transform:`translate(${p.x-W/2},${p.y-H/2})`,style:'cursor:pointer'},nebsvg);
     const stroke = d.risk?`var(${RISK[d.risk][0]})`:'var(--baseline)';
     el('rect',{width:W,height:H,rx:8,stroke:stroke,'stroke-dasharray':d.status==='confirme'?'none':'4 3'},g);
-    const nm=el('text',{x:W/2,y:15,'text-anchor':'middle',class:'nm'},g);
+    const nm=el('text',{x:W/2,y:15,'text-anchor':'middle',class:'cz-nm'},g);
     nm.textContent=(d.risk?RISK[d.risk][1]+' ':'')+d.name;
-    const dp=el('text',{x:W/2,y:27,'text-anchor':'middle',class:'dp'},g);
+    const dp=el('text',{x:W/2,y:27,'text-anchor':'middle',class:'cz-dp'},g);
     dp.textContent=d.short;
     if(d.contract){const cc=el('text',{x:W-6,y:13,'text-anchor':'end',style:'font-size:9.5px;font-weight:700;fill:'+(d.contract==='ok'?'var(--st-good)':(d.contract==='none'?'var(--st-critical)':'var(--ink-muted)'))},g);cc.textContent=d.contract==='ok'?'✓':(d.contract==='none'?'✕':'?');}
     g.addEventListener('click',ev=>{ev.stopPropagation();showPanel(d);});
@@ -152,11 +152,11 @@ function drawNebula(){
 /* ===================== DEPARTMENT MAP ===================== */
 function layout(){
   svg.innerHTML='';
-  el('rect',{x:OUTER.x,y:OUTER.y,width:OUTER.w,height:OUTER.h,rx:10,class:'zone outer'},svg);
+  el('rect',{x:OUTER.x,y:OUTER.y,width:OUTER.w,height:OUTER.h,rx:10,class:'cz-zone outer'},svg);
   const ot=el('text',{x:OUTER.x+12,y:OUTER.y+20,class:'zone-title'},svg); ot.textContent=OUTER.title;
   const os=el('text',{x:OUTER.x+12,y:OUTER.y+34,class:'zone-sub'},svg); os.textContent=OUTER.sub;
   for(const z in ZONES){const Z=ZONES[z];
-    el('rect',{x:Z.x,y:Z.y,width:Z.w,height:Z.h,rx:8,class:'zone'},svg);
+    el('rect',{x:Z.x,y:Z.y,width:Z.w,height:Z.h,rx:8,class:'cz-zone'},svg);
     const t=el('text',{x:Z.x+12,y:Z.y+18,class:'zone-title'+(Z.small?' sm':'')},svg); t.textContent=Z.title;
     if(Z.sub){const s=el('text',{x:Z.x+12,y:Z.y+32,class:'zone-sub'},svg); s.textContent=Z.sub;}
   }
@@ -187,26 +187,26 @@ function layout(){
     if(e.to && pos[e.to]){const t=pos[e.to]; a=anchorNode(e.from,t); b=anchorNode(e.to,s);}
     else if(e.toZone && ZONES[e.toZone]){b=zoneAnchor(e.toZone); a=anchorNode(e.from,b);}
     else return;
-    const p=el('path',{d:curve(a,b),class:'edge '+e.kind,'data-n':e.from,'data-t':e.to||('z_'+e.toZone)},eg);
+    const p=el('path',{d:curve(a,b),class:'cz-edge'+e.kind,'data-n':e.from,'data-t':e.to||('z_'+e.toZone)},eg);
     if(e.kind==='data') p.setAttribute('marker-end','url(#arr)');
   });
   DATA.forEach(d=>{
     const [x,y]=pos[d.id];
-    const g=el('g',{class:'node','data-id':d.id,transform:`translate(${x},${y})`},svg);
+    const g=el('g',{class:'cz-node','data-id':d.id,transform:`translate(${x},${y})`},svg);
     const stroke = d.risk?`var(${RISK[d.risk][0]})`:'var(--baseline)';
     const dash = (d.status==='confirme')?'none':'4 3';
     const r=el('rect',{width:NW,height:NH,rx:7,stroke:stroke,'stroke-dasharray':dash},g);
     if(d.risk) r.setAttribute('stroke-width','1.8');
     if(d.status==='attente'){g.setAttribute('opacity','0.62');}
-    const nm=el('text',{x:9,y:17,class:'nm'},g);
+    const nm=el('text',{x:9,y:17,class:'cz-nm'},g);
     nm.textContent=(d.risk?RISK[d.risk][1]+' ':'')+d.name;
-    const dp=el('text',{x:9,y:29,class:'dp'},g); dp.textContent=d.short||d.dept;
+    const dp=el('text',{x:9,y:29,class:'cz-dp'},g); dp.textContent=d.short||d.dept;
     d.ent.forEach((en,i)=>{ el('circle',{cx:12+i*11,cy:38,r:3.4,fill:`var(${E[en]})`},g); });
     if(d.impact==='Y'){const im=el('text',{x:NW-9,y:40,'text-anchor':'end',style:'font-size:8.5px;fill:var(--ink-muted)'},g); im.textContent='OPS';}
     if(d.contract){const cc=el('text',{x:NW-7,y:15,'text-anchor':'end',style:'font-size:9.5px;font-weight:700;fill:'+(d.contract==='ok'?'var(--st-good)':(d.contract==='none'?'var(--st-critical)':'var(--ink-muted)'))},g);cc.textContent=d.contract==='ok'?'✓':(d.contract==='none'?'✕':'?');}
     g.addEventListener('click',ev=>{ev.stopPropagation();select(d.id);});
-    g.addEventListener('mouseenter',()=>{svg.querySelectorAll(`.edge[data-n="${d.id}"],.edge[data-t="${d.id}"]`).forEach(p=>p.classList.add('hi'));});
-    g.addEventListener('mouseleave',()=>{svg.querySelectorAll('.edge.hi').forEach(p=>p.classList.remove('hi'));});
+    g.addEventListener('mouseenter',()=>{svg.querySelectorAll(`.cz-edge[data-n="${d.id}"],.edge[data-t="${d.id}"]`).forEach(p=>p.classList.add('hi'));});
+    g.addEventListener('mouseleave',()=>{svg.querySelectorAll('.cz-edge.hi').forEach(p=>p.classList.remove('hi'));});
     const tt=el('title',{},g); tt.textContent=`${d.name} — ${d.purpose}`;
   });
   applyFilters();
@@ -220,12 +220,12 @@ function matches(d){
 }
 function applyFilters(){
   DATA.forEach(d=>{
-    const g=svg.querySelector(`.node[data-id="${d.id}"]`);
+    const g=svg.querySelector(`.cz-node[data-id="${d.id}"]`);
     if(!g) return;
     g.classList.toggle('dim',!matches(d));
     g.classList.toggle('sel',selected===d.id);
   });
-  svg.querySelectorAll('.edge').forEach(p=>{
+  svg.querySelectorAll('.cz-edge').forEach(p=>{
     const s=DATA.find(x=>x.id===p.dataset.n);
     const t=p.dataset.t&&!p.dataset.t.startsWith('z_')?DATA.find(x=>x.id===p.dataset.t):null;
     p.classList.toggle('dimmed', (s&&!matches(s)) || (t&&!matches(t)));
@@ -238,10 +238,10 @@ function showPanel(d){
   const panel=document.getElementById('panel');
   const stMap={confirme:'Confirmed',a_confirmer:'To be confirmed',scope:'Scope TBD',attente:'Awaiting reply'};
   const respMap={own:'Entity (own contract)',grp:'Clair Group / other entity',auth:'Authority / State'};
-  panel.innerHTML=`<button class="close" aria-label="Close">✕</button>
+  panel.innerHTML=`<button class="cz-close" aria-label="Close">✕</button>
     <h3>${d.risk?RISK[d.risk][1]+' ':''}${d.name}</h3>
-    <div>${d.ent.map(en=>`<span class="chip"><span class="dot" style="background:var(${E[en]});margin-right:4px"></span>${en}</span>`).join('')}
-    <span class="chip">${stMap[d.status]}</span>${d.impact==='Y'?'<span class="chip">Operational impact</span>':''}</div>
+    <div>${d.ent.map(en=>`<span class="cz-chip"><span class="cz-dot" style="background:var(${E[en]});margin-right:4px"></span>${en}</span>`).join('')}
+    <span class="cz-chip">${stMap[d.status]}</span>${d.impact==='Y'?'<span class="cz-chip">Operational impact</span>':''}</div>
     <dl>
       <dt>Purpose</dt><dd>${d.purpose}</dd>
       <dt>Department</dt><dd>${d.dept}</dd>
@@ -249,7 +249,7 @@ function showPanel(d){
       <dt>Data</dt><dd>${d.dataT}</dd>
       <dt>Hosting · Provider</dt><dd>${d.hosting} · ${d.provider}</dd>
       ${d.risk?`<dt>Attention level</dt><dd style="color:var(${RISK[d.risk][0]});font-weight:600">${RISK[d.risk][2]}</dd>`:''}
-      ${d.notes.length?`<dt>Observations</dt><dd>${d.notes.map(n=>`<div class="risk-line"><span class="risk-ic">–</span><span>${n}</span></div>`).join('')}</dd>`:''}
+      ${d.notes.length?`<dt>Observations</dt><dd>${d.notes.map(n=>`<div class="cz-risk-line"><span class="cz-risk-ic">–</span><span>${n}</span></div>`).join('')}</dd>`:''}
       <dt>Source</dt><dd>${d.src}</dd>
     </dl>${d.link?`<p style="margin-top:12px"><a href="${d.link}" style="color:var(--ajd);text-decoration:underline">Open in the systems register</a></p>`:''}`;
   panel.classList.add('open');
@@ -285,7 +285,7 @@ function renderTiles(){
       [DATA.filter(d=>d.zone==='pending').length,'departments without reply (follow-up needed)'],
     ];
   }
-  document.getElementById('tiles').innerHTML=t.map(([v,l])=>`<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  document.getElementById('tiles').innerHTML=t.map(([v,l])=>`<div class="cz-tile"><div class="cz-v">${v}</div><div class="cz-l">${l}</div></div>`).join('');
 }
 
 function renderTable(){
@@ -293,15 +293,15 @@ function renderTable(){
   const zMap={g_compta:'Group · Accounting',g_hr:'Group · HR',g_it:'Group · IT',g_mkt:'Group · Marketing',g_own:'Group · Mkt/Owner',g_gen:'Group · Generic',trans:'Transverse',fo:'Flight Ops',camo:'Group CAMO (AJD)',go:'Ground Ops',training:'Training',caa:'CAA/EASA',asf:'ASF (ATO)',pending:'Awaiting reply'};
   const respMap={own:'Entity',grp:'Group/other',auth:'Authority/State'};
   const rows=DATA.map(d=>`<tr class="${matches(d)?'':'dimrow'}">
-    <td><strong>${d.risk?RISK[d.risk][1]+' ':''}${d.name}</strong><div class="sub2">${d.provider}</div></td>
+    <td><strong>${d.risk?RISK[d.risk][1]+' ':''}${d.name}</strong><div class="cz-sub2">${d.provider}</div></td>
     <td>${zMap[d.zone]}</td>
-    <td>${d.ent.map(en=>`<span class="dot" style="background:var(${E[en]});margin-right:3px" title="${en}"></span>`).join('')}<span class="sub2">${d.ent.join(', ')}</span></td>
-    <td>${d.purpose}<div class="sub2">${d.dataT}</div></td>
+    <td>${d.ent.map(en=>`<span class="cz-dot" style="background:var(${E[en]});margin-right:3px" title="${en}"></span>`).join('')}<span class="cz-sub2">${d.ent.join(', ')}</span></td>
+    <td>${d.purpose}<div class="cz-sub2">${d.dataT}</div></td>
     <td>${d.impact}</td>
-    <td>${d.resp?respMap[d.resp]+(d.contract==='tbc'?' <span class="sub2">(TBC)</span>':''):'—'}</td>
+    <td>${d.resp?respMap[d.resp]+(d.contract==='tbc'?' <span class="cz-sub2">(TBC)</span>':''):'—'}</td>
     <td>${stMap[d.status]}</td>
-    <td>${d.risk?`<span style="color:var(${RISK[d.risk][0]});font-weight:600">${RISK[d.risk][2]}</span>`:'—'}${d.notes.length?`<div class="sub2">${d.notes[0]}</div>`:''}</td>
-    <td class="sub2">${d.src}</td></tr>`).join('');
+    <td>${d.risk?`<span style="color:var(${RISK[d.risk][0]});font-weight:600">${RISK[d.risk][2]}</span>`:'—'}${d.notes.length?`<div class="cz-sub2">${d.notes[0]}</div>`:''}</td>
+    <td class="cz-sub2">${d.src}</td></tr>`).join('');
   document.getElementById('tbl').innerHTML=`<thead><tr><th>System</th><th>Zone / department</th><th>Entities</th>
     <th>Purpose · data</th><th>Ops</th><th>Responsibility</th><th>Status</th><th>Attention</th><th>Source</th></tr></thead><tbody>${rows}</tbody>`;
 }
