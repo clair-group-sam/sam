@@ -2,6 +2,9 @@
 (function(){
 const C = window.__CARTO; if (!C || !document.getElementById("carto-root")) return;
 const E = {AJD:'--ajd', ASJ:'--asj', ASF:'--asf', GRP:'--grp'};
+const LBL = {AJD:'ASJMT', ASJ:'ASJFR', ASF:'ASFFR', GRP:'Group'};
+const NEBLBL = {AJD:'ASJMT', ASJASF:'ASJFR + ASFFR', ASF:'ASFFR'};
+const ANNEX = {AJD:'PRO-IS-01 AJD', ASJASF:'PRO-IS-01 ASJ+ASF', ASF:'ASFFR perimeter (PRO-IS-01 ASJ+ASF annex)'};
 const RISK = {critical:['--st-critical','◆','Critical'], serious:['--st-serious','▲','To address'], warning:['--st-warn','●','To monitor']};
 
 // resp: own = entity's own contract | grp = Clair Group / other entity responsibility | auth = authorities / State
@@ -46,8 +49,9 @@ const SECTORS = {
   auth:{a0:90,  a1:180, lblx:30,   lbly:830, anchor:'start', title:'AUTHORITIES / STATE', sub:'imposed channels (TM-CAD, DGAC, EU, AIFE)'},
 };
 function nebSystems(entKey){
-  const base = DATA.filter(d=>d.zone!=='pending' && d.resp && (entKey==='AJD' ? d.ent.includes('AJD') : (d.ent.includes('ASJ')||d.ent.includes('ASF'))));
+  const base = DATA.filter(d=>d.zone!=='pending' && d.resp && (entKey==='AJD' ? d.ent.includes('AJD') : entKey==='ASF' ? d.ent.includes('ASF') : (d.ent.includes('ASJ')||d.ent.includes('ASF'))));
   if(entKey==='AJD') return base;
+  if(entKey==='ASF') return base.map(d=>d.respAsf?Object.assign({},d,{resp:d.respAsf}):(d.respAsj?Object.assign({},d,{resp:d.respAsj}):d));
   return base.map(d=>d.respAsj?Object.assign({},d,{resp:d.respAsj}):d).concat(NEB_EXTRA.ASJASF);
 }
 function drawNebula(){
@@ -127,9 +131,9 @@ function drawNebula(){
     }
   });
   const cg=el('g',{style:'cursor:pointer'},nebsvg);
-  el('circle',{cx:CX,cy:CY,r:62,fill:'var(--surface-1)',stroke:nebEnt==='AJD'?'var(--ajd)':'var(--asj)','stroke-width':2.5},cg);
+  el('circle',{cx:CX,cy:CY,r:62,fill:'var(--surface-1)',stroke:nebEnt==='AJD'?'var(--ajd)':nebEnt==='ASF'?'var(--asf)':'var(--asj)','stroke-width':2.5},cg);
   const ct=el('text',{x:CX,y:CY-4,'text-anchor':'middle',style:'font-size:17px;font-weight:700;fill:var(--ink-1)'},cg);
-  ct.textContent = nebEnt==='AJD' ? 'AJD' : 'ASJ + ASF';
+  ct.textContent = NEBLBL[nebEnt];
   const cs=el('text',{x:CX,y:CY+14,'text-anchor':'middle',style:'font-size:8.5px;fill:var(--ink-muted)'},cg);
   cs.textContent='click: department detail';
   cg.addEventListener('click',()=>{setMode('map'); setView(nebEnt);});
@@ -215,6 +219,7 @@ function layout(){
 function matches(d){
   if(view==='AJD' && !d.ent.includes('AJD')) return false;
   if(view==='ASJASF' && !d.ent.includes('ASJ') && !d.ent.includes('ASF')) return false;
+  if(view==='ASF' && !d.ent.includes('ASF')) return false;
   if(impactOnly && d.impact!=='Y') return false;
   return true;
 }
@@ -240,7 +245,7 @@ function showPanel(d){
   const respMap={own:'Entity (own contract)',grp:'Clair Group / other entity',auth:'Authority / State'};
   panel.innerHTML=`<button class="cz-close" aria-label="Close">✕</button>
     <h3>${d.risk?RISK[d.risk][1]+' ':''}${d.name}</h3>
-    <div>${d.ent.map(en=>`<span class="cz-chip"><span class="cz-dot" style="background:var(${E[en]});margin-right:4px"></span>${en}</span>`).join('')}
+    <div>${d.ent.map(en=>`<span class="cz-chip"><span class="cz-dot" style="background:var(${E[en]});margin-right:4px"></span>${LBL[en]||en}</span>`).join('')}
     <span class="cz-chip">${stMap[d.status]}</span>${d.impact==='Y'?'<span class="cz-chip">Operational impact</span>':''}</div>
     <dl>
       <dt>Purpose</dt><dd>${d.purpose}</dd>
@@ -248,12 +253,14 @@ function showPanel(d){
       ${d.resp?`<dt>Responsibility / contract</dt><dd>${respMap[d.resp]}${d.contract==='tbc'?' — <strong>holder / IS clauses to be confirmed</strong>':''}</dd>`:''}
       <dt>Data</dt><dd>${d.dataT}</dd>
       <dt>Hosting · Provider</dt><dd>${d.hosting} · ${d.provider}</dd>
-      ${d.risk?`<dt>Attention level</dt><dd style="color:var(${RISK[d.risk][0]});font-weight:600">${RISK[d.risk][2]}</dd>`:''}
+      ${d.contractTxt?`<dt>Contract (Subcontractors register)</dt><dd>${d.contractTxt}</dd>`:''}
+      ${d.risk?`<dt>Attention level${d.riskFrom?' (from the IS risk assessment)':''}</dt><dd style="color:var(${RISK[d.risk][0]});font-weight:600">${RISK[d.risk][2]}</dd>`:''}
+      ${d.risks&&d.risks.length?`<dt>IS risks</dt><dd>${d.risks.map(r=>`<div class="cz-risk-line"><span class="cz-risk-ic">${r.score||'?'}</span><span>${r.threat} <span class="cz-sub2">(${r.status})</span></span></div>`).join('')}</dd>`:(d.zone!=='pending'?'<dt>IS risks</dt><dd class="cz-sub2">No IS risk assessment yet</dd>':'')}
       ${d.notes.length?`<dt>Observations</dt><dd>${d.notes.map(n=>`<div class="cz-risk-line"><span class="cz-risk-ic">–</span><span>${n}</span></div>`).join('')}</dd>`:''}
       <dt>Source</dt><dd>${d.src}</dd>
     </dl>${d.link?`<p style="margin-top:12px"><a href="${d.link}" style="color:var(--ajd);text-decoration:underline">Open in the systems register</a></p>`:''}`;
   panel.classList.add('open');
-  panel.querySelector('.close').addEventListener('click',()=>{panel.classList.remove('open');selected=null;applyFilters();});
+  panel.querySelector('.cz-close').addEventListener('click',()=>{panel.classList.remove('open');selected=null;applyFilters();});
 }
 function select(id){
   selected=(selected===id)?null:id;
@@ -271,7 +278,7 @@ function renderTiles(){
   if(mode==='neb'){
     const sys=nebSystems(nebEnt);
     t=[
-      [sys.length,'systems — '+(nebEnt==='AJD'?'PRO-IS-01 AJD':'PRO-IS-01 ASJ+ASF')],
+      [sys.length,'systems, '+ANNEX[nebEnt]],
       [sys.filter(d=>d.risk==='critical').length,'critical'],
       [sys.filter(d=>d.resp==='grp').length,'under Group / other responsibility'],
       [sys.filter(d=>d.contract==='tbc').length,'contracts / holders to be confirmed'],
@@ -279,7 +286,7 @@ function renderTiles(){
   } else {
     const inView=DATA.filter(d=>d.zone!=='pending'&&matches(d));
     t=[
-      [inView.length,'systems listed'+(view==='AJD'?' — PRO-IS-01 AJD':(view==='ASJASF'?' — PRO-IS-01 ASJ+ASF':''))],
+      [inView.length,'systems listed'+(ANNEX[view]?', '+ANNEX[view]:'')],
       [inView.filter(d=>d.risk==='critical').length,'critical systems'],
       [inView.filter(d=>d.status!=='confirme').length,'status or scope undetermined'],
       [DATA.filter(d=>d.zone==='pending').length,'departments without reply (follow-up needed)'],
@@ -295,7 +302,7 @@ function renderTable(){
   const rows=DATA.map(d=>`<tr class="${matches(d)?'':'dimrow'}">
     <td><strong>${d.risk?RISK[d.risk][1]+' ':''}${d.name}</strong><div class="cz-sub2">${d.provider}</div></td>
     <td>${zMap[d.zone]}</td>
-    <td>${d.ent.map(en=>`<span class="cz-dot" style="background:var(${E[en]});margin-right:3px" title="${en}"></span>`).join('')}<span class="cz-sub2">${d.ent.join(', ')}</span></td>
+    <td>${d.ent.map(en=>`<span class="cz-dot" style="background:var(${E[en]});margin-right:3px" title="${LBL[en]||en}"></span>`).join('')}<span class="cz-sub2">${d.ent.map(en=>LBL[en]||en).join(', ')}</span></td>
     <td>${d.purpose}<div class="cz-sub2">${d.dataT}</div></td>
     <td>${d.impact}</td>
     <td>${d.resp?respMap[d.resp]+(d.contract==='tbc'?' <span class="cz-sub2">(TBC)</span>':''):'—'}</td>

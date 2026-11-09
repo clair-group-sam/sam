@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { INFO, SCENARIOS, posts } from "@/lib/erp";
+import { openCrisisChat } from "@/lib/erp-teams";
 
 /* ERP · activation mode: start (alert or activation, real or exercise), log, tick the checklists, close. The log is append-only. */
 const db = () => supabaseAdmin();
@@ -51,6 +52,12 @@ export async function startActivation(fd: FormData) {
   const link = "/erp/activate";
   await db().from("tasks").insert(cell.map((role) => ({ entity, kind: "erp", title: `${exercise ? "Exercise: " : ""}ERP ${level === "activation" ? "activated" : "alert"}: ${title}`.slice(0, 200), detail: "Join the emergency response unit and open the activation log in S.A.M. Your checklist is there.", owner_role: role, status: "open", link, ref_id: id })));
   await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "contact", text: `Called out in S.A.M. (Inbox and Teams): ${cell.join(", ")}` });
+  // the response unit's Teams group chat, with the alert card (best effort: the reason is logged when it cannot be opened)
+  const chat = await openCrisisChat(db(), { id, entity, title, exercise, level, scenario, info: Object.keys(info).length ? info : null }, cell);
+  if (chat.ok) {
+    await db().from("erp_activations").update({ teams_chat_id: chat.chatId, teams_chat_url: chat.url }).eq("id", id);
+    await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "contact", text: `Teams crisis chat opened with ${chat.members} members of the unit; alert card posted.` });
+  } else await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "log", text: `Teams crisis chat not opened: ${chat.reason}`.slice(0, 2000) });
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "erp_activation", object_id: id, action: exercise ? "erp_exercise_started" : "erp_activation_started", after: { level, scenario, title, cell } });
   revalidatePath("/erp/activate"); revalidatePath("/home/tasks"); revalidatePath("/is/inc");
   redirect("/erp/activate");

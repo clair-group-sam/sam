@@ -2,9 +2,9 @@ import type { Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export type Sys = { id: string; entity: string; name: string; kind: string | null; provider: string | null; hosting: string | null; data: string | null; owner_role: string | null; criticality: string; safety_relevant: boolean; active: boolean;
-  ref: string | null; short: string | null; dept: string | null; zone: string | null; scope: string[] | null; resp: string | null; contract: string | null; ops_impact: string | null; purpose: string | null; status: string; attention: string | null; ring: number | null; source: string | null; note: string | null };
+  ref: string | null; short: string | null; dept: string | null; zone: string | null; scope: string[] | null; resp: string | null; contract: string | null; ops_impact: string | null; purpose: string | null; status: string; attention: string | null; ring: number | null; source: string | null; note: string | null; subcontractor_id: string | null };
 export type Flow = { id: string; entity: string; from_system: string; to_system: string; data: string | null; means: string | null; contract_ref: string | null; is_clause: boolean | null; criticality: string; active: boolean };
-export type Risk = { id: string; entity: string; system: string | null; threat: string; likelihood: number | null; severity: number | null; status: string; due: string | null; owner_role: string | null; reviewed_on: string | null };
+export type Risk = { id: string; entity: string; system_id: string | null; system: string | null; threat: string; likelihood: number | null; severity: number | null; status: string; due: string | null; owner_role: string | null; reviewed_on: string | null };
 export type Inc = { id: string; entity: string; occurred_on: string; title: string; reported: boolean; status: string };
 
 /** Part-IS data of the working entity (or every entity in Group view). */

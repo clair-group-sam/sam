@@ -7,7 +7,7 @@ import { ENT, ENTS4 } from "@/lib/nav";
 import { closeActivation, logEvent, mayActivate, startActivation, tickAction } from "../actions";
 import { INFO, SCENARIOS, after, appliesTo } from "@/lib/erp";
 
-type Act = { id: string; entity: string; plan_id: string | null; exercise: boolean; level: string; scenario: string; info: Record<string, string> | null; is_incident: string | null; title: string; started_at: string; started_by: string | null; status: string; closed_at: string | null; summary: string | null };
+type Act = { id: string; entity: string; plan_id: string | null; exercise: boolean; level: string; scenario: string; info: Record<string, string> | null; is_incident: string | null; teams_chat_url: string | null; title: string; started_at: string; started_by: string | null; status: string; closed_at: string | null; summary: string | null };
 type Ev = { id: number; at: string; person_id: string | null; kind: string; text: string; ref: string | null };
 type Cl = { id: string; code: string | null; title: string; phase: string; owner_role: string | null; applies: string; items: string };
 type Ms = { id: string; label: string; minutes: number; owner_role: string | null; applies: string; source: string | null };
@@ -61,6 +61,7 @@ export default async function Activation() {
               <b>{open.exercise ? "EXERCISE, NOT A REAL EVENT" : open.level === "activation" ? "ERP ACTIVATED" : "ALERT"}</b>
               <span>{open.title}</span>
               <span className="mini">{SCENARIOS.find(([k]) => k === open.scenario)?.[1]}{plan ? `. Unit: ${(open.scenario === "security" || open.scenario === "cyber" ? plan.cell_security : plan.cell_safety) ?? "AM, SM, CMM"}` : ""}{plan?.location ? `. ${plan.location}` : ""}</span>
+              {open.teams_chat_url && <a className="mini underline" href={open.teams_chat_url} target="_blank" rel="noreferrer">Open the crisis chat in Teams</a>}
               {open.is_incident && <Link className="mini underline" href={`/is/inc?open=${open.is_incident}#edit`}>Part-IS event opened</Link>}
             </div></section>
             {can && <section className="card"><div className="ch"><span className="eyebrow">Log</span><span className="mini">every entry is timed and kept</span></div><div className="cb">

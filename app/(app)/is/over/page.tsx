@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { Metric, PageHeader } from "@/components/Page";
 import { isData, level, score, onePerRef } from "../data";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { attentionFrom, contractFrom, risksOf, type SubLite } from "@/lib/is-shared";
 
 /* Part-IS · Overview (EU 2023/203): systems, interfaces without an IS clause, open risks by level, events to report. */
 export default async function IsOverview() {
@@ -12,11 +14,14 @@ export default async function IsOverview() {
   const all = s.entity === "ALL" ? onePerRef(d.systems) : d.systems;
   const systems = all.filter((x) => x.status !== "awaiting");
   const awaiting = all.filter((x) => x.status === "awaiting");
-  const critical = systems.filter((x) => x.attention === "critical");
+  const { data: cd } = await supabaseAdmin().from("subcontractors").select("id,name,contract_ref,contract_until,is_clause,access_clause").limit(3000);
+  const subs = new Map(((cd ?? []) as SubLite[]).map((x) => [x.id, x]));
+  const contractOf = (x: { subcontractor_id: string | null; contract: string | null }) => contractFrom(x.subcontractor_id ? subs.get(x.subcontractor_id) : undefined)?.state ?? x.contract;
+  const critical = systems.filter((x) => (attentionFrom(risksOf(x, risks)) ?? x.attention) === "critical");
   const grp = systems.filter((x) => x.resp === "grp");
-  const tbc = systems.filter((x) => x.contract === "tbc" && x.resp !== "auth");
+  const tbc = systems.filter((x) => contractOf(x) === "tbc" && x.resp !== "auth");
   const unsure = systems.filter((x) => x.status === "to_confirm" || x.ops_impact === "?");
-  const assessed = (x: { entity: string; name: string }) => risks.some((r) => r.entity === x.entity && (r.system ?? "").toLowerCase().includes(x.name.toLowerCase().split(/[ (]/)[0]));
+  const assessed = (x: { id: string; entity: string; name: string }) => risksOf(x, risks).length > 0;
   const critNoRisk = critical.filter((x) => !assessed(x));
   const t0 = new Date().toISOString().slice(0, 10);
   const open = risks.filter((r) => r.status === "open");

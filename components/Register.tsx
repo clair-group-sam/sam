@@ -7,7 +7,9 @@ import { mayWrite, saveRegisterRow, archiveRegisterRow } from "@/lib/register-ac
 
 type Row = Record<string, unknown> & { id: string; entity: string };
 
-function Input({ f, v }: { f: Field; v: unknown }) {
+type Opts = Record<string, [string, string, string][]>; // field → [id, label, entity]
+function Input({ f, v, opts, ent }: { f: Field; v: unknown; opts?: Opts; ent?: string }) {
+  if (f.type === "ref") { const list = (opts?.[f.k] ?? []).filter((o) => !ent || o[2] === ent); return <select id={`f-${f.k}`} name={f.k} className="inp" defaultValue={(v as string) ?? ""}><option value="">None</option>{list.map(([id, l, e]) => <option key={id} value={id}>{ent ? l : `${l} (${e})`}</option>)}</select>; }
   const common = { id: `f-${f.k}`, name: f.k, className: "inp" + (f.mono ? " mono" : ""), required: f.required, placeholder: f.placeholder };
   if (f.type === "textarea") return <textarea {...common} rows={3} defaultValue={(v as string) ?? ""} />;
   if (f.type === "select") return <select {...common} defaultValue={(v as string) ?? f.options?.[0]?.[0]}>{f.options?.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>;
@@ -15,7 +17,7 @@ function Input({ f, v }: { f: Field; v: unknown }) {
   return <input {...common} type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"} defaultValue={v === null || v === undefined ? "" : String(v)} />;
 }
 
-function Form({ reg, row, ents }: { reg: string; row: Row | null; ents: string[] }) {
+function Form({ reg, row, ents, opts }: { reg: string; row: Row | null; ents: string[]; opts: Opts }) {
   const R = REGS[reg];
   return (
     <form action={saveRegisterRow} className="grid gap-3">
@@ -27,7 +29,7 @@ function Form({ reg, row, ents }: { reg: string; row: Row | null; ents: string[]
         {R.fields.map((f) => (
           <label key={f.k} className="block" style={{ gridColumn: `span ${f.span ?? 1}` }}>
             <span className="eyebrow">{f.label}</span>
-            <Input f={f} v={row?.[f.k]} />
+            <Input f={f} v={row?.[f.k]} opts={opts} ent={row?.entity ?? (ents.length === 1 ? ents[0] : undefined)} />
           </label>
         ))}
       </div>
@@ -56,6 +58,15 @@ export default async function Register({ reg, s, open, adding, empty, extraFilte
   const ents = (scope ?? ENTS4).filter((e) => s.group || s.entities.includes(e));
   const cur = open ? rows.find((r) => r.id === open) ?? null : null;
   const cols = R.list.map((k) => R.fields.find((f) => f.k === k)!).filter(Boolean);
+  // "ref" fields: the rows of the other table in the same scope, for the select and for the list cell
+  const opts: Opts = {};
+  for (const f of R.fields.filter((x) => x.type === "ref" && x.ref)) {
+    let oq = supabaseAdmin().from(f.ref!.table).select(`id,entity,${f.ref!.label}`).order(f.ref!.label).limit(3000);
+    if (scope) oq = oq.in("entity", scope);
+    const { data: od } = await oq;
+    opts[f.k] = ((od ?? []) as unknown as Record<string, string>[]).map((o) => [o.id, String(o[f.ref!.label] ?? ""), o.entity]);
+  }
+  const refLabel = (k: string, v: unknown) => opts[k]?.find((o) => o[0] === v)?.[1] ?? "";
   return (
     <>
       {can && (adding || cur) && (
@@ -63,7 +74,7 @@ export default async function Register({ reg, s, open, adding, empty, extraFilte
           <div className="ch"><span className="eyebrow">{cur ? `Edit the ${R.noun}` : `New ${R.noun}`}</span>
             {cur && "active" in cur && <form action={archiveRegisterRow}><input type="hidden" name="__reg" value={reg} /><input type="hidden" name="id" value={cur.id} /><button className="btn sm" type="submit">Archive</button></form>}
           </div>
-          <div className="cb"><Form reg={reg} row={cur} ents={ents} /></div>
+          <div className="cb"><Form reg={reg} row={cur} ents={ents} opts={opts} /></div>
         </section>
       )}
       <section className="card">
@@ -75,7 +86,7 @@ export default async function Register({ reg, s, open, adding, empty, extraFilte
                 <tr key={r.id} className={cur?.id === r.id ? "on" : ""}>
                   <td className="entcol"><span className={"ent " + r.entity}>{r.entity}</span></td>
                   {cols.map((c, i) => {
-                    const txt = cell(c, r[c.k]);
+                    const txt = c.type === "ref" ? refLabel(c.k, r[c.k]) : cell(c, r[c.k]);
                     const tone = R.tone?.[c.k]?.[String(r[c.k])];
                     const inner = tone !== undefined ? <span className={"pill " + tone}>{txt}</span> : <span className={c.mono ? "mono" : ""}>{txt}</span>;
                     return <td key={c.k} className={i ? "mini" : ""}>{i === 0 && can ? <Link href={`${R.path}?open=${r.id}#edit`}><b>{txt || "(untitled)"}</b></Link> : i === 0 ? <b>{txt}</b> : inner}</td>;

@@ -2,8 +2,9 @@
 // Used for the simple registers of Users & fleet, ERP and Part-IS. Only the tables and fields listed here can be written.
 export type Field = {
   k: string; label: string;
-  type?: "text" | "textarea" | "date" | "number" | "select" | "bool";
+  type?: "text" | "textarea" | "date" | "number" | "select" | "bool" | "ref";
   options?: [string, string][];       // [value, label]
+  ref?: { table: string; label: string }; // type "ref": a row of another table of the same entity (id stored, label shown)
   mono?: boolean; required?: boolean; span?: 1 | 2 | 3 | 4; placeholder?: string;
 };
 export type Reg = {
@@ -125,6 +126,7 @@ export const REGS: Record<string, Reg> = {
       { k: "dept", label: "Department", placeholder: "Flight Ops, Group CAMO…" },
       { k: "zone", label: "Zone on the map", type: "select", options: ZONE_OPTS },
       { k: "resp", label: "Responsibility", type: "select", options: [["own", "Entity (own contract)"], ["grp", "Clair Group or another entity"], ["auth", "Authority or State"]] },
+      { k: "subcontractor_id", label: "Contract (Subcontractors register)", type: "ref", ref: { table: "subcontractors", label: "name" }, span: 2 },
       { k: "contract", label: "Contract and IS clauses", type: "select", options: [["tbc", "Holder or IS clauses to confirm"], ["ok", "Confirmed"], ["none", "No contract"]] },
       { k: "ops_impact", label: "Operational impact", type: "select", options: [["?", "Not known"], ["Y", "Yes"], ["N", "No"]] },
       { k: "purpose", label: "Purpose", type: "textarea", span: 2 },
@@ -162,8 +164,9 @@ export const REGS: Record<string, Reg> = {
   is_risks: {
     table: "is_risks", path: "/is/risks", noun: "risk", posts: ["ISM", "AM"],
     fields: [
-      { k: "system", label: "System or interface", placeholder: "Leon API" },
-      { k: "threat", label: "Threat", required: true, span: 3, placeholder: "Account takeover of a dispatcher" },
+      { k: "system_id", label: "System (register)", type: "ref", ref: { table: "is_systems", label: "name" }, span: 2 },
+      { k: "system", label: "Or interface, other", placeholder: "Leon API to ForeFlight", span: 2 },
+      { k: "threat", label: "Threat", required: true, span: 4, placeholder: "Account takeover of a dispatcher" },
       { k: "safety_impact", label: "Impact on aviation safety", type: "textarea", span: 4 },
       { k: "likelihood", label: "Likelihood (1-5)", type: "number" },
       { k: "severity", label: "Severity (1-5)", type: "number" },
@@ -173,7 +176,7 @@ export const REGS: Record<string, Reg> = {
       { k: "status", label: "Status", type: "select", options: [["open", "Open"], ["treated", "Treated"], ["accepted", "Accepted"], ["closed", "Closed"]] },
       { k: "reviewed_on", label: "Last review", type: "date" },
     ],
-    list: ["threat", "system", "likelihood", "severity", "status", "due"], order: [["status", true], ["due", true]],
+    list: ["threat", "system_id", "system", "likelihood", "severity", "status", "due"], order: [["status", true], ["due", true]],
     tone: { status: { open: "amber", treated: "", accepted: "", closed: "green" } },
   },
   is_incidents: {

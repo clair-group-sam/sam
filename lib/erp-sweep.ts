@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { risksOf, type IsRiskLite } from "@/lib/is-shared";
 
 /* Daily sweep for the ERP and Part-IS (10/11/2026). What S.A.M. can watch alone is not a human task until it is due:
  * plan review date passed → SM; no exercise in erp_exercise_months → SM; per entity, critical Part-IS systems without a risk
@@ -29,14 +30,14 @@ export async function sweepErpIs(db: SupabaseClient): Promise<number> {
 
   // Part-IS: one task per entity, never one per system (a list thrown at the ISM is not a task)
   const { data: sys } = await db.from("is_systems").select("id,entity,ref,name,attention,status").eq("active", true);
-  const { data: risks } = await db.from("is_risks").select("entity,system");
-  const assessed = (e: string, name: string) => ((risks ?? []) as { entity: string; system: string | null }[]).some((r) => r.entity === e && (r.system ?? "").toLowerCase().includes(name.toLowerCase().split(/[ (]/)[0]));
+  const { data: risks } = await db.from("is_risks").select("id,entity,system_id,system,threat,likelihood,severity,status");
+  const assessed = (x: { id: string; entity: string; name: string }) => risksOf(x, (risks ?? []) as IsRiskLite[]).length > 0;
   const byEnt = new Map<string, { anchor?: string; first?: string; crit: string[]; wait: string[] }>();
   for (const x of (sys ?? []) as { id: string; entity: string; ref: string | null; name: string; attention: string | null; status: string }[]) {
     const g = byEnt.get(x.entity) ?? { crit: [], wait: [] }; byEnt.set(x.entity, g);
     if (x.ref === "sam") g.anchor = x.id; g.first ??= x.id;
     if (x.status === "awaiting") g.wait.push(x.name);
-    else if (x.attention === "critical" && !assessed(x.entity, x.name)) g.crit.push(x.name);
+    else if (x.attention === "critical" && !assessed(x)) g.crit.push(x.name);
   }
   for (const [entity, g] of byEnt) {
     const ref = g.anchor ?? g.first!; const ex = await openTask("is_review", ref);
