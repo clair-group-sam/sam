@@ -14,10 +14,12 @@ a{color:inherit;text-decoration:none}
 
 /* rail */
 .rail{width:230px;flex:0 0 auto;background:var(--white);border-right:1px solid var(--line);display:flex;flex-direction:column;padding-top:16px;z-index:3}
-.rail .brand{display:block;padding:4px 20px 18px;color:var(--navy)}
-.rail .brand img{display:block;margin-bottom:8px}
-.rail .brand b{font-size:17px;letter-spacing:.14em;display:block}
-.rail .brand span{display:block;font-size:11px;color:var(--slate6);margin-top:3px;line-height:1.3}
+/* brand block: the mark, then the three words whose initials spell S·A·M, after a hairline */
+.rail .brand{display:flex;align-items:center;gap:12px;padding:2px 20px 18px 18px;color:var(--navy)}
+.rail .brand img{display:block;width:46px;height:auto;flex:0 0 auto}
+.rail .brand .acro{display:flex;flex-direction:column;gap:1px;padding-left:12px;border-left:1px solid var(--line);white-space:nowrap}
+.rail .brand .acro>span{font-size:13px;line-height:1.22;font-weight:500;color:var(--slate6);letter-spacing:.01em}
+.rail .brand .acro b{color:var(--navy);font-weight:800}
 .rl{height:42px;margin:0 10px;display:flex;align-items:center;gap:14px;padding:0 10px 0 14px;border-radius:var(--r-sm);color:var(--navy);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;background:none;border:0;width:calc(100% - 20px);cursor:pointer;text-align:left}
 .rl svg{color:var(--slate5);flex:0 0 auto}
 .rl:hover{background:var(--blue05)}
@@ -220,13 +222,13 @@ button.ent.on.ASJMT{background:var(--blue05);color:var(--cyan-ink)}button.ent.on
 .compact{position:relative}
 .rail{transition:box-shadow .22s ease}
 .rail.mini{width:62px;position:relative;z-index:30}
-.rail.mini .brand b,.rail.mini .brand span,.rail.mini .rl span,.rail.mini .morebox .rl span{display:none}
+.rail.mini .brand .acro,.rail.mini .rl span,.rail.mini .morebox .rl span{display:none}
 .rail.mini .brand{padding:4px 0 14px 13px}.rail.mini .brand img{width:36px;height:auto}
 .rail.mini .rl{justify-content:center;padding:0;margin:0 8px;width:calc(100% - 16px)}
 .rail.mini .morebox.open{margin:6px 6px}
 .rail.mini.hover{width:230px;box-shadow:8px 0 24px rgba(13,42,63,.12)}
-.rail.mini.hover .brand b,.rail.mini.hover .rl span{display:inline}.rail.mini.hover .brand span{display:block}
-.rail.mini.hover .brand{padding:4px 20px 18px}.rail.mini.hover .brand img{width:56px}
+.rail.mini.hover .rl span{display:inline}.rail.mini.hover .brand .acro{display:flex}
+.rail.mini.hover .brand{padding:2px 20px 18px 18px}.rail.mini.hover .brand img{width:46px}
 .rail.mini.hover .rl{justify-content:flex-start;padding:0 10px 0 14px;margin:0 10px;width:calc(100% - 20px)}
 .rl.collapse{color:var(--slate6);font-weight:600;letter-spacing:0;text-transform:none;font-size:12.5px;height:36px}
 .rl.collapse .chev.rot180{transform:rotate(180deg)}

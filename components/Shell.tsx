@@ -69,9 +69,10 @@ export default function Shell({ session, children }: Props) {
       <div className={"sidewrap" + (compact ? " compact-w" : "")} style={compact ? { width: subs.length > 0 ? 88 : 62 } : undefined}
         onMouseLeave={() => { rail.leave(); subH.leave(); }}>
       <nav className={"rail" + (compact ? (rail.on ? " mini hover" : " mini") : "")} onMouseEnter={() => { if (compact) { rail.enter(); subH.leave(); } }}>
-        <Link href={session.home} className="brand">
-          <img src="/logos/sam.svg" alt="" width={56} height={52} />
-          <b>S.A.M.</b><span>Safety · Assurance · Management</span>
+        <Link href={session.home} className="brand" aria-label="S.A.M. — Safety · Assurance · Management">
+          <img src="/logos/sam.svg" alt="" width={46} height={42} />
+          {/* the three words in a column: their initials spell S·A·M */}
+          <span className="acro" aria-hidden="true"><span><b>S</b>afety</span><span><b>A</b>ssurance</span><span><b>M</b>anagement</span></span>
         </Link>
         <div className="flex-1 overflow-y-auto">
           {daily.map((m) => <RailLink key={m.id} m={m} role={role} on={mod === m.id} />)}
