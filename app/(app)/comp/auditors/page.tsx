@@ -49,8 +49,8 @@ export default async function Auditors({ searchParams }: { searchParams: Promise
       <section className="card mb-4"><div className="cb" style={{ padding: 0 }}>{!all.length ? <p className="p-4 mini">No auditor in the register yet.</p> : (
         <table className="tbl"><thead><tr><th>Auditor</th><th>Entities</th><th>Domains, cannot audit</th><th>Approval</th><th>Audits</th><th>Status</th></tr></thead><tbody>{all.map((a) => { const au = auditsOf(a.person_id); const last = au.map((x) => x.done_on ?? "").sort().pop();
           return <tr key={a.id}><td><Link href={`/comp/auditors?a=${a.id}#auditor`}><b>{name(a.person_id)}</b></Link>{a.lead && <span className="pill" style={{ marginLeft: 6 }}>Lead</span>}{a.external && <div className="mini">{a.external}</div>}</td>
-            <td>{a.entities.map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</td>
-            <td className="mini">{a.domains.join(", ") || "—"}{a.exclusions.length > 0 && <div style={{ color: "#8a5a00" }}>Not: {a.exclusions.join(", ")}</div>}</td>
+            <td>{a.entities.map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} />{e} </span>)}</td>
+            <td className="mini">{a.domains.join(", ") || "—"}{a.exclusions.length > 0 && <div style={{ color: "var(--amber-ink)" }}>Not: {a.exclusions.join(", ")}</div>}</td>
             <td className="mini">{a.approved_on ? `${a.approved_on} → ${a.valid_until ?? "—"}` : "—"}{a.approved_by && <div>by {name(a.approved_by)}</div>}</td>
             <td className="mini">{au.length}{last ? `, last ${last}` : ""}</td>
             <td><span className={"pill " + tone(a)}>{AUDITOR_STATUS[a.status]}{a.status === "approved" && expiring(a) ? `, ends ${a.valid_until}` : ""}</span></td></tr>; })}</tbody></table>)}</div></section>

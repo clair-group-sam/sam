@@ -165,7 +165,7 @@ function TopBar({ session, crumb }: { session: Session; crumb: [string, string] 
     window.location.reload();
   }
   return (
-    <header className={"topbar ent-" + cur} style={{ ["--entc" as string]: ENT_COLOR[cur] ?? "#0b2a4a" } as React.CSSProperties}>
+    <header className={"topbar ent-" + cur} style={{ ["--entc" as string]: ENT_COLOR[cur] ?? "var(--navy-ink)" } as React.CSSProperties}>
       <div className="entid" title={curSub}>
         {!(choices.length > 1 || session.group) && <span className="entcode">{cur}</span>}
         <span className="enttext"><b>{curName}</b><small>{curSub}</small></span>

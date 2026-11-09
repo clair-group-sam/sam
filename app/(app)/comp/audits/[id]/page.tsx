@@ -71,7 +71,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
         <Metric label="Not conforming" value={b.non_conforming} hint={`${findings.length} finding${findings.length === 1 ? "" : "s"} raised`} tone={b.non_conforming ? "red" : undefined} />
         <Metric label="N/A, not covered" value={`${b.not_applicable}, ${b.not_covered}`} />
       </div>
-      {!elig.ok && <section className="card mb-4" style={{ borderColor: "var(--amber)" }}><div className="cb mini" style={{ color: "#8a5a00" }}>Lead auditor {name(a.lead_auditor)}: {elig.why.join(", ")}, <Link href="/comp/auditors">Internal auditors</Link>.</div></section>}
+      {!elig.ok && <section className="card mb-4" style={{ borderColor: "var(--amber)" }}><div className="cb mini" style={{ color: "var(--amber-ink)" }}>Lead auditor {name(a.lead_auditor)}: {elig.why.join(", ")}, <Link href="/comp/auditors">Internal auditors</Link>.</div></section>}
       {a.status === "planned" && <section className="card mb-4"><div className="cb mini">{team ? "Pick the checklist and start: its items become the checks of this audit, with the official text of the rules in the version loaded today." : "Not started yet."}{!checklists.length && desk ? <> No checklist for {a.entity} yet, create one from the programme (module › checklist).</> : null}</div></section>}
       {a.report_summary && <section className="card mb-4"><div className="ch"><span className="eyebrow">Report</span><span className="mini">{a.report_at ? `issued ${a.report_at.slice(0, 10)}` : ""}{a.closed_at ? `, closed ${a.closed_at.slice(0, 10)} by ${name(a.closed_by)}` : ""}</span></div><div className="cb" style={{ whiteSpace: "pre-wrap" }}>{a.report_summary}</div></section>}
 
@@ -127,7 +127,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
 
       {findings.length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Findings of this audit, {findings.length}</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{findings.map((f) => <tr key={f.id}><td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link></td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td className="mini">{f.status}</td></tr>)}</tbody></table></div></section>}
       {(ev ?? []).length > 0 && <details className="card mt-4"><summary className="ch"><span className="eyebrow">History</span></summary><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((ev ?? []) as AuditEvent[]).map((e) => <tr key={e.id}><td className="mono mini">{e.at.slice(0, 16).replace("T", " ")}</td><td>{e.kind === "status" ? `Status → ${STATUS_LABEL[e.status ?? ""] ?? e.status}` : e.kind === "replanned" ? `Moved ${e.from_month ? monthLong(e.from_month) : ""} → ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind}{e.reason ? <div className="mini">{e.reason}</div> : null}</td><td className="mini">{name(e.by)}</td></tr>)}</tbody></table></div></details>}
-      <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "#888" }} />{a.entity}, PRO-CM-02</p>
+      <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} />{a.entity}, PRO-CM-02</p>
     </>
   );
 }

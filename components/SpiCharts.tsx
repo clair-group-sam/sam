@@ -40,7 +40,7 @@ export function MonthCells({ values, verdicts, labels }: { values: (string | nul
     <div className="spicells">
       {values.map((v, i) => {
         const t = verdicts[i]; const c = t && TONE[t];
-        return <span key={i} title={`${labels[i]}: ${v ?? "no data"}`} className={"spicell" + (v == null ? " empty" : "")} style={c ? { background: c, color: "#fff", borderColor: c } : undefined}>{v ?? ""}</span>;
+        return <span key={i} title={`${labels[i]}: ${v ?? "no data"}`} className={"spicell" + (v == null ? " empty" : "")} style={c ? { background: c, color: "var(--white)", borderColor: c } : undefined}>{v ?? ""}</span>;
       })}
     </div>
   );
@@ -55,7 +55,7 @@ export function SpiLine({ months, values, target, alert, unit }: { months: strin
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Monthly values against the target">
       {[0, max / 2, max].map((t, k) => <g key={k}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--line)" /><text x={L - 6} y={y(t) + 4} fontSize="10" textAnchor="end" fill="var(--slate5)">{t >= 10 ? Math.round(t) : t.toFixed(1)}</text></g>)}
-      {target != null && <><line x1={L} x2={W - R} y1={y(target)} y2={y(target)} stroke="var(--green)" strokeDasharray="5 4" /><text x={W - R} y={y(target) - 4} fontSize="10" textAnchor="end" fill="#1d7a3a">target {target}{unit}</text></>}
+      {target != null && <><line x1={L} x2={W - R} y1={y(target)} y2={y(target)} stroke="var(--green)" strokeDasharray="5 4" /><text x={W - R} y={y(target) - 4} fontSize="10" textAnchor="end" fill="var(--green-ink)">target {target}{unit}</text></>}
       {alert != null && <><line x1={L} x2={W - R} y1={y(alert)} y2={y(alert)} stroke="var(--terra)" strokeDasharray="2 4" /><text x={W - R} y={y(alert) - 4} fontSize="10" textAnchor="end" fill="var(--terra)">alert {alert}{unit}</text></>}
       <polyline fill="none" stroke="var(--navy)" strokeWidth="2" points={values.map((v, i) => (v == null ? null : `${x(i)},${y(v)}`)).filter(Boolean).join(" ")} />
       {values.map((v, i) => v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r="3" fill="var(--navy)"><title>{`${monthShort(months[i])}: ${v.toFixed(2)}${unit}`}</title></circle>)}

@@ -40,7 +40,7 @@ export default async function Investigations({ searchParams }: { searchParams: P
               <td className="mono"><Link className="underline" href={`/safe/inv/${i.id}`}>{i.number}</Link>{scope.length > 1 && <div><span className={"ent " + i.entity}>{i.entity}</span></div>}</td>
               <td><Link href={`/safe/inv/${i.id}`}><b>{i.title}</b></Link><div className="mini">{INV_LEVEL[i.level]?.[0]}{i.report_id ? `, report ${i.report_id}` : ""}</div></td>
               <td className="mini">{i.lead_name ?? "—"}</td>
-              <td className={"mono" + (invLate(i) ? " text-red-700" : "")}>{i.due ?? "—"}</td>
+              <td className={"due" + (invLate(i) ? " red" : "")}>{i.due ?? "—"}{invLate(i) && <small> late</small>}</td>
               <td className="mini">{nAct(i.id).length || "—"}</td>
               <td><span className={"pill " + (invLate(i) ? "red" : INV_STATUS[i.status]?.[1] ?? "")}>{invLate(i) ? "Overdue" : INV_STATUS[i.status]?.[0]}</span></td>
             </tr>))}

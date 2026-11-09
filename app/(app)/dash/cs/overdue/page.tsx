@@ -32,7 +32,7 @@ export default async function ComplianceSafetyDash() {
         {groups.map((g) => (
           <section className="card" key={`${g.entity}|${g.owner}`}>
             <div className="ch">
-              <span className="eyebrow"><span className="entdot" style={{ background: ENT_COLOR[g.entity] ?? "#888" }} /> {g.entity}, {g.owner}{g.isPerson ? "" : " (post)"}</span>
+              <span className="eyebrow"><span className="entdot" style={{ background: ENT_COLOR[g.entity] ?? "var(--field)" }} /> {g.entity}, {g.owner}{g.isPerson ? "" : " (post)"}</span>
               <span className={"pill " + (g.worst > 15 ? "red" : g.worst > 7 ? "amber" : "")}>{g.count} overdue, worst {g.worst} d</span>
             </div>
             <div className="cb" style={{ padding: 0 }}>

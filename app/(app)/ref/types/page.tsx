@@ -12,7 +12,7 @@ import { saveType } from "./actions";
 function TypeForm({ t, isNew }: { t: FileType | null; isNew?: boolean }) {
   const checklist = (t?.checklist ?? []).map((c) => `${c.label}${c.role || c.required === false ? ` | ${c.role ?? ""}` : ""}${c.required === false ? " | optional" : ""}`).join("\n");
   return (
-    <form action={saveType} className="grid gap-3 mt-3 p-3" style={{ background: "var(--bg2, #f7f9fb)", borderRadius: 10 }}>
+    <form action={saveType} className="grid gap-3 mt-3 p-3" style={{ background: "var(--gray05)", borderRadius: 10 }}>
       <div className="grid grid-cols-4 gap-3">
         <label><span className="mini">Code</span>{isNew ? <input name="code" className="inp mono" required placeholder="e.g. DG" /> : <><input type="hidden" name="code" value={t!.code} /><input className="inp mono" value={t!.code} disabled /></>}</label>
         <label className="col-span-2"><span className="mini">Name</span><input name="name" className="inp" required defaultValue={t?.name ?? ""} /></label>

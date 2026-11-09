@@ -23,7 +23,7 @@ async function renderPage(doc: PdfDoc, n: number, scale: number, type: "image/pn
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "var(--white)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvasContext: ctx, viewport }).promise;
   return await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), type, 0.8));
 }

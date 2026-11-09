@@ -46,7 +46,7 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
           return (
             <section key={r.id} className="card">
               <div className="ch" style={{ alignItems: "flex-start" }}>
-                <span><Link href={`/reg/ear/${r.key}`}><b>{r.short}</b></Link><div className="mini">{r.number}{r.number ? ", " : ""}{r.entities.filter((e) => !desk ? scope.includes(e) : true).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}</div></span>
+                <span><Link href={`/reg/ear/${r.key}`}><b>{r.short}</b></Link><div className="mini">{r.number}{r.number ? ", " : ""}{r.entities.filter((e) => !desk ? scope.includes(e) : true).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} />{e} </span>)}</div></span>
                 <span style={{ textAlign: "right" }}><span className={"pill " + (r.current_version ? "green" : "amber")}>{r.current_version ?? "version not read yet"}</span>{r.version_since && <div className="mini">in S.A.M. since {r.version_since}</div>}</span>
               </div>
               <div className="cb">

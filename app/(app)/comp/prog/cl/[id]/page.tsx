@@ -48,8 +48,8 @@ export default async function ChecklistPage({ params }: { params: Promise<{ id: 
           {groups.map(({ sec, list }) => (
             <section key={sec?.id ?? "none"} className="card mb-3"><div className="ch"><span className="eyebrow">{sec ? `${sec.code ? sec.code + ", " : ""}${sec.title}` : "Without section"}</span><span className="mini">{list.length}</span></div>
               <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{list.map((it) => (
-                <tr key={it.id} className={it.review_flag ? "late" : ""}><td style={{ width: 200 }}><Link href={`/reg/ear/${regulations.find((r) => r.id === (it.regulation_id ?? cl.regulation_id))?.key ?? ""}?code=${encodeURIComponent(it.code)}`}><b className="mono">{it.ref ?? it.code}</b></Link>{it.regulation_id && it.regulation_id !== cl.regulation_id && <div className="mini">{regName(it.regulation_id)}</div>}{codes.size > 0 && !codes.has(it.code) && (it.regulation_id ?? cl.regulation_id) === defReg?.id && <div className="mini" style={{ color: "#8a5a00" }}>not found in the loaded text</div>}</td>
-                  <td>{it.question && <div>{it.question}</div>}{it.guidance && <div className="mini">{it.guidance}</div>}{it.review_flag && <div className="mini" style={{ color: "#8a5a00" }}>To review, {it.review_note}</div>}</td>
+                <tr key={it.id} className={it.review_flag ? "late" : ""}><td style={{ width: 200 }}><Link href={`/reg/ear/${regulations.find((r) => r.id === (it.regulation_id ?? cl.regulation_id))?.key ?? ""}?code=${encodeURIComponent(it.code)}`}><b className="mono">{it.ref ?? it.code}</b></Link>{it.regulation_id && it.regulation_id !== cl.regulation_id && <div className="mini">{regName(it.regulation_id)}</div>}{codes.size > 0 && !codes.has(it.code) && (it.regulation_id ?? cl.regulation_id) === defReg?.id && <div className="mini" style={{ color: "var(--amber-ink)" }}>not found in the loaded text</div>}</td>
+                  <td>{it.question && <div>{it.question}</div>}{it.guidance && <div className="mini">{it.guidance}</div>}{it.review_flag && <div className="mini" style={{ color: "var(--amber-ink)" }}>To review, {it.review_note}</div>}</td>
                   {desk && <td style={{ width: 70 }}><details className="inlineedit" style={{ position: "relative" }}><summary className="btn sm">Edit</summary>
                     <div className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 30, width: 460, zIndex: 5 }}>
                       <form action={saveItem} className="grid gap-2"><input type="hidden" name="checklist" value={cl.id} /><input type="hidden" name="id" value={it.id} />
@@ -82,7 +82,7 @@ export default async function ChecklistPage({ params }: { params: Promise<{ id: 
           <section className="card"><div className="ch"><span className="eyebrow">Audits run with it</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((used ?? []) as { id: string; number: string; status: string; planned_month: string }[]).map((a) => <tr key={a.id}><td><Link href={`/comp/audits/${a.id}`}><b className="mono">{a.number}</b></Link></td><td className="mini">{a.planned_month.slice(0, 7)}</td><td className="mini">{a.status}</td></tr>)}{!(used ?? []).length && <tr><td className="mini">None yet.</td></tr>}</tbody></table></div></section>
         </div>
       </div>
-      <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[cl.entity] ?? "#888" }} />{cl.entity}</p>
+      <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[cl.entity] ?? "var(--field)" }} />{cl.entity}</p>
     </>
   );
 }

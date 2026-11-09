@@ -12,7 +12,7 @@ function LoginCard() {
     <div className="text-3xl font-extrabold tracking-tight">S.A.M.</div><div className="text-slate6 text-sm mt-1">Safety · Assurance · Management</div>
     {configured
       ? <button onClick={signIn} className="mt-8 w-full rounded-md bg-navy text-white py-3 font-semibold">Sign in with Microsoft</button>
-      : <div className="mt-8 rounded-md border border-amber-300 bg-amber-50 text-amber-900 text-sm p-4 text-left">
+      : <div className="mt-8 rounded-md text-sm p-4 text-left" style={{ border: "1px solid var(--amber-line)", background: "var(--amber-s)", color: "var(--amber-ink)" }}>
           <b>Deployment OK — database not connected yet.</b><br/>Add the Supabase environment variables in Vercel, then redeploy.{setup ? "" : ""}
         </div>}
     <p className="text-xs text-slate6 mt-4">Clair Group accounts only (Entra ID).</p></div>);

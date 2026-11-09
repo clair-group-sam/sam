@@ -44,7 +44,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
               <tbody>
                 {rows.map((f) => (
                   <tr key={f.id}>
-                    <td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[f.entity] ?? "#888" }} />{f.entity}, {SOURCE_LABEL[f.source] ?? f.source}{f.authority ? `, ${f.authority}` : ""}{f.audit_ref ? `, ${f.audit_ref}` : ""}</div></td>
+                    <td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[f.entity] ?? "var(--field)" }} />{f.entity}, {SOURCE_LABEL[f.source] ?? f.source}{f.authority ? `, ${f.authority}` : ""}{f.audit_ref ? `, ${f.audit_ref}` : ""}</div></td>
                     <td className="mono">{f.requirement ?? "—"}</td>
                     <td>{LEVEL_LABEL[f.level] ?? f.level}</td>
                     <td>{f.owner_role ?? "person"}</td>
@@ -63,7 +63,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
         if (!cats.length || !causes.length) return null;
         const n = (c: string, k: string) => fx.filter((f) => f.category === c && f.cause === k).length; const max = Math.max(1, ...cats.flatMap((c) => causes.map((k) => n(c, k))));
         return <section className="card mt-4"><div className="ch"><span className="eyebrow">Open findings, category × cause</span><span className="mini">{fx.filter((f) => f.repeat).length} repeat</span></div><div className="cb" style={{ overflow: "auto" }}>
-          <table className="matrix"><thead><tr><th></th>{causes.map((k) => <th key={k}>{k}</th>)}<th>Total</th></tr></thead><tbody>{cats.map((c) => <tr key={c}><td style={{ textAlign: "left" }}><b>{c}</b></td>{causes.map((k) => { const v = n(c, k); return <td key={k} style={{ background: v ? `rgba(226,6,18,${0.12 + 0.6 * v / max})` : undefined, color: v / max > 0.5 ? "#fff" : undefined }}>{v || ""}</td>; })}<td><b>{fx.filter((f) => f.category === c).length}</b></td></tr>)}</tbody></table>
+          <table className="matrix"><thead><tr><th></th>{causes.map((k) => <th key={k}>{k}</th>)}<th>Total</th></tr></thead><tbody>{cats.map((c) => <tr key={c}><td style={{ textAlign: "left" }}><b>{c}</b></td>{causes.map((k) => { const v = n(c, k); return <td key={k} style={{ background: v ? `rgba(226,6,18,${0.12 + 0.6 * v / max})` : undefined, color: v / max > 0.5 ? "var(--white)" : undefined }}>{v || ""}</td>; })}<td><b>{fx.filter((f) => f.category === c).length}</b></td></tr>)}</tbody></table>
         </div></section>; })()}
     </>
   );

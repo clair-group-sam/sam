@@ -17,7 +17,7 @@ function templateText(t: ProjectTemplate | null): { phases: string; tasks: strin
 function TemplateForm({ t, isNew }: { t: ProjectTemplate | null; isNew?: boolean }) {
   const txt = templateText(t);
   return (
-    <form action={saveTemplate} className="grid gap-3 mt-3 p-3" style={{ background: "#f7f9fb", borderRadius: 10 }}>
+    <form action={saveTemplate} className="grid gap-3 mt-3 p-3" style={{ background: "var(--gray05)", borderRadius: 10 }}>
       <div className="grid grid-cols-4 gap-3">
         <label><span className="mini">Code</span>{isNew ? <input name="code" className="inp mono" required placeholder="e.g. BASE-NEW" /> : <><input type="hidden" name="code" value={t!.code} /><input className="inp mono" value={t!.code} disabled /></>}</label>
         <label className="col-span-2"><span className="mini">Name</span><input name="name" className="inp" required defaultValue={t?.name ?? ""} /></label>

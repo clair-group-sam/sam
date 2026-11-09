@@ -72,7 +72,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
                     <details className="more"><summary title="Cancel or delete (super admin)">⋯</summary>
                       <div className="morepanel" style={{ width: 360 }}>
                         {p.status !== "cancelled" && p.status !== "closed" && <form action={cancelProject} className="flex items-center gap-2"><input type="hidden" name="id" value={p.id} /><input name="reason" className="inp" placeholder="Why it is cancelled (optional)" /><button className="btn" type="submit">Cancel the project</button></form>}
-                        <form action={deleteProject} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><label className="mini flex items-center gap-1"><input type="checkbox" name="confirm" /> I confirm, tasks and attached documents are deleted for good</label><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></form>
+                        <form action={deleteProject} className="flex items-center gap-2 flex-wrap"><input type="hidden" name="id" value={p.id} /><label className="mini flex items-center gap-1"><input type="checkbox" name="confirm" /> I confirm, tasks and attached documents are deleted for good</label><button className="btn" type="submit" style={{ color: "var(--red-ink)" }}>Delete</button></form>
                       </div>
                     </details>
                   </td>

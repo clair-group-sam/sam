@@ -61,7 +61,7 @@ export default async function ComplianceOverview() {
     <>
       <PageHeader eyebrow="Compliance, Overview" title="Compliance overview" sub="Programme, audits, checks, findings, watch, rules, auditors, subcontractors, computed live for the entity in work. Each tile opens its list." />
       {cards.map(({ e, tiles }) => (
-        <section key={e} className="card mb-4"><div className="ch"><span><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} /><b>{ENT[e]?.name ?? e}</b> <span className="mini">· {ENT[e]?.qual}, {ENT[e]?.auth}</span></span></div>
+        <section key={e} className="card mb-4"><div className="ch"><span><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} /><b>{ENT[e]?.name ?? e}</b> <span className="mini">· {ENT[e]?.qual}, {ENT[e]?.auth}</span></span></div>
           <div className="cb tiles">{tiles.map((t) => <Link key={t.label} href={t.href} className="tilelink"><div className={"tile " + (t.tone ?? "")}><div className="tv">{t.value}</div><div className="tl">{t.label}</div>{t.hint && <div className="th">{t.hint}</div>}</div></Link>)}</div>
         </section>))}
     </>

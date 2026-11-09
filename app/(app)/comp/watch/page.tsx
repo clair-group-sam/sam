@@ -53,7 +53,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
         {topics.map((t) => (
           <Link key={t.id} href={`/comp/watch/topic/${t.id}`} className={"card wtopic" + (t.overdue >= 0 ? " late" : "")}>
             <div className="ch"><span className="eyebrow">{DOMAIN_LABEL[t.domain] ?? t.domain}</span><span className={"pill " + (t.overdue >= 0 ? (t.overdue > 14 ? "red" : "amber") : "green")}>{t.overdue >= 0 ? (t.overdue === 9999 ? "never checked" : t.overdue === 0 ? "due today" : `${t.overdue} d late`) : `due in ${-t.overdue} d`}</span></div>
-            <div className="cb"><b>{t.title}</b><div className="mini mt-1">{t.entities.map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "#888" }} />{e} </span>)}· {t.sources.length} source{t.sources.length === 1 ? "" : "s"}, every {t.every_days} d, {t.owner_person ? name(t.owner_person) : t.owner_role ?? "—"}</div>
+            <div className="cb"><b>{t.title}</b><div className="mini mt-1">{t.entities.map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} />{e} </span>)}· {t.sources.length} source{t.sources.length === 1 ? "" : "s"}, every {t.every_days} d, {t.owner_person ? name(t.owner_person) : t.owner_role ?? "—"}</div>
               <div className="mini">{t.last_checked_on ? `last check ${t.last_checked_on}${t.last_checked_by ? `, ${name(t.last_checked_by)}` : ""}` : "no check recorded yet"}</div></div>
           </Link>
         ))}
@@ -75,7 +75,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
           <table className="tbl"><thead><tr><th>Entry</th><th>Reference</th><th>Applicability</th><th>Tasked to</th><th>Return before</th><th>Status</th></tr></thead>
             <tbody>{rows.map((e) => (
               <tr key={e.id}>
-                <td><Link href={`/comp/watch/${e.id}`}><b className="mono">{e.number}</b> {e.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[e.entity] ?? "#888" }} />{e.entity}{e.source_kind ? `, ${e.source_kind.toUpperCase()}` : ""}{e.domain ? `, ${e.domain}` : ""}{e.published_on ? `, published ${e.published_on}` : ""}</div></td>
+                <td><Link href={`/comp/watch/${e.id}`}><b className="mono">{e.number}</b> {e.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[e.entity] ?? "var(--field)" }} />{e.entity}{e.source_kind ? `, ${e.source_kind.toUpperCase()}` : ""}{e.domain ? `, ${e.domain}` : ""}{e.published_on ? `, published ${e.published_on}` : ""}</div></td>
                 <td className="mono">{e.reference ?? "—"}</td>
                 <td><span className={"pill " + (APPL_TONE[e.applicability] ?? "")}>{APPL_LABEL[e.applicability] ?? e.applicability}</span>{e.task && <div className="mini">{TASK_LABEL[e.task]}</div>}</td>
                 <td>{e.owner_person ? name(e.owner_person) : e.owner_role ?? "—"}</td>

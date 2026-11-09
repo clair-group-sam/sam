@@ -44,7 +44,7 @@ export default async function Subcontractors({ searchParams }: { searchParams: P
       </div>
       <section className="card mb-4"><div className="cb" style={{ padding: 0 }}>{!rows.length ? <p className="p-4 mini">No subcontractor in your scope.</p> : (
         <table className="tbl"><thead><tr><th>Subcontractor</th><th>Service</th><th>Contract</th><th>Clauses</th><th>Last control</th><th>Next</th><th>Status</th></tr></thead><tbody>{rows.map(({ x, c }) => (
-          <tr key={x.id}><td><Link href={`/comp/subs?s=${x.id}#sub`}><b>{x.name}</b></Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[x.entity] ?? "#888" }} />{x.entity}{x.code ? `, ${x.code}` : ""}{x.approval_ref ? `, ${x.approval_ref}` : ""}</div></td>
+          <tr key={x.id}><td><Link href={`/comp/subs?s=${x.id}#sub`}><b>{x.name}</b></Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[x.entity] ?? "var(--field)" }} />{x.entity}{x.code ? `, ${x.code}` : ""}{x.approval_ref ? `, ${x.approval_ref}` : ""}</div></td>
             <td className="mini">{x.service ?? "—"}</td><td className="mini">{x.contract_ref ?? "—"}{x.contract_until ? <div className={x.contract_until < t0 ? "late" : ""}>until {x.contract_until}</div> : null}</td>
             <td className="mini">{x.access_clause === true ? "Access OK" : x.access_clause === false ? <span className="red">Access missing</span> : "Access ?"}, {x.is_clause === true ? "IS OK" : x.is_clause === false ? <span className="red">IS missing</span> : "IS ?"}</td>
             <td className="mono mini">{c.last ?? "—"}</td><td className="mono mini">{c.next ?? (c.planned ? `${c.planned.planned_month.slice(0, 7)} planned` : "—")}</td>

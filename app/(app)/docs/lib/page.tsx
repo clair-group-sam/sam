@@ -13,7 +13,7 @@ import FolderTree, { type TNode } from "@/components/FolderTree";
 import { isTestData, TEST_PILL_TITLE } from "@/lib/testdata";
 import { Icon } from "@/lib/icons";
 
-const FAMILY_COLORS: Record<string, string> = { "1": "#7d166d", "2": "#0e8cc4", "3": "#248a3d", "4": "#b86e00", "5": "#b43a0f", "6": "#6b5bd2" };
+const FAMILY_COLORS: Record<string, string> = { "1": "var(--violet-ink)", "2": "var(--cyan-ink)", "3": "var(--green-ink)", "4": "var(--amber-ink)", "5": "var(--orange-ink)", "6": "var(--indigo-ink)" };
 type Row = Awaited<ReturnType<typeof listManuals>>[number];
 type Node = { name: string; full: string; depth: number; count: number; worst: 0 | 1 | 2; children: Map<string, Node> };
 
@@ -112,8 +112,8 @@ export default async function Library({ searchParams }: { searchParams: Promise<
     nHits = groups.reduce((n, g) => n + g.hits.length, 0);
   }
   const scope = s.entity === "ALL" ? "all entities" : `${ENT[s.entity]?.name} (${s.entity})`;
-  const famColor = (name: string) => FAMILY_COLORS[name.trim()[0]] ?? "#5b7183";
-  const ENT_COLOR: Record<string, string> = { ASJMT: "#006c9c", ASJFR: "#3a7a1b", ASFFR: "#b08300", ASTFR: "#b43a0f" };
+  const famColor = (name: string) => FAMILY_COLORS[name.trim()[0]] ?? "var(--slate6)";
+  const ENT_COLOR: Record<string, string> = { ASJMT: "var(--cyan-ink)", ASJFR: "var(--green-ink)", ASFFR: "var(--amber-ink)", ASTFR: "var(--orange-ink)" };
 
   // certificates of each entity, as "1. Certificates" with their folders, inside the entity (or at the top for one entity)
   let cq2 = supabaseAdmin().from("certificates").select("entity,folder,valid_until").is("archived_at", null);

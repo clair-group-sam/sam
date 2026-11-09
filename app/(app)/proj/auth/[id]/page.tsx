@@ -216,7 +216,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
             <details className="card"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">Delete this file</span><span className="mini">super admin, never submitted</span></summary>
               <form action={deleteFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />
                 <label className="mini flex items-center gap-2"><input type="checkbox" name="confirm" /> I confirm, checklist, journal and attachments are deleted for good; a project task bound to it goes back to “to do”.</label>
-                <div><button className="btn" type="submit" style={{ color: "var(--terra, #c0603a)" }}>Delete</button></div></form>
+                <div><button className="btn" type="submit" style={{ color: "var(--red-ink)" }}>Delete</button></div></form>
             </details>
           )}
           {/* close-out */}

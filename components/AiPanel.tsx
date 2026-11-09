@@ -62,7 +62,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
             {agent !== "check" && agent !== "explain" && (<>
               <div className="flex items-center gap-2 mb-2">
                 <div className="seg"><button type="button" className={view === "diff" ? "on" : ""} onClick={() => setView("diff")}>Changes</button><button type="button" className={view === "preview" ? "on" : ""} onClick={() => setView("preview")}>Preview</button></div>
-                <span className="mini"><b style={{ color: "#1d7a3a" }}>+{added}</b>, <b style={{ color: "var(--terra)" }}>−{removed}</b> words</span>
+                <span className="mini"><b style={{ color: "var(--green-ink)" }}>+{added}</b>, <b style={{ color: "var(--terra)" }}>−{removed}</b> words</span>
               </div>
               {view === "diff"
                 ? <div className="aidiff">{diff.map((d, i) => d.k === "=" ? <span key={i}>{d.t} </span> : d.k === "+" ? <ins key={i}>{d.t} </ins> : <del key={i}>{d.t} </del>)}</div>
