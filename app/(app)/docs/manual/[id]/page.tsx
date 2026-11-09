@@ -7,6 +7,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
 import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
+import AskManual from "@/components/AskManual";
 import { acknowledge, saveAudience, setNature, toggleFavourite } from "./actions";
 import EntityBand from "@/components/EntityBand";
 import ManualClass from "@/components/ManualClass";
@@ -211,6 +212,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         {published.length > 1 && <span className="mini ml-auto">Other published revisions: {published.slice(1).map((r) => <Link key={r.id} className="underline mr-2" href={`/docs/manual/${manual.id}?rev=${r.id}`}>Rev {r.rev}</Link>)}</span>}
       </div>
 
+      {tab === "read" && current && <AskManual manualId={manual.id} revisionId={current.id} rev={current.rev} />}
       {tab === "read" && current && (
         <Reader manualId={manual.id} revId={current.id} parts={parts} toc={toc} initialQuery={q}
           active={active ? { ref: active.ref, title: active.title, html: activeHtml, part: partOf(active.ref), pages: active.body.pages?.length ?? 0 } : null} />

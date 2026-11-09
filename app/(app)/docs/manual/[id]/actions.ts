@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSession } from "@/lib/session";
 import { isCmm, ownsManual } from "@/lib/revisions";
 import type { Manual } from "@/lib/docs";
+import { callClaude } from "@/lib/ai";
 
 /** Reading acknowledgement: one row per (revision, person), kept forever (readers tab, Read tracking). Closes the reading task. */
 export async function acknowledge(formData: FormData) {
@@ -69,4 +70,56 @@ export async function setNature(formData: FormData) {
   revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/lib"); revalidatePath("/docs/drafts");
   const { data: revs } = await db.from("revisions").select("id").eq("manual_id", manual.id);
   for (const r of (revs ?? []) as { id: string }[]) revalidatePath(`/docs/editor/${r.id}`);
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Ask this manual (IA plan 21/10, readers): a reader asks a question; S.A.M. picks the chapters of the
+ * revision being read that mention the question's words, and Claude answers ONLY from them, citing the
+ * chapters. Read-only, nothing stored but the usage line (AI-01). Answer in the reader's language.
+ * ------------------------------------------------------------------------------------------------ */
+export type ManualAnswer = { answer: string; notFound: boolean; cites: { ref: string; title: string; quote: string }[]; searched: number };
+
+const STOP = new Set("the and for are with that this what when who how does must shall which from into have has been can may our your their about there where les des une est que qui pour dans par sur pas aux avec sont doit quoi comment quand quel quelle quels quelles nous vous elle ils leur plus".split(" "));
+const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const plain = (b: { html?: string; text?: string } | null) => (b?.html ?? b?.text ?? "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
+
+const ASK_SYSTEM = `You answer a reader's question about ONE aviation organisation manual, using ONLY the chapter excerpts given.
+Rules:
+- Answer in the language of the question, in plain professional words, at most 120 words. Lead with the answer itself.
+- Use only what the excerpts say. Never use outside knowledge, never invent a rule, a delay, a post or a reference. If the excerpts do not answer, say so and set not_found to true.
+- Cite every chapter you rely on by its reference (e.g. "A.3"), with one short verbatim quote (at most 25 words) from that chapter.
+- Answer ONLY with a JSON object: {"answer": "...", "not_found": false, "cites": [{"ref": "A.3", "quote": "..."}]}`;
+
+export async function askManual(input: { manualId: string; revisionId: string; question: string }): Promise<{ ok: true; a: ManualAnswer } | { ok: false; error: string }> {
+  const s = await getSession();
+  if (!s?.person) return { ok: false, error: "Your session has expired, sign in again." };
+  const question = input.question.trim().slice(0, 600);
+  if (question.length < 6) return { ok: false, error: "Ask a full question, for example: who approves a temporary revision?" };
+  const sb = await supabaseServer(); // row-level security: only a manual the reader can open
+  const { data: m } = await sb.from("manuals").select("id,code,title,entity").eq("id", input.manualId).maybeSingle();
+  if (!m) return { ok: false, error: "This manual is not available to you." };
+  const { data: rows } = await sb.from("revision_sections").select("ref,title,body,deleted_at").eq("revision_id", input.revisionId).order("ord");
+  const secs = ((rows ?? []) as { ref: string; title: string | null; body: { html?: string; text?: string } | null; deleted_at: string | null }[])
+    .filter((r) => !r.deleted_at).map((r) => ({ ref: r.ref, title: r.title ?? "", text: plain(r.body) })).filter((r) => r.text.length > 0);
+  const terms = [...new Set(fold(question).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w)))];
+  if (!terms.length) return { ok: false, error: "Ask with a few precise words (a post, a document, a delay…)." };
+  const scored = secs.map((x) => {
+    const body = fold(x.text), head = fold(x.ref + " " + x.title);
+    let sc = 0;
+    for (const t of terms) { const n = body.split(t).length - 1; sc += Math.min(n, 8) + (head.includes(t) ? 6 : 0); }
+    return { ...x, sc };
+  }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 8);
+  if (!scored.length) return { ok: true, a: { answer: "No chapter of this revision mentions these words. Try other words, or the full-text search of the library.", notFound: true, cites: [], searched: secs.length } };
+  let budget = 48_000;
+  const excerpts = scored.map((x) => { const t = x.text.slice(0, Math.max(1500, Math.min(9000, budget))); budget -= t.length; return `### Chapter ${x.ref}: ${x.title}\n${t}`; }).filter((_, i) => i === 0 || budget > 0);
+  try {
+    const { text } = await callClaude({ agent: "ask", personId: s.person.id, entity: m.entity, system: ASK_SYSTEM, maxTokens: 900,
+      user: `Manual: ${m.code}, ${m.title} (${m.entity}).\n\nQUESTION: ${question}\n\nEXCERPTS (the chapters that mention the question's words):\n${excerpts.join("\n\n")}` });
+    const j = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { answer?: string; not_found?: boolean; cites?: { ref: string; quote?: string }[] };
+    const byRef = new Map(secs.map((x) => [x.ref, x.title]));
+    const cites = (j.cites ?? []).filter((c) => byRef.has(c.ref)).slice(0, 5).map((c) => ({ ref: c.ref, title: byRef.get(c.ref) ?? "", quote: (c.quote ?? "").slice(0, 220) }));
+    return { ok: true, a: { answer: (j.answer ?? "").trim() || "No answer.", notFound: !!j.not_found, cites, searched: secs.length } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "SAM could not answer, try again." };
+  }
 }

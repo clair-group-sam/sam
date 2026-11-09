@@ -762,3 +762,14 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 /* DA v3 · interaction states on every button (Hallmark 26b) */
 .btn:active:not(:disabled){transform:translateY(1px)}
 .btn:disabled,.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+/* Ask this manual (readers) */
+.askm-f{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 16px}
+.askm-l{display:inline-flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px;white-space:nowrap}
+.askm-a{border-top:1px solid var(--line);padding:12px 16px 14px;display:grid;gap:10px}
+.askm-a>p:first-child{font-size:14px;line-height:1.55;max-width:72ch}
+.askm-nf{color:var(--slate6)}
+.askm-c{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.askm-c li{display:flex;gap:10px;align-items:baseline}
+.askm-c .badge{flex:0 0 auto;background:var(--cyan-ink)}
+.askm-c q{display:block;color:var(--slate6);font-size:12.5px;margin-top:2px}
+@media (max-width:700px){.askm-f{grid-template-columns:minmax(0,1fr)}}
