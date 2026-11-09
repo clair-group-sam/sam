@@ -16,8 +16,12 @@ export async function GET(req: NextRequest) {
   if (diag) return NextResponse.json(await tokenDiagnostic(diag));
   // raw look at the taxonomy answer for one entity (first attributes only) — to map the field names of the API
   const dump = req.nextUrl.searchParams.get("taxdump");
-  if (dump) { const { e2 } = await import("@/lib/eccairs"); const tid = req.nextUrl.searchParams.get("tid") ?? "708"; const code = req.nextUrl.searchParams.get("code") ?? "24";
-    try { const j = await e2(dump, `/taxonomy-service/external/entity/${code}?taxonomyId=${tid}`); const d = j.data as { attributesList?: { childrenAttributes?: unknown[] } } & Record<string, unknown>; const attrs = d?.attributesList?.childrenAttributes ?? []; return NextResponse.json({ keys: Object.keys(d ?? {}), n: attrs.length, sample: attrs.slice(0, 2), withList: attrs.find((a) => JSON.stringify(a).includes("alueList")) }); }
+  if (dump) { const { e2 } = await import("@/lib/eccairs"); const tid = req.nextUrl.searchParams.get("tid") ?? "708"; const code = req.nextUrl.searchParams.get("code") ?? "24"; const attr = Number(req.nextUrl.searchParams.get("attr") ?? "431");
+    try { const j = await e2(dump, `/taxonomy-service/external/entity/${code}?taxonomyId=${tid}`); const d = j.data as { attributesList?: { childrenAttributes?: { taxonomyCode: number; valueList?: { id?: number; identifier?: number } | null }[] } } & Record<string, unknown>; const attrs = d?.attributesList?.childrenAttributes ?? [];
+      const a = attrs.find((x) => x.taxonomyCode === attr) ?? null; const withList = attrs.filter((x) => x.valueList).map((x) => ({ code: x.taxonomyCode, vl: x.valueList }));
+      let list: unknown = null; const vid = a?.valueList?.id;
+      if (vid) { try { const r = await e2(dump, `/taxonomy-service/external/value-lists/${vid}?taxonomyId=${tid}`); const dd = r.data as Record<string, unknown>; list = { keys: Object.keys(dd ?? {}), sample: JSON.stringify(dd).slice(0, 1500) }; } catch (e) { list = { error: (e as Error).message }; } }
+      return NextResponse.json({ n: attrs.length, attribute: a, lists_in_entity: withList.slice(0, 40), list }); }
     catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 502 }); } }
   const ent = req.nextUrl.searchParams.get("test");
   if (ent) {
