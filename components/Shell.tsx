@@ -117,7 +117,7 @@ export default function Shell({ session, children }: Props) {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar session={session} ent={ent} mode={eMode} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
-        {ent === "ALL" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
+        {ent === "ALL" && eMode === "group" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
         {entAuto && <div className="groupband"><b>{ENT[ent]?.name ?? ent} ({ent})</b>: this page works one entity at a time, so the group view gives way to your home entity here. Pick another entity at the top if needed; the overviews and lists stay in group view.</div>}
         {/* entity switch, after the reload: the new page slides in from the side the click went to. Runs while the HTML is parsed,
             before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
