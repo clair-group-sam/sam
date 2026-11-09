@@ -6,8 +6,8 @@ import { Metric, PageHeader } from "@/components/Page";
 import EntityBand from "@/components/EntityBand";
 import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
-import { CHANGE_LABEL, LEVEL_LABEL, loadFinding, plan, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, stepOf, STEPS_PATH, type Assistant, type Point, type Round } from "@/lib/findings";
-import { addChange, checkPlan, decideClosure, gotoStep, openDossier, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, updateFinding, verifyChange } from "../actions";
+import { CHANGE_LABEL, LEVEL_LABEL, loadFinding, needsAuthority, plan, progress, ROUTE_LABEL, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, stepOf, STEPS_PATH, type Assistant, type Point, type Round } from "@/lib/findings";
+import { addChange, checkPlan, decideClosure, gotoStep, openDossier, recordChangeAuthority, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, updateFinding, verifyChange } from "../actions";
 import { Icon } from "@/lib/icons";
 
 /* FND-03 · the finding sheet. The NP writes in order — ① root cause, read by S.A.M. with them; ② corrective action plan, read by S.A.M.
@@ -57,12 +57,22 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   const PlanItems = (
     <>
       <div>
-        <div className="eyebrow mb-1">Expected manual changes <span className="mini">(shown to the author when a draft of the manual opens; verified after publication)</span></div>
+        <div className="eyebrow mb-1">Expected manual changes <span className="mini">(shown to the author when a draft of the manual opens; effective at the authority's approval / acknowledgement or at publication, then verified — MSM §2.3)</span></div>
         {changes.length ? <table className="tbl"><tbody>{changes.map((c) => (
-          <tr key={c.id}><td><b className="mono">{c.manual_code ?? "manual"}</b> {c.section_ref}<div className="mini">{c.expected}</div>{c.verified_note && <div className="mini">Compliance: {c.verified_note}</div>}</td>
-            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{step >= 4 && <span className={"pill " + (c.status === "verified" ? "green" : c.status === "published" ? "amber" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}
+          <tr key={c.id}><td><b className="mono">{c.manual_code ?? "manual"}</b> {c.section_ref}<div className="mini">{c.expected}</div>
+              {(c.route || c.authority_ref || c.effective_on) && <div className="mini">{c.route ? `Effective by ${ROUTE_LABEL[c.route] ?? c.route}` : ""}{c.authority_ref ? ` · ${c.authority_ref}` : ""}{c.effective_on ? ` · ${c.effective_on}` : ""}{c.authority_file_id ? <> · <Link href={`/proj/auth/${c.authority_file_id}`}>application</Link></> : null}</div>}
+              {c.verified_note && <div className="mini">Compliance: {c.verified_note}</div>}</td>
+            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{step >= 4 && <span className={"pill " + (c.status === "verified" ? "green" : c.status === "published" || c.status === "awaiting_authority" ? "amber" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}
               {c.revision_id && <div className="mini"><Link href={`/docs/editor/${c.revision_id}`}>open revision</Link></div>}
-              {c.status === "published" && compliance && <form action={verifyChange} className="flex gap-1 justify-end mt-1"><input type="hidden" name="id" value={f.id} /><input type="hidden" name="change" value={c.id} /><input name="note" className="inp" placeholder="text found / remark" style={{ width: 160, marginTop: 0 }} /><button className="btn" name="verdict" value="ok">Verified</button><button className="btn" name="verdict" value="no">Not in</button></form>}
+              {c.status === "published" && compliance && <form action={verifyChange} className="grid gap-1 justify-end mt-1" style={{ gridTemplateColumns: "auto auto" }}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="change" value={c.id} />
+                {needsAuthority(c) && !c.authority_ref && <input name="authority_ref" className="inp mono" required placeholder="METEOR / TM-CAD ref." style={{ width: 150, marginTop: 0 }} />}
+                {!c.effective_on && <input name="effective_on" type="date" className="inp" required style={{ marginTop: 0 }} title={needsAuthority(c) ? "Decision / acknowledgement date" : "Publication date"} />}
+                <input name="note" className="inp" placeholder="text found / remark" style={{ width: 160, marginTop: 0 }} /><span className="flex gap-1"><button className="btn" name="verdict" value="ok">Verified</button><button className="btn" name="verdict" value="no">Not in</button></span></form>}
+              {["awaiting_authority", "included"].includes(c.status) && compliance && <details className="mt-1"><summary className="mini">Record the authority's return / the publication</summary>
+                <form action={recordChangeAuthority} className="grid gap-1 mt-1" style={{ gridTemplateColumns: "auto auto auto" }}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="change" value={c.id} />
+                  <select name="route" className="inp" defaultValue={c.route ?? "approval"} style={{ marginTop: 0 }}><option value="approval">Approved by the authority</option><option value="notification">Acknowledged (notification)</option><option value="publication">Published (no authority)</option></select>
+                  <input name="authority_ref" className="inp mono" placeholder="METEOR / TM-CAD ref." defaultValue={c.authority_ref ?? ""} style={{ width: 150, marginTop: 0 }} /><input name="effective_on" type="date" className="inp" required style={{ marginTop: 0 }} />
+                  <div className="col-span-3 flex justify-end"><button className="btn" type="submit">Record</button></div></form></details>}
               {["pending", "deferred"].includes(c.status) && mayEditPlan && <form action={removeChange} className="mt-1"><input type="hidden" name="id" value={f.id} /><input type="hidden" name="change" value={c.id} /><button className="btn mini" type="submit">Remove</button></form>}</td></tr>))}</tbody></table>
           : <p className="mini">None yet.</p>}
         {mayEditPlan && (
@@ -86,7 +96,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   return (
     <>
       <EntityBand entity={f.entity} current={s.entity} multi={s.entities.length > 1} what="finding" />
-      <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${f.notified ?? "—"}, answer due ${f.due ?? "—"}, answered by ${who}`}
+      <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${f.notified ?? "—"}, answer due ${f.due ?? "—"}, answered by ${who}, ${progress(f, changes, actions).label}`}
         right={<span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>} />
 
       <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? <Icon name="check" size={12} /> : i + 1}</i><span>{l}</span></div>)}</div>
@@ -237,7 +247,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <label><span className="mini">Note</span><input name="note" className="inp" placeholder="Why, accepted by the authority on …, raised by mistake…" /></label>
                 <div className="flex gap-2 justify-end"><button className="btn" name="what" value="cancel">Cancel the finding</button><button className="btn" name="what" value="close">Close directly</button></div></form></div></details>
           )}
-          {f.closed_at && <section className="card"><div className="ch"><span className="eyebrow">{f.status === "cancelled" ? "Cancelled" : "Closed"}</span><span className="mini">{f.closed_at.slice(0, 10)}, {name(f.closed_by)}</span></div>{f.closed_note && <div className="cb">{f.closed_note}</div>}</section>}
+          {f.closed_at && <section className="card"><div className="ch"><span className="eyebrow">{f.status === "cancelled" ? "Cancelled" : "Closed"}</span><span className="mini">{f.status === "closed" && f.effective_closed_on ? <>effective {f.effective_closed_on}, decided {f.closed_at.slice(0, 10)}</> : f.closed_at.slice(0, 10)}, {name(f.closed_by)}</span></div>{(f.closed_note || (f.status === "closed" && f.effective_closed_on)) && <div className="cb">{f.status === "closed" && f.effective_closed_on && <p className="mini">Closure date = date of the last approval / acknowledgement / publication of the plan (MSM §2.3), not the day the text was written.</p>}{f.closed_note}</div>}</section>}
         </div>
       </div>
     </>

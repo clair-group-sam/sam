@@ -824,3 +824,10 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 .ismx th{font-size:12px;color:var(--slate6);font-weight:600;width:28px}
 .ismx td{width:56px;height:34px;text-align:center;border-radius:var(--r-xs);font-weight:700;font-variant-numeric:tabular-nums}
 .ismx .lv-green{background:var(--green-s);color:var(--green-ink)}.ismx .lv-amber{background:var(--amber-s);color:var(--amber-ink)}.ismx .lv-red{background:var(--terra-s);color:var(--state-red)}
+
+/* FND-04 · work-done bar on the findings list */
+.wbar { display: inline-block; width: 56px; height: 6px; border-radius: 3px; background: #e3e8ee; overflow: hidden; flex: none; }
+.wbar i { display: block; height: 100%; background: #8aa2b8; }
+.wbar i.green { background: var(--green); }
+.wbar i.amber { background: var(--amber); }
+.wbar i.red { background: var(--terra, #c0603a); }

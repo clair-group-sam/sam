@@ -4,7 +4,8 @@ import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { ENT_COLOR } from "@/lib/nav";
-import { CMM_TURN, LEVEL_LABEL, NP_TURN, OPEN_STATUSES, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, type Finding } from "@/lib/findings";
+import { CMM_TURN, LEVEL_LABEL, NP_TURN, OPEN_STATUSES, progress, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, type Change, type Finding } from "@/lib/findings";
+import type { Action } from "@/lib/actions-shared";
 
 type Sp = { tab?: string };
 /** Compliance › Findings: every audit / authority finding, who holds it, what S.A.M. waits for. */
@@ -18,6 +19,13 @@ export default async function Findings({ searchParams }: { searchParams: Promise
   if (!(s.group && s.entity === "ALL")) q = q.in("entity", scope);
   const { data } = await q;
   const all = (data ?? []) as Finding[];
+  // FND-04 · the work done on each finding, visible without opening it
+  const ids = all.map((f) => f.id);
+  const [{ data: chs }, { data: acs }] = ids.length ? await Promise.all([db.from("finding_changes").select("*").in("finding_id", ids).neq("status", "removed").limit(5000), db.from("safety_actions").select("*").in("finding_id", ids).neq("status", "cancelled").limit(5000)]) : [{ data: [] }, { data: [] }];
+  const chBy = new Map<string, Change[]>(), acBy = new Map<string, Action[]>();
+  for (const c of (chs ?? []) as Change[]) chBy.set(c.finding_id, [...(chBy.get(c.finding_id) ?? []), c]);
+  for (const a of (acs ?? []) as (Action & { finding_id: string })[]) acBy.set(a.finding_id, [...(acBy.get(a.finding_id) ?? []), a]);
+  const prog = (f: Finding) => progress(f, chBy.get(f.id) ?? [], acBy.get(f.id) ?? []);
   const compliance = s.role === "cmm";
   const posts = s.roles.map(basePost);
   const mine = (f: Finding) => (f.owner_person && f.owner_person === s.person?.id) || (f.owner_role && posts.includes(basePost(f.owner_role)));
@@ -33,14 +41,14 @@ export default async function Findings({ searchParams }: { searchParams: Promise
         <Metric label="Open" value={open.length} hint={`${open.filter((f) => f.level === "1").length} level 1`} />
         <Metric label="Waiting for an answer" value={open.filter((f) => NP_TURN.includes(f.status)).length} tone={open.some((f) => NP_TURN.includes(f.status) && f.due && f.due < t0) ? "red" : undefined} hint={`${open.filter((f) => NP_TURN.includes(f.status) && f.due && f.due < t0).length} past due`} />
         <Metric label="To review (Compliance)" value={open.filter((f) => CMM_TURN.includes(f.status)).length} />
-        <Metric label="Plan in progress" value={open.filter((f) => f.status === "accepted").length} />
+        <Metric label="Plan in progress" value={open.filter((f) => f.status === "accepted").length} hint={`${open.filter((f) => f.status === "accepted" && prog(f).label.startsWith("Work done")).length} with the work done`} />
       </div>
       <div className="tabs mb-3">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/find?tab=${k}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
       <section className="card">
         <div className="cb" style={{ padding: 0 }}>
           {!rows.length ? <p className="p-4 mini">Nothing here.</p> : (
             <table className="tbl">
-              <thead><tr><th>Finding</th><th>Requirement</th><th>Level</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead>
+              <thead><tr><th>Finding</th><th>Requirement</th><th>Level</th><th>Owner</th><th>Due</th><th>Status</th><th>Work done</th></tr></thead>
               <tbody>
                 {rows.map((f) => (
                   <tr key={f.id}>
@@ -50,6 +58,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
                     <td>{f.owner_role ?? "person"}</td>
                     <td className={f.due && f.due < t0 && OPEN_STATUSES.includes(f.status) ? "late" : ""}>{f.due ?? "—"}</td>
                     <td><span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>{f.current_round > 1 && <div className="mini">round {f.current_round}</div>}</td>
+                    {(() => { const p = prog(f); return <td style={{ minWidth: 190 }}><div className="flex items-center gap-2"><span className="wbar" title={`${p.pct} %`}><i style={{ width: `${p.pct}%` }} className={p.tone || undefined} /></span><span className={"mini " + (p.tone === "red" ? "late" : "")} style={p.tone === "green" ? { color: "var(--green)" } : undefined}>{p.label}</span></div>{p.detail.length > 0 && <div className="mini">{p.detail.join(" · ")}</div>}</td>; })()}
                   </tr>
                 ))}
               </tbody>

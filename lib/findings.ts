@@ -8,14 +8,15 @@ import { today } from "@/lib/authority";
 
 export type Finding = { id: string; entity: string; number: string; source: string; authority: string | null; audit_ref: string | null; level: string; requirement: string | null; title: string; description: string | null;
   owner_role: string | null; owner_person: string | null; notified: string | null; due: string | null; status: string; current_round: number; plan_round: number; authority_file_id: string | null;
-  draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; draft_comment: string | null; draft_step: number; rca_check: Assistant | null; plan_check: Assistant | null;
+  draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; draft_comment: string | null; draft_step: number; rca_check: Assistant | null; plan_check: Assistant | null; effective_closed_on: string | null;
   closed_at: string | null; closed_by: string | null; closed_note: string | null; created_by: string | null; created_at: string; updated_at: string };
 export type Point = { code: string; label: string; detail: string; part?: "rca" | "plan" };
 export type Assistant = { verdict: "complete" | "incomplete" | "off_topic"; points: Point[]; model: string; at: string };
 export type Stage = "rca" | "plan" | "full";
 export type Round = { id: string; finding_id: string; stage: Stage; n: number; comment: string | null; root_cause: string | null; factors: string | null; immediate: string | null; answered_by: string | null; answered_at: string; via: string;
   assistant: Assistant | null; decision: "accepted" | "sent_back" | null; points: Point[] | null; decided_by: string | null; decided_at: string | null; note: string | null };
-export type Change = { id: string; finding_id: string; manual_id: string | null; manual_code: string | null; section_ref: string | null; expected: string; status: string; revision_id: string | null; verified_at: string | null; verified_by: string | null; verified_note: string | null; created_at: string };
+export type Change = { id: string; finding_id: string; manual_id: string | null; manual_code: string | null; section_ref: string | null; expected: string; status: string; revision_id: string | null; verified_at: string | null; verified_by: string | null; verified_note: string | null; created_at: string;
+  route: string | null; authority_file_id: string | null; authority_ref: string | null; effective_on: string | null };
 
 export const STATUS_LABEL: Record<string, string> = { open: "Analysis in progress", review: "Analysis to review", back: "Sent back — to complete", accepted: "Plan in progress", closure_requested: "Closure requested", closed: "Closed", cancelled: "Cancelled" };
 export const STATUS_TONE: Record<string, string> = { open: "amber", review: "", back: "amber", accepted: "", closure_requested: "", closed: "green", cancelled: "" };
@@ -28,7 +29,10 @@ export const NP_TURN = ["open", "back"];
 export const CMM_TURN = ["review", "closure_requested"];
 export const LEVEL_LABEL: Record<string, string> = { "1": "Level 1", "2": "Level 2", "3": "Level 3", obs: "Observation" };
 export const SOURCE_LABEL: Record<string, string> = { authority: "Authority", internal_audit: "Internal audit", inspection: "Inspection", subcontractor: "Subcontractor", other: "Other" };
-export const CHANGE_LABEL: Record<string, string> = { pending: "Waiting for a revision", included: "In a draft", deferred: "Deferred to a later revision", published: "Published — to verify", verified: "Verified", removed: "Removed" };
+export const CHANGE_LABEL: Record<string, string> = { pending: "Waiting for a revision", included: "In a draft", deferred: "Deferred to a later revision", awaiting_authority: "Published — awaiting the authority's return", published: "Effective — to verify", verified: "Verified", removed: "Removed" };
+/** FND-04 · what makes a manual change effective: the authority's approval / acknowledgement, or the publication (MSM §2.3). */
+export const ROUTE_LABEL: Record<string, string> = { approval: "authority approval", notification: "authority acknowledgement", publication: "publication" };
+export const needsAuthority = (c: Pick<Change, "route">) => c.route === "approval" || c.route === "notification";
 export const OPEN_STATUSES = ["open", "review", "back", "accepted", "closure_requested"];
 
 export async function nextFindingNumber(db: SupabaseClient, entity: string): Promise<string> {
@@ -55,6 +59,45 @@ export function plan(changes: Change[], actions: Action[]): { total: number; don
   for (const c of changes) if (c.status !== "verified") remaining.push(`${c.manual_code ?? "manual"}${c.section_ref ? ` ${c.section_ref}` : ""}: ${CHANGE_LABEL[c.status] ?? c.status}`);
   for (const a of actions) if (a.status !== "verified") remaining.push(`${a.number} ${a.title}: ${a.status.replace("_", " ")}`);
   return { total: changes.length + actions.length, done: changes.length + actions.length - remaining.length, remaining };
+}
+
+/** FND-04 · The regulatory closure date: the last approval / acknowledgement / publication of the plan (never the day the text was written). */
+export function effectiveClosure(changes: Change[], actions: Action[]): string | null {
+  const d = [...changes.filter((c) => c.status === "verified").map((c) => c.effective_on ?? c.verified_at?.slice(0, 10) ?? null), ...actions.filter((a) => a.status === "verified").map((a) => (a.verified_at ?? a.done_at)?.slice(0, 10) ?? null)].filter((x): x is string => !!x);
+  return d.length ? d.sort().at(-1)! : null;
+}
+
+/** FND-04 · One glance at how far the work has gone — on the list, without opening the finding. */
+export type Progress = { label: string; tone: "" | "amber" | "green" | "red"; detail: string[]; pct: number };
+export function progress(f: Pick<Finding, "status" | "draft_step" | "current_round" | "effective_closed_on">, changes: Change[], actions: Action[]): Progress {
+  const ch = changes.filter((c) => c.status !== "removed"), ac = actions.filter((a) => a.status !== "cancelled");
+  const total = ch.length + ac.length;
+  const n = (st: string[]) => ch.filter((c) => st.includes(c.status)).length;
+  const drafting = n(["pending", "deferred", "included"]), waiting = n(["awaiting_authority"]), toVerify = n(["published"]), chDone = n(["verified"]);
+  const acDone = ac.filter((a) => a.status === "verified").length, acClosed = ac.filter((a) => a.status === "done").length, acOpen = ac.length - acDone - acClosed;
+  const done = chDone + acDone;
+  const detail: string[] = [];
+  if (drafting) detail.push(`${drafting} manual change${drafting > 1 ? "s" : ""} being written`);
+  if (waiting) detail.push(`${waiting} with the authority`);
+  if (toVerify) detail.push(`${toVerify} effective, to verify`);
+  if (acOpen) detail.push(`${acOpen} action${acOpen > 1 ? "s" : ""} open`);
+  if (acClosed) detail.push(`${acClosed} action${acClosed > 1 ? "s" : ""} done, to verify`);
+  const pct = total ? Math.round((100 * done) / total) : 0;
+  switch (f.status) {
+    case "open": return { label: f.draft_step >= 2 ? "Plan being written" : "Root cause being written", tone: "amber", detail, pct };
+    case "back": return { label: `Sent back — round ${f.current_round}`, tone: "amber", detail, pct };
+    case "review": return { label: "Analysis with Compliance", tone: "", detail, pct };
+    case "accepted":
+      if (!total) return { label: "Plan accepted — nothing attached", tone: "red", detail, pct };
+      if (done === total) return { label: "Work done — closure to request", tone: "green", detail, pct: 100 };
+      if (waiting && !drafting && !acOpen) return { label: `Work done — awaiting the authority (${waiting})`, tone: "amber", detail, pct };
+      if (toVerify && !drafting && !waiting && !acOpen && !acClosed) return { label: "Work done — Compliance to verify", tone: "green", detail, pct };
+      return { label: `Plan ${done}/${total}`, tone: "", detail, pct };
+    case "closure_requested": return { label: "Closure requested — Compliance", tone: "green", detail, pct: 100 };
+    case "closed": return { label: f.effective_closed_on ? `Closed · effective ${f.effective_closed_on}` : "Closed", tone: "green", detail: [], pct: 100 };
+    case "cancelled": return { label: "Cancelled", tone: "", detail: [], pct: 0 };
+    default: return { label: f.status, tone: "", detail, pct };
+  }
 }
 
 /* ---------- pre-reading ---------- */

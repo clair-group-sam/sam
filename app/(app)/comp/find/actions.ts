@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { loadFinding, nextFindingNumber, preRead, syncFindingTasks, type Finding, type Point, type Round } from "@/lib/findings";
+import { effectiveClosure, loadFinding, needsAuthority, nextFindingNumber, preRead, syncFindingTasks, type Finding, type Point, type Round } from "@/lib/findings";
 import { createAuthorityFile } from "@/lib/authority-create";
 
 const db = () => supabaseAdmin();
@@ -128,12 +128,27 @@ export async function removeChange(fd: FormData) {
   await db().from("finding_changes").update({ status: "removed" }).eq("id", String(fd.get("change"))).eq("finding_id", x.f.id).in("status", ["pending", "deferred"]);
   touch(x.f.id);
 }
-/** Compliance verifies a published change against the published text (FND-01). */
+/** FND-04 · Compliance verifies an effective change against the text in force. A change that went through the authority is
+ * verified with the dossier reference and the decision / acknowledgement date (MSM §2.3: that date closes it, not the writing). */
 export async function verifyChange(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const c = x.changes.find((q) => q.id === String(fd.get("change"))); if (!c) throw new Error("Change not found");
   const ok = str(fd, "verdict") === "ok";
-  await db().from("finding_changes").update(ok ? { status: "verified", verified_at: new Date().toISOString(), verified_by: s.person?.id ?? null, verified_note: str(fd, "note") } : { status: "pending", revision_id: null, verified_note: str(fd, "note") }).eq("id", String(fd.get("change"))).eq("finding_id", x.f.id);
+  if (!ok) { await db().from("finding_changes").update({ status: "pending", revision_id: null, verified_note: str(fd, "note") }).eq("id", c.id); touch(x.f.id); return; }
+  const authority_ref = str(fd, "authority_ref") ?? c.authority_ref, effective_on = str(fd, "effective_on") ?? c.effective_on;
+  if (needsAuthority(c) && (!authority_ref || !effective_on)) throw new Error("This change went to the authority: the dossier reference (METEOR / TM-CAD) and the decision or acknowledgement date are required to verify it.");
+  if (!effective_on) throw new Error("The publication date is required.");
+  await db().from("finding_changes").update({ status: "verified", verified_at: new Date().toISOString(), verified_by: s.person?.id ?? null, verified_note: str(fd, "note"), authority_ref, effective_on }).eq("id", c.id).eq("finding_id", x.f.id);
   touch(x.f.id);
+}
+/** FND-04 · A change that waits for the authority, or was published outside S.A.M.: Compliance records the reference and the date by hand. */
+export async function recordChangeAuthority(fd: FormData) {
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const c = x.changes.find((q) => q.id === String(fd.get("change"))); if (!c) throw new Error("Change not found");
+  const authority_ref = str(fd, "authority_ref"), effective_on = str(fd, "effective_on"), route = str(fd, "route") ?? c.route ?? "publication";
+  if (!effective_on || ((route === "approval" || route === "notification") && !authority_ref)) throw new Error("Reference and date are required.");
+  await db().from("finding_changes").update({ status: "published", route, authority_ref, effective_on }).eq("id", c.id).eq("finding_id", x.f.id).in("status", ["included", "awaiting_authority", "pending", "deferred"]);
+  await log(x.f, "finding_change_effective", s.person?.id ?? null, { change: c.id, route, authority_ref, effective_on }); touch(x.f.id);
 }
 
 /** The NP asks for the closure once the plan is done. */
@@ -141,6 +156,8 @@ export async function requestClosure(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
   if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
   if (x.f.status !== "accepted") throw new Error("The plan must be accepted first.");
+  const pendingDoc = x.changes.filter((c) => c.status !== "verified");
+  if (pendingDoc.length) throw new Error(`${pendingDoc.length} manual change${pendingDoc.length > 1 ? "s are" : " is"} not effective yet (approved / acknowledged by the authority, or published, then verified by Compliance). A documentary finding is closed on that date, not when the text is written (MSM §2.3).`);
   await db().from("findings").update({ status: "closure_requested", updated_at: new Date().toISOString() }).eq("id", x.f.id);
   await db().from("tasks").update({ status: "done" }).eq("ref_id", x.f.id).eq("kind", "finding_closure").eq("status", "open");
   const { f } = await load(x.f.id); await syncFindingTasks(db(), f);
@@ -151,7 +168,7 @@ export async function decideClosure(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
   const what = str(fd, "what"); const note = str(fd, "note");
   const now = new Date().toISOString();
-  if (what === "close") await db().from("findings").update({ status: "closed", closed_at: now, closed_by: s.person?.id ?? null, closed_note: note, updated_at: now }).eq("id", x.f.id);
+  if (what === "close") await db().from("findings").update({ status: "closed", closed_at: now, closed_by: s.person?.id ?? null, closed_note: note, effective_closed_on: effectiveClosure(x.changes, x.actions) ?? now.slice(0, 10), updated_at: now }).eq("id", x.f.id);
   else if (what === "cancel") { if (!s.roles.includes("SUPERADMIN") && !s.roles.includes("CMM")) throw new Error("Not allowed"); await db().from("findings").update({ status: "cancelled", closed_at: now, closed_by: s.person?.id ?? null, closed_note: note, updated_at: now }).eq("id", x.f.id); }
   else await db().from("findings").update({ status: "accepted", updated_at: now }).eq("id", x.f.id);
   const { f } = await load(x.f.id); await syncFindingTasks(db(), f);
