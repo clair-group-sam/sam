@@ -71,9 +71,11 @@ export function findModule(mod: string): Module | undefined {
  */
 export type EntMode = "group" | "single" | "none";
 const ENT_SINGLE = ["safe/over/data", "safe/over/set", "safe/inv", "safe/comm", "safe/promo", "erp/activate", "docs/drop"];
-const ENT_NONE = ["set", "admin", "ref", "is", "erp", "users/fleet", "docs/link", "docs/editor", "docs/manual"];
-// filtered by the entity through a helper (listManuals, brew, the register query) although under a "none" prefix above
-const ENT_LISTS_UNDER_NONE = ["admin/comms", "set/integ"];
+// checked through what each page calls, not only what it reads itself: the registers (components/Register), Part-IS (isData),
+// the admin registers (scopeOf), listManuals and the coffee all filter by the entity, so ERP, Part-IS, Registers and the
+// aircraft registry are lists ("group"), not "none".
+const ENT_NONE = ["set", "ref", "admin/signrules", "docs/link", "docs/editor", "docs/manual"];
+const ENT_LISTS_UNDER_NONE = ["set/integ"]; // listManuals
 const ENT_DEEP_LISTS = ["safe/risk/match", "safe/risk/templates", "dash/cs/overdue"]; // three segments, still lists
 export function entMode(path: string): EntMode {
   const seg = path.split("?")[0].split("/").filter(Boolean);
