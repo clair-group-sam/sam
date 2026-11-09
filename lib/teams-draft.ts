@@ -80,8 +80,8 @@ export async function draftReport(db: SupabaseClient, personId: string, entities
 /** The editable draft card: every field is an input; Create in S.A.M. / Discard. `ref` travels in the action data so the thread is attached at creation. */
 export function draftCard(d: Draft, entities: string[], ref: ThreadRef, by: string): unknown {
   const body: unknown[] = [
-    { type: "TextBlock", text: "S.A.M. · Safety report — draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
-    { type: "TextBlock", text: `Drafted from this conversation for ${by}. Check and complete, then create it in S.A.M. — nothing is stored until then.`, wrap: true, isSubtle: true },
+    { type: "TextBlock", text: "S.A.M. · Safety report, draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: `Drafted from this conversation for ${by}. Check and complete, then create it in S.A.M., nothing is stored until then.`, wrap: true, isSubtle: true },
     { type: "Input.ChoiceSet", id: "entity", label: "Entity", value: d.entity, choices: entities.map((e) => ({ title: e, value: e })), style: "compact" },
     { type: "Input.Text", id: "headline", label: "Title (one factual line)", value: d.headline, maxLength: 200 },
     { type: "Input.Text", id: "narrative", label: "What happened", value: d.narrative, isMultiline: true, maxLength: 6000 },
@@ -106,7 +106,7 @@ export function draftCard(d: Draft, entities: string[], ref: ThreadRef, by: stri
 export function createdCard(id: string, headline: string, by: string): unknown {
   return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body: [
     { type: "TextBlock", text: "S.A.M. · Safety report", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
-    { type: "TextBlock", text: `${id} — ${headline}`, size: "Medium", weight: "Bolder", wrap: true },
+    { type: "TextBlock", text: `${id}, ${headline}`, size: "Medium", weight: "Bolder", wrap: true },
     { type: "TextBlock", text: `Created by ${by}. The Safety Manager has it in the Inbox (72 h clock running); the conversation is attached as context.`, wrap: true },
   ], actions: [{ type: "Action.OpenUrl", title: "Open in S.A.M.", url: `${origin()}/safe/reports/${id}` }], msteams: { width: "Full" } };
 }
@@ -164,10 +164,10 @@ export async function draftAuthority(db: SupabaseClient, personId: string, entit
 }
 export function authorityCard(d: AuthorityDraft, entities: string[], types: TypeRow[], ref: ThreadRef, by: string): unknown {
   const body: unknown[] = [
-    { type: "TextBlock", text: "S.A.M. · Authority file — draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: "S.A.M. · Authority file, draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
     { type: "TextBlock", text: `Drafted from this conversation for ${by}. The file opens in Draft with the checklist of its type; nothing is sent to the authority.`, wrap: true, isSubtle: true },
     { type: "Input.ChoiceSet", id: "entity", label: "Entity", value: d.entity, choices: entities.map((e) => ({ title: e, value: e })), style: "compact" },
-    { type: "Input.ChoiceSet", id: "type_code", label: "Type of application", value: d.type_code, choices: types.map((t) => ({ title: `${t.code} — ${t.name.slice(0, 70)} [${t.entities.join("/")}]`, value: t.code })), style: "compact" },
+    { type: "Input.ChoiceSet", id: "type_code", label: "Type of application", value: d.type_code, choices: types.map((t) => ({ title: `${t.code}, ${t.name.slice(0, 70)} [${t.entities.join("/")}]`, value: t.code })), style: "compact" },
     { type: "Input.Text", id: "title", label: "Title", value: d.title, maxLength: 200 },
     { type: "ColumnSet", columns: [
       { type: "Column", width: "stretch", items: [{ type: "Input.Text", id: "owner_role", label: "Owner post", value: d.owner_role, maxLength: 10 }] },
@@ -203,7 +203,7 @@ export async function draftMoc(db: SupabaseClient, personId: string, entities: s
 }
 export function mocCard(d: MocDraft, entities: string[], ref: ThreadRef, by: string): unknown {
   const body: unknown[] = [
-    { type: "TextBlock", text: "S.A.M. · Management of change — draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: "S.A.M. · Management of change, draft", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
     { type: "TextBlock", text: `Drafted from this conversation for ${by}. The MOC opens at the “assessment” step for the SM; hazards and decision follow in S.A.M.`, wrap: true, isSubtle: true },
     { type: "Input.ChoiceSet", id: "entity", label: "Entity", value: d.entity, choices: entities.map((e) => ({ title: e, value: e })), style: "compact" },
     { type: "Input.Text", id: "name", label: "Change (one line)", value: d.name, maxLength: 200 },

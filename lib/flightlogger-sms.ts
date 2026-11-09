@@ -125,7 +125,7 @@ export async function upsertFlReports(db: SupabaseClient, reports: FlReport[], o
       if (error) throw new Error(error.message);
       await db.from("report_events").insert({ report_id: id, kind: "received", at: received, note: `Received in FlightLogger ${received.slice(0, 16).replace("T", " ")} UTC${r.receivedAt ? "" : " (list date)"} — ${r.type ?? "report"} ${r.no}; retrieved in S.A.M. on ${now.slice(0, 10)} (${opts.by})` });
       const due = new Date(Date.parse(received) + 72 * 3600e3).toISOString().slice(0, 10);
-      await db.from("tasks").insert({ entity: FL_ENTITY, kind: "safety_report", title: `Safety report ${id} — ${r.headline.trim().slice(0, 120)}`, detail: "New report from FlightLogger: acknowledge, classify and decide on the MOR within 72 h of its receipt in FlightLogger.", due, owner_role: "SM", status: "open", link: `/safe/reports/${id}` });
+      await db.from("tasks").insert({ entity: FL_ENTITY, kind: "safety_report", title: `Safety report ${id}, ${r.headline.trim().slice(0, 120)}`, detail: "New report from FlightLogger: acknowledge, classify and decide on the MOR within 72 h of its receipt in FlightLogger.", due, owner_role: "SM", status: "open", link: `/safe/reports/${id}` });
     } catch (e) { errors.push(`${r.no}: ${e instanceof Error ? e.message : String(e)}`); }
   }
   return { read: reports.length, created, status_changed: changed, errors };

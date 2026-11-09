@@ -125,7 +125,7 @@ export async function officialTextsFor(db: SupabaseClient, entity: string, codes
   for (const r of (regs ?? []) as { id: string; key: string; title: string; items_version: string }[]) {
     const { data } = await db.from("regulation_items").select("ref,kind,code,title,body_text").eq("regulation_id", r.id).eq("version", r.items_version).in("code", codes).or("change.is.null,change.neq.removed").order("ord").limit(60);
     for (const it of (data ?? []) as { ref: string; kind: string; code: string; title: string | null; body_text: string | null }[]) {
-      const block = `[${r.title} · ${r.items_version}] ${it.ref}${it.title ? " — " + it.title : ""}\n${(it.body_text ?? "").slice(0, it.kind === "ir" ? 4000 : 1500)}`;
+      const block = `[${r.title} · ${r.items_version}] ${it.ref}${it.title ? ", " + it.title : ""}\n${(it.body_text ?? "").slice(0, it.kind === "ir" ? 4000 : 1500)}`;
       if (used + block.length > maxChars) return out.join("\n\n");
       out.push(block); used += block.length;
     }

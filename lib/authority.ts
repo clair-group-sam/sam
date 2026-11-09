@@ -43,9 +43,9 @@ export function movesFrom(stage: Stage, needsSignature: boolean): Move[] {
   switch (stage) {
     case "draft": return [{ to: "compliance", label: "Hand over to Compliance", by: "owner_or_cmm", primary: true }, { to: "standby", label: "Put on standby", by: "cmm", needsNote: true }];
     case "compliance": return [
-      ...(needsSignature ? [{ to: "signing" as Stage, label: "Checked — send for signature", by: "cmm" as const, needsAllRequired: true, primary: true }] : [{ to: "ready" as Stage, label: "Checked — ready to submit", by: "cmm" as const, needsAllRequired: true, primary: true }]),
+      ...(needsSignature ? [{ to: "signing" as Stage, label: "Checked, send for signature", by: "cmm" as const, needsAllRequired: true, primary: true }] : [{ to: "ready" as Stage, label: "Checked, ready to submit", by: "cmm" as const, needsAllRequired: true, primary: true }]),
       { to: "draft", label: "Send back to the author", by: "cmm", needsNote: true }, { to: "standby", label: "Put on standby", by: "cmm", needsNote: true }];
-    case "signing": return [{ to: "ready", label: "Signed — ready to submit", by: "cmm", primary: true }, { to: "draft", label: "Send back to the author", by: "cmm", needsNote: true }];
+    case "signing": return [{ to: "ready", label: "Signed, ready to submit", by: "cmm", primary: true }, { to: "draft", label: "Send back to the author", by: "cmm", needsNote: true }];
     case "ready": return [{ to: "submitted", label: "Record the submission", by: "cmm", needsRef: true, primary: true }, { to: "compliance", label: "Back to Compliance check", by: "cmm" }];
     case "submitted": return [{ to: "remarks", label: "Remarks received", by: "cmm", needsNote: true }, { to: "approved", label: "Decision received", by: "cmm", primary: true }, { to: "standby", label: "Withdrawn / standby", by: "cmm", needsNote: true }];
     case "remarks": return [{ to: "submitted", label: "Reply sent (new version)", by: "cmm", needsNote: true, primary: true }, { to: "approved", label: "Decision received", by: "cmm" }];
@@ -165,7 +165,7 @@ export async function followRevision(db: SupabaseClient, who: { name: string; pe
       const { data: t } = await db.from("authority_file_types").select("*").eq("code", code).maybeSingle();
       const type = (t as FileType | null) ?? null;
       const route = routeFor(type, manual.entity);
-      const row = { entity: manual.entity, type_code: code, title: `${manual.code} Iss ${rev.issue} Rev ${rev.rev} — ${manual.title}`, stage, category: route.category, authority: route.authority, portal: route.portal,
+      const row = { entity: manual.entity, type_code: code, title: `${manual.code} Iss ${rev.issue} Rev ${rev.rev}, ${manual.title}`, stage, category: route.category, authority: route.authority, portal: route.portal,
         owner_role: type?.default_owner_role ?? "CMM", trigger_kind: "revision", trigger_note: "sent from the revision editor", revision_id: rev.id, portal_ref: rev.authority_ref,
         submitted_at: rev.authority_ref ? today() : null, target_date: addDays(today(), type?.target_days ?? 20), created_by: who.personId };
       const { data: created } = await db.from("authority_files").insert(row).select("*").single();

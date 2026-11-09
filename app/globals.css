@@ -609,6 +609,8 @@ details.more[open]{z-index:40}
   main.px-8{padding-left:16px;padding-right:16px}
   .grid-cols-4,.grid-cols-3{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
   .grid-cols-3 > .col-span-2 + *{grid-column:1 / -1}
+  .grid-cols-3:has(> .metric:nth-child(3):last-child){grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+  .grid-cols-4:has(> .metric:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr)) !important}
   .groupband{font-size:12px}
 }
 @media (max-width:900px){

@@ -202,13 +202,13 @@ export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): un
   ];
   if (t.detail) body.push({ type: "TextBlock", text: t.detail, wrap: true, spacing: "Small" });
   const facts: { title: string; value: string }[] = [];
-  if (t.due) facts.push({ title: "Due", value: fr(t.due) + (t.due < todayISO() ? " — overdue" : "") });
+  if (t.due) facts.push({ title: "Due", value: fr(t.due) + (t.due < todayISO() ? ", overdue" : "") });
   if (t.owner_role && !t.owner_person) facts.push({ title: "For", value: t.owner_role });
   if (facts.length) body.push({ type: "FactSet", facts, spacing: "Small" });
   const actions: unknown[] = [];
   if (state) {
     const label = state.answered === "done" ? "✓ Done" : state.answered === "not_yet" ? "Not yet" : state.answered === "closed" ? "✓ Done" : "No longer needed";
-    body.push({ type: "TextBlock", text: `${label} — ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" || state.answered === "closed" ? "Good" : state.answered === "not_yet" ? "Attention" : "Default", weight: "Bolder", spacing: "Medium" });
+    body.push({ type: "TextBlock", text: `${label}, ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" || state.answered === "closed" ? "Good" : state.answered === "not_yet" ? "Attention" : "Default", weight: "Bolder", spacing: "Medium" });
   } else if (opts.actions) {
     if (opts.hint) body.push({ type: "TextBlock", text: opts.hint, wrap: true, isSubtle: true, spacing: "Medium" });
     body.push({ type: "Input.Text", id: "comment", placeholder: opts.commentHint ?? "Comment", isMultiline: true, spacing: "Small" });
@@ -266,7 +266,7 @@ export function promoCard(t: TaskRow, p: { id: string; kind: string; number: str
   if (p.summary) body.push({ type: "TextBlock", text: p.summary, wrap: true, weight: "Bolder", spacing: "Small" });
   for (const para of text.split(/\n\s*\n/).filter(Boolean).slice(0, 12)) body.push({ type: "TextBlock", text: para, wrap: true, spacing: "Small" });
   const actions: unknown[] = [];
-  if (state) body.push({ type: "TextBlock", text: `✓ ${p.ack_required ? "Acknowledged" : "Read"} — ${state.by}, ${state.at}`, wrap: true, color: "Good", weight: "Bolder", spacing: "Medium" });
+  if (state) body.push({ type: "TextBlock", text: `✓ ${p.ack_required ? "Acknowledged" : "Read"}, ${state.by}, ${state.at}`, wrap: true, color: "Good", weight: "Bolder", spacing: "Medium" });
   else actions.push({ type: "Action.Execute", title: p.ack_required ? "I have read and understood" : "Read", verb: "promo_ack", style: "positive", data: { taskId: t.id, promoId: p.id } });
   actions.push({ type: "Action.OpenUrl", title: "Open in S.A.M.", url });
   return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions, msteams: { width: "Full" } };
@@ -286,7 +286,7 @@ export function submitConfirmCard(t: TaskRow, f: { id: string; title: string; au
     ] },
     { type: "Input.Text", id: "comment", label: "Note (optional)", maxLength: 500 },
   ], actions: [
-    { type: "Action.Execute", title: "Confirm — it is submitted", verb: "file_submit_confirm", style: "positive", data: { taskId: t.id, fileId: f.id } },
+    { type: "Action.Execute", title: "Confirm, it is submitted", verb: "file_submit_confirm", style: "positive", data: { taskId: t.id, fileId: f.id } },
     { type: "Action.Execute", title: "Cancel", verb: "file_submit_cancel", data: { taskId: t.id } },
   ], msteams: { width: "Full" } };
 }

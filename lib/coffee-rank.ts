@@ -35,7 +35,7 @@ export function candidates(r: Omit<Recap, "synthesis">, nowHm: string): Cand[] {
   (r.agenda?.items ?? []).forEach((a, i) => {
     if (a.allDay || !a.busy || a.end.slice(11) <= nowHm) return;
     const startsSoon = a.start.slice(11) <= addHm(nowHm, 120);
-    c.push({ id: `ag${i}`, key: `agenda:${a.subject.toLowerCase()}`, keyLabel: a.subject, tier: startsSoon ? 2 : 3, max: startsSoon ? 2 : 3, title: `${a.start.slice(11)}–${a.end.slice(11)} ${a.subject}`, why: startsSoon ? "Meeting within 2 h" : "Meeting today", action: a.sam ? `Prepare — ${a.sam.label}` : "Be ready", sources: [{ kind: "agenda", label: "Meeting", link: a.sam?.link ?? a.link }], text: `meeting ${a.start.slice(11)} ${a.subject}${a.sam ? " [S.A.M. " + a.sam.label + "]" : ""}` });
+    c.push({ id: `ag${i}`, key: `agenda:${a.subject.toLowerCase()}`, keyLabel: a.subject, tier: startsSoon ? 2 : 3, max: startsSoon ? 2 : 3, title: `${a.start.slice(11)}–${a.end.slice(11)} ${a.subject}`, why: startsSoon ? "Meeting within 2 h" : "Meeting today", action: a.sam ? `Prepare, ${a.sam.label}` : "Be ready", sources: [{ kind: "agenda", label: "Meeting", link: a.sam?.link ?? a.link }], text: `meeting ${a.start.slice(11)} ${a.subject}${a.sam ? " [S.A.M. " + a.sam.label + "]" : ""}` });
   });
   (r.mail?.groups ?? []).forEach((g) => g.items.forEach((m, i) => {
     const t: Tier = g.name === "Notifications" ? (m.action ? 3 : 4) : g.name === "Authorities" ? 2 : m.action ? 2 : 3;
@@ -46,7 +46,7 @@ export function candidates(r: Omit<Recap, "synthesis">, nowHm: string): Cand[] {
   // Lot 2 · what the person is waiting for (sent, unanswered)
   (r.waiting ?? []).forEach((w, i) => {
     const days = Math.max(1, Math.round((Date.now() - new Date(w.since).getTime()) / 864e5));
-    c.push({ id: `wt${i}`, key: `wait:${w.subject.toLowerCase()}`, keyLabel: w.subject, draftable: true, tier: 3, max: 3, title: `${w.who} — ${w.subject}`, why: `No answer for ${days} days`, action: `Chase ${w.who.split(",")[0]}`, badge: "you-wait", sources: [{ kind: w.kind, label: w.kind === "mail" ? "Mail · sent" : "Teams · sent", link: w.link }], text: `YOU are waiting: you asked ${w.who} (${w.kind}) ${days} days ago, no answer yet: ${w.subject} — ${w.preview}` });
+    c.push({ id: `wt${i}`, key: `wait:${w.subject.toLowerCase()}`, keyLabel: w.subject, draftable: true, tier: 3, max: 3, title: `${w.who}, ${w.subject}`, why: `No answer for ${days} days`, action: `Chase ${w.who.split(",")[0]}`, badge: "you-wait", sources: [{ kind: w.kind, label: w.kind === "mail" ? "Mail · sent" : "Teams · sent", link: w.link }], text: `YOU are waiting: you asked ${w.who} (${w.kind}) ${days} days ago, no answer yet: ${w.subject}, ${w.preview}` });
   });
   return c;
 }

@@ -27,10 +27,10 @@ export type Recap = {
   ranked?: Ranked;
 };
 export const SOURCES = [
-  { id: "sam", label: "S.A.M. — deadlines, readings, validities, what moved", ready: true },
-  { id: "calendar", label: "Outlook calendar — today's agenda", ready: true },
-  { id: "mail", label: "Outlook mail — unread since yesterday 18:00", ready: true },
-  { id: "teams", label: "Teams — unread chats and @mentions", ready: true },
+  { id: "sam", label: "S.A.M.: deadlines, readings, validities, what moved", ready: true },
+  { id: "calendar", label: "Outlook calendar: today's agenda", ready: true },
+  { id: "mail", label: "Outlook mail: unread since yesterday 18:00", ready: true },
+  { id: "teams", label: "Teams: unread chats and @mentions", ready: true },
 ];
 
 /** Date (YYYY-MM-DD) and wall-clock parts in Paris time. */
@@ -109,7 +109,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
       const c = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, now.getTime(), (r.source ?? "sam") !== "sam");
       if (c.state !== "running" && c.state !== "late") continue;
       const late = c.state === "late"; const d = Math.floor(-c.left / 24);
-      mor.push({ kind: "mor", label: late ? `expired ${d >= 1 ? `${d} d` : `${-c.left} h`} ago` : `${c.left} h left`, cls: late || c.left <= 24 ? "k-comp" : "k-cert", title: `Report ${r.id} · ${r.headline}`, note: late ? "MOR decision overdue — decide now" : a?.mor_status ? `MOR ${a.mor_status} (proposed)` : "MOR to assess", entity: r.entity, link: `/safe/reports/${r.id}` });
+      mor.push({ kind: "mor", label: late ? `expired ${d >= 1 ? `${d} d` : `${-c.left} h`} ago` : `${c.left} h left`, cls: late || c.left <= 24 ? "k-comp" : "k-cert", title: `Report ${r.id} · ${r.headline}`, note: late ? "MOR decision overdue, decide now" : a?.mor_status ? `MOR ${a.mor_status} (proposed)` : "MOR to assess", entity: r.entity, link: `/safe/reports/${r.id}` });
     }
   }
 
@@ -119,7 +119,7 @@ export async function gather(s: Session): Promise<Omit<Recap, "synthesis" | "age
   {
     const { data } = await db.from("manual_notices").select("sent_at,manual_id,entity,revisions(rev),manuals(code,title)").in("entity", scope).gte("sent_at", sinceIso).limit(20);
     for (const n of (data ?? []) as unknown as { sent_at: string; manual_id: string; entity: string; revisions: { rev: string } | null; manuals: { code: string; title: string } | null }[])
-      moved.push({ at: n.sent_at, l: { kind: "published", label: "Published", cls: "k-docs", title: `${n.manuals?.code ?? ""} Rev ${n.revisions?.rev ?? ""} — ${n.manuals?.title ?? ""}`, entity: n.entity, link: `/docs/manual/${n.manual_id}`, note: hhmm(n.sent_at) } });
+      moved.push({ at: n.sent_at, l: { kind: "published", label: "Published", cls: "k-docs", title: `${n.manuals?.code ?? ""} Rev ${n.revisions?.rev ?? ""}, ${n.manuals?.title ?? ""}`, entity: n.entity, link: `/docs/manual/${n.manual_id}`, note: hhmm(n.sent_at) } });
   }
   if (office) {
     const { data: files } = await db.from("authority_files").select("id,title,entity,stage,owner_role,owner_person").in("entity", scope).gte("updated_at", sinceIso).limit(40);

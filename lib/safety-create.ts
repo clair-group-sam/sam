@@ -21,6 +21,6 @@ export async function createReport(db: SupabaseClient, r: NewReport, reporterId:
   }
   const due = new Date(Date.now() + 72 * 3600e3).toISOString().slice(0, 10);
   await db.from("report_events").insert({ report_id: id, kind: "received", to_reporter: true, note: opts.note ?? (r.anonymous ? "Received (anonymous)" : opts.source === "teams" ? "Received (from a Teams conversation)" : "Received") });
-  await db.from("tasks").insert({ entity: r.entity, kind: "safety_report", title: `Safety report ${id} — ${r.headline.trim().slice(0, 120)}`, detail: "New report: acknowledge, classify and decide on the MOR within 72 h of receipt.", due, owner_role: "SM", status: "open", link: `/safe/reports/${id}` });
+  await db.from("tasks").insert({ entity: r.entity, kind: "safety_report", title: `Safety report ${id}, ${r.headline.trim().slice(0, 120)}`, detail: "New report: acknowledge, classify and decide on the MOR within 72 h of receipt.", due, owner_role: "SM", status: "open", link: `/safe/reports/${id}` });
   return { ok: true, id };
 }

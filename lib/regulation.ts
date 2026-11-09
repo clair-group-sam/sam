@@ -39,7 +39,7 @@ export async function recordVersion(db: SupabaseClient, r: Regulation, v: { vers
   if (!first) for (const entity of r.entities) {
     const t = await topicFor(db, entity, r);
     const row = { number: await nextEntryNumber(db, entity), entity, topic_id: t?.id ?? null, source_kind: r.kind === "ear" ? "easa" : "misc", domain: t?.domain ?? "compliance",
-      title: `${r.title} — ${v.version}`.slice(0, 300), reference: r.number, url: r.page_url, published_on: today(), applicability: "to_analyse", owner_role: t?.owner_role ?? "CMM", owner_person: t?.owner_person ?? null, status: "open", regulation_id: r.id, created_by: by,
+      title: `${r.title}, ${v.version}`.slice(0, 300), reference: r.number, url: r.page_url, published_on: today(), applicability: "to_analyse", owner_role: t?.owner_role ?? "CMM", owner_person: t?.owner_person ?? null, status: "open", regulation_id: r.id, created_by: by,
       impact: `New version of the ${r.short} Easy Access Rules (previous: ${r.current_version}). See what changed and the manuals concerned.` };
     const { data } = await db.from("watch_entries").insert(row).select("*").single();
     if (data) { entries.push((data as Entry).id); await syncEntryTask(db, data as Entry); }
@@ -100,7 +100,7 @@ export const KNOWN_TEXTS: { pattern: string; label: string; key?: string }[] = [
   { pattern: "2019/947", label: "Unmanned aircraft (EU) 2019/947" },
   { pattern: "CS-MMEL", label: "CS-MMEL" },
   { pattern: "CS-GEN-MMEL", label: "CS-GEN-MMEL" },
-  { pattern: "Doc 9284", label: "ICAO Doc 9284 — Technical Instructions (dangerous goods)" },
+  { pattern: "Doc 9284", label: "ICAO Doc 9284. Technical Instructions (dangerous goods)" },
   { pattern: "1199/2011", label: "(EU) 1199/2011" },
   { pattern: "2021/1296", label: "Fuel / energy planning (EU) 2021/1296" },
 ];

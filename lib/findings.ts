@@ -138,7 +138,7 @@ export async function syncFindingTasks(db: SupabaseClient, f: Finding, extra?: {
   const head = `${f.number} — ${f.title}`.slice(0, 160);
   const n = extra?.points?.length;
   if (f.status === "open") want.push({ kind: "finding", title: `Answer ${head}`, detail: `${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? ` · ${f.requirement}` : ""}. Root cause (why the organisation let this happen), then the corrective action plan, then send both to Compliance. S.A.M. reads each part with you before sending.`, ...owner, due: f.due });
-  if (f.status === "back") want.push({ kind: "finding", title: `Analysis sent back — ${n ?? "some"} point${(n ?? 2) === 1 ? "" : "s"} to address · ${head}`.slice(0, 200), detail: (extra?.points ?? []).map((p) => `• ${p.label}`).join("\n") || "Compliance asked for a complement; see the finding.", ...owner, due: f.due });
+  if (f.status === "back") want.push({ kind: "finding", title: `Analysis sent back, ${n ?? "some"} point${(n ?? 2) === 1 ? "" : "s"} to address · ${head}`.slice(0, 200), detail: (extra?.points ?? []).map((p) => `• ${p.label}`).join("\n") || "Compliance asked for a complement; see the finding.", ...owner, due: f.due });
   if (f.status === "review") want.push({ kind: "finding_review", title: `Read the analysis · ${head}`, detail: "Root cause and corrective action plan received: accept both (the plan starts), or send back with the points to address.", ...cmm, due: today() });
   if (f.status === "closure_requested") want.push({ kind: "finding_review", title: `Closure requested · ${head}`, detail: "The plan is reported complete: check the evidence (published changes verified, actions verified) and close, or send back.", ...cmm, due: today() });
   const keep = new Set<string>();
@@ -159,7 +159,7 @@ export async function sweepFindings(db: SupabaseClient): Promise<number> {
     const { data: ex } = await db.from("tasks").select("id").eq("ref_id", f.id).eq("kind", "finding_closure").limit(1);
     if (ex?.length) continue;
     const owner = f.owner_person ? { owner_role: null, owner_person: f.owner_person } : { owner_role: f.owner_role ?? "CMM", owner_person: null };
-    await db.from("tasks").insert({ entity: f.entity, kind: "finding_closure", title: `Closure proposed · ${f.number} — ${f.title}`.slice(0, 200), detail: "Every expected change is published and verified, every action is verified: request the closure from the finding.", ...owner, due: today(), status: "open", link: `/comp/find/${f.id}`, ref_id: f.id });
+    await db.from("tasks").insert({ entity: f.entity, kind: "finding_closure", title: `Closure proposed · ${f.number}, ${f.title}`.slice(0, 200), detail: "Every expected change is published and verified, every action is verified: request the closure from the finding.", ...owner, due: today(), status: "open", link: `/comp/find/${f.id}`, ref_id: f.id });
     n++;
   }
   return n;

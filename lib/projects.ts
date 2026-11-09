@@ -105,7 +105,7 @@ export async function openFileForProjectTask(db: SupabaseClient, who: Who, p: Pr
   const type = ty as FileType;
   const route = routeFor(type, p.entity);
   const pivotTxt = [p.pivot?.aircraft_type, p.pivot?.aircraft_reg, p.pivot?.np_post_code].filter(Boolean).join(" ");
-  const row = { entity: p.entity, type_code: type.code, title: `${task.title}${pivotTxt ? ` — ${pivotTxt}` : ""}`, stage: "draft", category: route.category, authority: route.authority, portal: route.portal,
+  const row = { entity: p.entity, type_code: type.code, title: `${task.title}${pivotTxt ? `, ${pivotTxt}` : ""}`, stage: "draft", category: route.category, authority: route.authority, portal: route.portal,
     owner_role: task.owner_role ?? type.default_owner_role ?? "CMM", trigger_kind: "other", trigger_note: `Project: ${p.title}`, aircraft_reg: p.pivot?.aircraft_reg ?? null, np_post_code: p.pivot?.np_post_code ?? null,
     project_id: p.id, triggered_at: today(), target_date: addDays(today(), type.target_days + 14), created_by: who.personId };
   const { data: created, error } = await db.from("authority_files").insert(row).select("*").single();
@@ -149,9 +149,9 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
     const revs = (rs ?? []) as { id: string; manual_id: string; rev: string; issue: number; step: string; created_at: string; published_at: string | null }[];
     for (const t of manualTasks) {
       const m = manuals.find((x) => x.code === t.link_ref);
-      if (!m) { out.set(t.id, { label: `${t.link_ref} — not in ${p.entity} yet`, href: `/docs/new?entity=${p.entity}&code=${encodeURIComponent(t.link_ref ?? "")}`, state: "create it", tone: "" }); continue; }
+      if (!m) { out.set(t.id, { label: `${t.link_ref}, not in ${p.entity} yet`, href: `/docs/new?entity=${p.entity}&code=${encodeURIComponent(t.link_ref ?? "")}`, state: "create it", tone: "" }); continue; }
       const r = (t.link_id && revs.find((x) => x.id === t.link_id)) || revs.find((x) => x.manual_id === m.id);
-      if (!r) { out.set(t.id, { label: `${m.code} — ${m.title}`, href: `/docs/manual/${m.id}`, state: "no revision started", tone: "" }); continue; }
+      if (!r) { out.set(t.id, { label: `${m.code}, ${m.title}`, href: `/docs/manual/${m.id}`, state: "no revision started", tone: "" }); continue; }
       if (t.link_id !== r.id) await db.from("project_tasks").update({ link_id: r.id, status: t.status === "todo" ? "in_progress" : t.status, started_at: t.started_at ?? r.created_at.slice(0, 10), updated_at: new Date().toISOString() }).eq("id", t.id);
       const published = r.step === "published" || r.step === "repository";
       if (published && t.status !== "done" && t.status !== "not_needed") await db.from("project_tasks").update({ status: "done", done_at: r.published_at ?? today(), updated_at: new Date().toISOString() }).eq("id", t.id);
@@ -165,7 +165,7 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
     const files = (fs ?? []) as { id: string; title: string; stage: string; portal_ref: string | null; type_code: string }[];
     for (const t of fileTasks) {
       const f = files.find((x) => x.id === t.link_id);
-      if (!f) { out.set(t.id, { label: `${t.link_ref ?? "CAA application"} — not opened yet`, href: "", state: "open the file", tone: "" }); continue; }
+      if (!f) { out.set(t.id, { label: `${t.link_ref ?? "CAA application"}, not opened yet`, href: "", state: "open the file", tone: "" }); continue; }
       const done = ["approved", "published", "closed"].includes(f.stage);
       out.set(t.id, { label: `${f.type_code} · ${f.portal_ref ?? f.title}`, href: `/proj/auth/${f.id}`, state: f.stage, tone: done ? "green" : f.stage === "remarks" ? "red" : "amber" });
     }
@@ -177,7 +177,7 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
     const mocs = (ms ?? []) as { id: string; number: string; status: string; moc_status: string | null; project_task_id: string | null }[];
     for (const t of mocTasks) {
       const m = (t.link_id && mocs.find((x) => x.id === t.link_id)) || mocs.find((x) => x.project_task_id === t.id);
-      if (!m) { out.set(t.id, { label: "MOC — not opened yet", href: `/safe/moc/new?project=${p.id}&task=${t.id}`, state: "open it", tone: "" }); continue; }
+      if (!m) { out.set(t.id, { label: "MOC, not opened yet", href: `/safe/moc/new?project=${p.id}&task=${t.id}`, state: "open it", tone: "" }); continue; }
       const done = m.status === "accepted" || ["approved", "implemented", "closed"].includes(m.moc_status ?? "");
       if (done && t.status !== "done" && t.status !== "not_needed") await db.from("project_tasks").update({ status: "done", done_at: today(), updated_at: new Date().toISOString() }).eq("id", t.id);
       out.set(t.id, { label: m.number, href: `/safe/risk/a/${m.id}`, state: m.moc_status ?? m.status, tone: done ? "green" : "amber" });
@@ -190,7 +190,7 @@ export async function resolveLinks(db: SupabaseClient, p: Project, tasks: Task[]
     const certs = (cs ?? []) as { id: string; kind: string; registration: string | null; title: string; valid_until: string | null }[];
     for (const t of certTasks) {
       const c = (t.link_id && certs.find((x) => x.id === t.link_id)) || certs.find((x) => x.kind === t.link_ref && (!reg || x.registration === reg));
-      if (!c) { out.set(t.id, { label: `${t.link_ref ?? "certificate"}${reg ? ` for ${reg}` : ""} — not filed yet`, href: `/docs/files?entity=${p.entity}`, state: "upload it", tone: "" }); continue; }
+      if (!c) { out.set(t.id, { label: `${t.link_ref ?? "certificate"}${reg ? ` for ${reg}` : ""}, not filed yet`, href: `/docs/files?entity=${p.entity}`, state: "upload it", tone: "" }); continue; }
       if (t.link_id !== c.id || (t.status !== "done" && t.status !== "not_needed")) await db.from("project_tasks").update({ link_id: c.id, status: "done", done_at: t.done_at ?? today(), updated_at: new Date().toISOString() }).eq("id", t.id);
       out.set(t.id, { label: `${c.title}${c.valid_until ? ` · valid until ${c.valid_until}` : ""}`, href: `/docs/files?entity=${p.entity}`, state: "filed", tone: "green" });
     }
