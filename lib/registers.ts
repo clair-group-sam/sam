@@ -18,6 +18,9 @@ export type Reg = {
 
 const LMH: [string, string][] = [["low", "Low"], ["medium", "Medium"], ["high", "High"]];
 const ROLE_PH = "SM, CMM, NPFO…";
+const APPLIES: [string, string][] = [["all", "Every scenario"], ["safety", "Safety emergency"], ["security", "Security emergency"], ["cyber", "Cyber-attack, IS event"], ["overdue", "Aircraft overdue"]];
+export const ZONES: [string, string][] = [["g_compta", "Group, Accounting"], ["g_hr", "Group, HR"], ["g_it", "Group, IT"], ["g_mkt", "Group, Marketing"], ["g_own", "Group, Marketing / Owner"], ["g_gen", "Group, Generic"], ["trans", "Transverse"], ["fo", "Flight Ops"], ["camo", "Group CAMO (AJD)"], ["go", "Ground Ops"], ["training", "Training"], ["caa", "CAA / EASA, State channels"], ["asf", "Astonfly (ATO)"], ["pending", "Awaiting reply"]];
+const ZONE_OPTS = ZONES;
 
 export const REGS: Record<string, Reg> = {
   aircraft: {
@@ -46,6 +49,11 @@ export const REGS: Record<string, Reg> = {
       { k: "reviewed_on", label: "Last review", type: "date" },
       { k: "next_review", label: "Next review", type: "date" },
       { k: "owner_role", label: "Owner (post)", mono: true, placeholder: "SM" },
+      { k: "cell_safety", label: "Unit for a safety emergency (posts)", mono: true, span: 2, placeholder: "AM, SM, NPFO, NPCA" },
+      { k: "cell_security", label: "Unit for a security or cyber emergency (posts)", mono: true, span: 2, placeholder: "AM, NPCT, SM, ISM" },
+      { k: "deputy_rule", label: "If the AM is unavailable", span: 2 },
+      { k: "location", label: "Crisis room and paper copy", span: 2 },
+      { k: "triggers", label: "Events that may activate the plan, one per line", type: "textarea", span: 4 },
       { k: "note", label: "Note", type: "textarea", span: 4 },
     ],
     list: ["title", "code", "manual_ref", "version", "reviewed_on", "next_review"], order: [["code", true], ["title", true]],
@@ -54,26 +62,46 @@ export const REGS: Record<string, Reg> = {
     table: "erp_contacts", path: "/erp/contacts", noun: "contact", posts: ["SM", "AM"],
     fields: [
       { k: "crisis_role", label: "Role in the crisis", required: true, span: 2, placeholder: "Crisis director, Family assistance, BEA…" },
+      { k: "kind", label: "Kind", type: "select", options: [["internal", "Unit member, staff"], ["authority", "Authority"], ["investigation", "Investigation bureau"], ["partner", "Partner, insurer"], ["contractor", "Contracted organisation"], ["emergency", "Emergency services"]] },
+      { k: "post", label: "Post (holder taken from NP management)", mono: true, placeholder: "NPFO" },
       { k: "name", label: "Name" },
+      { k: "deputy", label: "Deputy" },
       { k: "organisation", label: "Organisation" },
       { k: "phone", label: "Phone", mono: true },
       { k: "email", label: "E-mail" },
       { k: "available", label: "Availability", placeholder: "24/7" },
       { k: "ord", label: "Order", type: "number" },
+      { k: "erp_clause", label: "Contractor: mutual ERP notification in the contract", type: "bool" },
       { k: "note", label: "Note", type: "textarea", span: 4 },
     ],
-    list: ["crisis_role", "name", "organisation", "phone", "email", "available"], order: [["ord", true], ["crisis_role", true]],
+    list: ["crisis_role", "name", "organisation", "phone", "email", "kind"], order: [["ord", true], ["crisis_role", true]],
+    tone: { kind: { internal: "", authority: "amber", investigation: "amber", partner: "", contractor: "", emergency: "red" } },
   },
   erp_checklists: {
     table: "erp_checklists", path: "/erp/check", noun: "checklist", posts: ["SM", "AM"],
     fields: [
-      { k: "title", label: "Title", required: true, span: 2, placeholder: "Crisis director, first hour" },
-      { k: "phase", label: "Phase", type: "select", options: [["first hour", "First hour"], ["first day", "First day"], ["recovery", "Recovery"]] },
+      { k: "code", label: "Code", mono: true, placeholder: "ERP-AJD-04" },
+      { k: "title", label: "Title", required: true, span: 3, placeholder: "Accountable Manager" },
+      { k: "phase", label: "Phase", type: "select", options: [["alert", "Before activation"], ["first hour", "First hour"], ["first day", "First day"], ["recovery", "Recovery"]] },
       { k: "owner_role", label: "Who runs it", mono: true, placeholder: ROLE_PH },
-      { k: "items", label: "Actions, one per line", type: "textarea", span: 4, required: true },
+      { k: "applies", label: "Scenario", type: "select", options: APPLIES },
       { k: "ord", label: "Order", type: "number" },
+      { k: "items", label: "Actions, one per line", type: "textarea", span: 4, required: true },
+      { k: "source", label: "Source", span: 4, placeholder: "AJD MSM 9.7.3.4" },
     ],
-    list: ["title", "phase", "owner_role"], order: [["ord", true], ["title", true]],
+    list: ["title", "code", "phase", "owner_role", "applies", "source"], order: [["ord", true], ["title", true]],
+  },
+  erp_milestones: {
+    table: "erp_milestones", path: "/erp/times", noun: "milestone", posts: ["SM", "AM"],
+    fields: [
+      { k: "label", label: "What must be done", required: true, span: 3, placeholder: "Passengers and crew on board sent to the authority" },
+      { k: "minutes", label: "Minutes after the start (0 = at once)", type: "number" },
+      { k: "owner_role", label: "Who", mono: true, placeholder: ROLE_PH },
+      { k: "applies", label: "Scenario", type: "select", options: APPLIES },
+      { k: "ord", label: "Order", type: "number" },
+      { k: "source", label: "Source", placeholder: "MSM 9.6.3" },
+    ],
+    list: ["label", "minutes", "owner_role", "applies", "source"], order: [["minutes", true], ["ord", true]],
   },
   erp_exercises: {
     table: "erp_exercises", path: "/erp/exer", noun: "exercise", posts: ["SM", "AM"],
@@ -93,17 +121,28 @@ export const REGS: Record<string, Reg> = {
     table: "is_systems", path: "/is/systems", noun: "system", posts: ["ISM", "AM"],
     fields: [
       { k: "name", label: "System", required: true, placeholder: "Leon, FlightLogger…" },
-      { k: "kind", label: "Domain", placeholder: "operations, maintenance, training…" },
+      { k: "short", label: "Role in one line", span: 2 },
+      { k: "dept", label: "Department", placeholder: "Flight Ops, Group CAMO…" },
+      { k: "zone", label: "Zone on the map", type: "select", options: ZONE_OPTS },
+      { k: "resp", label: "Responsibility", type: "select", options: [["own", "Entity (own contract)"], ["grp", "Clair Group or another entity"], ["auth", "Authority or State"]] },
+      { k: "contract", label: "Contract and IS clauses", type: "select", options: [["tbc", "Holder or IS clauses to confirm"], ["ok", "Confirmed"], ["none", "No contract"]] },
+      { k: "ops_impact", label: "Operational impact", type: "select", options: [["?", "Not known"], ["Y", "Yes"], ["N", "No"]] },
+      { k: "purpose", label: "Purpose", type: "textarea", span: 2 },
+      { k: "data", label: "Data held", span: 2 },
       { k: "provider", label: "Provider" },
       { k: "hosting", label: "Hosting", placeholder: "SaaS EU" },
-      { k: "data", label: "Data held", span: 2 },
       { k: "owner_role", label: "Owner (post)", mono: true, placeholder: ROLE_PH },
+      { k: "status", label: "Status", type: "select", options: [["confirmed", "Confirmed"], ["to_confirm", "To be confirmed"], ["awaiting", "Awaiting the department's reply"]] },
+      { k: "attention", label: "Attention level", type: "select", options: [["", "None"], ["critical", "Critical"], ["serious", "To address"], ["warning", "To monitor"]] },
+      { k: "ring", label: "Ring (1 critical, 2 standard, 3 lower)", type: "number" },
       { k: "criticality", label: "Criticality", type: "select", options: LMH },
       { k: "safety_relevant", label: "Aviation safety relevant", type: "bool" },
-      { k: "note", label: "Note", type: "textarea", span: 4 },
+      { k: "source", label: "Source", placeholder: "Who answered, decision" },
+      { k: "reviewed_on", label: "Last review", type: "date" },
+      { k: "note", label: "Observations, one per line", type: "textarea", span: 4 },
     ],
-    list: ["name", "kind", "provider", "hosting", "criticality", "safety_relevant"], order: [["name", true]],
-    tone: { criticality: { high: "red", medium: "amber", low: "" } },
+    list: ["name", "dept", "resp", "contract", "ops_impact", "attention", "status"], order: [["name", true]],
+    tone: { criticality: { high: "red", medium: "amber", low: "" }, attention: { critical: "red", serious: "amber", warning: "" }, contract: { tbc: "amber", ok: "green", none: "red" }, status: { confirmed: "", to_confirm: "amber", awaiting: "amber" } },
   },
   is_flows: {
     table: "is_flows", path: "/is/flows", noun: "interface", posts: ["ISM", "AM"],

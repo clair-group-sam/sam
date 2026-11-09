@@ -93,6 +93,7 @@ button.ent.on.ASJMT{background:var(--blue05);color:var(--cyan-ink)}button.ent.on
 .metric .val{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:4px 0 2px}
 .metric.red{--st:var(--state-red)}.metric.red .val{color:var(--state-red)}
 .metric.amber{--st:var(--amber)}.metric.green{--st:var(--green)}.metric.none{--st:var(--blue2)}.metric.none .val{color:var(--slate6)}
+.metric.info{--st:var(--cyan-ink)}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl th{text-align:left;font-size:12.5px;font-weight:600;color:var(--slate6);padding:12px 16px;border-bottom:1px solid var(--line)}
 .tbl td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -831,6 +832,11 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 .erp-banner .cb{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
 .erp-banner b{color:var(--state-red);font-size:15px}
 .erp-banner.ex{background:var(--amber-s);border-color:var(--amber-line)}.erp-banner.ex b{color:var(--amber-ink)}
+.erp-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;margin:0}.erp-info dt{font-size:11.5px;color:var(--slate6)}.erp-info dd{margin:0;font-size:13.5px;color:var(--navy)}
+.erp-sheet summary{cursor:pointer;font-weight:600;color:var(--navy)}
+.erp-print{max-width:900px}.erp-print h2{font-size:17px;margin:22px 0 8px;color:var(--navy)}.erp-print h3{font-size:14px;margin:14px 0 4px}.erp-print ol{margin:0 0 8px;padding-left:22px;font-size:13px;line-height:1.45}.erp-print ol li{padding:1px 0}
+.erp-print .box{display:inline-block;width:11px;height:11px;border:1px solid var(--slate6);margin-right:6px;vertical-align:-1px}
+@media print{.erp-print h2{break-after:avoid}.erp-print section{break-inside:avoid}}
 .erp-todo,.erp-done{display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13.5px}
 .erp-done s{color:var(--slate6)}
 @media (max-width:900px){.erp-live{grid-template-columns:minmax(0,1fr) !important}}

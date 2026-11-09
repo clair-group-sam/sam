@@ -16,7 +16,7 @@ function valueOf(reg: Reg, fd: FormData, k: string): unknown {
   const raw = String(fd.get(k) ?? "").trim();
   if (f.type === "bool") return raw === "yes" ? true : raw === "no" ? false : null;
   if (f.type === "number") { if (!raw) return null; const n = Number(raw); return Number.isFinite(n) ? n : null; }
-  if (f.type === "select") return f.options?.some(([v]) => v === raw) ? raw : null;
+  if (f.type === "select") return raw && f.options?.some(([v]) => v === raw) ? raw : null;
   return raw || null;
 }
 

@@ -14,7 +14,7 @@ export function PageHeader({ eyebrow, title, sub, right, tag, stacked }: { eyebr
 }
 // DA v3 (06/11): every figure card carries a 3 px state rule on top. red = late, amber = to watch, green = nothing pending,
 // cyan-ink = information (default), pale = empty (a zero without a tone).
-export function Metric({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: "amber" | "red" | "green" | "none" }) {
+export function Metric({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: "amber" | "red" | "green" | "info" | "none" }) {
   const t = tone ?? (value === 0 || value === "0" ? "none" : undefined);
   return (
     <div className={"metric" + (t ? " " + t : "")}>

@@ -9,6 +9,7 @@ import { sweepWatch } from "@/lib/watch";
 import { sweepAuditors, sweepChecks } from "@/lib/compliance-registers";
 import { sweepKpis, sweepProgrammeReviews } from "@/lib/compliance-kpi";
 import { ENTS4 } from "@/lib/nav";
+import { sweepErpIs } from "@/lib/erp-sweep";
 // Daily (Hobby plan): CAA applications past their target date get a follow-up task for Compliance (PRJ-01 §6.2);
 // step 4 will add 90/30/7-day certificate alerts, MOR 72 h clock (SAF-01), reading reminders.
 export async function GET(req: NextRequest) {
@@ -88,6 +89,7 @@ export async function GET(req: NextRequest) {
   // KPI-01 · ENR-CM-06: previous month's indicators snapshotted in the first days of the month; AUD-04: annual review of the programme due
   jobs.kpi_snapshots = await sweepKpis(db, ENTS4);
   jobs.programme_reviews = await sweepProgrammeReviews(db);
+  jobs.erp_is = await sweepErpIs(db);
   // SOC-02 · one reminder / escalation ladder for every open item past its due date (Settings › Notification rules)
   const esc = await runEscalations(db);
   for (const [k, v] of Object.entries(esc)) jobs[`escalation_${k}`] = v;

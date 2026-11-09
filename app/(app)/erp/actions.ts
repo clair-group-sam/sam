@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { INFO, SCENARIOS, posts } from "@/lib/erp";
 
 /* ERP · activation mode: start (alert or activation, real or exercise), log, tick the checklists, close. The log is append-only. */
 const db = () => supabaseAdmin();
@@ -25,16 +26,33 @@ export async function startActivation(fd: FormData) {
   if (!title) throw new Error("Say in a few words what happened.");
   const exercise = fd.get("exercise") === "on";
   const level = fd.get("level") === "activation" ? "activation" : "alert";
-  const plan = String(fd.get("plan") ?? "") || null;
-  const { data, error } = await db().from("erp_activations").insert({ entity, title: title.slice(0, 200), exercise, level, plan_id: plan, started_by: s.person?.id ?? null }).select("id").single();
+  const scenario = SCENARIOS.some(([k]) => k === String(fd.get("scenario"))) ? String(fd.get("scenario")) : "safety";
+  let plan = String(fd.get("plan") ?? "") || null;
+  const info: Record<string, string> = {};
+  for (const [k] of INFO) { const v = String(fd.get("i_" + k) ?? "").trim(); if (v) info[k] = v.slice(0, 300); }
+  // the plan of the entity is taken by default: its response unit decides who is called out
+  const { data: pl } = plan ? await db().from("erp_plans").select("id,cell_safety,cell_security").eq("id", plan).maybeSingle()
+    : await db().from("erp_plans").select("id,cell_safety,cell_security").eq("entity", entity).eq("active", true).order("created_at").limit(1).maybeSingle();
+  const P = pl as { id: string; cell_safety: string | null; cell_security: string | null } | null;
+  if (P) plan = P.id;
+  const cell = [...new Set(["AM", "SM", "CMM", ...posts(scenario === "security" || scenario === "cyber" ? P?.cell_security : P?.cell_safety)])];
+  if (scenario === "cyber" && !cell.includes("ISM")) cell.push("ISM");
+  const { data, error } = await db().from("erp_activations").insert({ entity, title: title.slice(0, 200), exercise, level, scenario, info: Object.keys(info).length ? info : null, plan_id: plan, started_by: s.person?.id ?? null }).select("id").single();
   if (error) throw new Error(error.message);
   const id = (data as { id: string }).id;
-  await db().from("erp_events").insert({ activation_id: id, person_id: s.person?.id ?? null, kind: "status", text: `${exercise ? "EXERCISE. " : ""}${level === "activation" ? "ERP activated" : "Alert raised"} by ${s.name}: ${title}` });
-  // the crisis cell gets an Inbox item at once (and so a Teams card at the next sweep)
+  await db().from("erp_events").insert({ activation_id: id, person_id: s.person?.id ?? null, kind: "status", text: `${exercise ? "EXERCISE. " : ""}${level === "activation" ? "ERP activated" : "Alert raised"} by ${s.name} (${scenario}): ${title}` });
+  if (Object.keys(info).length) await db().from("erp_events").insert({ activation_id: id, person_id: s.person?.id ?? null, kind: "log", text: "Primary information sheet: " + INFO.filter(([k]) => info[k]).map(([k, l]) => `${l}: ${info[k]}`).join("; ") });
+  // a cyber-attack is also a Part-IS event (IS.I.OR.220): opened at once, linked to the activation
+  if (scenario === "cyber" && !exercise) {
+    const { data: inc } = await db().from("is_incidents").insert({ entity, title: title.slice(0, 200), description: `Opened from the ERP activation of ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`, status: "open" }).select("id").single();
+    if (inc) { await db().from("erp_activations").update({ is_incident: (inc as { id: string }).id }).eq("id", id); await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "log", text: "Part-IS event opened in IS events & incidents (report within 72 h if significant, IS.I.OR.230)." }); }
+  }
+  // the response unit of the plan gets an Inbox item at once (and so a Teams card at the next sweep)
   const link = "/erp/activate";
-  await db().from("tasks").insert(["AM", "SM", "CMM"].map((role) => ({ entity, kind: "erp", title: `${exercise ? "Exercise: " : ""}ERP ${level === "activation" ? "activated" : "alert"}: ${title}`.slice(0, 200), detail: "Join the crisis cell and open the activation log in S.A.M.", owner_role: role, status: "open", link, ref_id: id })));
-  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "erp_activation", object_id: id, action: exercise ? "erp_exercise_started" : "erp_activation_started", after: { level, title } });
-  revalidatePath("/erp/activate"); revalidatePath("/home/tasks");
+  await db().from("tasks").insert(cell.map((role) => ({ entity, kind: "erp", title: `${exercise ? "Exercise: " : ""}ERP ${level === "activation" ? "activated" : "alert"}: ${title}`.slice(0, 200), detail: "Join the emergency response unit and open the activation log in S.A.M. Your checklist is there.", owner_role: role, status: "open", link, ref_id: id })));
+  await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "contact", text: `Called out in S.A.M. (Inbox and Teams): ${cell.join(", ")}` });
+  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "erp_activation", object_id: id, action: exercise ? "erp_exercise_started" : "erp_activation_started", after: { level, scenario, title, cell } });
+  revalidatePath("/erp/activate"); revalidatePath("/home/tasks"); revalidatePath("/is/inc");
   redirect("/erp/activate");
 }
 

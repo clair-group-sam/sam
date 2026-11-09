@@ -8,7 +8,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
   const sp = await searchParams;
   return (
     <>
-      <PageHeader eyebrow="ERP, Crisis directory" title="Crisis directory" sub="Who to call in a crisis: crisis cell, authorities, investigation bodies, insurers, assistance. Keep phone numbers current; the list opens in activation mode." right={await RegisterAdd({ reg: "erp_contacts", s })} />
+      <PageHeader eyebrow="ERP, Crisis directory" title="Crisis directory" sub="One directory per entity replaces the tables of the MSM, of ENR-CM-15 and of the checklists. A unit member is attached to a post: when the post changes holder in NP management, the directory follows. Activation mode and the printed ERP binder read from here." right={await RegisterAdd({ reg: "erp_contacts", s })} />
       <Register reg="erp_contacts" s={s} open={sp.open} adding={sp.new === "1"} empty="No crisis contact yet." />
     </>
   );
