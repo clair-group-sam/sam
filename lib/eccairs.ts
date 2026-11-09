@@ -41,6 +41,8 @@ export async function tokenDiagnostic(entity: string): Promise<Record<string, un
   };
   await tryOne("post_body_openid", { headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret, scope: "openid" }).toString() });
   await tryOne("post_body_noscope", { headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.id, client_secret: c.secret }).toString() });
+  const alt = process.env.ECCAIRS_ALT_CLIENT_ID; // e.g. the M2M user's e-mail, to test whether the server expects it instead of the username
+  if (alt) await tryOne("post_body_alt_id", { headers: { "content-type": form }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: alt, client_secret: c.secret, scope: "openid" }).toString() });
   const basic = Buffer.from(`${c.id}:${c.secret}`).toString("base64");
   await tryOne("basic_raw", { headers: { "content-type": form, authorization: `Basic ${basic}` }, body: new URLSearchParams({ grant_type: "client_credentials" }).toString() });
   const basicEnc = Buffer.from(`${encodeURIComponent(c.id)}:${encodeURIComponent(c.secret)}`).toString("base64");
