@@ -75,7 +75,7 @@ export default function Shell({ session, children }: Props) {
         onMouseLeave={() => { rail.leave(); subH.leave(); }}>
       <nav className={"rail" + (compact ? (rail.on ? " mini hover" : " mini") : "")} onMouseEnter={() => { if (compact) { rail.enter(); subH.leave(); } }}>
         <Link href={session.home} className="brand" aria-label="S.A.M. — Safety · Assurance · Management">
-          <img src="/logos/sam.svg" alt="" width={46} height={42} />
+          <img src="/logos/sam.svg" alt="" width={64} height={58} />
           {/* the three words in a column: their initials spell S·A·M */}
           <span className="acro" aria-hidden="true"><span><b>S</b>afety</span><span><b>A</b>ssurance</span><span><b>M</b>anagement</span></span>
         </Link>
