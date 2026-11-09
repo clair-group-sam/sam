@@ -54,7 +54,13 @@ function Rings({ systems }: { systems: Sys[] }) {
   const pts: { s: Sys; x: number; y: number; a: number }[] = [];
   for (const k of Object.keys(SECT)) for (const r of [1, 2, 3]) {
     const list = systems.filter((s) => s.resp === k && (s.ring ?? 2) === r && s.status !== "awaiting"); const S = SECT[k];
-    list.forEach((s, i) => { const a = S.a0 + ((i + 1) * (S.a1 - S.a0)) / (list.length + 1); pts.push({ s, a, x: CX + RR[r] * Math.cos(rad(a)), y: CY + RR[r] * Math.sin(rad(a)) }); });
+    const n = list.length, span = S.a1 - S.a0;
+    list.forEach((s, i) => {
+      // ring 3 is shifted so that its dots never sit on the same ray as ring 2; a crowded ring alternates two radii so labels do not collide
+      const a = r === 3 ? S.a0 + (span * (i + 1)) / (n + 2) : S.a0 + (span * (i + 1)) / (n + 1);
+      const R0 = RR[r] + (n > 7 ? (i % 2 ? 22 : -22) : 0);
+      pts.push({ s, a, x: CX + R0 * Math.cos(rad(a)), y: CY + R0 * Math.sin(rad(a)) });
+    });
   }
   const arc = (a0: number, a1: number, ri: number, ro: number) => `M${CX + ri * Math.cos(rad(a0))},${CY + ri * Math.sin(rad(a0))} L${CX + ro * Math.cos(rad(a0))},${CY + ro * Math.sin(rad(a0))} A${ro},${ro} 0 0 1 ${CX + ro * Math.cos(rad(a1))},${CY + ro * Math.sin(rad(a1))} L${CX + ri * Math.cos(rad(a1))},${CY + ri * Math.sin(rad(a1))} A${ri},${ri} 0 0 0 ${CX + ri * Math.cos(rad(a0))},${CY + ri * Math.sin(rad(a0))} Z`;
   return (
