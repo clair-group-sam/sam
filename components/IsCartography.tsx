@@ -13,7 +13,7 @@ export default function IsCartography({ data }: { data: CartoData }) {
   useEffect(() => {
     (window as unknown as { __CARTO: CartoData }).__CARTO = data;
     const s = document.createElement("script");
-    s.src = "/is-carto.js?v=1";
+    s.src = "/is-carto.js?v=2";
     document.body.appendChild(s);
     return () => { s.remove(); };
   }, [data]);

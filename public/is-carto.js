@@ -187,7 +187,7 @@ function layout(){
     if(e.to && pos[e.to]){const t=pos[e.to]; a=anchorNode(e.from,t); b=anchorNode(e.to,s);}
     else if(e.toZone && ZONES[e.toZone]){b=zoneAnchor(e.toZone); a=anchorNode(e.from,b);}
     else return;
-    const p=el('path',{d:curve(a,b),class:'cz-edge'+e.kind,'data-n':e.from,'data-t':e.to||('z_'+e.toZone)},eg);
+    const p=el('path',{d:curve(a,b),class:'cz-edge '+e.kind,'data-n':e.from,'data-t':e.to||('z_'+e.toZone)},eg);
     if(e.kind==='data') p.setAttribute('marker-end','url(#arr)');
   });
   DATA.forEach(d=>{
