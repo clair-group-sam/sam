@@ -121,11 +121,12 @@ export async function askManual(input: { manualId: string; revisionId: string; q
     return { ...x, sc };
   }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 8);
   if (!scored.length) return { ok: true, a: { answer: "No chapter of this revision mentions these words. Try other words, or the full-text search of the library.", notFound: true, cites: [], searched: secs.length } };
+  const lang = /[éèêàùçœ]/i.test(question) || /\b(qui|quel|quelle|quels|quelles|est|sont|les|des|une|pour|dans|doit|comment|quand|faut)\b/i.test(question) ? "French" : "English";
   let budget = 48_000;
   const excerpts = scored.map((x) => { const t = x.text.slice(0, Math.max(1500, Math.min(9000, budget))); budget -= t.length; return `### Chapter ${x.ref}: ${x.title}\n${t}`; }).filter((_, i) => i === 0 || budget > 0);
   try {
     const { text } = await callClaude({ agent: "ask", personId: s.person.id, entity: m.entity, system: ASK_SYSTEM, maxTokens: 900,
-      user: `Manual: ${m.code}, ${m.title} (${m.entity}).\n\nQUESTION: ${question}\n\nEXCERPTS (the chapters that mention the question's words):\n${excerpts.join("\n\n")}` });
+      user: `Manual: ${m.code}, ${m.title} (${m.entity}).\nANSWER LANGUAGE: ${lang} (the language of the question; quotes stay as written in the manual).\n\nQUESTION: ${question}\n\nEXCERPTS (the chapters that mention the question's words):\n${excerpts.join("\n\n")}` });
     const j = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { answer?: string; not_found?: boolean; cites?: { ref: string; quote?: string }[] };
     const byRef = new Map(secs.map((x) => [x.ref.toLowerCase(), x]));
     // the model may write "Chapter A.5", "§A.5" or a sub-chapter "A.5.2": bring each cite back to a chapter of this revision
