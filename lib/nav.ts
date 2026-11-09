@@ -71,12 +71,15 @@ export function findModule(mod: string): Module | undefined {
  */
 export type EntMode = "group" | "single" | "none";
 const ENT_SINGLE = ["safe/over/data", "safe/over/set", "safe/inv", "safe/comm", "safe/promo", "erp/activate", "docs/drop"];
-const ENT_NONE = ["set", "admin", "ref", "is", "erp", "users/fleet", "home/coffee", "docs/mine", "docs/drafts", "docs/link", "docs/editor", "docs/manual"];
+const ENT_NONE = ["set", "admin", "ref", "is", "erp", "users/fleet", "docs/link", "docs/editor", "docs/manual"];
+// filtered by the entity through a helper (listManuals, brew, the register query) although under a "none" prefix above
+const ENT_LISTS_UNDER_NONE = ["admin/comms", "set/integ"];
 const ENT_DEEP_LISTS = ["safe/risk/match", "safe/risk/templates", "dash/cs/overdue"]; // three segments, still lists
 export function entMode(path: string): EntMode {
   const seg = path.split("?")[0].split("/").filter(Boolean);
   const p = seg.join("/");
   if (seg.includes("new") || ENT_SINGLE.includes(p)) return "single";
+  if (ENT_LISTS_UNDER_NONE.includes(p)) return "group";
   if (ENT_NONE.some((x) => p === x || p.startsWith(x + "/"))) return "none";
   if (seg.length >= 3 && !ENT_DEEP_LISTS.includes(p)) return "none"; // a record's own page
   return "group";
