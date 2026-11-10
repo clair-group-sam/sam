@@ -22,7 +22,7 @@ export const PROG_REF: Record<string, { reference: string; msm: string; domains:
 };
 export const KIND_LABEL: Record<string, string> = { internal: "Internal audit", subcontractor: "Subcontractor audit", checks: "Compliance checks", authority: "Authority audit" };
 export const KIND_LETTER: Record<string, string> = { internal: "P", subcontractor: "S", checks: "C", authority: "A" };
-export const STATUS_LABEL: Record<string, string> = { planned: "Planned", in_progress: "In progress", report: "Report", closed: "Done", cancelled: "Cancelled" };
+export const STATUS_LABEL: Record<string, string> = { planned: "Planned", in_progress: "In progress", report: "Report to finalise", closed: "Done", cancelled: "Cancelled" };
 export const PROG_STATUS: Record<string, string> = { draft: "Draft", approved: "Approved", closed: "Closed" };
 export const DONE = ["closed"];
 export const LIVE = ["planned", "in_progress", "report", "closed"];

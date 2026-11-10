@@ -37,11 +37,21 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
   const view = sp.view === "list" ? "list" : "board";
   const isLateA = (a: Audit) => a.status === "planned" && addMonths(a.planned_month, 1) <= t0;
   const soon = addMonths(t0.slice(0, 7) + "-01", 6);
-  const cols = [
+  // findings per audit: an authority audit lives by its findings (Guillaume 10/11: « réalisés, on a eu nos findings » ≠ in progress)
+  const { data: fds } = all.length ? await db.from("findings").select("audit_id,status").in("audit_id", all.map((a) => a.id)).limit(5000) : { data: [] };
+  const fOf = (id: string) => { const l = ((fds ?? []) as { audit_id: string; status: string }[]).filter((f) => f.audit_id === id); const open = l.filter((f) => !["closed", "cancelled"].includes(f.status)).length; return { n: l.length, open }; };
+  const happened = (a: Audit) => !!a.done_on || (a.planned_end ?? a.planned_on ?? addMonths(a.planned_month, 1)) <= t0;
+  const yr = t0.slice(0, 4);
+  const cols = src === "authority" ? [
+    { key: "ann", label: "Announced", sub: "audit or inspection to come, prepare it", tone: "amber", list: all.filter((a) => a.status !== "cancelled" && a.status !== "closed" && !happened(a)), more: 0 },
+    { key: "wait", label: "Done, report awaited", sub: "the authority came, no finding received yet", tone: "", list: all.filter((a) => a.status !== "cancelled" && a.status !== "closed" && happened(a) && !fOf(a.id).n), more: 0 },
+    { key: "open", label: "Findings to answer", sub: "audit done, findings received and still open", tone: "red", list: all.filter((a) => a.status !== "cancelled" && happened(a) && fOf(a.id).open > 0), more: 0 },
+    { key: "closed", label: `Closed in ${yr}`, sub: "every finding closed", tone: "green", list: all.filter((a) => a.status !== "cancelled" && (a.status === "closed" || (happened(a) && fOf(a.id).n > 0 && !fOf(a.id).open)) && !(happened(a) && fOf(a.id).open > 0) && (a.done_on ?? a.planned_on ?? a.planned_month).startsWith(yr)).reverse(), more: 0 },
+  ] : [
     { key: "start", label: "To start", sub: late.length ? `${late.length} with the month passed, then the next 6 months` : "the next 6 months", tone: late.length ? "red" : "amber", list: all.filter((a) => a.status === "planned" && a.planned_month < soon), more: all.filter((a) => a.status === "planned" && a.planned_month >= soon).length },
-    { key: "run", label: "In progress", sub: "checklist being run", tone: "", list: all.filter((a) => a.status === "in_progress"), more: 0 },
-    { key: "report", label: "Report to close", sub: "findings raised, report to sign", tone: "amber", list: all.filter((a) => a.status === "report"), more: 0 },
-    { key: "done", label: `Done in ${t0.slice(0, 4)}`, sub: "closed this year", tone: "green", list: all.filter((a) => a.status === "closed" && (a.done_on ?? a.planned_month).startsWith(t0.slice(0, 4))).reverse(), more: 0 },
+    { key: "run", label: "In progress", sub: "the auditor is running the checklist", tone: "", list: all.filter((a) => a.status === "in_progress"), more: 0 },
+    { key: "report", label: "Report to finalise", sub: "checklist done, findings raised: the lead auditor writes the audit report, Compliance signs it and closes the audit (PRO-CM-02)", tone: "amber", list: all.filter((a) => a.status === "report"), more: 0 },
+    { key: "done", label: `Done in ${yr}`, sub: "report signed, audit closed", tone: "green", list: all.filter((a) => a.status === "closed" && (a.done_on ?? a.planned_month).startsWith(yr)).reverse(), more: 0 },
   ];
   let cq = db.from("checklists").select("id,entity,code,title,domain,imported_from").eq("active", true).order("entity").order("code");
   if (scope) cq = cq.in("entity", scope);
@@ -68,6 +78,7 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
                 <div className="wcm" style={{ marginTop: 0 }}><span><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} /><b className="mono">{a.number}</b></span><span className={"akind " + a.kind}>{src === "authority" ? (a.authority ?? "Authority") : KIND_LABEL[a.kind]?.replace(" audit", "")}</span></div>
                 <div className="wct">{a.title}</div>
                 <div className="wcm"><span>{src === "authority" ? (a.external_auditor ?? "") : a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "no auditor"}</span><span className={"wdue" + (lt ? " late" : "")}>{a.done_on ?? (a.planned_on ?? monthLong(a.planned_month))}{lt ? " · late" : ""}</span></div>
+                {(() => { const x = fOf(a.id); return x.n ? <div className="mini" style={{ color: x.open ? "var(--red-ink)" : "var(--green-ink)" }}>{x.n} finding{x.n > 1 ? "s" : ""}{x.open ? `, ${x.open} open` : ", all closed"}</div> : null; })()}
                 {!a.checklist_id && a.kind !== "authority" && a.status !== "closed" && <div className="mini" style={{ color: "var(--amber-ink)" }}>no checklist yet</div>}
               </Link>); })}
             {c.list.length > 12 && <Link href={`/comp/audits?src=${src}&view=list`} className="mini wmore">+ {c.list.length - 12} more, see the list</Link>}
@@ -82,7 +93,7 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
           return <tr key={a.id}><td><Link href={`/comp/audits/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} />{a.entity}, {KIND_LABEL[a.kind]}{a.subcontractor ? `, ${a.subcontractor}` : ""}{a.authority ? `, ${a.authority}` : ""}{!a.checklist_id && a.kind !== "authority" ? <span className="red">, no checklist</span> : ""}</div></td>
             <td className={isLate ? "late" : ""}>{monthLong(a.planned_month)}{a.planned_on && <div className="mini mono">{a.planned_on}{a.planned_end ? ` → ${a.planned_end}` : ""}</div>}</td>
             <td>{src === "authority" ? <>{a.authority ?? a.external_auditor ?? "—"}{a.external_auditor && a.authority && a.external_auditor !== a.authority && <div className="mini">{a.external_auditor}</div>}</> : a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "—"}</td>
-            <td><span className={"pill " + (a.status === "closed" ? "green" : a.status === "report" ? "amber" : isLate ? "red" : a.status === "in_progress" ? "amber" : "")}>{STATUS_LABEL[a.status]}</span>{a.done_on && <div className="mini mono">{a.done_on}</div>}</td></tr>;
+            <td>{src === "authority" ? (() => { const x = fOf(a.id); const [l, t] = a.status === "cancelled" ? ["Cancelled", ""] : !happened(a) ? ["Announced", "amber"] : x.open ? [`Findings to answer, ${x.open} open`, "red"] : x.n || a.status === "closed" ? ["Closed", "green"] : ["Report awaited", ""]; return <span className={"pill " + t}>{l}</span>; })() : <span className={"pill " + (a.status === "closed" ? "green" : a.status === "report" ? "amber" : isLate ? "red" : a.status === "in_progress" ? "amber" : "")}>{STATUS_LABEL[a.status]}</span>}{a.done_on && <div className="mini mono">{a.done_on}</div>}</td></tr>;
         })}</tbody></table>)}</div></section></>}
       {desk && <details className="card mt-4 mb-4"><summary className="ch"><span className="eyebrow">Checklists, {checklists.length}</span><span className="mini">the templates behind the audits, linked to the programme's modules</span></summary>
         <div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Checklist</th><th>Domain</th><th>Items</th><th>Origin</th></tr></thead><tbody>{checklists.map((c) => <tr key={c.id}><td><Link href={`/comp/prog/cl/${c.id}`}><b className="mono">{c.code}</b> {c.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[c.entity] ?? "var(--field)" }} />{c.entity}</div></td><td className="mini">{c.domain ?? "—"}</td><td className={nItems(c.id) ? "" : "late"}>{nItems(c.id)}</td><td className="mini">{c.imported_from ?? "S.A.M."}</td></tr>)}{!checklists.length && <tr><td className="mini" colSpan={4}>No checklist yet, create one from a programme module, or import from Centrik.</td></tr>}</tbody></table></div></details>}
