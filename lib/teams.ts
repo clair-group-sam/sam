@@ -281,13 +281,11 @@ export function findingCard(t: TaskRow, f: FindingLite, reading?: { verdict: str
     const pts = reading.points.slice(0, 6);
     body.push({ type: "TextBlock", text: `S.A.M. read this with you${reading.created ? ` · ${reading.created} action${reading.created > 1 ? "s" : ""} created from your plan` : ""}`, weight: "Bolder", spacing: "Medium", color: reading.note ? "Attention" : pts.length ? "Default" : "Good" });
     if (reading.note) body.push({ type: "TextBlock", text: reading.note, wrap: true, color: "Attention" });
-    body.push({ type: "TextBlock", text: pts.length ? "Points that would strengthen it — your call:" : "Nothing to point out: the cause explains, the factors are there, the plan answers it.", wrap: true, isSubtle: true, spacing: "Small" });
+    body.push({ type: "TextBlock", text: pts.length ? "Points that would strengthen it — your call:" : "Nothing to point out: the cause explains why, the plan answers it.", wrap: true, isSubtle: true, spacing: "Small" });
     for (const q of pts) body.push({ type: "TextBlock", text: `• **${q.label}**${q.detail && q.detail !== q.label ? ` — ${q.detail}` : ""}`, wrap: true, spacing: "None" });
   }
   body.push(
     { type: "Input.Text", id: "root_cause", label: "Root cause — why did the organisation let this happen?", isMultiline: true, value: f.draft_root_cause ?? "", maxLength: 3000, spacing: "Medium" },
-    { type: "Input.Text", id: "factors", label: "Contributing factors (procedure, training, resources, supervision, tools…)", isMultiline: true, value: f.draft_factors ?? "", maxLength: 2000 },
-    { type: "Input.Text", id: "immediate", label: "Immediate action taken", isMultiline: true, value: f.draft_immediate ?? "", maxLength: 1000 },
     { type: "Input.Text", id: "plan", label: "Corrective action plan — one action per line (each becomes an action with you as owner and the finding's due date; manual changes are added in S.A.M.)", isMultiline: true, maxLength: 3000 },
   );
   const actions: unknown[] = [

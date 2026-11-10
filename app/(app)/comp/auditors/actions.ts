@@ -19,10 +19,11 @@ const lines = (v: string | null) => (v ?? "").split(/[\n;,]+/).map((x) => x.trim
 export async function saveAuditor(fd: FormData) {
   const s = await me(); if (!desk(s)) throw new Error("Compliance desk only.");
   const id = str(fd, "id");
-  const row = { entities: fd.getAll("entities").map(String).filter(Boolean), domains: fd.getAll("domains").map(String).filter(Boolean), exclusions: lines(str(fd, "exclusions")), lead: !!fd.get("lead"), external: str(fd, "external"), note: str(fd, "note") };
-  if (id) { await db().from("auditors").update(row).eq("id", id); touch(id); return; }
-  const person = str(fd, "person"); if (!person) throw new Error("Pick the person.");
-  const { data, error } = await db().from("auditors").insert({ person_id: person, ...row }).select("id").single();
+  const row = { entities: fd.getAll("entities").map(String).filter(Boolean), domains: fd.getAll("domains").map(String).filter(Boolean), exclusions: lines(str(fd, "exclusions")), lead: !!fd.get("lead"), external: str(fd, "external"), note: str(fd, "note"), aliases: lines(str(fd, "aliases")) };
+  if (id) { await db().from("auditors").update({ ...row, ...(str(fd, "name") ? { name: str(fd, "name") } : {}) }).eq("id", id); touch(id); return; }
+  // 10/11 · a staff member (person) or an external auditor known by name only (L. Rudelle, Aero Services EI)
+  const person = str(fd, "person"), name = str(fd, "name"); if (!person && !name) throw new Error("Pick the person, or type the external auditor's name.");
+  const { data, error } = await db().from("auditors").insert({ person_id: person, name: person ? null : name, ...row }).select("id").single();
   if (error) throw new Error(error.message.includes("duplicate") ? "Already in the register." : error.message);
   await db().from("auditor_items").insert(QUALIFICATION_ITEMS.map((label, i) => ({ auditor_id: data.id, ord: i, label })));
   touch(); redirect(`/comp/auditors?a=${data.id}`);

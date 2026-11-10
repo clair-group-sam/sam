@@ -64,7 +64,7 @@ export async function computeKpis(db: SupabaseClient, entity: string, asOf = tod
   const p = current(progs, asOf).find((x) => x.status !== "draft") ?? null;
   if (p) {
     const thisMonth = asOf.slice(0, 7) + "-01";
-    const inScope = audits.filter((a) => a.programme_id === p.id && a.kind !== "authority" && a.kind !== "checks" && a.status !== "cancelled" && a.planned_month <= thisMonth);
+    const inScope = audits.filter((a) => a.programme_id === p.id && a.kind !== "authority" && a.kind !== "checks" && a.status !== "cancelled" && a.planned_month >= p.starts_on.slice(0, 7) + "-01" && a.planned_month <= thisMonth); // only the audits of this cycle
     const done = inScope.filter((a) => DONE.includes(a.status)).length;
     push("C1", pct(done, inScope.length), done, inScope.length, `${p.title}`);
   } else push("C1", null, null, null, "no programme in force");

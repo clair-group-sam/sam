@@ -31,12 +31,17 @@ export async function POST(req: NextRequest) {
     for (const f of a.findings) {
       const level = f.level === "E1" ? "1" : f.level === "E2" ? "2" : "obs";
       const closed = f.status === "Closed";
-      const desc = [f.description, f.root_cause ? `Root cause (Monday): ${f.root_cause}` : null, f.pac ? `Corrective action plan (Monday): ${f.pac}` : null, f.ext && f.ext !== "No" ? `Extension: ${f.ext}` : null].filter(Boolean).join("\n\n");
-      const frow = { entity, source: civil ? "authority" : kind === "checks" ? "inspection" : "internal_audit", authority, audit_ref: number, audit_id: auditId, level, requirement: f.regulation || f.ref || null, title: f.title.slice(0, 300), description: desc || null, owner_role: f.dept === "Compliance" ? "CMM" : f.dept === "FSTD" ? "FSTDM" : f.dept === "ATO" ? "HT" : f.dept === "TEC" ? "MAM" : null, notified: f.notified ?? a.report ?? a.end, due: f.due, status: closed ? "closed" : "open", closed_at: closed ? `${f.closed_on ?? a.closed ?? f.due ?? "2026-01-01"}T12:00:00Z` : null, closed_note: closed ? "Closed in Monday" : null, imported_from: `Monday Compliance Software · subitem ${f.id}` };
+      // 10/11 · the Monday root cause and plan are the analysis (round 1, accepted); an open finding with both is "plan in progress", one without is "to analyse"
+      const analysed = !!f.root_cause && !!f.pac;
+      const desc = [f.description, f.ext && f.ext !== "No" ? `Extension: ${f.ext}` : null].filter(Boolean).join("\n\n");
+      const frow = { entity, source: civil ? "authority" : kind === "checks" ? "inspection" : "internal_audit", authority, audit_ref: number, audit_id: auditId, level, requirement: f.regulation || f.ref || null, title: f.title.slice(0, 300), description: desc || null, owner_role: f.dept === "Compliance" ? "CMM" : f.dept === "FSTD" ? "FSTDM" : f.dept === "ATO" ? "HT" : f.dept === "TEC" ? "MAM" : null, notified: f.notified ?? a.report ?? a.end, due: f.due, status: closed ? "closed" : analysed ? "accepted" : "open", draft_root_cause: f.root_cause || null, draft_comment: f.pac || null, current_round: f.root_cause ? 1 : 0, draft_step: f.root_cause ? 3 : 1, closed_at: closed ? `${f.closed_on ?? a.closed ?? f.due ?? "2026-01-01"}T12:00:00Z` : null, closed_note: closed ? "Closed in Monday" : null, imported_from: `Monday Compliance Software · subitem ${f.id}` };
       const { data: fx } = await db.from("findings").select("id").eq("imported_from", frow.imported_from).maybeSingle();
-      if (fx) { await db.from("findings").update(frow).eq("id", (fx as { id: string }).id); nf++; continue; }
-      const { error } = await db.from("findings").insert({ ...frow, number: await nextFindingNumber(db, entity), created_by: s.person?.id ?? null });
-      if (!error) nf++; else out.push(`${number}/${f.title.slice(0, 20)}: ${error.message}`);
+      let fid = (fx as { id: string } | null)?.id ?? null;
+      if (fid) await db.from("findings").update(frow).eq("id", fid);
+      else { const { data: ins, error } = await db.from("findings").insert({ ...frow, number: await nextFindingNumber(db, entity), created_by: s.person?.id ?? null }).select("id").single(); if (error) { out.push(`${number}/${f.title.slice(0, 20)}: ${error.message}`); continue; } fid = ins.id; }
+      nf++;
+      if (f.root_cause && fid) { const { data: r1 } = await db.from("finding_rounds").select("id").eq("finding_id", fid).limit(1); const at = `${f.notified ?? a.report ?? a.end ?? "2025-01-01"}T12:00:00Z`;
+        if (!r1?.length) await db.from("finding_rounds").insert({ finding_id: fid, stage: "full", n: 1, root_cause: f.root_cause, comment: f.pac, answered_at: at, via: "import", decision: "accepted", decided_at: at, note: "Analysis and plan imported from Monday (Compliance Software)" }); }
     }
     out.push(`${number} (${entity}, ${kind}): ${nf} findings`);
   }

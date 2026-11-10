@@ -37,7 +37,7 @@ export function AuditGrid({ p, mods, audits, checks = [], t0 }: { p: Programme; 
           )),
         ])}
       </div>
-      <div className="mini mt-2"><span className="pill">P</span> planned, <span className="pill green"><Icon name="check" size={11} /></span> done, <span className="pill amber">C</span> compliance checks, <span className="pill" style={{ background: "var(--purple-s)", color: "var(--purple)" }}>A</span> authority, <span className="pill red">P!</span> month passed, not done, dashed = replanned</div>
+      <div className="aglegend"><span className="k"><span className="au">P</span> planned</span><span className="k"><span className="au closed"><Icon name="check" size={12} /></span> done</span><span className="k"><span className="au checks">C</span> compliance check due</span><span className="k"><span className="au">S</span> subcontractor</span><span className="k"><span className="au authority">A</span> authority</span><span className="k"><span className="au late">P!</span> month passed, not done</span><span className="k"><span className="au repl">P</span> replanned</span></div>
     </div>
   );
 }

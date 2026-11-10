@@ -7,7 +7,7 @@ import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { APPL_LABEL, APPL_TONE, DOMAIN_LABEL, loadTopics, OPEN_STATUSES, STATUS_LABEL, TASK_LABEL, type Entry } from "@/lib/watch";
 import { createEntry, saveTopic } from "./actions";
 
-type Sp = { tab?: string };
+type Sp = { tab?: string; view?: string };
 /* REG-01 · Compliance › Regulatory watch. Top: the watch streams (topics) and whether they were checked on time — the proof.
  * Below: the entries — what concerns us, who handles it, what was done. */
 export default async function RegulatoryWatch({ searchParams }: { searchParams: Promise<Sp> }) {
@@ -30,6 +30,17 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
   const rows = tab === "mine" ? open.filter(mine) : tab === "analyse" ? open.filter((e) => e.applicability === "to_analyse") : tab === "closed" ? all.filter((e) => !OPEN_STATUSES.includes(e.status)) : tab === "all" ? all : open;
   const tabs: [string, string, number][] = [["mine", "Mine", open.filter(mine).length], ["open", "Open", open.length], ["analyse", "To analyse", open.filter((e) => e.applicability === "to_analyse").length], ["closed", "Closed", all.length - open.length], ["all", "All", all.length]];
   const late = topics.filter((t) => t.overdue >= 0);
+  // 10/11 · entries as a board by stage (Guillaume: « une liste infinie de liens »): what to analyse, what is in work, what waits to be closed
+  const view = sp.view === "list" || tab === "closed" || tab === "all" ? (sp.view === "board" ? "board" : "list") : "board";
+  const byDue = (a: Entry, b: Entry) => (a.due ?? "9999").localeCompare(b.due ?? "9999");
+  const live = (e: Entry) => e.status === "open" || e.status === "in_progress";
+  const cols = [
+    { key: "an", label: "To analyse", sub: "does it concern us? S.A.M. finds where our manuals cite it", tone: "amber", list: rows.filter((e) => live(e) && e.applicability === "to_analyse").sort(byDue) },
+    { key: "wk", label: "Applicable, in work", sub: "study or apply, owner and date", tone: "red", list: rows.filter((e) => live(e) && e.applicability === "applicable").sort(byDue) },
+    { key: "dn", label: "Done, to close", sub: "Compliance checks the conclusion", tone: "green", list: rows.filter((e) => e.status === "done").sort(byDue) },
+    { key: "in", label: "For information", sub: "recorded, nothing to do", tone: "", list: rows.filter((e) => live(e) && ["for_information", "not_applicable"].includes(e.applicability)).sort(byDue) },
+    ...(tab === "closed" || tab === "all" ? [{ key: "cl", label: "Closed", sub: "the record", tone: "", list: rows.filter((e) => !OPEN_STATUSES.includes(e.status)).sort((a, b) => (b.due ?? "").localeCompare(a.due ?? "")) }] : []),
+  ];
   const { data: ppl } = await db.from("people").select("id,display_name").limit(500);
   const name = (id: string | null) => ((ppl ?? []) as { id: string; display_name: string }[]).find((p) => p.id === id)?.display_name ?? "—";
   const ents = scope ?? ENTS4;
@@ -60,7 +71,8 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
         {!topics.length && <section className="card"><div className="cb mini">No watch stream in your scope yet.</div></section>}
       </div>
 
-      <div className="flex items-center justify-between mb-2"><div className="tabs">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/watch?tab=${k}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
+      <div className="flex items-center justify-between mb-2" style={{ gap: 8, flexWrap: "wrap" }}><div className="tabs">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/watch?tab=${k}&view=${view}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
+        <div className="seg" style={{ display: "inline-flex", marginLeft: "auto" }}><Link href={`/comp/watch?tab=${tab}&view=board`} className={view === "board" ? "on" : ""}>Board</Link><Link href={`/comp/watch?tab=${tab}&view=list`} className={view === "list" ? "on" : ""}>List</Link></div>
         {desk && <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Entry</summary>
           <form action={createEntry} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 36, width: 520, zIndex: 5 }}>
             <div className="grid grid-cols-2 gap-2"><label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={ents[0]}>{ents.map((e) => <option key={e} value={e}>{ENT[e]?.name ?? e}</option>)}</select></label><label><span className="mini">Watch stream</span><select name="topic" className="inp" defaultValue=""><option value="">—</option>{topics.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}</select></label></div>
@@ -70,7 +82,21 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
             <div className="grid grid-cols-2 gap-2"><label><span className="mini">Tasked to, post</span><input name="owner_role" className="inp mono" placeholder="CMM, NPFO, NPCA…" /></label><label><span className="mini">Task</span><select name="task" className="inp" defaultValue=""><option value="">—</option>{Object.entries(TASK_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label></div>
             <div className="flex justify-end"><button className="btn primary" type="submit">Raise</button></div></form></details>}
       </div>
-      <section className="card"><div className="cb" style={{ padding: 0 }}>
+      {view === "board" && rows.length > 0 ? (
+        <div className="wboard">{cols.map((c) => (
+          <div key={c.key} className={"wcol " + c.tone}>
+            <div className="wcolh"><b>{c.label}</b><span className="wcount">{c.list.length}</span></div>
+            <div className="mini wcolsub">{c.sub}</div>
+            {c.list.slice(0, 10).map((e) => { const lateE = !!e.due && e.due < t0 && OPEN_STATUSES.includes(e.status); return (
+              <Link key={e.id} href={`/comp/watch/${e.id}`} className={"wcard" + (lateE ? " late" : "")}>
+                <div className="wct">{e.title}</div>
+                <div className="wcm"><span className="entdot" style={{ background: ENT_COLOR[e.entity] ?? "var(--field)" }} />{e.entity}{e.reference ? <span className="mono"> · {e.reference.slice(0, 28)}</span> : null}</div>
+                <div className="wcm"><span>{e.owner_person ? name(e.owner_person) : e.owner_role ?? "no owner"}</span>{e.due && <span className={"wdue" + (lateE ? " late" : "")}>{lateE ? "late · " : ""}{e.due}</span>}</div>
+              </Link>); })}
+            {c.list.length > 10 && <Link href={`/comp/watch?tab=${tab}&view=list`} className="mini wmore">+ {c.list.length - 10} more, see the list</Link>}
+            {!c.list.length && <p className="mini wmore">Nothing.</p>}
+          </div>))}</div>
+      ) : <section className="card"><div className="cb" style={{ padding: 0 }}>
         {!rows.length ? <p className="p-4 mini">Nothing here.</p> : (
           <table className="tbl"><thead><tr><th>Entry</th><th>Reference</th><th>Applicability</th><th>Tasked to</th><th>Return before</th><th>Status</th></tr></thead>
             <tbody>{rows.map((e) => (
@@ -82,7 +108,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
                 <td className={e.due && e.due < t0 && OPEN_STATUSES.includes(e.status) ? "late" : ""}>{e.due ?? "—"}</td>
                 <td><span className={"pill " + (e.status === "closed" ? "green" : e.status === "done" ? "amber" : "")}>{STATUS_LABEL[e.status] ?? e.status}</span></td>
               </tr>))}</tbody></table>)}
-      </div></section>
+      </div></section>}
     </>
   );
 }

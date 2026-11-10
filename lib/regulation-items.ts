@@ -113,7 +113,7 @@ export async function itemsForCode(db: SupabaseClient, regulationId: string, ver
 
 /** EASA rule codes found in a text (ORO.GEN.200, CAO.A.095, CAMO.A.305, M.A.201, 145.A.30, FCL.055, ML.A.403, IS.I.OR.200, 21.A.3…). */
 export function ruleCodesIn(text: string): string[] {
-  const re = /\b((?:ORO|CAT|SPA|NCC|NCO|SPO|ARO|ARA|FCL|MED|CC|ATCO|ADR|SERA|CAO|CAMO|ML|CS|IS)(?:\.[A-Z]{1,4})*\.\d{2,4}[A-Z]?|(?:M|T|145|147|66|21)\.[AB]\.\d{2,4}[A-Z]?|IS\.[ID]\.OR\.\d{3})\b/g;
+  const re = /\b((?:ORO|ORA|CAT|SPA|NCC|NCO|SPO|ARO|ARA|FCL|MED|CC|ATCO|ADR|SERA|CAO|CAMO|ML|CS|IS)(?:\.[A-Z]{1,4})*\.\d{2,4}[A-Z]?|(?:M|T|145|147|66|21)\.[AB]\.\d{2,4}[A-Z]?|IS\.[ID]\.OR\.\d{3})\b/g;
   return [...new Set((text.match(re) ?? []).map((c) => c.toUpperCase()))].slice(0, 12);
 }
 
@@ -131,4 +131,21 @@ export async function officialTextsFor(db: SupabaseClient, entity: string, codes
     }
   }
   return out.join("\n\n");
+}
+
+/** 10/11 · the rules cited by a finding (its « requirement » field), found in the EARs of the entity: per code, the text and where to read it in full. */
+export async function rulesCited(db: SupabaseClient, entity: string, text: string | null): Promise<{ code: string; reg: { key: string; title: string; version: string; online_url: string | null } | null; items: RegItem[] }[]> {
+  const codes = ruleCodesIn(text ?? ""); if (!codes.length) return [];
+  const { data: regs } = await db.from("regulations").select("id,key,title,items_version,online_url").contains("entities", [entity]).not("items_version", "is", null);
+  const rs = (regs ?? []) as { id: string; key: string; title: string; items_version: string; online_url: string | null }[];
+  const out: { code: string; reg: { key: string; title: string; version: string; online_url: string | null } | null; items: RegItem[] }[] = [];
+  for (const code of codes) {
+    let hit: (typeof out)[number] = { code, reg: null, items: [] };
+    for (const r of rs) {
+      const { data } = await db.from("regulation_items").select("*").eq("regulation_id", r.id).eq("version", r.items_version).eq("code", code).or("change.is.null,change.neq.removed").order("ord").limit(40);
+      if (data?.length) { hit = { code, reg: { key: r.key, title: r.title, version: r.items_version, online_url: r.online_url }, items: data as RegItem[] }; break; }
+    }
+    out.push(hit);
+  }
+  return out;
 }

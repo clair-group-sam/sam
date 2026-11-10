@@ -975,3 +975,54 @@ html[data-theme="dark"] ::selection{background:#2c4a5c;color:#fff}
 html[data-theme="dark"] .groupband{background:#2e1a2b;color:#e0a2d6}
 html[data-theme="dark"] .tocpart .ph{color:var(--navy) !important}
 html[data-theme="dark"] .topbar .btn.primary{color:#fff;background:color-mix(in srgb,var(--entc,#0b2a4a) 75%,#000);border-color:transparent}
+
+/* 10/11 · audit programme grid: solid marks that read at a glance (Guillaume: « trop pâle ») */
+.agrid a.au,.aglegend .au{background:var(--cyan6);color:#fff;border:0;font-weight:800;box-shadow:0 1px 0 rgba(13,42,63,.18)}
+.agrid a.au.closed,.aglegend .au.closed{background:var(--green);color:#fff;border:0}
+.agrid a.au.checks,.aglegend .au.checks{background:var(--amber);color:var(--navy-ink)}
+.agrid a.au.authority,.aglegend .au.authority{background:var(--purple);color:#fff}
+.agrid a.au.late,.aglegend .au.late{background:var(--state-red);color:#fff}
+.agrid a.au.repl,.aglegend .au.repl{outline:2px dashed var(--amber);outline-offset:1px}
+.agrid a.au:hover{filter:brightness(1.12)}
+.aglegend{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:8px;font-size:12px;color:var(--slate6)}
+.aglegend span.k{display:inline-flex;align-items:center;gap:6px}
+.aglegend .au{display:inline-flex;min-width:26px;min-height:22px;padding:0 5px;border-radius:3px;font-size:12px}
+.samguide{border-left:3px solid var(--cyan);background:var(--blue05);padding:8px 12px;border-radius:var(--r-xs)}
+.samguide .pts{margin:4px 0}
+.rulecited>summary{cursor:pointer;padding:6px 8px;border-radius:var(--r-xs);background:var(--gray05)}
+.rulecited[open]>summary{background:var(--blue1)}
+.fstack{display:inline-flex;width:90px;height:8px;border-radius:4px;overflow:hidden;background:var(--gray1)}
+.fstack i{display:block}.fstack i.o{background:var(--amber)}.fstack i.c{background:var(--green)}
+/* 10/11 · Compliance overview */
+.ovattn{margin-bottom:14px}.ovattn .eyebrow{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.ovchips{display:flex;flex-wrap:wrap;gap:6px}
+.ovchip{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid}
+.ovchip.red{background:var(--terra-s);color:var(--red-ink);border-color:var(--red-line)}.ovchip.amber{background:var(--amber-s);color:var(--amber-ink);border-color:var(--amber-line)}
+.ovchip:hover{filter:brightness(.97);text-decoration:none}
+.ovcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1000px){.ovcols{grid-template-columns:1fr}}
+.ovcol{border:1px solid var(--line);border-radius:var(--r);padding:10px;background:var(--gray05);display:flex;flex-direction:column;gap:8px}
+.ovh{font-weight:700;color:var(--navy);display:flex;align-items:center;gap:6px}.ovh .mini{font-weight:400;margin-left:auto}
+.ovrow{display:block;background:var(--white);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;color:inherit}
+.ovrow:hover{box-shadow:0 2px 8px rgba(13,42,63,.12);text-decoration:none}
+.ovtop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.ovl{font-size:14px;color:var(--slate7);font-weight:600}.ovv{font-size:22px;font-weight:800;color:var(--navy)}
+.ovs{font-size:12px;color:var(--slate6);margin-top:4px}
+.ovbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--gray1);margin-top:6px;gap:2px}
+.ovbar i,.ovleg b{display:block}.ovbar .green,.ovleg .green{background:var(--green)}.ovbar .amber,.ovleg .amber{background:var(--amber)}.ovbar .red,.ovleg .red{background:var(--state-red)}.ovbar .blue,.ovleg .blue{background:var(--cyan6)}.ovbar .grey,.ovleg .grey{background:var(--slate3)}
+.ovleg{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--slate6);margin-top:4px}.ovleg span{display:inline-flex;align-items:center;gap:4px}.ovleg b{width:8px;height:8px;border-radius:2px}
+.ovprog{position:relative;height:10px;border-radius:5px;background:var(--gray1);margin-top:6px}.ovprog i{display:block;height:100%;border-radius:5px;background:var(--green)}
+.ovprog b{position:absolute;top:-3px;width:2px;height:16px;background:var(--navy);transform:translateX(-1px)}
+.ovdots{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}.ovdot{font-size:10px;font-weight:700;padding:2px 4px;border-radius:3px;color:#fff}
+.ovdot.green{background:var(--green)}.ovdot.amber{background:var(--amber);color:var(--navy-ink)}.ovdot.red{background:var(--state-red)}.ovdot.grey{background:var(--slate3)}
+/* 10/11 · regulatory watch board */
+.wboard{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;align-items:start}
+.wcol{background:var(--gray05);border:1px solid var(--line);border-top:4px solid var(--slate3);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px}
+.wcol.amber{border-top-color:var(--amber)}.wcol.red{border-top-color:var(--state-red)}.wcol.green{border-top-color:var(--green)}
+.wcolh{display:flex;justify-content:space-between;align-items:center;color:var(--navy)}.wcount{font-weight:800;font-size:18px}
+.wcolsub{margin-top:-6px}
+.wcard{display:block;background:var(--white);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;color:inherit}
+.wcard:hover{box-shadow:0 2px 8px rgba(13,42,63,.12);text-decoration:none}.wcard.late{border-left:3px solid var(--state-red)}
+.wct{font-weight:600;color:var(--navy);font-size:13px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wcm{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--slate6);margin-top:4px}
+.wdue{white-space:nowrap}.wdue.late{color:var(--state-red);font-weight:700}
+.wmore{text-align:center}

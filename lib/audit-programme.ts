@@ -44,9 +44,12 @@ export async function nextAuditNumber(db: SupabaseClient, entity: string, year: 
   return `AUD-${entity}-${year}-${String((n.length ? Math.max(...n) : 0) + 1).padStart(2, "0")}`;
 }
 
-export type Coverage = { done: number; planned: number; replanned: number; cancelled: number; late: number; modulesWithout: AuditModule[]; reqs: { req: string; modules: string[] }[]; gaps: string[] };
-/** What the cycle covers: modules without a live audit, requirements of the programme no audited module lists. */
-export function coverage(p: Programme, mods: AuditModule[], audits: Audit[], t0: string): Coverage {
+export type Coverage = { done: number; planned: number; replanned: number; cancelled: number; late: number; outside: number; modulesWithout: AuditModule[]; reqs: { req: string; modules: string[] }[]; gaps: string[] };
+/** Is the audit's month inside the programme's cycle? (Guillaume 10/11: an audit of the previous cycle attached for history is not "done in the cycle".) */
+export const inCycle = (p: Pick<Programme, "starts_on" | "ends_on">, a: Pick<Audit, "planned_month">) => a.planned_month >= monthStart(p.starts_on) && a.planned_month <= monthStart(p.ends_on);
+/** What the cycle covers: modules without a live audit, requirements of the programme no audited module lists. Only the audits whose month falls in the cycle count. */
+export function coverage(p: Programme, mods: AuditModule[], all: Audit[], t0: string): Coverage {
+  const audits = all.filter((a) => inCycle(p, a));
   const live = audits.filter((a) => LIVE.includes(a.status));
   const audited = new Set(live.map((a) => a.module_id).filter(Boolean) as string[]);
   for (const m of mods) if (m.kind === "checks" && m.check_ids?.length) audited.add(m.id); // a linked recurring check covers its module
@@ -58,6 +61,7 @@ export function coverage(p: Programme, mods: AuditModule[], audits: Audit[], t0:
     replanned: audits.filter((a) => a.replanned > 0 && a.status !== "cancelled").length,
     cancelled: audits.filter((a) => a.status === "cancelled").length,
     late: audits.filter((a) => a.status === "planned" && addMonths(a.planned_month, 1) <= t0).length,
+    outside: all.length - audits.length,
     modulesWithout: active.filter((m) => m.kind !== "authority" && !audited.has(m.id)),
     reqs, gaps: reqs.filter((r) => !r.modules.length).map((r) => r.req),
   };

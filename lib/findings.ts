@@ -8,6 +8,7 @@ import { today } from "@/lib/authority";
 
 export type Finding = { id: string; entity: string; number: string; source: string; authority: string | null; audit_ref: string | null; level: string; requirement: string | null; title: string; description: string | null;
   owner_role: string | null; owner_person: string | null; notified: string | null; due: string | null; status: string; current_round: number; plan_round: number; authority_file_id: string | null;
+  finding_type?: string | null; finding_type_by?: string | null; imported_from?: string | null; audit_id?: string | null;
   draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; draft_comment: string | null; draft_step: number; rca_check: Assistant | null; plan_check: Assistant | null; effective_closed_on: string | null;
   closed_at: string | null; closed_by: string | null; closed_note: string | null; created_by: string | null; created_at: string; updated_at: string };
 export type Point = { code: string; label: string; detail: string; part?: "rca" | "plan" };
@@ -18,7 +19,7 @@ export type Round = { id: string; finding_id: string; stage: Stage; n: number; c
 export type Change = { id: string; finding_id: string; manual_id: string | null; manual_code: string | null; section_ref: string | null; expected: string; status: string; revision_id: string | null; verified_at: string | null; verified_by: string | null; verified_note: string | null; created_at: string;
   route: string | null; authority_file_id: string | null; authority_ref: string | null; effective_on: string | null };
 
-export const STATUS_LABEL: Record<string, string> = { open: "Analysis in progress", review: "Analysis to review", back: "Sent back — to complete", accepted: "Plan in progress", closure_requested: "Closure requested", closed: "Closed", cancelled: "Cancelled" };
+export const STATUS_LABEL: Record<string, string> = { open: "To analyse", review: "Analysis to review", back: "Sent back — to complete", accepted: "Plan in progress", closure_requested: "Closure requested", closed: "Closed", cancelled: "Cancelled" };
 export const STATUS_TONE: Record<string, string> = { open: "amber", review: "", back: "amber", accepted: "", closure_requested: "", closed: "green", cancelled: "" };
 /** The 5-step path shown on the sheet. Steps 1-2 are the NP's writing (draft_step), 3 the review, 4 the plan, 5 the closure. */
 export const STEPS_PATH = ["Root cause", "Action plan", "Compliance review", "Plan in progress", "Closure"];
@@ -69,7 +70,7 @@ export function effectiveClosure(changes: Change[], actions: Action[]): string |
 
 /** FND-04 · One glance at how far the work has gone — on the list, without opening the finding. */
 export type Progress = { label: string; tone: "" | "amber" | "green" | "red"; detail: string[]; pct: number };
-export function progress(f: Pick<Finding, "status" | "draft_step" | "current_round" | "effective_closed_on">, changes: Change[], actions: Action[]): Progress {
+export function progress(f: Pick<Finding, "status" | "draft_step" | "current_round" | "effective_closed_on"> & { draft_root_cause?: string | null; imported_from?: string | null }, changes: Change[], actions: Action[]): Progress {
   const ch = changes.filter((c) => c.status !== "removed"), ac = actions.filter((a) => a.status !== "cancelled");
   const total = ch.length + ac.length;
   const n = (st: string[]) => ch.filter((c) => st.includes(c.status)).length;
@@ -84,11 +85,14 @@ export function progress(f: Pick<Finding, "status" | "draft_step" | "current_rou
   if (acClosed) detail.push(`${acClosed} action${acClosed > 1 ? "s" : ""} done, to verify`);
   const pct = total ? Math.round((100 * done) / total) : 0;
   switch (f.status) {
-    case "open": return { label: f.draft_step >= 2 ? "Plan being written" : "Root cause being written", tone: "amber", detail, pct };
+    case "open": // 10/11 · nothing written yet is "not started", not "being written"
+      if (f.draft_step >= 2) return { label: "Plan being written", tone: "amber", detail, pct };
+      if (f.draft_root_cause?.trim()) return { label: "Root cause being written", tone: "amber", detail, pct };
+      return { label: "Not started", tone: "", detail, pct };
     case "back": return { label: `Sent back — round ${f.current_round}`, tone: "amber", detail, pct };
     case "review": return { label: "Analysis with Compliance", tone: "", detail, pct };
     case "accepted":
-      if (!total) return { label: "Plan accepted — nothing attached", tone: "red", detail, pct };
+      if (!total) return f.imported_from ? { label: "Plan in progress — Monday plan, actions not attached yet", tone: "amber", detail, pct } : { label: "Plan accepted — nothing attached", tone: "red", detail, pct };
       if (done === total) return { label: "Work done — closure to request", tone: "green", detail, pct: 100 };
       if (waiting && !drafting && !acOpen) return { label: `Work done — awaiting the authority (${waiting})`, tone: "amber", detail, pct };
       if (toVerify && !drafting && !waiting && !acOpen && !acClosed) return { label: "Work done — Compliance to verify", tone: "green", detail, pct };
@@ -122,9 +126,10 @@ export function critique(f: Finding, r: Pick<Round, "root_cause" | "factors" | "
     if (!CAUSAL.test(rc) && rcW.size < 40) pts.push({ code: "RC_NO_WHY", label: "No causal link", detail: "The text describes but does not explain: no “because”, “due to”, “as a result”." });
     if (PERSON.test(rc) && !ORG.test(`${rc} ${fa}`)) pts.push({ code: "RC_PERSON", label: "Cause placed on a person only", detail: "An individual error is the symptom; what in procedures, training, workload, tools or supervision allowed it?" });
   }
-  if (!fa && !ORG.test(rc)) pts.push({ code: "FACTORS_NONE", label: "No organisational factor", detail: "Contributing factors (procedure, resources, communication, supervision, interface…) are not stated." });
-  if (!im) pts.push({ code: "IMMEDIATE_NONE", label: "No immediate action", detail: "What was done right away to contain the non-compliance?" });
-  const blocking = new Set(["RC_EMPTY", "RC_SYMPTOM", "FACTORS_NONE"]);
+  // 10/11 · one root-cause field only (Guillaume): the organisational factor is looked for in the root cause itself
+  if (rc && !ORG.test(`${rc} ${fa}`)) pts.push({ code: "RC_NO_SYSTEM", label: "No organisational cause named", detail: "Say what in the system let it happen: procedure, training, resources, supervision, interface, tools." });
+  void im;
+  const blocking = new Set(["RC_EMPTY", "RC_SYMPTOM"]);
   const offTopic = !!rc && rcW.size >= 6 && overlap(rcW, new Set([...fW, ...words(f.requirement)])) === 0;
   const verdict: Assistant["verdict"] = offTopic ? "off_topic" : pts.some((p) => blocking.has(p.code)) ? "incomplete" : "complete";
   return { verdict, points: pts.map((q) => ({ ...q, part: "rca" as const })), model: "rules", at: new Date().toISOString() };
@@ -149,9 +154,9 @@ function critiquePlan(f: Finding, r: Pick<Round, "root_cause" | "factors" | "imm
 }
 
 const PREREAD_SYSTEM = (stage: Stage, forNp: boolean) => `You are the assistant of a Compliance Monitoring Manager (EASA AOC / ATO / CAMO). You read a nominated person's answer to an audit finding${forNp ? ", BEFORE it is sent, to help the nominated person strengthen it" : ", for the compliance manager who decides"}.
-Scope: ${stage === "rca" ? "the root cause analysis only (root cause, contributing factors, immediate action). Do not comment on the plan" : stage === "plan" ? "the corrective action plan only (expected manual changes, actions), against the root cause given. Do not re-judge the root cause" : "both the root cause analysis and the corrective action plan"}.
+Scope: ${stage === "rca" ? "the root cause only (one text). Do not comment on the plan, do not ask for separate contributing factors or immediate action" : stage === "plan" ? "the corrective action plan only (expected manual changes, actions), against the root cause given. Do not re-judge the root cause" : "both the root cause analysis and the corrective action plan"}.
 Judge the ANALYSIS, never the person. Neutral, short, professional English, addressed ${forNp ? "to the author (\"you\")" : "to the compliance manager"}. Suggestions only.
-Root cause checks: a cause (why the system allowed it) or a restatement of the symptom? why-chain followed far enough? organisational factor present (procedure, training, resources, supervision, interface, tools)? cause placed on a person only? containment action? about this finding?
+Root cause checks: a cause (why the system allowed it) or a restatement of the symptom? why-chain followed far enough? organisational factor present in the text (procedure, training, resources, supervision, interface, tools)? cause placed on a person only? about this finding? Use the finding type, when given, to suggest where to look.
 Plan checks: does each action address the cause (not only training / reminders)? manual or procedure change needed and planned? owner and realistic date on each action? part of the cause left without an action? a way to verify effectiveness?
 Answer ONLY with JSON: {"verdict":"complete|incomplete|off_topic","points":[{"part":"rca|plan","code":"SHORT_CODE","label":"≤ 8 words","detail":"one sentence the author can act on"}]} — at most 6 points, none if the answer is sound.`;
 
@@ -161,7 +166,7 @@ export async function preRead(f: Finding, r: Pick<Round, "root_cause" | "factors
   if (!process.env.ANTHROPIC_API_KEY) return rules;
   try {
     const { callClaude } = await import("@/lib/ai");
-    const user = `FINDING ${f.number} (${LEVEL_LABEL[f.level] ?? f.level}, ${f.requirement ?? "no reference"})\nTitle: ${f.title}\nText: ${f.description ?? "—"}\n\nROOT CAUSE ANALYSIS\nRoot cause: ${r.root_cause ?? "—"}\nContributing factors: ${r.factors ?? "—"}\nImmediate action: ${r.immediate ?? "—"}\n\nPLAN${stage === "rca" ? " (out of scope)" : r.comment ? ` — author's note: ${r.comment}` : ""}\nExpected manual changes: ${changes.length ? changes.map((c) => `${c.manual_code ?? "?"} ${c.section_ref ?? ""}: ${c.expected}`).join(" | ") : "none"}\nActions: ${actions.length ? actions.map((a) => `${a.number} ${a.title} (owner ${a.owner_role ?? a.owner_person ?? "none"}, due ${a.due ?? "none"})`).join(" | ") : "none"}`;
+    const user = `FINDING ${f.number} (${LEVEL_LABEL[f.level] ?? f.level}, ${f.requirement ?? "no reference"}${f.finding_type ? `, type ${TYPE_LABEL[f.finding_type] ?? f.finding_type}` : ""})\nTitle: ${f.title}\nText: ${f.description ?? "—"}\n\nROOT CAUSE ANALYSIS\nRoot cause: ${r.root_cause ?? "—"}\nContributing factors: ${r.factors ?? "—"}\nImmediate action: ${r.immediate ?? "—"}\n\nPLAN${stage === "rca" ? " (out of scope)" : r.comment ? ` — author's note: ${r.comment}` : ""}\nExpected manual changes: ${changes.length ? changes.map((c) => `${c.manual_code ?? "?"} ${c.section_ref ?? ""}: ${c.expected}`).join(" | ") : "none"}\nActions: ${actions.length ? actions.map((a) => `${a.number} ${a.title} (owner ${a.owner_role ?? a.owner_person ?? "none"}, due ${a.due ?? "none"})`).join(" | ") : "none"}`;
     const { text, model } = await callClaude({ agent: "check", personId: null, entity: f.entity, system: PREREAD_SYSTEM(stage, forNp), user, maxTokens: 1200 });
     const m = /\{[\s\S]*\}/.exec(text); if (!m) return rules;
     const j = JSON.parse(m[0]) as { verdict?: string; points?: Point[] };
@@ -242,3 +247,40 @@ export async function answerFromTeams(db: SupabaseClient, f: Finding, actor: { i
   await db.from("audit_log").insert({ actor: actor.id, entity: f.entity, object_type: "finding", object_id: f.id, action: "finding_analysis_sent", after: { round: n, via: "teams", verdict: assistant.verdict, points: assistant.points.length, changes: changes.length, actions: actions.length } });
   return { assistant, actions: created, sent: true };
 }
+
+/* ---------- 10/11 · type of finding: S.A.M. proposes, the user changes; it steers the advice for writing the root cause ---------- */
+export const TYPES = ["documentation", "procedure", "training", "records", "organisation", "oversight", "change", "subcontractor", "equipment"] as const;
+export const TYPE_LABEL: Record<string, string> = {
+  documentation: "Documentation (manual content)", procedure: "Procedure not applied", training: "Training & competence", records: "Records & traceability",
+  organisation: "Organisation & resources", oversight: "Compliance monitoring & oversight", change: "Change & authority notification", subcontractor: "Subcontractor & contract", equipment: "Equipment, facilities, FSTD",
+};
+const TYPE_RULES: [string, RegExp][] = [
+  ["change", /(changement|modification au sein|notif|approbation|approval|change management|ORA\.GEN\.130|ORO\.GEN\.130|CAO\.A\.105|non soumis|soumettre|submitted|soumis à la DSAC|autorité)/i],
+  ["subcontractor", /(sous[- ]?trait|subcontract|contrat|contract|prestataire|fournisseur|ORA\.GEN\.205|ORO\.GEN\.205)/i],
+  ["training", /(formation|training|compétenc|competen|qualification|recyclage|instructeur|instructor|examinateur|FI|FE|connaissance par le personnel)/i],
+  ["records", /(enregistrement|record|archiv|traçab|tracab|dossier|log ?book|carnet|signature|preuve|evidence)/i],
+  ["equipment", /(FSTD|simulat|équipement|equipment|installation|facilit|outillage|tool|étalonnage|calibration|ORA\.FSTD)/i],
+  ["oversight", /(surveillance|audit|conformité|compliance monitoring|programme d'audit|revue|review|ORA\.GEN\.200|ORO\.GEN\.200|management system|système de gestion|instances|comité)/i],
+  ["organisation", /(organisation|organigramme|ressource|resource|effectif|staffing|responsable|nominated|personnel désigné|ORA\.GEN\.210|ORO\.GEN\.210)/i],
+  ["documentation", /(manuel|manual|MSM|OM-?[A-D]|TM-|CAE|MOE|CAME|documentation|document|chapitre|section|incomplet|non à jour|not up to date|missing in the)/i],
+  ["procedure", /(procédure|procedure|non respect|not followed|not applied|appliqu|process)/i],
+];
+/** S.A.M.'s proposal: the first family whose words appear in the title, text or rule cited. A guess, shown as such. */
+export function guessType(f: Pick<Finding, "title" | "description" | "requirement">): string {
+  const t = `${f.title} ${f.description ?? ""} ${f.requirement ?? ""}`;
+  let best = "procedure", n = 0;
+  for (const [k, re] of TYPE_RULES) { const m = (t.match(new RegExp(re.source, "gi")) ?? []).length; if (m > n) { best = k; n = m; } }
+  return best;
+}
+/** Where to look when writing the root cause, per type: questions, never an answer. */
+export const TYPE_GUIDE: Record<string, { look: string[]; avoid: string }> = {
+  documentation: { look: ["Who owns this part of the manual, and how is it kept up to date when the rule or the practice changes?", "Was the regulatory change seen (regulatory watch) and was the manual revision planned?", "Is the review of the manual before submission checking this content?"], avoid: "« The manual was not up to date » restates the finding: say why the revision process did not catch it." },
+  procedure: { look: ["Is the procedure written, known, and workable in real conditions (time, roster, tools)?", "Who checks that it is applied, and how often?", "Did a recent change (people, organisation, tool) break the way it used to be done?"], avoid: "« The person did not follow the procedure » is the symptom: what made not following it possible or easier?" },
+  training: { look: ["Is the training requirement defined for this function, with a recurrence?", "Who tracks the validity, and does a reminder exist before expiry?", "Was the content of the training adapted to this task?"], avoid: "« Lack of training » alone: say why the training was missing (not planned, not tracked, not defined)." },
+  records: { look: ["Is the record defined (form, who fills it, where it is kept, for how long)?", "Is the record checked by someone after it is filled?", "Is the tool (paper, Centrik, Monday, S.A.M.) helping or making it easy to skip?"], avoid: "« Record missing » restates the finding: why does the process allow it to go missing?" },
+  organisation: { look: ["Are the responsibilities written and known (job description, nominated person, deputy)?", "Are the resources sized for the workload, including absences?", "Is the interface between the departments involved defined?"], avoid: "Pointing at a person or a vacancy alone: say what in the organisation left the gap open." },
+  oversight: { look: ["Is this area in the audit / compliance-check programme, with the right frequency?", "Were earlier signals (previous findings, checks) followed up?", "Do the management system meetings (CODIR, SRB, reviews) look at it?"], avoid: "« Not audited » restates the finding: why was it out of the programme or the review?" },
+  change: { look: ["Was the change identified as a change (management of change procedure)?", "Who decides whether the authority must approve or be notified, and on what basis?", "Is there a checklist / tracking of the documents to submit before the change takes effect?"], avoid: "« Forgot to notify » is the symptom: why did the process not stop the change until the authority was involved?" },
+  subcontractor: { look: ["Is there a contract, and does it cover the requirement (access for the authority, Part-IS, quality)?", "Is the subcontractor in the control plan, and was it controlled?", "Who in the organisation follows the subcontractor day to day?"], avoid: "Blaming the subcontractor alone: our oversight of the subcontractor is the cause to examine." },
+  equipment: { look: ["Is the maintenance / qualification plan of the equipment defined and followed?", "Who monitors the due dates (calibration, FSTD recurrent evaluation)?", "Was a deviation known and accepted without a decision traced?"], avoid: "« The equipment was out of date » restates the finding: why did the follow-up not catch it?" },
+};

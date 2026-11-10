@@ -30,7 +30,7 @@ export default async function AuditProgramme() {
   ]) : [{ data: [] }, { data: [] }];
   const mods = (md ?? []) as AuditModule[], audits = (ad ?? []) as Audit[];
   const per = cur.map((p) => { const m = mods.filter((x) => x.programme_id === p.id), a = audits.filter((x) => x.programme_id === p.id); return { p, m, a, c: coverage(p, m, a, t0) }; });
-  const tot = per.reduce((o, x) => ({ d: o.d + x.c.done, p: o.p + x.c.planned, r: o.r + x.c.replanned, l: o.l + x.c.late, g: o.g + x.c.gaps.length + x.c.modulesWithout.length }), { d: 0, p: 0, r: 0, l: 0, g: 0 });
+  const tot = per.reduce((o, x) => ({ d: o.d + x.c.done, p: o.p + x.c.planned, r: o.r + x.c.replanned, l: o.l + x.c.late, g: o.g + x.c.gaps.length + x.c.modulesWithout.length, o: o.o + x.c.outside }), { d: 0, p: 0, r: 0, l: 0, g: 0, o: 0 });
   const ents = scope ?? ENTS4;
   const others = progs.filter((p) => !ids.includes(p.id));
   return (
@@ -44,8 +44,8 @@ export default async function AuditProgramme() {
           <label><span className="mini">Requirements the cycle must cover, one per line (optional, for the coverage matrix)</span><textarea name="requirements" className="inp mono" rows={3} placeholder={"ORO.GEN.200\nORO.FC.230"} /></label>
           <div className="flex justify-end"><button className="btn primary" type="submit">Create</button></div></form></details> : undefined} />
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Audits done" value={tot.d} hint="in the cycles in force" tone={tot.d ? "green" : undefined} />
-        <Metric label="Planned" value={tot.p} hint={tot.l ? `${tot.l} with the month passed` : "remaining in the cycles"} tone={tot.l ? "red" : undefined} />
+        <Metric label="Audits done" value={`${tot.d} / ${tot.d + tot.p}`} hint={`in the cycle in force${tot.o ? `, ${tot.o} outside the cycle (previous / next) not counted` : ""}`} tone={tot.d ? "green" : undefined} />
+        <Metric label="Still to do" value={tot.p} hint={tot.l ? `${tot.l} with the month passed` : "planned or in progress, in the cycle"} tone={tot.l ? "red" : tot.p ? "amber" : undefined} />
         <Metric label="Replanned" value={tot.r} hint="reason traced" tone={tot.r ? "amber" : undefined} />
         <Metric label="Coverage gaps" value={tot.g} hint="modules / requirements without an audit" tone={tot.g ? "amber" : "green"} />
       </div>

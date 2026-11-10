@@ -5,7 +5,7 @@ import { today } from "@/lib/authority";
 
 export type CCheck = { id: string; entity: string; code: string; title: string; reference: string | null; domain: string | null; checklist_id: string | null; every_months: number; owner_role: string | null; owner_person: string | null; last_done_on: string | null; next_due: string | null; note: string | null; active: boolean };
 export type CRun = { id: string; check_id: string; done_on: string; done_by: string | null; result: string; sample: string | null; comment: string | null; evidence: { name: string; path: string; size: number; at: string }[]; finding_id: string | null; audit_id: string | null; created_at: string };
-export type Auditor = { id: string; person_id: string; entities: string[]; domains: string[]; exclusions: string[]; lead: boolean; status: string; approved_by: string | null; approved_on: string | null; valid_until: string | null; external: string | null; note: string | null };
+export type Auditor = { id: string; person_id: string | null; name?: string | null; aliases?: string[]; entities: string[]; domains: string[]; exclusions: string[]; lead: boolean; status: string; approved_by: string | null; approved_on: string | null; valid_until: string | null; external: string | null; note: string | null };
 export type AuditorItem = { id: string; auditor_id: string; ord: number; label: string; done: boolean; evidence: string | null; on_date: string | null; valid_until: string | null };
 export type AuditorDoc = { id: string; auditor_id: string; name: string; kind: string | null; path: string | null; size: number | null; issued_on: string | null; valid_until: string | null; at: string };
 export type Subcontractor = { id: string; entity: string; code: string | null; name: string; service: string | null; domain: string | null; approval_ref: string | null; contract_ref: string | null; contract_from: string | null; contract_until: string | null; access_clause: boolean | null; is_clause: boolean | null; every_months: number; contact: string | null; status_note: string | null; active: boolean; imported_from: string | null };
@@ -102,4 +102,52 @@ export async function sweepAuditors(db: SupabaseClient): Promise<number> {
     n++;
   }
   return n;
+}
+
+/* ---------- 10/11 · the register as Compliance sees it: every auditor named in an audit appears, with what its file is missing ---------- */
+const norm = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+/** "L. Rudelle (Aero Services EI)" → name + company. */
+export function splitAuditor(v: string): { name: string; company: string | null } { const m = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(v.trim()); return m ? { name: m[1].trim(), company: m[2].trim() || null } : { name: v.trim(), company: null }; }
+/** Do these two ways of writing a name designate the same person? ("L. Rudelle" ~ "Loïc Rudelle", initials, alias.) */
+export function sameAuditor(a: string, b: string): boolean {
+  const x = norm(a), y = norm(b); if (!x || !y) return false; if (x === y) return true;
+  const tx = x.split(" "), ty = y.split(" "); const lx = tx.at(-1)!, ly = ty.at(-1)!;
+  if (lx.length > 2 && lx === ly && tx[0][0] === ty[0][0]) return true; // same surname, same first initial
+  return false;
+}
+export type RosterAudit = { id: string; number: string; entity: string; kind: string; status: string; planned_month: string; done_on: string | null };
+export type RosterRow = { key: string; auditor: Auditor | null; name: string; company: string | null; audits: RosterAudit[]; missing: string[]; items: { total: number; done: number } };
+/** One row per auditor of the register, plus one per name found in the audits (lead or external auditor, authority audits excluded) that has no file yet.
+ *  missing = what keeps the file from being complete (Guillaume 10/11: an error shows until the file is filled). */
+export function auditorRoster(register: Auditor[], people: { id: string; display_name: string }[], audits: (RosterAudit & { lead_auditor: string | null; auditors: string[]; external_auditor: string | null })[], items: { auditor_id: string; done: boolean }[], docs: { auditor_id: string }[], t0 = today()): RosterRow[] {
+  const pname = (id: string | null) => people.find((p) => p.id === id)?.display_name ?? null;
+  const namesOf = (a: Auditor) => [a.name, pname(a.person_id), ...(a.aliases ?? [])].filter(Boolean) as string[];
+  const rows: RosterRow[] = register.map((a) => ({ key: a.id, auditor: a, name: a.name ?? pname(a.person_id) ?? "—", company: a.external, audits: [], missing: [], items: { total: 0, done: 0 } }));
+  const own = audits.filter((x) => x.kind !== "authority");
+  for (const x of own) {
+    const hits = new Set<RosterRow>();
+    for (const pid of [x.lead_auditor, ...(x.auditors ?? [])].filter(Boolean) as string[]) {
+      let r = rows.find((q) => q.auditor?.person_id === pid);
+      if (!r) { r = { key: `p:${pid}`, auditor: null, name: pname(pid) ?? "—", company: null, audits: [], missing: [], items: { total: 0, done: 0 } }; rows.push(r); }
+      hits.add(r);
+    }
+    if (x.external_auditor) for (const part of x.external_auditor.split(/\s*[/,&+]\s*|\s+et\s+|\s+and\s+/i).filter(Boolean)) {
+      const { name, company } = splitAuditor(part);
+      let r = rows.find((q) => (q.auditor ? namesOf(q.auditor) : [q.name]).some((n) => sameAuditor(n, name)));
+      if (!r) { r = { key: `n:${norm(name)}`, auditor: null, name, company, audits: [], missing: [], items: { total: 0, done: 0 } }; rows.push(r); }
+      hits.add(r);
+    }
+    for (const r of hits) r.audits.push(x);
+  }
+  for (const r of rows) {
+    const a = r.auditor;
+    if (!a) { r.missing.push("no file in the register"); continue; }
+    const it = items.filter((i) => i.auditor_id === a.id); r.items = { total: it.length, done: it.filter((i) => i.done).length };
+    if (r.items.total > r.items.done) r.missing.push(`${r.items.total - r.items.done} qualification item${r.items.total - r.items.done > 1 ? "s" : ""} open`);
+    if (!docs.some((d) => d.auditor_id === a.id)) r.missing.push("no certificate / evidence");
+    if (a.status !== "approved") r.missing.push(a.status === "in_qualification" ? "not approved yet" : AUDITOR_STATUS[a.status]?.toLowerCase() ?? a.status);
+    else if (a.valid_until && a.valid_until < t0) r.missing.push(`approval expired ${a.valid_until}`);
+    if (!a.entities.length) r.missing.push("no entity");
+  }
+  return rows;
 }

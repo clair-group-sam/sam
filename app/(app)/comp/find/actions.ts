@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { effectiveClosure, loadFinding, needsAuthority, nextFindingNumber, preRead, syncFindingTasks, type Finding, type Point, type Round } from "@/lib/findings";
+import { effectiveClosure, guessType, TYPES, loadFinding, needsAuthority, nextFindingNumber, preRead, syncFindingTasks, type Finding, type Point, type Round } from "@/lib/findings";
 import { createAuthorityFile } from "@/lib/authority-create";
 
 const db = () => supabaseAdmin();
@@ -48,7 +48,7 @@ export async function saveRootCause(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
   if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
   if (!["open", "back"].includes(x.f.status)) throw new Error("This finding is not being answered.");
-  const draft = { draft_root_cause: str(fd, "root_cause"), draft_factors: str(fd, "factors"), draft_immediate: str(fd, "immediate") };
+  const draft = { draft_root_cause: str(fd, "root_cause"), draft_factors: str(fd, "factors") ?? x.f.draft_factors, draft_immediate: str(fd, "immediate") ?? x.f.draft_immediate }; // 10/11 · one field on screen; older answers keep theirs
   if (!draft.draft_root_cause) throw new Error("Write the root cause.");
   const check = await preRead(x.f, { root_cause: draft.draft_root_cause, factors: draft.draft_factors, immediate: draft.draft_immediate, comment: null, n: x.f.current_round + 1 }, x.changes, x.actions, "rca", true);
   const next = str(fd, "next") === "1";
@@ -183,4 +183,15 @@ export async function openDossier(fd: FormData) {
   await db().from("findings").update({ authority_file_id: f.id, updated_at: new Date().toISOString() }).eq("id", x.f.id);
   touch(x.f.id);
   redirect(`/proj/auth/${f.id}`);
+}
+
+/** 10/11 · the type of finding (documentary, procedure, training…): S.A.M. proposes it, the owner or Compliance sets it; it steers the root-cause advice. */
+export async function setFindingType(fd: FormData) {
+  const x = await load(String(fd.get("id"))); const s = await me();
+  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding or Compliance.");
+  const t = str(fd, "type");
+  const type = t === "auto" ? guessType(x.f) : t && (TYPES as readonly string[]).includes(t) ? t : null;
+  await db().from("findings").update({ finding_type: type, finding_type_by: t === "auto" ? "sam" : type ? "user" : null, updated_at: new Date().toISOString() }).eq("id", x.f.id);
+  await log(x.f, "finding_type", s.person?.id ?? null, { type, by: t === "auto" ? "sam" : "user" });
+  touch(x.f.id);
 }

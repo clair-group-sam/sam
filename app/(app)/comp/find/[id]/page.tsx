@@ -6,8 +6,10 @@ import { Metric, PageHeader } from "@/components/Page";
 import EntityBand from "@/components/EntityBand";
 import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
-import { CHANGE_LABEL, LEVEL_LABEL, loadFinding, needsAuthority, plan, progress, ROUTE_LABEL, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, stepOf, STEPS_PATH, type Assistant, type Point, type Round } from "@/lib/findings";
-import { addChange, checkPlan, decideClosure, gotoStep, openDossier, recordChangeAuthority, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, updateFinding, verifyChange } from "../actions";
+import { CHANGE_LABEL, guessType, LEVEL_LABEL, loadFinding, TYPE_GUIDE, TYPE_LABEL, TYPES, needsAuthority, plan, progress, ROUTE_LABEL, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, stepOf, STEPS_PATH, type Assistant, type Point, type Round } from "@/lib/findings";
+import { addChange, checkPlan, decideClosure, gotoStep, openDossier, recordChangeAuthority, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, setFindingType, updateFinding, verifyChange } from "../actions";
+import { rulesCited } from "@/lib/regulation-items";
+import { RuleText } from "@/components/RuleText";
 import { Icon } from "@/lib/icons";
 
 /* FND-03 · the finding sheet. The NP writes in order — ① root cause, read by S.A.M. with them; ② corrective action plan, read by S.A.M.
@@ -38,6 +40,11 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
     db.from("manuals").select("id,code,title").eq("entity", f.entity).order("code"),
     db.from("audit_log").select("at,actor,action,after").eq("object_type", "finding").eq("object_id", f.id).order("id", { ascending: false }).limit(40),
   ]);
+  // 10/11 · the rules the finding cites, with their text from the EARs loaded in S.A.M.; and the audit it comes from
+  const [rules, { data: aud }] = await Promise.all([rulesCited(db, f.entity, f.requirement), f.audit_id ? db.from("audits").select("id,number,title,kind,done_on,planned_month").eq("id", f.audit_id).maybeSingle() : Promise.resolve({ data: null })]);
+  const audit = aud as { id: string; number: string; title: string; kind: string; done_on: string | null; planned_month: string } | null;
+  const ftype = f.finding_type ?? guessType(f); const typeBySam = !f.finding_type || f.finding_type_by === "sam";
+  const guide = TYPE_GUIDE[ftype];
   const name = (pid: string | null) => ((ppl ?? []) as { id: string; display_name: string }[]).find((q) => q.id === pid)?.display_name ?? "—";
   const manuals = (mans ?? []) as { id: string; code: string; title: string }[];
   const events = (evs ?? []) as { at: string; actor: string | null; action: string; after: Record<string, unknown> | null }[];
@@ -46,7 +53,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   /** S.A.M.'s reading for the author: what could make the part stronger. Never a score. */
   const SamNote = ({ a, part }: { a: Assistant | null; part: "rca" | "plan" }) => a ? (
     <div className="samnote"><div className="eyebrow">S.A.M. read this with you{a.model === "rules" ? " (quick check)" : ""}</div>
-      {a.points.filter((q) => (q.part ?? "rca") === part).length ? <><p className="mini">Points that would strengthen it, your call:</p><Pts pts={a.points} part={part} /></> : <p className="mini">Nothing to point out: {part === "rca" ? "the cause explains, the factors are there." : "the plan answers the cause, each action has an owner and a date."}</p>}
+      {a.points.filter((q) => (q.part ?? "rca") === part).length ? <><p className="mini">Points that would strengthen it, your call:</p><Pts pts={a.points} part={part} /></> : <p className="mini">Nothing to point out: {part === "rca" ? "the text explains why the organisation let it happen." : "the plan answers the cause, each action has an owner and a date."}</p>}
     </div>
   ) : null;
   const RcaText = ({ r }: { r: Pick<Round, "root_cause" | "factors" | "immediate"> }) => <div className="grid gap-3">
@@ -134,7 +141,27 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <label><span className="mini">or person</span><select name="owner_person" className="inp" defaultValue={f.owner_person ?? ""}><option value="">—</option>{((ppl ?? []) as { id: string; display_name: string }[]).map((q) => <option key={q.id} value={q.id}>{q.display_name}</option>)}</select></label>
                 <label className="col-span-2"><span className="mini">Text</span><textarea name="description" className="inp" rows={4} defaultValue={f.description ?? ""} /></label>
                 <div className="col-span-2 flex justify-end"><button className="btn" type="submit">Save</button></div></form></details>}</div>
-            <div className="cb"><p style={{ whiteSpace: "pre-wrap" }}>{f.description ?? <span className="mini">No text pasted.</span>}</p></div>
+            <div className="cb"><p style={{ whiteSpace: "pre-wrap" }}>{f.description ?? <span className="mini">No text pasted.</span>}</p>
+              {audit && <p className="mini mt-2">From the audit <Link href={`/comp/audits/${audit.id}`}><b className="mono">{audit.number}</b> {audit.title}</Link>{audit.done_on ? `, ${audit.done_on}` : ""}</p>}</div>
+          </section>
+
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Type of finding</span><span className="mini">{typeBySam ? "proposed by S.A.M. from the text, change it if wrong" : "set by hand"}</span></div>
+            <div className="cb grid gap-2">
+              <div className="flex items-center gap-2" style={{ flexWrap: "wrap" }}><span className={"pill " + (typeBySam ? "amber" : "green")} style={{ fontSize: 13 }}>{TYPE_LABEL[ftype] ?? ftype}</span>
+                {actor && !closedOrCancelled && <form action={setFindingType} className="flex gap-1"><input type="hidden" name="id" value={f.id} /><select name="type" className="inp" defaultValue={f.finding_type ?? ""} style={{ marginTop: 0, width: 260 }}><option value="" disabled>Change the type…</option>{TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}</select><button className="btn sm" type="submit">Set</button></form>}</div>
+              {guide && <p className="mini">S.A.M. uses the type to suggest where to look for the root cause, it never writes it for you.</p>}
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Regulation cited</span><span className="mono mini">{f.requirement ?? "no reference given"}</span></div>
+            <div className="cb grid gap-2">
+              {!rules.length ? <p className="mini">{f.requirement ? "No rule code S.A.M. recognises in the reference." : "No reference given on the finding."}</p> : rules.map((r) => (
+                <details key={r.code} className="rulecited"><summary><b className="mono">{r.code}</b> {r.items.find((i) => i.kind === "ir" || i.kind === "cs")?.title ?? ""} <span className="mini">{r.reg ? `· ${r.reg.title}, ${r.reg.version}` : "· not in the texts loaded in S.A.M."}</span></summary>
+                  <div className="mt-2">{r.items.length ? <RuleText items={r.items} version={r.reg!.version} onlineUrl={r.reg!.online_url} compact /> : <p className="mini">Load the Easy Access Rules that contain it (Regulation) to read it here.</p>}
+                    {r.reg && <p className="mini mt-1"><Link href={`/reg/ear/${r.reg.key}?code=${encodeURIComponent(r.code)}`}>Open in Regulation ↗</Link></p>}</div></details>))}
+            </div>
           </section>
 
           {writing ? (
@@ -145,11 +172,10 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <div className="cb">
                   {ds === 1 ? (
                     <form action={saveRootCause} className="grid gap-3"><input type="hidden" name="id" value={f.id} />
-                      <label><span className="mini">Root cause, why did the organisation let this happen? (not what was found, not who)</span><textarea name="root_cause" className="inp" rows={4} required defaultValue={f.draft_root_cause ?? ""} placeholder="Example: the procedure for … did not name who checks …, so the check depended on memory when the roster changed." /></label>
-                      <label><span className="mini">Contributing factors, procedure, training, resources, supervision, interface, tools</span><textarea name="factors" className="inp" rows={3} defaultValue={f.draft_factors ?? ""} /></label>
-                      <label><span className="mini">Immediate action taken</span><textarea name="immediate" className="inp" rows={2} defaultValue={f.draft_immediate ?? ""} /></label>
+                      {guide && <div className="samguide"><div className="eyebrow">Where to look, {TYPE_LABEL[ftype]}{typeBySam ? " (type proposed by S.A.M.)" : ""}</div><ul className="pts">{guide.look.map((q) => <li key={q}>{q}</li>)}</ul><p className="mini"><b>Avoid:</b> {guide.avoid}</p></div>}
+                      <label><span className="mini">Root cause, why did the organisation let this happen? (not what was found, not who)</span><textarea name="root_cause" className="inp" rows={6} required defaultValue={f.draft_root_cause ?? ""} placeholder="Example: the procedure for … did not name who checks …, so the check depended on memory when the roster changed." /></label>
                       <SamNote a={f.rca_check} part="rca" />
-                      <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="next" value="0">Save &amp; read with S.A.M.</button><button className="btn primary" type="submit" name="next" value="1">Save → action plan</button></div>
+                      <div className="flex gap-2 justify-end items-center"><span className="mini" style={{ marginRight: "auto" }}>Nothing goes to Compliance before step ③.</span><button className="btn" type="submit" name="next" value="0" title="Saves your text and shows S.A.M.'s remarks below; you stay on this step">Save and get S.A.M.'s remarks</button><button className="btn primary" type="submit" name="next" value="1">Save, next: action plan →</button></div>
                     </form>
                   ) : <RcaText r={{ root_cause: f.draft_root_cause, factors: f.draft_factors, immediate: f.draft_immediate }} />}
                 </div>
@@ -163,7 +189,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                     <form action={checkPlan} className="grid gap-2" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><input type="hidden" name="id" value={f.id} />
                       <label><span className="mini">How the plan answers the cause (optional, goes to Compliance)</span><textarea name="comment" className="inp" rows={2} defaultValue={f.draft_comment ?? ""} /></label>
                       <SamNote a={f.plan_check} part="plan" />
-                      <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="next" value="0" disabled={!p.total}>Read with S.A.M.</button><button className="btn primary" type="submit" name="next" value="1" disabled={!p.total}>Continue → send</button></div>
+                      <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="next" value="0" disabled={!p.total} title="Shows S.A.M.'s remarks on the plan below; you stay on this step">Get S.A.M.'s remarks on the plan</button><button className="btn primary" type="submit" name="next" value="1" disabled={!p.total}>Next: send →</button></div>
                     </form>
                   )}
                   {ds === 3 && f.draft_comment && <p className="mini">{f.draft_comment}</p>}
@@ -179,7 +205,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
             </>
           ) : current ? (
             <section className="card">
-              <div className="ch"><span className="eyebrow">Analysis, round {current.n}</span><span className="mini">{current.decision === "accepted" ? `accepted by ${name(current.decided_by)}, ${current.decided_at?.slice(0, 10)}` : `by ${name(current.answered_by)}, ${current.answered_at.slice(0, 10)}`}</span></div>
+              <div className="ch"><span className="eyebrow">{current.via === "import" ? "Analysis (imported from Monday)" : `Analysis, round ${current.n}`}</span><span className="mini">{current.decision === "accepted" ? `accepted by ${name(current.decided_by)}, ${current.decided_at?.slice(0, 10)}` : `by ${name(current.answered_by)}, ${current.answered_at.slice(0, 10)}`}</span></div>
               <div className="cb grid gap-3"><RcaText r={current} />{current.comment && <div><div className="eyebrow">How the plan answers the cause</div><p className="mini">{current.comment}</p></div>}</div>
             </section>
           ) : <section className="card"><div className="ch"><span className="eyebrow">Analysis</span></div><div className="cb mini">Waiting for {who}.</div></section>}
