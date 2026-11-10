@@ -111,10 +111,12 @@ export const E2_ATTR = {
 } as const;
 /** Attributes whose value lists S.A.M. caches (the long lists — aircraft types, aerodromes — are read on demand instead). */
 export const E2_LISTS_TO_CACHE: { entity: number; attributes: number[] }[] = [
-  { entity: 24, attributes: [E2_ATTR.STATE, E2_ATTR.OCC_CLASS, E2_ATTR.OCC_CATEGORY, E2_ATTR.NARRATIVE_LANG, E2_ATTR.REPORTER_LANG, E2_ATTR.DAMAGE, E2_ATTR.INJURY, E2_ATTR.WEATHER_RELEVANT, E2_ATTR.AVIATION_SECTOR, E2_ATTR.DETECTION, E2_ATTR.REPORT_STATUS] },
-  { entity: 4, attributes: [E2_ATTR.AC_OPERATION_TYPE, E2_ATTR.AC_CATEGORY, E2_ATTR.AC_STATE_OF_REGISTRY, E2_ATTR.AC_FLIGHT_PHASE] },
+  { entity: 24, attributes: [E2_ATTR.STATE, E2_ATTR.OCC_CLASS, E2_ATTR.OCC_CATEGORY, E2_ATTR.DAMAGE, E2_ATTR.INJURY, E2_ATTR.WEATHER_RELEVANT, E2_ATTR.AVIATION_SECTOR, E2_ATTR.DETECTION, E2_ATTR.REPORT_STATUS] },
+  { entity: 4, attributes: [E2_ATTR.AC_OPERATION_TYPE, E2_ATTR.AC_CATEGORY, E2_ATTR.AC_STATE_OF_REGISTRY, E2_ATTR.AC_FLIGHT_PHASE, E2_ATTR.WEATHER_RELEVANT] },
   { entity: 14, attributes: [E2_ATTR.EVENT_TYPE] },
   { entity: 1, attributes: [E2_ATTR.AD_LOCATION] },
+  { entity: 22, attributes: [E2_ATTR.NARRATIVE_LANG] },
+  { entity: 53, attributes: [E2_ATTR.REPORTER_LANG] },
 ];
 type TaxAttr = { taxonomyCode: number; description: string; detailed?: string; explanation?: string; minInstance?: number | string | null; maxInstance?: number | string | null; attributeDataType?: { name?: string } | string | null; dataType?: { name?: string } | string | null; valueList?: { id?: number } | null; attributeValueListId?: number | null; valueListId?: number | null };
 type TaxEntity = { taxonomyCode: number; description: string; attributesList?: { childrenAttributes?: TaxAttr[] } };
