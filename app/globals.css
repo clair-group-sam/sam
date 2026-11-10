@@ -929,6 +929,7 @@ html[data-size="large"] body,html[data-size="xlarge"] body{height:auto;min-heigh
   .rail>.menupills,.rail .railbottom,.rail .morebox,.rail .morebox.open{display:flex;flex-direction:row;align-items:center;gap:2px;flex:0 0 auto;overflow:visible;margin:0;padding:0;border:0;background:none}
   .rail .rl,.rail.mini .rl,.rail.mini.hover .rl,.rail .morebox.open .rl{width:46px;min-width:46px;height:46px;margin:0;padding:0;justify-content:center;flex:0 0 46px}
   .rail .rl span,.rail.mini.hover .rl span,.rail .rl .tgl{display:none}
+  .rail .rl.on{background:var(--navy) !important;color:var(--white)}.rail .rl.erp.on{background:var(--terra) !important}
   .subwrap,.sub{display:none}
   .mobsub{display:flex !important;gap:6px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--gray05)}
   .mobsub a{flex:0 0 auto;padding:8px 12px;border-radius:999px;background:var(--white);border:1px solid var(--line);font-size:13px;min-height:36px;display:flex;align-items:center}
