@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DueChip } from "@/components/DueChip";
 import { notFound, redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -12,6 +13,9 @@ import { rulesCited } from "@/lib/regulation-items";
 import { RuleText } from "@/components/RuleText";
 import { authorityStep, DECISION_LABEL, DECISION_TONE, effectiveDue, EXT_LABEL } from "@/lib/authority-audit";
 import { Icon } from "@/lib/icons";
+import { PendingButton } from "@/components/PendingButton";
+import { UseProposal } from "@/components/UseProposal";
+import { BackButton } from "@/components/BackButton";
 
 /* FND-03 · the finding sheet. The NP writes in order — ① root cause, read by S.A.M. with them; ② corrective action plan, read by S.A.M.
  * with them; ③ send both — then Compliance accepts both (the plan starts) or sends back with the points to address. S.A.M.'s reading
@@ -54,6 +58,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   /** S.A.M.'s reading for the author: what could make the part stronger. Never a score. */
   const SamNote = ({ a, part }: { a: Assistant | null; part: "rca" | "plan" }) => a ? (
     <div className="samnote"><div className="eyebrow">S.A.M. read this with you{a.model === "rules" ? " (quick check)" : ""}</div>
+      {part === "rca" && a.proposal && writing && <div className="samprop mb-2"><div className="flex items-center justify-between" style={{ gap: 8, flexWrap: "wrap" }}><b className="mini">S.A.M.'s proposal, yours to use or not</b><UseProposal text={a.proposal} /></div><p className="mini mt-1" style={{ whiteSpace: "pre-wrap" }}>{a.proposal}</p><p className="mini" style={{ color: "var(--slate6)" }}>Built from the finding and your draft; check every fact, the [bracketed] points are for you to confirm. Nothing is saved until you click Save.</p></div>}
       {a.points.filter((q) => (q.part ?? "rca") === part).length ? <><p className="mini">Points that would strengthen it, your call:</p><Pts pts={a.points} part={part} /></> : <p className="mini">Nothing to point out: {part === "rca" ? "the text explains why the organisation let it happen." : "the plan answers the cause, each action has an owner and a date."}</p>}
     </div>
   ) : null;
@@ -105,13 +110,13 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
     <>
       <EntityBand entity={f.entity} current={s.entity} multi={s.entities.length > 1} what="finding" />
       <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${f.notified ?? "—"}, answer due ${f.due ?? "—"}, answered by ${who}, ${progress(f, changes, actions).label}`}
-        right={<span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>} />
+        right={<span className="flex gap-2 items-center"><BackButton fallback={f.audit_id ? `/comp/audits/${f.audit_id}` : "/comp/find"} /><span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span></span>} />
 
       <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? <Icon name="check" size={12} /> : i + 1}</i><span>{l}</span></div>)}</div>
 
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Where" value={STATUS_LABEL[f.status] ?? f.status} hint={["review", "closure_requested"].includes(f.status) ? "Compliance's turn" : closedOrCancelled ? "" : `${who}'s turn`} />
-        <Metric label="Answer due" value={f.due ?? "—"} tone={f.due && f.due < t0 && step <= 3 ? "red" : undefined} />
+        <Metric label={f.source === "authority" ? "Authority deadline" : "Answer due"} value={(() => { const d = f.source === "authority" ? effectiveDue({ due: f.due, extension: f.extension ?? null }) : f.due; return d ? <DueChip due={d} done={closedOrCancelled} t0={t0} /> : "—"; })()} tone={f.due && f.due < t0 && !closedOrCancelled ? "red" : undefined} />
         <Metric label="Corrective plan" value={p.total ? (step >= 4 ? `${p.done} / ${p.total}` : `${p.total} item${p.total === 1 ? "" : "s"}`) : "—"} hint={step >= 4 ? (!p.total ? "nothing attached yet" : p.remaining.length ? `${p.remaining.length} remaining` : "complete") : "starts once accepted"} tone={step >= 4 && p.total && !p.remaining.length ? "green" : step >= 4 && !p.total ? "amber" : undefined} />
         <Metric label="Rounds" value={rounds.length} hint={rounds.some((r) => r.decision === "sent_back") ? `${rounds.filter((r) => r.decision === "sent_back").length} sent back` : ""} />
       </div>
@@ -151,7 +156,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
             <div className="ch"><span className="eyebrow">With the authority{f.authority ? `, ${f.authority}` : ""}</span><span className={"pill " + st.tone}>{st.label}</span></div>
             <div className="cb grid gap-2">
               <div className="grid grid-cols-4 gap-2 mini"><div>Reference<div className="mono" style={{ fontSize: 14 }}>{f.authority_ref ?? "—"}</div></div><div>Root cause<div><D v={f.authority_rca} /></div></div><div>Plan<div><D v={f.authority_pac} /></div></div><div>Proof<div><D v={f.authority_proof} /></div></div></div>
-              <p className="mini">Deadline {d ?? "—"}{f.extension ? ` (${EXT_LABEL[f.extension]}, initially ${f.due})` : ""}{f.notified ? `, notified ${f.notified}` : ""}{f.finding_file ? <> · <a href={f.finding_file} target="_blank" rel="noreferrer">finding sheet ↗</a></> : null}</p>
+              <p className="mini">Deadline <DueChip due={d} done={["closed", "cancelled"].includes(f.status)} t0={t0} />{f.extension ? ` (${EXT_LABEL[f.extension]}, initially ${f.due})` : ""}{f.notified ? `, notified ${f.notified}` : ""}{f.finding_file ? <> · <a href={f.finding_file} target="_blank" rel="noreferrer">finding sheet ↗</a></> : null}</p>
               {f.proof && <div><div className="eyebrow">Proof of implementation sent</div><p className="mini" style={{ whiteSpace: "pre-wrap" }}>{f.proof}</p></div>}
               {f.extension_reason && <p className="mini" style={{ whiteSpace: "pre-wrap" }}><b>Note:</b> {f.extension_reason}</p>}
               {compliance && <details><summary className="mini">Record the authority's answer</summary><form action={setAuthorityDecision} className="grid gap-2 grid-cols-2 mt-2"><input type="hidden" name="id" value={f.id} />
@@ -195,7 +200,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                       {guide && <div className="samguide"><div className="eyebrow">Where to look, {TYPE_LABEL[ftype]}{typeBySam ? " (type proposed by S.A.M.)" : ""}</div><ul className="pts">{guide.look.map((q) => <li key={q}>{q}</li>)}</ul><p className="mini"><b>Avoid:</b> {guide.avoid}</p></div>}
                       <label><span className="mini">Root cause, why did the organisation let this happen? (not what was found, not who)</span><textarea name="root_cause" className="inp" rows={6} required defaultValue={f.draft_root_cause ?? ""} placeholder="Example: the procedure for … did not name who checks …, so the check depended on memory when the roster changed." /></label>
                       <SamNote a={f.rca_check} part="rca" />
-                      <div className="flex gap-2 justify-end items-center"><span className="mini" style={{ marginRight: "auto" }}>Nothing goes to Compliance before step ③.</span><button className="btn" type="submit" name="next" value="0" title="Saves your text and shows S.A.M.'s remarks below; you stay on this step">Save and get S.A.M.'s remarks</button><button className="btn primary" type="submit" name="next" value="1">Save, next: action plan →</button></div>
+                      <div className="flex gap-2 justify-end items-center"><span className="mini" style={{ marginRight: "auto" }}>Nothing goes to Compliance before step ③.</span><PendingButton name="next" value="0" label="Save and get S.A.M.'s remarks" busy="S.A.M. is reading your root cause…" title="Saves your text, then S.A.M. gives its remarks and a proposal below; you stay on this step" /><PendingButton name="next" value="1" primary label="Save, next: action plan →" busy="Saving…" /></div>
                     </form>
                   ) : <RcaText r={{ root_cause: f.draft_root_cause, factors: f.draft_factors, immediate: f.draft_immediate }} />}
                 </div>
@@ -209,7 +214,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                     <form action={checkPlan} className="grid gap-2" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><input type="hidden" name="id" value={f.id} />
                       <label><span className="mini">How the plan answers the cause (optional, goes to Compliance)</span><textarea name="comment" className="inp" rows={2} defaultValue={f.draft_comment ?? ""} /></label>
                       <SamNote a={f.plan_check} part="plan" />
-                      <div className="flex gap-2 justify-end"><button className="btn" type="submit" name="next" value="0" disabled={!p.total} title="Shows S.A.M.'s remarks on the plan below; you stay on this step">Get S.A.M.'s remarks on the plan</button><button className="btn primary" type="submit" name="next" value="1" disabled={!p.total}>Next: send →</button></div>
+                      <div className="flex gap-2 justify-end"><PendingButton name="next" value="0" disabled={!p.total} label="Get S.A.M.'s remarks on the plan" busy="S.A.M. is reading your plan…" title="Shows S.A.M.'s remarks on the plan below; you stay on this step" /><PendingButton name="next" value="1" primary disabled={!p.total} label="Next: send →" busy="Saving…" /></div>
                     </form>
                   )}
                   {ds === 3 && f.draft_comment && <p className="mini">{f.draft_comment}</p>}

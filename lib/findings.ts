@@ -14,7 +14,7 @@ export type Finding = { id: string; entity: string; number: string; source: stri
   draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; draft_comment: string | null; draft_step: number; rca_check: Assistant | null; plan_check: Assistant | null; effective_closed_on: string | null;
   closed_at: string | null; closed_by: string | null; closed_note: string | null; created_by: string | null; created_at: string; updated_at: string };
 export type Point = { code: string; label: string; detail: string; part?: "rca" | "plan" };
-export type Assistant = { verdict: "complete" | "incomplete" | "off_topic"; points: Point[]; model: string; at: string };
+export type Assistant = { verdict: "complete" | "incomplete" | "off_topic"; points: Point[]; model: string; at: string; proposal?: string | null };
 export type Stage = "rca" | "plan" | "full";
 export type Round = { id: string; finding_id: string; stage: Stage; n: number; comment: string | null; root_cause: string | null; factors: string | null; immediate: string | null; answered_by: string | null; answered_at: string; via: string;
   assistant: Assistant | null; decision: "accepted" | "sent_back" | null; points: Point[] | null; decided_by: string | null; decided_at: string | null; note: string | null };
@@ -162,7 +162,7 @@ Scope: ${stage === "rca" ? "the root cause only (one text). Do not comment on th
 Judge the ANALYSIS, never the person. Neutral, short, professional English, addressed ${forNp ? "to the author (\"you\")" : "to the compliance manager"}. Suggestions only.
 Root cause checks: a cause (why the system allowed it) or a restatement of the symptom? why-chain followed far enough? organisational factor present in the text (procedure, training, resources, supervision, interface, tools)? cause placed on a person only? about this finding? Use the finding type, when given, to suggest where to look.
 Plan checks: does each action address the cause (not only training / reminders)? manual or procedure change needed and planned? owner and realistic date on each action? part of the cause left without an action? a way to verify effectiveness?
-Answer ONLY with JSON: {"verdict":"complete|incomplete|off_topic","points":[{"part":"rca|plan","code":"SHORT_CODE","label":"≤ 8 words","detail":"one sentence the author can act on"}]} — at most 6 points, none if the answer is sound.`;
+${forNp && stage === "rca" ? `Also PROPOSE a root cause the author may use or not: 2 to 5 sentences, in the language of the finding, built only from the finding text, the rule cited, the type and the author's draft (keep the author's facts, never invent names, dates or documents; where a fact is unknown write it as a question to check in [brackets]); it says why the organisation let it happen (process, responsibility, check, tool), not what was found and not who.\n` : ""}Answer ONLY with JSON: {"verdict":"complete|incomplete|off_topic","points":[{"part":"rca|plan","code":"SHORT_CODE","label":"≤ 8 words","detail":"one sentence the author can act on"}]${forNp && stage === "rca" ? `,"proposal":"…"` : ""}} — at most 6 points, none if the answer is sound.`;
 
 /** Pre-reads a round with Claude when the key is there, otherwise with the rules; always returns something. */
 export async function preRead(f: Finding, r: Pick<Round, "root_cause" | "factors" | "immediate" | "comment" | "n">, changes: Change[], actions: Action[], stage: Stage, forNp = false): Promise<Assistant> {
@@ -173,9 +173,9 @@ export async function preRead(f: Finding, r: Pick<Round, "root_cause" | "factors
     const user = `FINDING ${f.number} (${LEVEL_LABEL[f.level] ?? f.level}, ${f.requirement ?? "no reference"}${f.finding_type ? `, type ${TYPE_LABEL[f.finding_type] ?? f.finding_type}` : ""})\nTitle: ${f.title}\nText: ${f.description ?? "—"}\n\nROOT CAUSE ANALYSIS\nRoot cause: ${r.root_cause ?? "—"}\nContributing factors: ${r.factors ?? "—"}\nImmediate action: ${r.immediate ?? "—"}\n\nPLAN${stage === "rca" ? " (out of scope)" : r.comment ? ` — author's note: ${r.comment}` : ""}\nExpected manual changes: ${changes.length ? changes.map((c) => `${c.manual_code ?? "?"} ${c.section_ref ?? ""}: ${c.expected}`).join(" | ") : "none"}\nActions: ${actions.length ? actions.map((a) => `${a.number} ${a.title} (owner ${a.owner_role ?? a.owner_person ?? "none"}, due ${a.due ?? "none"})`).join(" | ") : "none"}`;
     const { text, model } = await callClaude({ agent: "check", personId: null, entity: f.entity, system: PREREAD_SYSTEM(stage, forNp), user, maxTokens: 1200 });
     const m = /\{[\s\S]*\}/.exec(text); if (!m) return rules;
-    const j = JSON.parse(m[0]) as { verdict?: string; points?: Point[] };
+    const j = JSON.parse(m[0]) as { verdict?: string; points?: Point[]; proposal?: string };
     const verdict = (["complete", "incomplete", "off_topic"].includes(j.verdict ?? "") ? j.verdict : rules.verdict) as Assistant["verdict"];
-    return { verdict, points: (j.points ?? []).slice(0, 6).map((p) => ({ code: String(p.code ?? "NOTE").slice(0, 32), label: String(p.label ?? "").slice(0, 80), detail: String(p.detail ?? "").slice(0, 300), part: (p.part === "plan" ? "plan" : "rca") as "rca" | "plan" })), model, at: new Date().toISOString() };
+    return { verdict, points: (j.points ?? []).slice(0, 6).map((p) => ({ code: String(p.code ?? "NOTE").slice(0, 32), label: String(p.label ?? "").slice(0, 80), detail: String(p.detail ?? "").slice(0, 300), part: (p.part === "plan" ? "plan" : "rca") as "rca" | "plan" })), model, at: new Date().toISOString(), proposal: forNp && stage === "rca" && j.proposal ? String(j.proposal).slice(0, 1500) : null };
   } catch { return rules; }
 }
 

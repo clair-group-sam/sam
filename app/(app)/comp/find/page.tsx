@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DueChip } from "@/components/DueChip";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -54,7 +55,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
                     <td className="mono mini" style={{ maxWidth: 180 }}>{f.requirement ?? "—"}</td>
                     <td>{LEVEL_LABEL[f.level] ?? f.level}</td>
                     <td>{f.owner_role ?? "person"}</td>
-                    <td className={f.due && f.due < t0 && OPEN_STATUSES.includes(f.status) ? "late" : ""}>{f.due ?? "—"}</td>
+                    <td><DueChip due={f.due} done={!OPEN_STATUSES.includes(f.status)} t0={t0} /></td>
                     <td><span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>{f.current_round > 1 && <div className="mini">round {f.current_round}</div>}</td>
                     {(() => { const p = prog(f); return <td style={{ minWidth: 190 }}><div className="flex items-center gap-2"><span className="wbar" title={`${p.pct} %`}><i style={{ width: `${p.pct}%` }} className={p.tone || undefined} /></span><span className={"mini " + (p.tone === "red" ? "late" : "")} style={p.tone === "green" ? { color: "var(--green)" } : undefined}>{p.label}</span></div>{p.detail.length > 0 && <div className="mini">{p.detail.join(" · ")}</div>}</td>; })()}
                   </tr>

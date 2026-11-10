@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DueChip } from "@/components/DueChip";
 import { PageHeader, Metric } from "@/components/Page";
 import { SurvTabs } from "@/components/SurvTabs";
 import { ENT } from "@/lib/nav";
@@ -32,19 +33,19 @@ export function AuthorityAudit({ a, findings, desk, name }: { a: AA; findings: A
         <Metric label="Report received" value={a.report_received_on ?? "—"} hint={a.report_files.length ? `${a.report_files.length} file${a.report_files.length > 1 ? "s" : ""}` : "no file yet"} tone={happened && !a.report_received_on ? "amber" : undefined} />
         <Metric label="Findings" value={findings.length} hint={[byLevel("1") && `${byLevel("1")} level 1`, byLevel("2") && `${byLevel("2")} level 2`, byLevel("obs") && `${byLevel("obs")} observation${byLevel("obs") > 1 ? "s" : ""}`].filter(Boolean).join(", ") || "none"} />
         <Metric label="Open" value={open.length} hint={open.length ? `${open.filter((f) => authorityStep(f).label === "Answer to send").length} answer to send, ${open.filter((f) => authorityStep(f).label.startsWith("Sent")).length} awaiting the authority` : "all closed"} tone={open.length ? "amber" : findings.length ? "green" : undefined} />
-        <Metric label="Next deadline" value={dues[0] ?? "—"} hint={late ? `${late} past due` : dues.length ? "earliest of the open findings, extension included" : ""} tone={late ? "red" : dues[0] ? "amber" : undefined} />
+        <Metric label="Next deadline" value={dues[0] ? <DueChip due={dues[0]} t0={t0} /> : "—"} hint={late ? `${late} past due` : dues.length ? "earliest of the open findings, extension included" : ""} tone={late ? "red" : dues[0] ? "amber" : undefined} />
       </div>
 
       <section className="card mb-4"><div className="ch"><span className="eyebrow">Findings notified by the authority, {findings.length}</span><span className="mini">answer deadline includes the extension granted</span></div>
         <div className="cb" style={{ padding: 0 }}>{!findings.length ? <p className="p-4 mini">{happened ? "No finding recorded. When the report arrives, raise each finding (Findings › + Raise a finding, source Authority, this audit's reference)." : "The audit has not taken place yet."}</p> : (
           <table className="tbl"><thead><tr><th>Ref.</th><th>Finding</th><th>Level</th><th>Owner</th><th>Deadline</th><th>Root cause</th><th>Plan</th><th>Proof</th><th>Where it stands</th></tr></thead><tbody>{findings.map((f) => {
-            const d = effectiveDue(f); const st = authorityStep(f); const lateF = !!d && d < t0 && !["closed", "cancelled"].includes(f.status);
+            const d = effectiveDue(f); const st = authorityStep(f);
             return <tr key={f.id} className="rowlink">
               <td className="mono mini">{f.authority_ref ?? "—"}</td>
               <td><Link className="stretch" href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link>{f.requirement && <div className="mini mono">{f.requirement.slice(0, 90)}{f.requirement.length > 90 ? "…" : ""}</div>}</td>
               <td>{LEVEL_LABEL[f.level] ?? f.level}</td>
               <td className="mini">{f.owner_person ? name(f.owner_person) : f.owner_role ?? "—"}</td>
-              <td className={lateF ? "late" : ""}>{d ?? "—"}{f.extension && <div className="mini">{EXT_LABEL[f.extension]}</div>}</td>
+              <td><DueChip due={d} done={["closed", "cancelled"].includes(f.status)} t0={t0} />{f.extension && <div className="mini">{EXT_LABEL[f.extension]}</div>}</td>
               <td><Dec v={f.authority_rca} /></td><td><Dec v={f.authority_pac} /></td><td><Dec v={f.authority_proof} /></td>
               <td><span className={"pill " + st.tone}>{st.label}</span>{f.closed_at && f.status === "closed" && <div className="mini">{f.closed_at.slice(0, 10)}</div>}</td></tr>; })}</tbody></table>)}
         </div></section>

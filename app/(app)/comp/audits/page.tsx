@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DueChip } from "@/components/DueChip";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -78,7 +79,7 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
                 <div className="wcm" style={{ marginTop: 0 }}><span><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} /><b className="mono">{a.number}</b></span><span className={"akind " + a.kind}>{src === "authority" ? (a.authority ?? "Authority") : KIND_LABEL[a.kind]?.replace(" audit", "")}</span></div>
                 <div className="wct">{a.title}</div>
                 <div className="wcm"><span>{src === "authority" ? (a.external_auditor ?? "") : a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "no auditor"}</span><span className={"wdue" + (lt ? " late" : "")}>{a.done_on ?? (a.planned_on ?? monthLong(a.planned_month))}{lt ? " · late" : ""}</span></div>
-                {(() => { const x = fOf(a.id); return x.n ? <div className="wcm"><span style={{ color: x.open ? "var(--red-ink)" : "var(--green-ink)" }}>{x.n} finding{x.n > 1 ? "s" : ""}{x.open ? `, ${x.open} open` : ", all closed"}</span>{x.due && <span className={"wdue" + (x.due < t0 ? " late" : "")} title="earliest answer due among the open findings">{x.due < t0 ? `${x.late} late · ` : "answer by "}{x.due}</span>}</div> : null; })()}
+                {(() => { const x = fOf(a.id); return x.n ? <div className="wcm"><span style={{ color: x.open ? "var(--red-ink)" : "var(--green-ink)" }}>{x.n} finding{x.n > 1 ? "s" : ""}{x.open ? `, ${x.open} open` : ", all closed"}</span>{x.due && <span title="earliest answer due among the open findings"><DueChip due={x.due} t0={t0} compact={false} /></span>}</div> : null; })()}
                 {!a.checklist_id && a.kind !== "authority" && a.status !== "closed" && <div className="mini" style={{ color: "var(--amber-ink)" }}>no checklist yet</div>}
               </Link>); })}
             {c.list.length > 12 && <Link href={`/comp/audits?src=${src}&view=list`} className="mini wmore">+ {c.list.length - 12} more, see the list</Link>}

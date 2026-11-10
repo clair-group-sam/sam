@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DueChip } from "@/components/DueChip";
 import { today } from "@/lib/authority";
 import { notFound, redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -134,7 +135,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
         </div>}
       </div>}
 
-      {findings.length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Findings of this audit, {findings.length}</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Finding</th><th>Level</th><th>Answer due</th><th>Status</th></tr></thead><tbody>{findings.map((f) => { const lateF = !!f.due && f.due < today() && OPEN_STATUSES.includes(f.status); return <tr key={f.id} className="rowlink"><td><Link className="stretch" href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link></td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td className={lateF ? "late" : ""}>{f.due ?? "—"}</td><td><span className={"pill " + (FND_TONE[f.status] ?? "")}>{FND_STATUS[f.status] ?? f.status}</span></td></tr>; })}</tbody></table></div></section>}
+      {findings.length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Findings of this audit, {findings.length}</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Finding</th><th>Level</th><th>Answer due</th><th>Status</th></tr></thead><tbody>{findings.map((f) => { const lateF = !!f.due && f.due < today() && OPEN_STATUSES.includes(f.status); return <tr key={f.id} className="rowlink"><td><Link className="stretch" href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link></td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td><DueChip due={f.due} done={!OPEN_STATUSES.includes(f.status)} /></td><td><span className={"pill " + (FND_TONE[f.status] ?? "")}>{FND_STATUS[f.status] ?? f.status}</span></td></tr>; })}</tbody></table></div></section>}
       {(ev ?? []).length > 0 && <details className="card mt-4"><summary className="ch"><span className="eyebrow">History</span></summary><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((ev ?? []) as AuditEvent[]).map((e) => <tr key={e.id}><td className="mono mini">{e.at.slice(0, 16).replace("T", " ")}</td><td>{e.kind === "status" ? `Status → ${STATUS_LABEL[e.status ?? ""] ?? e.status}` : e.kind === "replanned" ? `Moved ${e.from_month ? monthLong(e.from_month) : ""} → ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind}{e.reason ? <div className="mini">{e.reason}</div> : null}</td><td className="mini">{name(e.by)}</td></tr>)}</tbody></table></div></details>}
       <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} />{a.entity}, PRO-CM-02</p>
     </>

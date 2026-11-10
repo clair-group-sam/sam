@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DueChip } from "@/components/DueChip";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -91,7 +92,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
               <Link key={e.id} href={`/comp/watch/${e.id}`} className={"wcard" + (lateE ? " late" : "")}>
                 <div className="wct">{e.title}</div>
                 <div className="wcm"><span className="entdot" style={{ background: ENT_COLOR[e.entity] ?? "var(--field)" }} />{e.entity}{e.reference ? <span className="mono"> · {e.reference.slice(0, 28)}</span> : null}</div>
-                <div className="wcm"><span>{e.owner_person ? name(e.owner_person) : e.owner_role ?? "no owner"}</span>{e.due && <span className={"wdue" + (lateE ? " late" : "")}>{lateE ? "late · " : ""}{e.due}</span>}</div>
+                <div className="wcm"><span>{e.owner_person ? name(e.owner_person) : e.owner_role ?? "no owner"}</span>{e.due && <DueChip due={e.due} done={!OPEN_STATUSES.includes(e.status)} t0={t0} />}</div>
               </Link>); })}
             {c.list.length > 10 && <Link href={`/comp/watch?tab=${tab}&view=list`} className="mini wmore">+ {c.list.length - 10} more, see the list</Link>}
             {!c.list.length && <p className="mini wmore">Nothing.</p>}
