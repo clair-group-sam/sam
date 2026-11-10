@@ -8,17 +8,88 @@
   "approve": true,
   "attach_imported": false,
   "modules": [
-    { "code": "RO", "title": "Revue d'organisation annuelle (ASTDOC15 — Appendice II AMC1 CAO.A.100(f))", "domain": "CAE", "kind": "internal",
-      "requirements": ["CAO.A.100(a)","CAO.A.100(b)","CAO.A.100(d)","CAO.A.100(e)","CAO.A.100(f)","CAO.A.095","CAO.A.105","Part-ML"],
+    {
+      "code": "RO",
+      "title": "Revue d'organisation annuelle (ASTDOC15 — Appendice II AMC1 CAO.A.100(f))",
+      "domain": "CAE",
+      "kind": "internal",
+      "requirements": [
+        "CAO.A.100(a)",
+        "CAO.A.100(b)",
+        "CAO.A.100(d)",
+        "CAO.A.100(e)",
+        "CAO.A.100(f)",
+        "CAO.A.095",
+        "CAO.A.105",
+        "Part-ML"
+      ],
       "audits": [
-        { "month": "2025-10", "centrik_no": "RO2025" },
-        { "month": "2026-10", "title": "RO 2026 — Revue d'organisation annuelle", "note": "Due ≤ 12 months after RO 2025 (08/10/2025) — CAE §B.2" },
-        { "month": "2027-10", "title": "RO 2027 — Revue d'organisation annuelle", "note": "Due ≤ 12 months after RO 2026" }
-      ] },
-    { "code": "SUB-RBELL", "title": "Sous-traitant non agréé — R.BELL Aviation (sellerie)", "domain": "CAE", "kind": "subcontractor", "requirements": ["CAO.A.095(b)(3)","AMC1 CAO.A.095(b)(3)"],
-      "audits": [ { "month": "2026-11", "title": "SUB-RBELL — Contrôle sous-traitant ASTDOC20 (RRO)", "subcontractor": "R.BELL Aviation", "note": "CAE §B.7.3 — audit sur site par le RRO" } ] },
-    { "code": "SUB-AEROSTYLL", "title": "Sous-traitant non agréé — Aerostyll (peinture)", "domain": "CAE", "kind": "subcontractor", "requirements": ["CAO.A.095(b)(3)","AMC1 CAO.A.095(b)(3)"],
-      "audits": [ { "month": "2026-11", "title": "SUB-AEROSTYLL — Contrôle sous-traitant ASTDOC20 (RRO)", "subcontractor": "Aerostyll", "note": "Ajouté à ASTDOC12 après la RO 2025 — pré-audit et audit sur site avant habilitation (CAE §B.7.3)" } ] },
-    { "code": "CTR", "title": "Contrôles récurrents entre deux revues (contrats ASTDOC2, listes, PE, outillage, formation)", "domain": "CAE", "kind": "checks", "requirements": ["CAO.A.100(b)(2)","CAO.A.095"], "audits": [] }
+        {
+          "month": "2025-10",
+          "centrik_no": "RO2025"
+        },
+        {
+          "month": "2026-10",
+          "done_on": "2026-10-26",
+          "planned_on": "2026-10-26",
+          "planned_end": "2026-10-26",
+          "external_auditor": "GFE",
+          "title": "RO 2026 — Revue d'organisation annuelle",
+          "note": "Done 26/10/2026 (Guillaume, 10/11) — report and findings to be entered in S.A.M."
+        },
+        {
+          "month": "2027-10",
+          "title": "RO 2027 — Revue d'organisation annuelle",
+          "note": "Due ≤ 12 months after RO 2026 (26/10/2026) — CAE §B.2"
+        }
+      ]
+    },
+    {
+      "code": "SUB-RBELL",
+      "title": "Sous-traitant non agréé — R.BELL Aviation (sellerie)",
+      "domain": "CAE",
+      "kind": "subcontractor",
+      "requirements": [
+        "CAO.A.095(b)(3)",
+        "AMC1 CAO.A.095(b)(3)"
+      ],
+      "audits": [
+        {
+          "month": "2026-11",
+          "title": "SUB-RBELL — Contrôle sous-traitant ASTDOC20 (RRO)",
+          "subcontractor": "R.BELL Aviation",
+          "note": "CAE §B.7.3 — audit sur site par le RRO"
+        }
+      ]
+    },
+    {
+      "code": "SUB-AEROSTYLL",
+      "title": "Sous-traitant non agréé — Aerostyll (peinture)",
+      "domain": "CAE",
+      "kind": "subcontractor",
+      "requirements": [
+        "CAO.A.095(b)(3)",
+        "AMC1 CAO.A.095(b)(3)"
+      ],
+      "audits": [
+        {
+          "month": "2026-11",
+          "title": "SUB-AEROSTYLL — Contrôle sous-traitant ASTDOC20 (RRO)",
+          "subcontractor": "Aerostyll",
+          "note": "Ajouté à ASTDOC12 après la RO 2025 — pré-audit et audit sur site avant habilitation (CAE §B.7.3)"
+        }
+      ]
+    },
+    {
+      "code": "CTR",
+      "title": "Contrôles récurrents entre deux revues (contrats ASTDOC2, listes, PE, outillage, formation)",
+      "domain": "CAE",
+      "kind": "checks",
+      "requirements": [
+        "CAO.A.100(b)(2)",
+        "CAO.A.095"
+      ],
+      "audits": []
+    }
   ]
 }
