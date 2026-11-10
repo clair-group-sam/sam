@@ -61,7 +61,7 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
       const t = repTasks.find((x) => x.link!.endsWith("/" + r.id)); if (!t) continue;
       if (c.state === "late") { const d = Math.floor(-c.left / 24); t.detail = `MOR clock expired ${d >= 1 ? `${d} d` : `${-c.left} h`} ago — acknowledge, classify and decide on the MOR now.`; }
       else if (c.state === "running") t.detail = `${c.left} h left on the 72 h MOR clock — acknowledge, classify and decide.`;
-      else t.detail = c.state === "filed" ? "MOR filed — follow the report through investigation and closure." : "MOR decided (not reportable) — follow the report through to closure.";
+      else t.detail = c.state === "filed" || c.state === "filed_late" ? "MOR filed — follow the report through investigation and closure." : "MOR decided (not reportable) — follow the report through to closure.";
     }
   }
   return tasks;

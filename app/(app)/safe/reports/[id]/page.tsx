@@ -52,7 +52,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const hazGroups = [...new Set(hazOpts.map((h) => h.number.replace(/[\s-]*\d+\s*$/, "").trim()))]; // FB-099 · HZ OPS, HZ CAMO, HZ IS…: one group each, numbers in natural order
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
   const who = rep.data as { display_name: string; email: string; job_title: string | null } | null;
-  const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), !!(r as { history?: boolean | null }).history);
+  const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), !!(r as { history?: boolean | null }).history, (r as { e2_status?: string | null }).e2_status ?? null);
   const erc = a?.erc_value ?? ercValue(a?.erc_outcome, a?.erc_barriers);
   const translated = r.narrative_en && r.language && r.language !== "en";
   const { count: acN } = r.aircraft ? await db.from("aircraft").select("id", { count: "exact", head: true }).eq("registration", r.aircraft.trim().toUpperCase()) : { count: 1 };
@@ -71,7 +71,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     <>
       <PageHeader eyebrow={`Safety, Report ${r.id}, ${ENT[r.entity]?.name ?? r.entity}`} title={r.headline_en && translated ? r.headline_en : r.headline}
         tag={<span className="flex gap-2 items-center"><span className={"pill " + (STATUS[r.status]?.[1] ?? "")}>{invDone ? "Investigation closed, to conclude" : STATUS[r.status]?.[0] ?? r.status}</span>
-          <span className={"pill " + (clock.state === "late" ? "red" : clock.state === "running" ? (clock.left <= 24 ? "red" : "amber") : "green")}>MOR, {clock.label}</span>
+          <span className={"pill " + (clock.state === "late" ? "red" : clock.state === "running" ? (clock.left <= 24 ? "red" : "amber") : clock.state === "filed_late" ? "amber" : "green")}>MOR, {clock.label}</span>
           {erc != null && <span className={"pill " + ercTone(erc)}>ERC {erc}</span>}</span>}
         sub={`Received ${when(r.received_at)}, the 72 h run from receipt (EU 376/2014 art. 4(8)), deadline ${when(clock.deadline.toISOString())}`}
         right={<Link href="/safe/reports" className="btn">All reports</Link>} />
@@ -158,7 +158,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           </section>
 
           <section className="card mb-4">
-            <div className="ch"><span className="eyebrow">MOR, Regulation (EU) 376/2014 &amp; 2015/1018</span><span className={"pill " + (clock.state === "late" ? "red" : clock.state === "running" ? "amber" : "green")}>{clock.label}</span></div>
+            <div className="ch"><span className="eyebrow">MOR, Regulation (EU) 376/2014 &amp; 2015/1018</span><span className={"pill " + (clock.state === "late" ? "red" : clock.state === "running" || clock.state === "filed_late" ? "amber" : "green")}>{clock.label}</span></div>
             <div className="cb">
               {a?.mor_status && <p className="mb-2">SAM&apos;s view: <b>{a.mor_status === "mandatory" ? "mandatory occurrence" : a.mor_status === "likely" ? "probably mandatory" : "voluntary report"}</b>{a.mor_basis ? ", " + a.mor_basis : ""}</p>}
               {!a?.confirmed_at && !closed ? (
