@@ -11,8 +11,8 @@ import { sendToE2 } from "./actions";
 
 /* ECC-02 · Review before sending to ECCAIRS 2: each attribute with S.A.M.'s proposal and where it comes from; lists from the cached
  * taxonomy; the JSON that will leave; DRAFT (ours only) or SENT (the authority receives it, the MOR is filed). */
-export default async function E2Review({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function E2Review({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ err?: string }> }) {
+  const { id } = await params; const { err } = await searchParams;
   const s = await getSession(); if (!s) redirect("/login"); if (!isSafetyDesk(s)) redirect("/safe/mine");
   const db = supabaseAdmin();
   const { data } = await db.from("reports").select("*").eq("id", id).maybeSingle();
@@ -37,6 +37,7 @@ export default async function E2Review({ params }: { params: Promise<{ id: strin
         sub={`${env ?? "not connected"} · ${ctx.taxonomy ? `${ctx.taxonomy.name} ${ctx.taxonomy.version}, loaded ${ctx.taxonomy.loaded_at.slice(0, 10)}` : "taxonomy not loaded"} · S.A.M. proposes, you decide; nothing leaves without the button below.`}
         right={<Link className="btn" href={`/safe/reports/${r.id}`}>Back to the report</Link>} />
       {!cfg && <section className="card mb-4"><div className="cb">ECCAIRS is not connected for {r.entity} (environment variables). The report is filed in the <a className="underline" href="https://e2.aviationreporting.eu/home" target="_blank" rel="noreferrer">E2 portal</a> and its reference recorded on the report.</div></section>}
+      {err && <section className="card mb-4"><div className="cb"><span className="pill red">refused</span> <span className="mini" style={{ whiteSpace: "pre-wrap" }}>{err}</span></div></section>}
       {prepError && <section className="card mb-4"><div className="cb"><b>S.A.M. could not build the proposal:</b><pre className="mini" style={{ whiteSpace: "pre-wrap" }}>{prepError}</pre></div></section>}
       {cfg && !ctx.taxonomy && <section className="card mb-4"><div className="cb">The taxonomy of the authority is not loaded yet: <Link className="underline" href="/safe/mor/e2">Safety › MOR / ECCAIRS › Load the taxonomy</Link>.</div></section>}
       {cfg && ctx.taxonomy && (

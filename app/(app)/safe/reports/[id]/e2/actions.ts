@@ -52,7 +52,8 @@ export async function sendToE2(fd: FormData) {
   } catch (e) {
     const msg = (e as Error).message.slice(0, 600);
     await db().from("eccairs_submissions").insert({ entity: r.entity, report_id: id, env, kind: r.e2_id ? "edit" : "create", requested_status: want, payload: codes as unknown as TaxonomyCodes, ok: false, error: msg, by_person: by });
-    throw new Error(`ECCAIRS refused: ${msg}`);
+    revalidatePath(`/safe/reports/${id}/e2`);
+    redirect(`/safe/reports/${id}/e2?err=${encodeURIComponent(`ECCAIRS refused: ${msg}`)}`);
   }
   revalidatePath(`/safe/reports/${id}`); revalidatePath(`/safe/reports/${id}/e2`); revalidatePath("/safe/mor");
   redirect(`/safe/reports/${id}`);

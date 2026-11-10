@@ -55,8 +55,8 @@ type E2 = { data?: unknown; errorDetails?: string; returnCode?: number };
 export async function e2(entity: string, path: string, init: { method?: string; body?: unknown } = {}): Promise<E2> {
   const c = eccairsConfig(entity); if (!c) throw new Error(`ECCAIRS is not configured for ${entity}.`);
   const r = await proxyFetch(`${c.base}${path}`, { method: init.method ?? "GET", headers: { authorization: `Bearer ${await token(entity, c)}`, "content-type": "application/json" }, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
-  const j = (await r.json().catch(() => null)) as E2 | null;
-  if (!r.ok || !j) throw new Error(`ECCAIRS ${path} → ${r.status}`);
+  const raw = await r.text(); let j: E2 | null = null; try { j = JSON.parse(raw) as E2; } catch { j = null; }
+  if (!r.ok || !j) throw new Error(`ECCAIRS ${path} → ${r.status}${raw ? `: ${raw.replace(/\s+/g, " ").slice(0, 500)}` : ""}`);
   if (j.returnCode !== 1 && j.errorDetails) throw new Error(`ECCAIRS: ${j.errorDetails}`.slice(0, 400));
   return j;
 }
