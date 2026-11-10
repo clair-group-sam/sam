@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
+import { SurvTabs } from "@/components/SurvTabs";
 import { AuditGrid } from "@/components/AuditGrid";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { coverage, current, elapsedPct, PROG_REF, PROG_STATUS, type Audit, type AuditModule, type Programme } from "@/lib/audit-programme";
@@ -35,7 +36,7 @@ export default async function AuditProgramme() {
   const others = progs.filter((p) => !ids.includes(p.id));
   return (
     <>
-      <PageHeader eyebrow="Compliance, Audit programme" title="Audit programme" sub="One programme per entity and cycle: the areas to audit, the requirements they cover, the audits month by month. A moved audit keeps its reason." right={desk ? <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Programme</summary>
+      <PageHeader eyebrow="Compliance, Surveillance plan" title="Surveillance plan" sub="One programme per entity and cycle: the areas to audit, the requirements they cover, the audits month by month. A moved audit keeps its reason." right={desk ? <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Programme</summary>
         <form action={createProgramme} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 36, width: 440, zIndex: 5 }}>
           <label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={ents[0]}>{ents.map((e) => <option key={e} value={e}>{ENT[e]?.name ?? e}, {PROG_REF[e]?.reference}</option>)}</select></label>
           <label><span className="mini">Title</span><input name="title" className="inp" placeholder="Audit programme 2026-2027" /></label>
@@ -43,6 +44,7 @@ export default async function AuditProgramme() {
           <label><span className="mini">Reference (blank = the MSM one)</span><input name="reference" className="inp mono" /></label>
           <label><span className="mini">Requirements the cycle must cover, one per line (optional, for the coverage matrix)</span><textarea name="requirements" className="inp mono" rows={3} placeholder={"ORO.GEN.200\nORO.FC.230"} /></label>
           <div className="flex justify-end"><button className="btn primary" type="submit">Create</button></div></form></details> : undefined} />
+      <SurvTabs on="prog" />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Audits done" value={`${tot.d} / ${tot.d + tot.p}`} hint={`in the cycle in force${tot.o ? `, ${tot.o} outside the cycle (previous / next) not counted` : ""}`} tone={tot.d ? "green" : undefined} />
         <Metric label="Still to do" value={tot.p} hint={tot.l ? `${tot.l} with the month passed` : "planned or in progress, in the cycle"} tone={tot.l ? "red" : tot.p ? "amber" : undefined} />

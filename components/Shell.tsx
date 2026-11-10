@@ -1,4 +1,5 @@
 "use client";
+import { SUB_PARENT } from "@/lib/nav";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -54,7 +55,8 @@ function useSlidePill(key: string, dep: string, sel: string) {
 
 export default function Shell({ session, children }: Props) {
   const path = usePathname();
-  const [, mod = "home", sub = ""] = path.split("/");
+  const [, mod = "home", rawSub = ""] = path.split("/");
+  const sub = SUB_PARENT[`${mod}/${rawSub}`] ?? rawSub; // 10/11 · Audits, Checks, Subcontractors are tabs of the Surveillance plan
   const role: RoleKey = session.role;
   const mods = roleModules(role);
   const daily = mods.filter((m) => RAIL_DAILY.includes(m.id) && !m.erp);

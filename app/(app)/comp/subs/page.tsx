@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
+import { SurvTabs } from "@/components/SurvTabs";
 import { ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { CONTROL_LABEL, CONTROL_TONE, controlOf, type Subcontractor } from "@/lib/compliance-registers";
 import { today } from "@/lib/authority";
@@ -28,7 +29,7 @@ export default async function Subcontractors({ searchParams }: { searchParams: P
   const unlinked = audits.filter((a) => a.kind === "subcontractor" && !a.subcontractor_id);
   return (
     <>
-      <PageHeader eyebrow="Compliance, Subcontractors" title="Subcontractors" sub="Contracted activities (ENR-CM-11): contract and its clauses (authority access, Part-IS), the control cadence, the last and next control. A control is a subcontractor audit of the programme, linked to the row."
+      <PageHeader eyebrow="Compliance, Surveillance plan" title="Subcontractors" sub="Contracted activities (ENR-CM-11): contract and its clauses (authority access, Part-IS), the control cadence, the last and next control. A control is a subcontractor audit of the programme, linked to the row."
         right={desk ? <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Subcontractor</summary>
           <form action={saveSub} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 36, width: 480, zIndex: 5 }}>
             <div className="grid grid-cols-4 gap-2"><select name="entity" className="inp" defaultValue={ents[0]}>{ents.map((e) => <option key={e} value={e}>{e}</option>)}</select><input name="code" className="inp mono" placeholder="3P 15" /><input name="name" className="inp col-span-2" placeholder="Name" required /></div>
@@ -36,6 +37,7 @@ export default async function Subcontractors({ searchParams }: { searchParams: P
             <div className="grid grid-cols-3 gap-2"><input name="contract_ref" className="inp" placeholder="Contract ref" /><input type="date" name="contract_from" className="inp" /><input type="date" name="contract_until" className="inp" /></div>
             <div className="grid grid-cols-3 gap-2"><select name="access_clause" className="inp" defaultValue=""><option value="">Access clause ?</option><option value="yes">Access clause: yes</option><option value="no">Access clause: no</option></select><select name="is_clause" className="inp" defaultValue=""><option value="">Part-IS clause ?</option><option value="yes">Part-IS clause: yes</option><option value="no">Part-IS clause: no</option></select><input name="every_months" type="number" className="inp" defaultValue={12} min={1} title="Control every (months)" /></div>
             <div className="flex justify-end"><button className="btn primary">Create</button></div></form></details> : undefined} />
+      <SurvTabs on="subs" />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Subcontractors" value={subs.length} hint={`${subs.filter((x) => x.access_clause).length} with access clause`} />
         <Metric label="Under control" value={rows.filter((r) => r.c.status === "under_control").length} tone="green" />

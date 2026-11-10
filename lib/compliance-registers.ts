@@ -119,7 +119,7 @@ export type RosterAudit = { id: string; number: string; entity: string; kind: st
 export type RosterRow = { key: string; auditor: Auditor | null; name: string; company: string | null; audits: RosterAudit[]; missing: string[]; items: { total: number; done: number } };
 /** One row per auditor of the register, plus one per name found in the audits (lead or external auditor, authority audits excluded) that has no file yet.
  *  missing = what keeps the file from being complete (Guillaume 10/11: an error shows until the file is filled). */
-export function auditorRoster(register: Auditor[], people: { id: string; display_name: string }[], audits: (RosterAudit & { lead_auditor: string | null; auditors: string[]; external_auditor: string | null })[], items: { auditor_id: string; done: boolean }[], docs: { auditor_id: string }[], t0 = today()): RosterRow[] {
+export function auditorRoster(register: Auditor[], people: { id: string; display_name: string; roles?: string[] | null; home_entity?: string | null }[], audits: (RosterAudit & { lead_auditor: string | null; auditors: string[]; external_auditor: string | null })[], items: { auditor_id: string; done: boolean }[], docs: { auditor_id: string }[], t0 = today()): RosterRow[] {
   const pname = (id: string | null) => people.find((p) => p.id === id)?.display_name ?? null;
   const namesOf = (a: Auditor) => [a.name, pname(a.person_id), ...(a.aliases ?? [])].filter(Boolean) as string[];
   const rows: RosterRow[] = register.map((a) => ({ key: a.id, auditor: a, name: a.name ?? pname(a.person_id) ?? "—", company: a.external, audits: [], missing: [], items: { total: 0, done: 0 } }));
@@ -133,6 +133,12 @@ export function auditorRoster(register: Auditor[], people: { id: string; display
     }
     if (x.external_auditor) for (const part of x.external_auditor.split(/\s*[/,&+]\s*|\s+et\s+|\s+and\s+/i).filter(Boolean)) {
       const { name, company } = splitAuditor(part);
+      // a post written instead of a name (« CMM ») = the person who holds it for that entity
+      if (/^[A-Z]{2,6}$/.test(name)) {
+        const holders = people.filter((p) => (p.roles ?? []).some((r) => r.trim().toUpperCase() === name));
+        const h = holders.find((p) => p.home_entity === x.entity) ?? (holders.length === 1 ? holders[0] : null);
+        if (h) { let r = rows.find((q) => q.auditor?.person_id === h.id); if (!r) { r = { key: `p:${h.id}`, auditor: null, name: h.display_name, company: null, audits: [], missing: [], items: { total: 0, done: 0 } }; rows.push(r); } hits.add(r); continue; }
+      }
       let r = rows.find((q) => (q.auditor ? namesOf(q.auditor) : [q.name]).some((n) => sameAuditor(n, name)));
       if (!r) { r = { key: `n:${norm(name)}`, auditor: null, name, company, audits: [], missing: [], items: { total: 0, done: 0 } }; rows.push(r); }
       hits.add(r);

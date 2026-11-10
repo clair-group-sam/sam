@@ -255,21 +255,21 @@ export const TYPE_LABEL: Record<string, string> = {
   organisation: "Organisation & resources", oversight: "Compliance monitoring & oversight", change: "Change & authority notification", subcontractor: "Subcontractor & contract", equipment: "Equipment, facilities, FSTD",
 };
 const TYPE_RULES: [string, RegExp][] = [
-  ["change", /(changement|modification au sein|notif|approbation|approval|change management|ORA\.GEN\.130|ORO\.GEN\.130|CAO\.A\.105|non soumis|soumettre|submitted|soumis à la DSAC|autorité)/i],
-  ["subcontractor", /(sous[- ]?trait|subcontract|contrat|contract|prestataire|fournisseur|ORA\.GEN\.205|ORO\.GEN\.205)/i],
-  ["training", /(formation|training|compétenc|competen|qualification|recyclage|instructeur|instructor|examinateur|FI|FE|connaissance par le personnel)/i],
-  ["records", /(enregistrement|record|archiv|traçab|tracab|dossier|log ?book|carnet|signature|preuve|evidence)/i],
-  ["equipment", /(FSTD|simulat|équipement|equipment|installation|facilit|outillage|tool|étalonnage|calibration|ORA\.FSTD)/i],
-  ["oversight", /(surveillance|audit|conformité|compliance monitoring|programme d'audit|revue|review|ORA\.GEN\.200|ORO\.GEN\.200|management system|système de gestion|instances|comité)/i],
-  ["organisation", /(organisation|organigramme|ressource|resource|effectif|staffing|responsable|nominated|personnel désigné|ORA\.GEN\.210|ORO\.GEN\.210)/i],
-  ["documentation", /(manuel|manual|MSM|OM-?[A-D]|TM-|CAE|MOE|CAME|documentation|document|chapitre|section|incomplet|non à jour|not up to date|missing in the)/i],
-  ["procedure", /(procédure|procedure|non respect|not followed|not applied|appliqu|process)/i],
+  ["change", /(?<![\p{L}\p{N}])(changement|modification au sein|notif|approbation|approval|change management|ORA\.GEN\.130|ORO\.GEN\.130|CAO\.A\.105|non soumis|soumettre|submitted|soumis à la DSAC|autorité)/iu],
+  ["subcontractor", /(?<![\p{L}\p{N}])(sous[- ]?trait|subcontract|contrat|contract|prestataire|fournisseur|ORA\.GEN\.205|ORO\.GEN\.205)/iu],
+  ["training", /(?<![\p{L}\p{N}])(formation|training|compétenc|competen|qualification|recyclage|instructeur|instructor|examinateur|FI(?![\p{L}])|FE(?![\p{L}])|connaissance par le personnel)/iu],
+  ["records", /(?<![\p{L}\p{N}])(enregistrement|record|archiv|traçab|tracab|dossier|log ?book|carnet|signature|preuve|evidence)/iu],
+  ["equipment", /(?<![\p{L}\p{N}])(FSTD|simulat|équipement|equipment|installation|facilit|outillage|tool|étalonnage|calibration|ORA\.FSTD)/iu],
+  ["oversight", /(?<![\p{L}\p{N}])(surveillance|audit|conformité|compliance monitoring|programme d'audit|revue|review|ORA\.GEN\.200|ORO\.GEN\.200|management system|système de gestion|instances|comité)/iu],
+  ["organisation", /(?<![\p{L}\p{N}])(organisation|organigramme|ressource|resource|effectif|staffing|responsable|nominated|personnel désigné|ORA\.GEN\.210|ORO\.GEN\.210)/iu],
+  ["documentation", /(?<![\p{L}\p{N}])(manuel|manual|MSM|OM-?[A-D]|TM-|CAE|MOE|CAME|documentation|document|chapitre|section|incomplet|non à jour|not up to date|missing in the)/iu],
+  ["procedure", /(?<![\p{L}\p{N}])(procédure|procedure|non respect|not followed|not applied|appliqu|process)/iu],
 ];
 /** S.A.M.'s proposal: the first family whose words appear in the title, text or rule cited. A guess, shown as such. */
 export function guessType(f: Pick<Finding, "title" | "description" | "requirement">): string {
   const t = `${f.title} ${f.description ?? ""} ${f.requirement ?? ""}`;
   let best = "procedure", n = 0;
-  for (const [k, re] of TYPE_RULES) { const m = (t.match(new RegExp(re.source, "gi")) ?? []).length; if (m > n) { best = k; n = m; } }
+  for (const [k, re] of TYPE_RULES) { const m = (t.match(new RegExp(re.source, "giu")) ?? []).length; if (m > n) { best = k; n = m; } }
   return best;
 }
 /** Where to look when writing the root cause, per type: questions, never an answer. */

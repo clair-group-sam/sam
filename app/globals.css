@@ -1026,3 +1026,10 @@ html[data-theme="dark"] .topbar .btn.primary{color:#fff;background:color-mix(in 
 .wcm{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--slate6);margin-top:4px}
 .wdue{white-space:nowrap}.wdue.late{color:var(--state-red);font-weight:700}
 .wmore{text-align:center}
+/* 10/11 · Surveillance plan tabs */
+.survtabs{display:flex;gap:4px;border-bottom:2px solid var(--line);flex-wrap:wrap}
+.survtabs a{padding:8px 14px;font-weight:600;color:var(--slate7);border-radius:var(--r-xs) var(--r-xs) 0 0;margin-bottom:-2px;border-bottom:2px solid transparent}
+.survtabs a.on{color:var(--navy);border-bottom-color:var(--cyan);background:var(--blue05)}
+.survtabs a:hover{text-decoration:none;color:var(--navy)}
+.akind{font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--blue1);color:var(--cyan-ink)}
+.akind.subcontractor{background:var(--indigo-s);color:var(--indigo-ink)}.akind.checks{background:var(--amber-s);color:var(--amber-ink)}.akind.authority{background:var(--purple-s);color:var(--purple)}

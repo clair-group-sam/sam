@@ -18,11 +18,11 @@ export default async function Auditors({ searchParams }: { searchParams: Promise
   const db = supabaseAdmin(); const desk = s.role === "cmm" || s.roles.map(basePost).includes("CMM"); const am = s.role === "am" || s.roles.map(basePost).includes("AM"); const t0 = today();
   const [{ data: ad }, { data: ppl }, { data: aud }] = await Promise.all([
     db.from("auditors").select("*").order("created_at"),
-    db.from("people").select("id,display_name,roles").limit(800),
+    db.from("people").select("id,display_name,roles,home_entity").limit(800),
     db.from("audits").select("id,number,entity,kind,status,planned_month,done_on,lead_auditor,auditors,external_auditor").neq("status", "cancelled").limit(5000),
   ]);
   const [{ data: its }, { data: dcs }] = await Promise.all([db.from("auditor_items").select("auditor_id,done").limit(5000), db.from("auditor_docs").select("auditor_id").limit(5000)]);
-  const people = (ppl ?? []) as { id: string; display_name: string; roles: string[] }[]; const name = (id: string | null) => people.find((p) => p.id === id)?.display_name ?? "—";
+  const people = (ppl ?? []) as { id: string; display_name: string; roles: string[]; home_entity: string | null }[]; const name = (id: string | null) => people.find((p) => p.id === id)?.display_name ?? "—";
   const all = ((ad ?? []) as Auditor[]).filter((a) => !scope || a.entities.some((e) => scope.includes(e)) || !a.entities.length);
   // 10/11 · everyone named in an audit of the scope shows here; a red line until the file is complete (Guillaume)
   type AuRow = { id: string; number: string; entity: string; kind: string; status: string; planned_month: string; done_on: string | null; lead_auditor: string | null; auditors: string[]; external_auditor: string | null };

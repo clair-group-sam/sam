@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
+import { SurvTabs } from "@/components/SurvTabs";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { CHECK_RESULT_LABEL, CHECK_RESULT_TONE, daysTo, nextDueOf, type CCheck, type CRun, withProgrammeHistory } from "@/lib/compliance-registers";
 import { LEVEL_LABEL } from "@/lib/findings";
@@ -34,7 +35,7 @@ export default async function ComplianceChecks({ searchParams }: { searchParams:
   const owns = (c: CCheck) => desk || (!!c.owner_person && c.owner_person === s.person?.id) || (!!c.owner_role && posts.includes(basePost(c.owner_role)));
   return (
     <>
-      <PageHeader eyebrow="Compliance, Compliance checks" title="Compliance checks" sub="Recurring controls distinct from audits (flight packages, ARINC, aircraft library, student files…): a cadence, an owner, a result each time with what was sampled. Due dates reach the owner's Inbox 30 days ahead."
+      <PageHeader eyebrow="Compliance, Surveillance plan" title="Compliance checks" sub="Recurring controls distinct from audits (flight packages, ARINC, aircraft library, student files…): a cadence, an owner, a result each time with what was sampled. Due dates reach the owner's Inbox 30 days ahead."
         right={desk ? <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Check</summary>
           <form action={saveCheck} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 36, width: 460, zIndex: 5 }}>
             <div className="grid grid-cols-3 gap-2"><label><span className="mini">Entity</span><select name="entity" className="inp" defaultValue={ents[0]}>{ents.map((e) => <option key={e} value={e}>{e}</option>)}</select></label><label><span className="mini">Code</span><input name="code" className="inp mono" placeholder="CC-07" required /></label><label><span className="mini">Every (months)</span><input name="every_months" type="number" className="inp" defaultValue={6} min={1} /></label></div>
@@ -43,6 +44,7 @@ export default async function ComplianceChecks({ searchParams }: { searchParams:
             <div className="grid grid-cols-3 gap-2"><label><span className="mini">Owner, post</span><input name="owner_role" className="inp mono" defaultValue="CMM" /></label><label><span className="mini">or person</span><select name="owner_person" className="inp" defaultValue=""><option value="">—</option>{people.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select></label><label><span className="mini">First due</span><input type="date" name="next_due" className="inp" /></label></div>
             <label><span className="mini">Short checklist (optional)</span><select name="checklist" className="inp" defaultValue=""><option value="">—</option>{((cls ?? []) as { id: string; entity: string; code: string; title: string }[]).map((c) => <option key={c.id} value={c.id}>{c.entity}, {c.code}, {c.title}</option>)}</select></label>
             <div className="flex justify-end"><button className="btn primary" type="submit">Create</button></div></form></details> : undefined} />
+      <SurvTabs on="checks" />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Active checks" value={checks.length} hint={`${checks.filter((c) => c.every_months <= 3).length} quarterly or more`} />
         <Metric label="Due ≤ 30 days" value={checks.filter((c) => c.days !== null && c.days <= 30).length} hint={`${checks.filter((c) => c.days !== null && c.days < 0).length} past due`} tone={checks.some((c) => c.days !== null && c.days < 0) ? "red" : checks.some((c) => c.days !== null && c.days <= 30) ? "amber" : "green"} />

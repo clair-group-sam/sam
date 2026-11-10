@@ -37,7 +37,7 @@ export default async function ComplianceOverview() {
     db.from("auditors").select("*"),
     db.from("subcontractors").select("*").in("entity", scope).eq("active", true),
     db.from("audit_modules").select("*"),
-    db.from("people").select("id,display_name").limit(800),
+    db.from("people").select("id,display_name,roles,home_entity").limit(800),
     db.from("auditor_items").select("auditor_id,done").limit(5000),
     db.from("auditor_docs").select("auditor_id").limit(5000),
   ]);
@@ -81,7 +81,7 @@ export default async function ComplianceOverview() {
     const kv = kpis[e] ?? []; const kOff = kv.filter((v) => v.status === "off_target").length;
     if (kOff) alerts.push({ tone: "red", text: `${kOff} indicator${kOff > 1 ? "s" : ""} off target`, href: `/comp/kpi?ent=${e}` });
     if (p && p.next_review_on && p.next_review_on < t0) alerts.push({ tone: "red", text: "Annual review of the programme past due", href: `/comp/prog/${p.id}` });
-    const roster = auditorRoster(auditors.filter((a) => a.entities.includes(e)), (ppl ?? []) as { id: string; display_name: string }[], audits.filter((a) => a.entity === e) as never, (its ?? []) as { auditor_id: string; done: boolean }[], (dcs ?? []) as { auditor_id: string }[], t0);
+    const roster = auditorRoster(auditors.filter((a) => a.entities.includes(e)), (ppl ?? []) as { id: string; display_name: string; roles: string[] | null; home_entity: string | null }[], audits.filter((a) => a.entity === e) as never, (its ?? []) as { auditor_id: string; done: boolean }[], (dcs ?? []) as { auditor_id: string }[], t0);
     const auOk = roster.filter((r) => !r.missing.length).length, auBad = roster.length - auOk;
     if (auBad) alerts.push({ tone: "amber", text: `${auBad} auditor file${auBad > 1 ? "s" : ""} incomplete`, href: "/comp/auditors" });
     const re = regs.filter((r) => r.entities.includes(e));
