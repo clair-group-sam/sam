@@ -50,7 +50,7 @@ export async function sendToE2(fd: FormData) {
     await db().from("report_events").insert({ report_id: id, kind: "mor", actor: by, note: sent ? `Sent to the authority through ECCAIRS 2 (${env}) — ${res.e2Id} v${res.version}` : `Saved as DRAFT in ECCAIRS 2 (${env}) — ${res.e2Id} v${res.version}`, to_reporter: false });
     if (sent) await markMorFiled(db(), id, res.e2Id, by, "e2");
   } catch (e) {
-    const msg = (e as Error).message.slice(0, 600);
+    const msg = (e as Error).message.slice(0, 1900);
     await db().from("eccairs_submissions").insert({ entity: r.entity, report_id: id, env, kind: r.e2_id ? "edit" : "create", requested_status: want, payload: codes as unknown as TaxonomyCodes, ok: false, error: msg, by_person: by });
     revalidatePath(`/safe/reports/${id}/e2`);
     redirect(`/safe/reports/${id}/e2?err=${encodeURIComponent(`ECCAIRS refused: ${msg}`)}`);

@@ -32,3 +32,21 @@ export async function GET(req: NextRequest) {
   try { const a = await egressIp(); return NextResponse.json({ proxy: !!proxyUrl(), ips: [a.ip].filter(Boolean) }); }
   catch (e) { return NextResponse.json({ proxy: !!proxyUrl(), error: (e as Error).message }, { status: 502 }); }
 }
+
+/** POST ?probe=<ENT> · the safety desk tries a taxonomyCodes JSON against E2 (status DRAFT, sandbox/UAT only) and reads the raw answer —
+ * to learn the shape E2 expects of each attribute without a deploy per attempt. Never on production. */
+export async function POST(req: NextRequest) {
+  const s = await getSession();
+  if (!s || !isSafetyDesk(s)) return NextResponse.json({ error: "Safety desk only." }, { status: 403 });
+  const ent = req.nextUrl.searchParams.get("probe");
+  if (!ent || !eccairsConfig(ent)) return NextResponse.json({ error: "probe=<ENT> with ECCAIRS configured." }, { status: 400 });
+  if (eccairsEnv(ent) === "production") return NextResponse.json({ error: "Not on production." }, { status: 400 });
+  const body = (await req.json().catch(() => null)) as { taxonomyCodes?: unknown; e2Id?: string } | null;
+  if (!body?.taxonomyCodes) return NextResponse.json({ error: "taxonomyCodes missing." }, { status: 400 });
+  const { e2 } = await import("@/lib/eccairs");
+  try {
+    const j = body.e2Id ? await e2(ent, "/occurrences/edit", { method: "PUT", body: { e2Id: body.e2Id, versionType: "DRAFT", taxonomyCodes: body.taxonomyCodes } })
+      : await e2(ent, "/occurrences/create", { method: "POST", body: { type: "REPORT", status: "DRAFT", taxonomyCodes: body.taxonomyCodes } });
+    return NextResponse.json({ ok: true, answer: j });
+  } catch (e) { return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 200 }); }
+}

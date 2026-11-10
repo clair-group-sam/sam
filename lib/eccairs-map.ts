@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { E2_ATTR, E2_ENTITIES, getOccurrence, type TaxonomyCodes } from "@/lib/eccairs";
+import { E2_ATTR, E2_ENTITIES, getOccurrence, type TaxonomyCodes, E2_SHAPE } from "@/lib/eccairs";
 import { ENT } from "@/lib/nav";
 
 /* ECC-02 · From a S.A.M. safety report to an E2 original report (taxonomyCodes JSON, ECCAIRS Aviation 5.1).
@@ -99,10 +99,13 @@ export function buildTaxonomyCodes(fields: E2Field[]): { codes: TaxonomyCodes; m
   for (const f of fields) {
     const empty = f.value === null || f.value === "" || (Array.isArray(f.value) && !f.value.length);
     if (empty) { if (f.required) missing.push(f.label); continue; }
-    if (f.kind === "list") put(f, [Number(f.value)]);
-    else if (f.kind === "lists") put(f, (f.value as string[]).map(Number));
+    const shape = E2_SHAPE[f.attribute];
+    const wrapId = (n: number) => shape === "content" ? { content: [n], AdditionalText: "" } : n;
+    const wrapText = (t: string) => shape === "text" ? { text: t } : shape === "encoded" ? { EncodedText: Buffer.from(t, "utf8").toString("base64") } : t;
+    if (f.kind === "list") put(f, [wrapId(Number(f.value))]);
+    else if (f.kind === "lists") put(f, (f.value as string[]).map((v) => wrapId(Number(v))));
     else if (f.kind === "number") put(f, [Number(f.value)]);
-    else put(f, [String(f.value)]);
+    else put(f, [wrapText(String(f.value))]);
   }
   const codes: TaxonomyCodes = { "24": { ATTRIBUTES: occ, ...(Object.keys(ents).length ? { ENTITIES: ents } : {}) } };
   return { codes, missing };

@@ -56,7 +56,7 @@ export async function e2(entity: string, path: string, init: { method?: string; 
   const c = eccairsConfig(entity); if (!c) throw new Error(`ECCAIRS is not configured for ${entity}.`);
   const r = await proxyFetch(`${c.base}${path}`, { method: init.method ?? "GET", headers: { authorization: `Bearer ${await token(entity, c)}`, "content-type": "application/json" }, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
   const raw = await r.text(); let j: E2 | null = null; try { j = JSON.parse(raw) as E2; } catch { j = null; }
-  if (!r.ok || !j) throw new Error(`ECCAIRS ${path} → ${r.status}${raw ? `: ${raw.replace(/\s+/g, " ").slice(0, 500)}` : ""}`);
+  if (!r.ok || !j) throw new Error(`ECCAIRS ${path} → ${r.status}${raw ? `: ${raw.replace(/\s+/g, " ").slice(0, 1800)}` : ""}`);
   if (j.returnCode !== 1 && j.errorDetails) throw new Error(`ECCAIRS: ${j.errorDetails}`.slice(0, 400));
   return j;
 }
@@ -103,12 +103,15 @@ export const getOccurrence = async (entity: string, e2Id: string) => (await e2(e
 /** The entities S.A.M. fills and the attributes it reads the lists of (ECCAIRS Aviation 5.1 codes, ECG chapter 2 / DGAC guide). */
 export const E2_ENTITIES = { OCCURRENCE: 24, AIRCRAFT: 4, AERODROME: 1, EVENTS: 14, NARRATIVE: 22, REPORTER_TEXT: 53 } as const;
 export const E2_ATTR = {
-  REPORT_ID: 438, HEADLINE: 601, UTC_DATE: 477, LOCAL_DATE: 433, LOCATION: 440, STATE: 454, OCC_CLASS: 431, OCC_CATEGORY: 430,
+  REPORT_ID: 452, HEADLINE: 601, UTC_DATE: 477, LOCAL_DATE: 433, LOCATION: 440, STATE: 454, OCC_CLASS: 431, OCC_CATEGORY: 430,
   NARRATIVE_LANG: 424, NARRATIVE: 425, REPORTER_LANG: 1091, REPORTER_TEXT: 1092, REPORTING_ENTITY: 447, REPORT_STATUS: 800,
   DAMAGE: 432, INJURY: 451, WEATHER_RELEVANT: 606, AVIATION_SECTOR: 1088, ATTACHMENTS: 793, DETECTION: 746,
   AC_REGISTRATION: 244, AC_TYPE: 21, AC_MSN: 254, AC_CALLSIGN: 54, AC_OPERATOR: 215, AC_OPERATION_TYPE: 214, AC_CATEGORY: 32, AC_STATE_OF_REGISTRY: 281,
   AC_LAST_DEPARTURE: 167, AC_DESTINATION: 228, AC_FLIGHT_PHASE: 121, AD_INDICATOR: 5, AD_LOCATION: 641, EVENT_TYPE: 390,
 } as const;
+/** How E2 expects each value in the JSON (API guide §8.3, "ECCAIRS-DataTypes"): most values are bare (ids, strings, dates);
+ * a value-list "with additional text" travels as { content: [id], AdditionalText }, a memo as { text }. Learnt from the sandbox's answers. */
+export const E2_SHAPE: Record<number, "content" | "text" | "encoded"> = { 454: "content", 21: "content", 425: "text", 1092: "text" };
 /** Attributes whose value lists S.A.M. caches (the long lists — aircraft types, aerodromes — are read on demand instead). */
 export const E2_LISTS_TO_CACHE: { entity: number; attributes: number[] }[] = [
   { entity: 24, attributes: [E2_ATTR.STATE, E2_ATTR.OCC_CLASS, E2_ATTR.OCC_CATEGORY, E2_ATTR.DAMAGE, E2_ATTR.INJURY, E2_ATTR.WEATHER_RELEVANT, E2_ATTR.AVIATION_SECTOR, E2_ATTR.DETECTION, E2_ATTR.REPORT_STATUS] },
