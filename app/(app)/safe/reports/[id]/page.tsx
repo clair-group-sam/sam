@@ -55,6 +55,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), !!(r as { history?: boolean | null }).history);
   const erc = a?.erc_value ?? ercValue(a?.erc_outcome, a?.erc_barriers);
   const translated = r.narrative_en && r.language && r.language !== "en";
+  const { count: acN } = r.aircraft ? await db.from("aircraft").select("id", { count: "exact", head: true }).eq("registration", r.aircraft.trim().toUpperCase()) : { count: 1 };
+  const inRegistry = !!acN;
   const closed = r.status === "closed";
   // FB-099 · one line saying what the report waits for, and a status that follows the investigation
   const invOpen = invs.find((x) => !["closed", "cancelled"].includes(x.status));
@@ -82,7 +84,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <div className="cb">
               <table className="tbl mb-3"><tbody>
                 <tr><td className="mini" style={{ width: 130 }}>When</td><td>{r.event_date ?? "—"} {r.event_time_utc ? r.event_time_utc.slice(0, 5) + " UTC" : ""}</td></tr>
-                <tr><td className="mini">Aircraft, flight</td><td>{r.aircraft ?? "—"} {r.flight_ref ? "· " + r.flight_ref : ""}</td></tr>
+                <tr><td className="mini">Aircraft, flight</td><td>{r.aircraft ?? "—"} {r.flight_ref ? "· " + r.flight_ref : ""}{r.aircraft && !inRegistry && <div className="mini" style={{ color: "var(--amber-ink)" }}>{r.aircraft} is not in the aircraft registry of {r.entity}: <Link className="underline" href="/users/fleet?new=1">add it</Link>, or correct the registration.</div>}</td></tr>
                 <tr><td className="mini">Phase, where</td><td>{r.phase ?? "—"} {r.location ? "· " + r.location : ""}</td></tr>
               </tbody></table>
               <div className="narr">{translated ? r.narrative_en : r.narrative}</div>

@@ -861,3 +861,10 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 @media (max-width:1200px){.heatside{position:static}}
 .withside{grid-template-columns:minmax(0,1fr) 360px}
 @media (max-width:1200px){.withside{grid-template-columns:minmax(0,1fr)}.withside>.heatside{order:-1;max-width:420px}}
+
+/* FB-087 · global search results */
+.searchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px;align-items:start}
+.searchlist{list-style:none;margin:0;padding:4px 0}
+.searchlist a{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:8px 16px;min-height:36px;border-top:1px solid var(--line)}
+.searchlist li:first-child a{border-top:0}
+.searchlist a:hover{background:var(--tint,#f2fafe)}

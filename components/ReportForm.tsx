@@ -9,7 +9,7 @@ const DKRE = /(ne sais? pas|don'?t know|unknown|inconnu|non lo so|no lo s[ée]|w
 type Step = "write" | "precise" | "sent";
 
 /** SAF-01 New report: the reporter writes; on Send, SAM proposes a few factual precisions as form fields (never a chat); "Send as written" is always possible. */
-export default function ReportForm({ entities, defaultEntity }: { entities: { code: string; name: string }[]; defaultEntity: string }) {
+export default function ReportForm({ entities, defaultEntity, registrations = [] }: { entities: { code: string; name: string }[]; defaultEntity: string; registrations?: string[] }) {
   const [r, setR] = useState<NewReport>({ entity: defaultEntity, headline: "", narrative: "", event_date: new Date().toISOString().slice(0, 10), event_time_utc: "", aircraft: "", flight_ref: "", phase: "", location: "", contributing: "", anonymous: false, language: "", precisions: {} });
   const [step, setStep] = useState<Step>("write");
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export default function ReportForm({ entities, defaultEntity }: { entities: { co
             <label><span className="eyebrow">Entity</span><select className="inp w-full" value={r.entity} onChange={(e) => set({ entity: e.target.value })} disabled={step !== "write"}>{entities.map((e) => <option key={e.code} value={e.code}>{e.code}, {e.name}</option>)}</select></label>
             <label><span className="eyebrow">Date</span><input type="date" className="inp w-full" value={r.event_date} onChange={(e) => set({ event_date: e.target.value })} disabled={step !== "write"} /></label>
             <label><span className="eyebrow">Time (UTC)</span><input type="time" className="inp w-full" value={r.event_time_utc} onChange={(e) => set({ event_time_utc: e.target.value })} disabled={step !== "write"} /></label>
-            <label><span className="eyebrow">Aircraft</span><input className="inp w-full" value={r.aircraft} onChange={(e) => set({ aircraft: e.target.value.toUpperCase() })} placeholder="F-HXXX / 9H-XXX" disabled={step !== "write"} /></label>
+            <label><span className="eyebrow">Aircraft</span><input className="inp w-full" value={r.aircraft} onChange={(e) => set({ aircraft: e.target.value.toUpperCase() })} placeholder="F-HXXX / 9H-XXX" disabled={step !== "write"} list="rf-regs" />{registrations.length > 0 && <datalist id="rf-regs">{registrations.map((x) => <option key={x} value={x} />)}</datalist>}{/* FB-093 */ r.aircraft.trim().length >= 5 && registrations.length > 0 && !registrations.includes(r.aircraft.trim()) && <span className="mini" style={{ color: "var(--amber-ink)" }}>Not in the aircraft registry: check the spelling, or send as it is (the safety desk will see it).</span>}</label>
             <label><span className="eyebrow">Flight</span><input className="inp w-full" value={r.flight_ref} onChange={(e) => set({ flight_ref: e.target.value })} placeholder="flight / lesson" disabled={step !== "write"} /></label>
             <label><span className="eyebrow">Phase</span><select className="inp w-full" value={r.phase} onChange={(e) => set({ phase: e.target.value })} disabled={step !== "write"}><option value="">—</option>{PHASES.map((p) => <option key={p}>{p}</option>)}</select></label>
           </div>

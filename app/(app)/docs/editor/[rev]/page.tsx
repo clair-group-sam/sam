@@ -149,13 +149,13 @@ export default async function Editor({ params, searchParams }: { params: Promise
         tag={<ManualClass internal={internal} entity={manual.entity} action={cmm && rev.step === "draft" ? (
           <form action={setManualClass} className="inline"><input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="internal" value={internal ? "0" : "1"} />
             <button className="btn" type="submit" style={{ padding: "3px 10px", fontSize: 12 }}>{internal ? "Make it a regulated manual" : "Make it an internal document"}</button></form>) : null} />}
-        sub={`${STEP_LABEL[rev.step]}, based on ${baseLabel}, ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? `, ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? `, ${conflicts} in conflict` : ""}, owner ${manual.owner_name ?? manual.owner_role}${editable ? "" : ", read-only at this step"}`}
+        sub={`${STEP_LABEL[rev.step]}, ${!baseRow && /^0+$/.test(String(rev.rev)) ? "first issue" : `based on ${baseLabel}`}, ${changedCount} chapter${changedCount === 1 ? "" : "s"} changed${frozen.refs.size ? `, ${frozen.refs.size} frozen (Rev ${frozen.baseRev} under review)` : ""}${conflicts ? `, ${conflicts} in conflict` : ""}, owner ${manual.owner_name ?? manual.owner_role}${editable ? "" : ", read-only at this step"}`}
         right={<><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link><Link href={`/docs/manual/${manual.id}`} className="btn">‹ Manual</Link></>} />
 
       <div className="steps mb-4">
-        {STEPS.filter((st) => st !== "repository" || manual.to_tmcad_repository).map((st, i) => (
+        {STEPS.filter((st) => st !== "repository" || manual.to_tmcad_repository).filter((st) => !internal || st === "draft" || st === "published" || st === rev.step).map((st) => { const i = STEPS.indexOf(st); return (
           <div key={st} className={"step" + (i < stepIdx ? " done" : i === stepIdx ? " now" : "")}><i /><span>{STEP_LABEL[st]}</span></div>
-        ))}
+        ); })}
       </div>
       <div className="tabs mb-4">
         {tabs.map(([k, l]) => <Link key={k} href={`/docs/editor/${rev.id}?tab=${k}${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`} className={"tab" + (tab === k ? " on" : "")}>{l}</Link>)}

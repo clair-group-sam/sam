@@ -24,10 +24,10 @@ export default async function GenericPage({ params }: { params: Promise<{ mod: s
     <>
       <PageHeader eyebrow={modLabel(s.role, m)} title={subLabel(s.role, mod, item)} sub={`Scope: ${ent}`} />
       <section className="card">
-        <div className="ch"><span className="eyebrow">Beta build-up</span></div>
+        <div className="ch"><span className="eyebrow">Not available yet</span></div>
         <div className="cb">
-          <p>This screen exists in the prototype and will be built {step ? <>in <b>step {step[0]}</b>, {step[1]}.</> : <>after the core modules (steps 3 to 6).</>}</p>
-          <p className="mini">Navigation, roles and scope are live: what you see in the rail and in this menu is exactly what a <b>{s.role === "cmm" ? "CMM / SM" : s.role === "am" ? "Accountable Manager" : s.role === "np" ? "nominated person" : "crew / staff member"}</b> gets.</p>
+          <p>This screen is planned and not open yet. Nothing is lost: what it will show is already reachable from the other screens of {modLabel(s.role, m)}.</p>
+          {s.roles.includes("SUPERADMIN") && <p className="mini">Super admin note: {step ? <>planned in step {step[0]}, {step[1]}.</> : <>planned after the core modules.</>} Only super admins see the “soon” entries in the menus.</p>}
         </div>
       </section>
     </>

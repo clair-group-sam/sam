@@ -6,7 +6,8 @@ export type Transition = { from: string; to: string; label: string; by: "owner" 
 export const TRANSITIONS: Transition[] = [
   { from: "draft", to: "approved_np", label: "Approve content (NP)", by: "owner_or_cmm", note: "The nominated person validates the content and hands over to Compliance." },
   { from: "approved_np", to: "draft", label: "Send back to draft", by: "cmm", note: "Compliance remarks: the author resumes the draft; the round stays in the history." },
-  { from: "approved_np", to: "approved_compliance", label: "Approve (Compliance)", by: "cmm", note: "Checked against the requirements register." },
+  { from: "approved_np", to: "approved_compliance", label: "Approve (Compliance)", by: "cmm", note: "Checked against the applicable requirements (Easy Access Rules in S.A.M.)." },
+  { from: "approved_compliance", to: "draft", label: "Send back to draft", by: "cmm", note: "The author resumes the draft; an internal document is published from Draft, after its review." }, // FB-097
   { from: "approved_compliance", to: "signed", label: "Mark as signed", by: "cmm", note: "Only for manuals that need signatures (NP + CMM; MSM: AM + CMM)." },
   { from: "approved_compliance", to: "with_civil_aviation", label: "Send to the civil aviation authority", by: "cmm", note: "One application for the whole exchange; corrected manual goes back as a comment." },
   { from: "signed", to: "with_civil_aviation", label: "Send to the civil aviation authority", by: "cmm" },

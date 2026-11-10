@@ -106,8 +106,8 @@ export default function Shell({ session, children }: Props) {
     <aside className={cls + " menupills"} onMouseEnter={onEnter} ref={sp.box}>
       <span className="spill" ref={sp.pill} aria-hidden />
       <div className="h">{curMod ? modLabel(role, curMod) : mod}</div>
-      {subs.map((s) => (
-        <Link key={s.id} href={`/${mod}/${s.id}`} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "") + (isBuilt(mod, s.id) ? "" : " soon")} title={isBuilt(mod, s.id) ? undefined : "Not built yet, exists in the prototype"}>
+      {subs.filter((s) => isBuilt(mod, s.id) || sub === s.id || session.roles.includes("SUPERADMIN")).map((s) => (
+        <Link key={s.id} href={`/${mod}/${s.id}`} aria-current={sub === s.id ? "page" : undefined} className={"sl" + (sub === s.id ? " on" : "") + (s.gear ? " gear" : "") + (isBuilt(mod, s.id) ? "" : " soon")} title={isBuilt(mod, s.id) ? undefined : "Not built yet, exists in the prototype"}>
           {subLabel(role, mod, s)}{!isBuilt(mod, s.id) && <small className="soon-tag">soon</small>}
         </Link>
       ))}
@@ -267,11 +267,11 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
       )}
       <div className="topsearch">
       {searchOpen ? (
-        <form className="searchbox" action="/docs/lib" method="get" role="search" title="Search the published manuals (title, chapter or text)" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !searchRef.current?.value) setSearchOpen(false); }}>
-          <Icon name="search" size={14} /><input ref={searchRef} name="q" placeholder="Search manuals" aria-label="Search the manuals" /><kbd>Ctrl K</kbd>
+        <form className="searchbox" action="/home/search" method="get" role="search" title="Search S.A.M.: manuals, rules, reports, hazards, findings, audits, projects, people" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !searchRef.current?.value) setSearchOpen(false); }}>
+          <Icon name="search" size={14} /><input ref={searchRef} name="q" placeholder="Search S.A.M." aria-label="Search S.A.M." /><kbd>Ctrl K</kbd>
         </form>
       ) : (
-        <button type="button" className="searchbtn" onClick={() => setSearchOpen(true)} title="Search the published manuals (title, chapter or text)"><Icon name="search" size={14} /> Search <kbd>Ctrl K</kbd></button>
+        <button type="button" className="searchbtn" onClick={() => setSearchOpen(true)} title="Search S.A.M. (Ctrl K)"><Icon name="search" size={14} /> Search <kbd>Ctrl K</kbd></button>
       )}
       </div>
       {session.role !== "user" && (
