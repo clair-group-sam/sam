@@ -8,7 +8,7 @@ import { addMonths, KIND_LABEL, monthLong, STATUS_LABEL, type Audit } from "@/li
 import { today } from "@/lib/authority";
 import { AuditImport } from "@/components/AuditImport";
 
-type Sp = { tab?: string };
+type Sp = { tab?: string; src?: string };
 /* AUD-02 · Compliance › Audits (PRO-CM-02): the audits of the programme as they run — mine, to start, in progress, reports to close, done. */
 export default async function Audits({ searchParams }: { searchParams: Promise<Sp> }) {
   const s = await getSession(); if (!s) redirect("/login");
@@ -18,7 +18,11 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
   let q = db.from("audits").select("*").order("planned_month", { ascending: true }).limit(1500);
   if (scope) q = q.in("entity", scope);
   const { data } = await q;
-  const all = (data ?? []) as (Audit & { started_on: string | null; checklist_id: string | null })[];
+  const every = (data ?? []) as (Audit & { started_on: string | null; checklist_id: string | null })[];
+  // two registers, never mixed (Guillaume 10/11): what we plan and run (internal, subcontractors, checks) · what the authority does to us
+  const src = sp.src === "authority" ? "authority" : "internal";
+  const all = every.filter((a) => (a.kind === "authority") === (src === "authority"));
+  const nAuth = every.filter((a) => a.kind === "authority").length, nInt = every.length - nAuth;
   const { data: ppl } = await db.from("people").select("id,display_name").limit(500);
   const name = (id: string | null) => ((ppl ?? []) as { id: string; display_name: string }[]).find((p) => p.id === id)?.display_name ?? "—";
   const me = s.person?.id;
@@ -36,20 +40,24 @@ export default async function Audits({ searchParams }: { searchParams: Promise<S
   const nItems = (id: string) => ((cnt ?? []) as { checklist_id: string }[]).filter((x) => x.checklist_id === id).length;
   return (
     <>
-      <PageHeader eyebrow="Compliance, Audits" title="Audits" sub="Each audit runs its checklist: the official text of each rule, S.A.M.'s help on where to look, a result with evidence, a finding when needed, then the report. Planned in Compliance › Audit programme." right={<Link className="btn" href="/comp/prog">Audit programme</Link>} />
+      <PageHeader eyebrow="Compliance, Audits" title="Audits" sub={src === "authority" ? "What the authority did to us: audits, inspections, recurrent evaluations and meetings (DSAC, OSAC, TM-CAD, EASA), with their findings. Not part of our programme." : "Each audit runs its checklist: the official text of each rule, S.A.M.'s help on where to look, a result with evidence, a finding when needed, then the report. Planned in Compliance › Audit programme."} right={<Link className="btn" href="/comp/prog">Audit programme</Link>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="In progress" value={all.filter((a) => a.status === "in_progress").length} />
         <Metric label="To start" value={open.filter((a) => a.status === "planned").length} hint={late.length ? `${late.length} with the month passed` : undefined} tone={late.length ? "red" : undefined} />
         <Metric label="Reports to close" value={all.filter((a) => a.status === "report").length} tone={all.some((a) => a.status === "report") ? "amber" : undefined} />
         <Metric label="Done this year" value={all.filter((a) => a.status === "closed" && (a.done_on ?? "").startsWith(t0.slice(0, 4))).length} tone="green" />
       </div>
-      <div className="tabs mb-2">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/audits?tab=${k}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
+      <div className="seg mb-3" style={{ display: "inline-flex" }}>
+        <Link href="/comp/audits?src=internal" className={src === "internal" ? "on" : ""}>Internal audits &amp; subcontractors <span className="mini">{nInt}</span></Link>
+        <Link href="/comp/audits?src=authority" className={src === "authority" ? "on" : ""}>Authority audits &amp; inspections <span className="mini">{nAuth}</span></Link>
+      </div>
+      <div className="tabs mb-2">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/audits?src=${src}&tab=${k}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
       <section className="card"><div className="cb" style={{ padding: 0 }}>{!rows.length ? <p className="p-4 mini">Nothing here.</p> : (
-        <table className="tbl"><thead><tr><th>Audit</th><th>Month</th><th>Auditor</th><th>Status</th></tr></thead><tbody>{rows.map((a) => {
+        <table className="tbl"><thead><tr><th>Audit</th><th>Month</th><th>{src === "authority" ? "Authority" : "Auditor"}</th><th>Status</th></tr></thead><tbody>{rows.map((a) => {
           const isLate = a.status === "planned" && addMonths(a.planned_month, 1) <= t0;
           return <tr key={a.id}><td><Link href={`/comp/audits/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} />{a.entity}, {KIND_LABEL[a.kind]}{a.subcontractor ? `, ${a.subcontractor}` : ""}{a.authority ? `, ${a.authority}` : ""}{!a.checklist_id && a.kind !== "authority" ? <span className="red">, no checklist</span> : ""}</div></td>
             <td className={isLate ? "late" : ""}>{monthLong(a.planned_month)}{a.planned_on && <div className="mini mono">{a.planned_on}{a.planned_end ? ` → ${a.planned_end}` : ""}</div>}</td>
-            <td>{a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "—"}</td>
+            <td>{src === "authority" ? <>{a.authority ?? a.external_auditor ?? "—"}{a.external_auditor && a.authority && a.external_auditor !== a.authority && <div className="mini">{a.external_auditor}</div>}</> : a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "—"}</td>
             <td><span className={"pill " + (a.status === "closed" ? "green" : a.status === "report" ? "amber" : isLate ? "red" : a.status === "in_progress" ? "amber" : "")}>{STATUS_LABEL[a.status]}</span>{a.done_on && <div className="mini mono">{a.done_on}</div>}</td></tr>;
         })}</tbody></table>)}</div></section>
       {desk && <details className="card mt-4 mb-4"><summary className="ch"><span className="eyebrow">Checklists, {checklists.length}</span><span className="mini">the templates behind the audits, linked to the programme's modules</span></summary>

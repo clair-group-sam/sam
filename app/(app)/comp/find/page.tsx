@@ -7,7 +7,7 @@ import { ENT_COLOR } from "@/lib/nav";
 import { CMM_TURN, LEVEL_LABEL, NP_TURN, OPEN_STATUSES, progress, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, type Change, type Finding } from "@/lib/findings";
 import type { Action } from "@/lib/actions-shared";
 
-type Sp = { tab?: string };
+type Sp = { tab?: string; src?: string };
 /** Compliance › Findings: every audit / authority finding, who holds it, what S.A.M. waits for. */
 export default async function Findings({ searchParams }: { searchParams: Promise<Sp> }) {
   const s = await getSession();
@@ -18,7 +18,11 @@ export default async function Findings({ searchParams }: { searchParams: Promise
   let q = db.from("findings").select("*").order("due", { ascending: true, nullsFirst: false }).limit(1000);
   if (!(s.group && s.entity === "ALL")) q = q.in("entity", scope);
   const { data } = await q;
-  const all = (data ?? []) as Finding[];
+  const every = (data ?? []) as Finding[];
+  // two registers (Guillaume 10/11): findings raised by the authority · findings we raise ourselves (internal audits, checks, subcontractors)
+  const src = sp.src === "authority" ? "authority" : "internal";
+  const all = every.filter((f) => (f.source === "authority") === (src === "authority"));
+  const nAuth = every.filter((f) => f.source === "authority").length, nInt = every.length - nAuth;
   // FND-04 · the work done on each finding, visible without opening it
   const ids = all.map((f) => f.id);
   const [{ data: chs }, { data: acs }] = ids.length ? await Promise.all([db.from("finding_changes").select("*").in("finding_id", ids).neq("status", "removed").limit(5000), db.from("safety_actions").select("*").in("finding_id", ids).neq("status", "cancelled").limit(5000)]) : [{ data: [] }, { data: [] }];
@@ -43,7 +47,11 @@ export default async function Findings({ searchParams }: { searchParams: Promise
         <Metric label="To review (Compliance)" value={open.filter((f) => CMM_TURN.includes(f.status)).length} />
         <Metric label="Plan in progress" value={open.filter((f) => f.status === "accepted").length} hint={`${open.filter((f) => f.status === "accepted" && prog(f).label.startsWith("Work done")).length} with the work done`} />
       </div>
-      <div className="tabs mb-3">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/find?tab=${k}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
+      <div className="seg mb-3" style={{ display: "inline-flex" }}>
+        <Link href="/comp/find?src=internal" className={src === "internal" ? "on" : ""}>Internal findings <span className="mini">{nInt}</span></Link>
+        <Link href="/comp/find?src=authority" className={src === "authority" ? "on" : ""}>Authority findings <span className="mini">{nAuth}</span></Link>
+      </div>
+      <div className="tabs mb-3">{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/find?src=${src}&tab=${k}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
       <section className="card">
         <div className="cb" style={{ padding: 0 }}>
           {!rows.length ? <p className="p-4 mini">Nothing here.</p> : (

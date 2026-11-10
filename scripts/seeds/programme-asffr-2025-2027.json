@@ -1,0 +1,53 @@
+{
+  "_source": "ENR-ATO-01 Programme d'audit ASTONFLY 2025-2027 Ed2 Rev4 (05/10/2026) — SharePoint Management System › ASTONFLY › ATO › 01 - Programme de surveillance. Internal programme only: authority audits are a separate register.",
+  "entity": "ASFFR",
+  "title": "Programme d'audit interne ATO / FSTD / NCO 2025-2027",
+  "reference": "ENR-ATO-01 Ed.2 Rev.4 (05/10/2026)",
+  "starts_on": "2025-03-01",
+  "cycle_months": 24,
+  "approve": true,
+  "attach_imported": false,
+  "modules": [
+    { "code": "ATO-ORG", "title": "Organisation, supervision et installations (ATO)", "domain": "ATO", "kind": "internal",
+      "requirements": ["ORA.GEN.105","ORA.GEN.115(a)","ORA.GEN.120","ORA.GEN.135","ORA.GEN.140","ORA.GEN.205","ORA.GEN.210","ORA.GEN.215","ORA.ATO.110-230","ORA.ATO.300-355","Part-FCL App.3/9"],
+      "audits": [
+        { "month": "2025-02", "centrik_no": "ATO2025", "note": "ATO2025 (TTF, 11-19/02/2025) covered ATO-ORG, ATO-SG and NCO — previous cycle" },
+        { "month": "2027-01", "planned_on": "2027-01-25", "planned_end": "2027-01-26", "external_auditor": "L. Rudelle (Aero Services EI)", "title": "ATO-ORG — Organisation, supervision et installations (ATO)", "note": "1,5 j, regroupé avec ATO-NCO, à distance" }
+      ] },
+    { "code": "ATO-SG", "title": "Système de gestion — conformité et sécurité", "domain": "ATO", "kind": "internal",
+      "requirements": ["ORA.GEN.115(b)","ORA.GEN.125","ORA.GEN.130","ORA.GEN.150-220","ORA.GEN.205","ORA.ATO.300-355","Part-FCL App.3/9","Règl. (UE) 376/2014"],
+      "audits": [
+        { "month": "2025-02", "done_on": "2025-02-19", "external_auditor": "TTF", "title": "ATO-SG — Système de gestion (within ATO2025)", "note": "Audited on 19/02/2025 within ATO2025 — previous cycle" },
+        { "month": "2027-01", "planned_on": "2027-01-27", "planned_end": "2027-01-27", "external_auditor": "L. Rudelle (Aero Services EI)", "title": "ATO-SG — Système de gestion — conformité et sécurité", "note": "1 j, à distance" }
+      ] },
+    { "code": "ATO-NCO", "title": "Exploitation des aéronefs (Part-NCO)", "domain": "ATO", "kind": "internal",
+      "requirements": ["NCO.GEN.100-155","NCO.OP.100-220","NCO.POL.100-110"],
+      "audits": [
+        { "month": "2025-02", "centrik_no": "NCO2025", "note": "NCO2025 (TTF, 11-12/02/2025) — previous cycle" },
+        { "month": "2027-01", "planned_on": "2027-01-25", "planned_end": "2027-01-26", "external_auditor": "L. Rudelle (Aero Services EI)", "title": "ATO-NCO — Exploitation des aéronefs (Part-NCO)", "note": "Regroupé avec ATO-ORG" }
+      ] },
+    { "code": "FSTD-ORG", "title": "Organisation et supervision (FSTD)", "domain": "FSTD", "kind": "internal",
+      "requirements": ["ORA.GEN.105","ORA.GEN.115(a)","ORA.GEN.120","ORA.GEN.135","ORA.FSTD.100","GM2 ORA.FSTD.100","ORA.FSTD.110","ORA.FSTD.200-235"],
+      "audits": [
+        { "month": "2025-02", "centrik_no": "FSTD2025-02", "note": "FSTD2025-02 (TTF, 11-12/02/2025) — previous cycle" },
+        { "month": "2025-11", "centrik_no": "FSTD2025-11" },
+        { "month": "2027-11", "title": "FSTD-ORG — Organisation et supervision (FSTD)", "note": "Modalité à définir" }
+      ] },
+    { "code": "FSTD-ENT", "title": "Qualification et entretien (FSTD)", "domain": "FSTD", "kind": "internal",
+      "requirements": ["ORA.FSTD.105","ORA.FSTD.110","ORA.FSTD.120","ORA.FSTD.240","CS-FSTD(A)"],
+      "audits": [
+        { "month": "2025-11", "done_on": "2025-11-13", "external_auditor": "TTF", "title": "FSTD-ENT — Qualification et entretien (within FSTD2025-11)", "note": "Audited on 13/11/2025 within FSTD2025-11" },
+        { "month": "2027-11", "title": "FSTD-ENT — Qualification et entretien (FSTD)", "note": "Regroupé avec FSTD-ORG" }
+      ] },
+    { "code": "SUB-SKY4U", "title": "Sous-traitant MCC — Sky4U (AT.ATO.164)", "domain": "ATO", "kind": "subcontractor", "requirements": ["ORA.GEN.205","ORA.GEN.140"],
+      "audits": [ { "month": "2026-09", "done_on": "2026-09-25", "title": "SUB-SKY4U — Revue documentaire Sky4U (ENR-CM-10)", "subcontractor": "Sky4U" }, { "month": "2028-09", "title": "SUB-SKY4U — Revue documentaire Sky4U (ENR-CM-10)", "subcontractor": "Sky4U" } ] },
+    { "code": "SUB-AFA", "title": "Sous-traitant MCC — AFA, Airline Flight Academy (IE.ATO.005)", "domain": "ATO", "kind": "subcontractor", "requirements": ["ORA.GEN.205","ORA.GEN.140"],
+      "audits": [ { "month": "2026-10", "done_on": "2026-10-05", "title": "SUB-AFA — Revue documentaire AFA (ENR-CM-10)", "subcontractor": "AFA — Airline Flight Academy" }, { "month": "2028-10", "title": "SUB-AFA — Revue documentaire AFA (ENR-CM-10)", "subcontractor": "AFA — Airline Flight Academy" } ] },
+    { "code": "SUB-PADPILOT", "title": "Sous-traitant formation théorique — Pad Pilot", "domain": "ATO", "kind": "subcontractor", "requirements": ["ORA.GEN.205","ORA.GEN.140"],
+      "audits": [ { "month": "2026-10", "done_on": "2026-10-06", "title": "SUB-PADPILOT — Revue documentaire Pad Pilot (ENR-CM-10)", "subcontractor": "Pad Pilot" }, { "month": "2028-10", "title": "SUB-PADPILOT — Revue documentaire Pad Pilot (ENR-CM-10)", "subcontractor": "Pad Pilot" } ] },
+    { "code": "SUB-EVIONICA", "title": "Sous-traitant formation théorique UPRT — Evionica", "domain": "ATO", "kind": "subcontractor", "requirements": ["ORA.GEN.205","ORA.GEN.140"],
+      "audits": [ { "month": "2026-10", "done_on": "2026-10-06", "title": "SUB-EVIONICA — Revue documentaire Evionica (ENR-CM-10)", "subcontractor": "Evionica" }, { "month": "2028-10", "title": "SUB-EVIONICA — Revue documentaire Evionica (ENR-CM-10)", "subcontractor": "Evionica" } ] },
+    { "code": "CC", "title": "Contrôles de conformité (MSM §2.1)", "domain": "ATO", "kind": "checks", "requirements": [],
+      "audits": [ { "month": "2026-01", "centrik_no": "CC2026", "note": "Monday « FLY - Contrôles de conformité (CC) 2026 »" } ] }
+  ]
+}
