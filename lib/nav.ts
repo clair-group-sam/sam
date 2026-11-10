@@ -26,7 +26,7 @@ export function roleModules(role: RoleKey): Module[] {
 /** FB-051 · the screens that exist in the beta (app/(app)/<mod>/<sub>); the others are prototype placeholders ("soon"). Keep in step with the folders. */
 export const BUILT: Record<string, string[]> = {
   home: ["tasks", "coffee"], docs: ["lib", "mine", "drafts", "files", "drop", "editor", "manual", "new", "link"],
-  comp: ["over", "kpi", "prog", "checks", "audits", "auditors", "find", "watch", "subs"], reg: ["ear"], dash: ["cs"], np: ["over"], proj: ["boards", "auth", "rex"], ref: ["ptpl", "types", "annex"],
+  comp: ["over", "kpi", "prog", "checks", "audits", "auditors", "find", "watch", "subs"], reg: ["ear"], dash: ["codir", "cs"], np: ["over"], proj: ["boards", "auth", "rex"], ref: ["ptpl", "types", "annex"],
   safe: ["over", "reports", "actions", "new", "mine", "risk", "moc", "ra", "inv", "comm", "mor", "promo"],
   set: ["integ", "notif", "core", "ent", "param", "levels", "cat", "newac", "groups", "golive"],
   comm: ["camp", "track", "new"], admin: ["signreg", "signrules", "comms", "ai", "log"], users: ["book", "fleet"],
