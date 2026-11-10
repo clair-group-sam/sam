@@ -111,7 +111,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Where" value={STATUS_LABEL[f.status] ?? f.status} hint={["review", "closure_requested"].includes(f.status) ? "Compliance's turn" : closedOrCancelled ? "" : `${who}'s turn`} />
         <Metric label="Answer due" value={f.due ?? "—"} tone={f.due && f.due < t0 && step <= 3 ? "red" : undefined} />
-        <Metric label="Corrective plan" value={p.total ? (step >= 4 ? `${p.done} / ${p.total}` : `${p.total} item${p.total === 1 ? "" : "s"}`) : "—"} hint={step >= 4 ? (p.remaining.length ? `${p.remaining.length} remaining` : "complete") : "starts once accepted"} tone={step >= 4 && p.total && !p.remaining.length ? "green" : undefined} />
+        <Metric label="Corrective plan" value={p.total ? (step >= 4 ? `${p.done} / ${p.total}` : `${p.total} item${p.total === 1 ? "" : "s"}`) : "—"} hint={step >= 4 ? (!p.total ? "nothing attached yet" : p.remaining.length ? `${p.remaining.length} remaining` : "complete") : "starts once accepted"} tone={step >= 4 && p.total && !p.remaining.length ? "green" : step >= 4 && !p.total ? "amber" : undefined} />
         <Metric label="Rounds" value={rounds.length} hint={rounds.some((r) => r.decision === "sent_back") ? `${rounds.filter((r) => r.decision === "sent_back").length} sent back` : ""} />
       </div>
 
@@ -244,7 +244,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
               {step >= 4 && p.total > 0 && <div className="bar"><i style={{ width: `${Math.round((100 * p.done) / p.total)}%` }} /></div>}
               <div className="cb grid gap-3">
                 {PlanItems}
-                {f.status === "accepted" && actor && <form action={requestClosure} className="flex items-center justify-between" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><input type="hidden" name="id" value={f.id} /><span className="mini">{p.remaining.length ? `${p.remaining.length} item${p.remaining.length === 1 ? "" : "s"} still open. S.A.M. proposes the closure when everything is verified.` : "Everything is verified."}</span><button className="btn" type="submit" disabled={!!p.remaining.length && !compliance}>Request closure</button></form>}
+                {f.status === "accepted" && actor && <form action={requestClosure} className="flex items-center justify-between" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><input type="hidden" name="id" value={f.id} /><span className="mini">{!p.total ? "No manual change or action attached yet: add each item of the plan above (manual change or action) so S.A.M. follows it to closure." : p.remaining.length ? `${p.remaining.length} item${p.remaining.length === 1 ? "" : "s"} still open. S.A.M. proposes the closure when everything is verified.` : "Everything is verified."}</span><button className="btn" type="submit" disabled={(!!p.remaining.length || !p.total) && !compliance}>Request closure</button></form>}
               </div>
             </section>
           )}
