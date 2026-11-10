@@ -19,7 +19,7 @@ export default async function GoLive() {
     db.from("np_posts").select("entity,code,holder_name,holder_person"),
     db.from("erp_contacts").select("entity,kind,phone").eq("active", true),
     db.from("aircraft").select("entity,base"),
-    db.from("manuals").select("entity,code,current_revision_id"),
+    db.from("manuals").select("entity,code,revisions(step)"),
     db.from("regulations").select("checked_at").order("checked_at", { ascending: false }).limit(1),
     db.from("audit_log").select("at,object_id").eq("object_type", "escalation").order("id", { ascending: false }).limit(20),
     db.from("reports").select("id").ilike("headline", "%test%").limit(20),
@@ -31,7 +31,7 @@ export default async function GoLive() {
   const posts = (np ?? []) as { entity: string; holder_name: string | null; holder_person: string | null }[];
   const contacts = (ct ?? []) as { entity: string; kind: string; phone: string | null }[];
   const fleet = (ac ?? []) as { entity: string; base: string | null }[];
-  const manuals = (man ?? []) as { entity: string; current_revision_id: string | null }[];
+  const manuals = ((man ?? []) as unknown as { entity: string; revisions: { step: string }[] | null }[]).map((m) => ({ entity: m.entity, current_revision_id: (m.revisions ?? []).some((r) => r.step === "published" || r.step === "repository") ? "yes" : null })); // a manual is published when one of its revisions is
   const lastEar = ((reg ?? []) as { checked_at: string | null }[])[0]?.checked_at ?? null;
   const E = (esc ?? []) as { at: string; object_id: string }[]; const lastCron = E.find((x) => x.object_id === "cron")?.at ?? null; const lastHand = E.find((x) => x.object_id === "manual")?.at ?? null;
   const days = (d: string | null) => (d ? Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000) : null);

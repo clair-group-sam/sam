@@ -1,4 +1,6 @@
--- FB-109 · One clean-up of the test objects left on sam-dev by the test sessions (also covers FB-064 and FB-095).
+-- FB-109 · One clean-up of the test objects left on sam-dev by the test sessions (also covers FB-064).
+-- RUN ON sam-dev ON 10/11/2026: the 10 objects were removed. Kept as a record and for a later test campaign.
+-- Audit numbers without a prefix (FB-095) are NOT repaired here: the right prefix is a decision, not a guess.
 -- Run in the Supabase SQL editor of sam-dev. Step 1 only reads. Step 2 changes data inside one transaction:
 -- read the NOTICE lines, then COMMIT (or ROLLBACK to change nothing). An object that something real still
 -- points to is NOT removed: its NOTICE says which one, and the rest goes on.
@@ -9,19 +11,13 @@ select 'report' as what, id::text as ref, headline as title from reports where i
 union all select 'safety promotion', number, title from safety_promotions where title ilike 'TEST%'
 union all select 'risk assessment', number, name from risk_assessments where number ilike 'test%'
 union all select 'manual', entity || ' ' || code, title from manuals where code in ('TEST','TEST-CHART')
-union all select 'authority file', stage, title from authority_files where title ilike '%9HTEST%' or title = 'TEST carte team'
-union all select 'audit number to repair', number, title from audits where number like '-20%';
+union all select 'authority file', stage, title from authority_files where title ilike '%9HTEST%' or title = 'TEST carte team';
 
 -- 2 · the clean-up
 begin;
 do $$
-declare r record; n int;
+declare r record;
 begin
-  -- audits whose number lost its prefix at import ("-2025-009" → "MT-2025-009"), ASJMT only, no clash created
-  update audits a set number = 'MT' || a.number where a.entity = 'ASJMT' and a.number like '-20%'
-    and not exists (select 1 from audits b where b.entity = a.entity and b.number = 'MT' || a.number);
-  get diagnostics n = row_count; raise notice 'audit numbers repaired: %', n;
-
   for r in select id, headline from reports where id in ('2026-001','2026-003') and headline ilike '%test%' loop
     begin delete from reports where id = r.id; raise notice 'report % removed', r.id;
     exception when foreign_key_violation then raise notice 'report % kept: still referenced (%). Close it instead.', r.id, sqlerrm; end;
@@ -44,7 +40,6 @@ begin
 
   for r in select id, entity, code from manuals where code in ('TEST','TEST-CHART') loop
     begin
-      delete from revision_sections where revision_id in (select id from revisions where manual_id = r.id);
       delete from revisions where manual_id = r.id;
       delete from manuals where id = r.id;
       raise notice 'manual % % removed', r.entity, r.code;
