@@ -100,8 +100,8 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
         {!rows.length ? <p className="p-4 mini">Nothing here.</p> : (
           <table className="tbl"><thead><tr><th>Entry</th><th>Reference</th><th>Applicability</th><th>Tasked to</th><th>Return before</th><th>Status</th></tr></thead>
             <tbody>{rows.map((e) => (
-              <tr key={e.id}>
-                <td><Link href={`/comp/watch/${e.id}`}><b className="mono">{e.number}</b> {e.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[e.entity] ?? "var(--field)" }} />{e.entity}{e.source_kind ? `, ${e.source_kind.toUpperCase()}` : ""}{e.domain ? `, ${e.domain}` : ""}{e.published_on ? `, published ${e.published_on}` : ""}</div></td>
+              <tr key={e.id} className="rowlink">
+                <td><Link className="stretch" href={`/comp/watch/${e.id}`}><b className="mono">{e.number}</b> {e.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[e.entity] ?? "var(--field)" }} />{e.entity}{e.source_kind ? `, ${e.source_kind.toUpperCase()}` : ""}{e.domain ? `, ${e.domain}` : ""}{e.published_on ? `, published ${e.published_on}` : ""}</div></td>
                 <td className="mono">{e.reference ?? "—"}</td>
                 <td><span className={"pill " + (APPL_TONE[e.applicability] ?? "")}>{APPL_LABEL[e.applicability] ?? e.applicability}</span>{e.task && <div className="mini">{TASK_LABEL[e.task]}</div>}</td>
                 <td>{e.owner_person ? name(e.owner_person) : e.owner_role ?? "—"}</td>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { today } from "@/lib/authority";
 import { notFound, redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -6,7 +7,7 @@ import { Metric, PageHeader } from "@/components/Page";
 import { ENT, ENT_COLOR } from "@/lib/nav";
 import { KIND_LABEL, monthLong, STATUS_LABEL, type Audit, type AuditEvent } from "@/lib/audit-programme";
 import { breakdown, history, hintsFor, RESULT_LABEL, RESULT_TONE, RESULTS, textFor, type Check, type Checklist } from "@/lib/audit-run";
-import { LEVEL_LABEL } from "@/lib/findings";
+import { LEVEL_LABEL, OPEN_STATUSES, STATUS_LABEL as FND_STATUS, STATUS_TONE as FND_TONE } from "@/lib/findings";
 import { eligibility, type Auditor } from "@/lib/compliance-registers";
 import { RuleText } from "@/components/RuleText";
 import { ruleCodesIn } from "@/lib/regulation-items";
@@ -33,11 +34,11 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
     db.from("people").select("id,display_name").limit(500),
     db.from("audit_events").select("*").eq("audit_id", a.id).order("at", { ascending: false }).limit(50),
     db.from("checklists").select("*").eq("entity", a.entity).eq("active", true).order("code"),
-    db.from("findings").select("id,number,title,status,level,check_id").eq("audit_id", a.id),
+    db.from("findings").select("id,number,title,status,level,check_id,due").eq("audit_id", a.id).order("number"),
   ]);
   const checks = (cd ?? []) as Check[]; const people = (ppl ?? []) as { id: string; display_name: string }[];
   const name = (pid: string | null) => people.find((p) => p.id === pid)?.display_name ?? "—";
-  const findings = (fnd ?? []) as { id: string; number: string; title: string; status: string; level: string; check_id: string | null }[];
+  const findings = (fnd ?? []) as { id: string; number: string; title: string; status: string; level: string; check_id: string | null; due: string | null }[];
   const b = breakdown(checks);
   const open = checks.find((c) => c.id === sp.c) ?? checks.find((c) => !c.result) ?? checks[0] ?? null;
   const text = open ? await textFor(db, open) : [];
@@ -125,7 +126,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
         </div>}
       </div>}
 
-      {findings.length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Findings of this audit, {findings.length}</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{findings.map((f) => <tr key={f.id}><td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link></td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td className="mini">{f.status}</td></tr>)}</tbody></table></div></section>}
+      {findings.length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Findings of this audit, {findings.length}</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Finding</th><th>Level</th><th>Answer due</th><th>Status</th></tr></thead><tbody>{findings.map((f) => { const lateF = !!f.due && f.due < today() && OPEN_STATUSES.includes(f.status); return <tr key={f.id} className="rowlink"><td><Link className="stretch" href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link></td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td className={lateF ? "late" : ""}>{f.due ?? "—"}</td><td><span className={"pill " + (FND_TONE[f.status] ?? "")}>{FND_STATUS[f.status] ?? f.status}</span></td></tr>; })}</tbody></table></div></section>}
       {(ev ?? []).length > 0 && <details className="card mt-4"><summary className="ch"><span className="eyebrow">History</span></summary><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((ev ?? []) as AuditEvent[]).map((e) => <tr key={e.id}><td className="mono mini">{e.at.slice(0, 16).replace("T", " ")}</td><td>{e.kind === "status" ? `Status → ${STATUS_LABEL[e.status ?? ""] ?? e.status}` : e.kind === "replanned" ? `Moved ${e.from_month ? monthLong(e.from_month) : ""} → ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind}{e.reason ? <div className="mini">{e.reason}</div> : null}</td><td className="mini">{name(e.by)}</td></tr>)}</tbody></table></div></details>}
       <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} />{a.entity}, PRO-CM-02</p>
     </>

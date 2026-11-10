@@ -48,8 +48,8 @@ export default async function Findings({ searchParams }: { searchParams: Promise
       <thead><tr><th>Finding</th><th>Type</th><th>Requirement</th><th>Level</th><th>Owner</th><th>Due</th><th>Status</th><th>Work done</th></tr></thead>
       <tbody>
 {list.map((f) => (
-                  <tr key={f.id}>
-                    <td><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[f.entity] ?? "var(--field)" }} />{f.entity}, {SOURCE_LABEL[f.source] ?? f.source}{f.authority ? `, ${f.authority}` : ""}{f.audit_ref ? `, ${f.audit_ref}` : ""}</div></td>
+                  <tr key={f.id} className="rowlink">
+                    <td><Link className="stretch" href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[f.entity] ?? "var(--field)" }} />{f.entity}, {SOURCE_LABEL[f.source] ?? f.source}{f.authority ? `, ${f.authority}` : ""}{f.audit_ref ? `, ${f.audit_ref}` : ""}</div></td>
                     <td className="mini">{TYPE_LABEL[f.finding_type ?? guessType(f)]?.split(" (")[0]}{!f.finding_type && <span title="proposed by S.A.M."> ·?</span>}</td>
                     <td className="mono mini" style={{ maxWidth: 180 }}>{f.requirement ?? "—"}</td>
                     <td>{LEVEL_LABEL[f.level] ?? f.level}</td>
