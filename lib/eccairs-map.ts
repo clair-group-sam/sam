@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { E2_ATTR, E2_ENTITIES, E2_LONG_LISTS, E2_SHAPE, getOccurrence, type TaxonomyCodes } from "@/lib/eccairs";
 import { ENT } from "@/lib/nav";
+import { PHASES } from "@/lib/safety-shared";
 
 /* ECC-02 · From a S.A.M. safety report to an E2 original report (taxonomyCodes JSON, ECCAIRS Aviation 5.1).
  * What is sent is what the safety desk reviews on the screen: S.A.M. proposes, codes from the cached taxonomy, the desk corrects,
@@ -12,7 +13,7 @@ export type ReportForE2 = { id: string; entity: string; event_date: string | nul
 export type AnalysisForE2 = { mor_draft: string | null; adrep: unknown; mor_status: string | null } | null;
 type Attr = { entity_code: number; attribute_code: number; description: string; data_type: string | null; value_list_id: number | null; min_instance: number | null };
 type Val = { value_list_id: number; value_id: number; description: string; parent: number | null; level: number | null };
-type Map = { field: string; our_value: string; attribute_code: number; value_id: number | null };
+type Map = { field: string; our_value: string; attribute_code: number; value_id: number | null; note?: string | null };
 
 /** The value lists and maps a review screen needs, in one read. */
 export async function e2Context(db: SupabaseClient, entity: string) {
@@ -21,7 +22,7 @@ export async function e2Context(db: SupabaseClient, entity: string) {
   if (!t) return { taxonomy: null, attrs: [] as Attr[], values: [] as Val[], maps: [] as Map[], long: [] as number[] };
   const [{ data: at }, { data: mp }] = await Promise.all([
     db.from("eccairs_attributes").select("entity_code,attribute_code,description,data_type,value_list_id,min_instance").eq("taxonomy_id", t.taxonomy_id).range(0, 4999),
-    db.from("eccairs_value_maps").select("field,our_value,attribute_code,value_id").eq("entity", entity),
+    db.from("eccairs_value_maps").select("field,our_value,attribute_code,value_id,note").eq("entity", entity),
   ]);
   const attrs = (at ?? []) as Attr[];
   // the long lists (aircraft types, operators) stay in the database and are searched by name (longValues); the others are read whole
@@ -102,7 +103,7 @@ export function proposeFields(r: ReportForE2, a: AnalysisForE2, ctx: E2Context, 
     { key: "state", label: "State / area of occurrence", entity: O, attribute: E2_ATTR.STATE, kind: "list", listId: L(O, E2_ATTR.STATE), value: findValue(ctx, L(O, E2_ATTR.STATE), stateFromLocation(r.location)) ?? mapped(ctx, "state", r.entity) ?? findValue(ctx, L(O, E2_ATTR.STATE), OPERATOR_STATE[r.entity]), required: true, from: stateFromLocation(r.location) ? `ICAO indicator in the location (${stateFromLocation(r.location)})` : "entity's State" },
     { key: "occ_class", label: "Occurrence class", entity: O, attribute: E2_ATTR.OCC_CLASS, kind: "list", listId: L(O, E2_ATTR.OCC_CLASS), value: mapped(ctx, "occurrence_class", r.occurrence_class) ?? findValue(ctx, L(O, E2_ATTR.OCC_CLASS), clsName), required: true, from: r.occurrence_class ? "occurrence class of the report" : "MOR decision" },
     { key: "occ_category", label: "Occurrence category", entity: O, attribute: E2_ATTR.OCC_CATEGORY, kind: "lists", listId: L(O, E2_ATTR.OCC_CATEGORY), value: [...new Set([mapped(ctx, "report_type", r.report_type), mapped(ctx, "risk_category", r.risk_category), ...(Array.isArray(a?.adrep) ? a.adrep : [a?.adrep]).map((c) => findValue(ctx, L(O, E2_ATTR.OCC_CATEGORY), c))].filter((x): x is string => !!x))], required: true, from: a?.adrep ? "ADREP category proposed by S.A.M." : "report type / risk category" },
-    { key: "event_type", label: "Event type", entity: EV, attribute: E2_ATTR.EVENT_TYPE, kind: "lists", listId: L(EV, E2_ATTR.EVENT_TYPE), value: [mapped(ctx, "event_type", r.event_type), findValue(ctx, L(EV, E2_ATTR.EVENT_TYPE), r.event_type?.split("/").pop())].filter((x): x is string => !!x), required: true, from: r.event_type ? "event type of the report" : "to choose" },
+    { key: "event_type", label: "Event type", entity: EV, attribute: E2_ATTR.EVENT_TYPE, kind: "lists", listId: L(EV, E2_ATTR.EVENT_TYPE), value: [mapped(ctx, "event_type", r.event_type), findValue(ctx, L(EV, E2_ATTR.EVENT_TYPE), lastSegment(r.event_type))].filter((x): x is string => !!x), required: true, from: r.event_type ? "event type of the report" : "to choose" },
     { key: "narrative_lang", label: "Narrative language", entity: N, attribute: E2_ATTR.NARRATIVE_LANG, kind: "list", listId: L(N, E2_ATTR.NARRATIVE_LANG), value: findValue(ctx, L(N, E2_ATTR.NARRATIVE_LANG), "English"), required: true },
     { key: "narrative", label: "Narrative (de-identified)", entity: N, attribute: E2_ATTR.NARRATIVE, kind: "text", value: narrative, required: true, from: narrative ? "MOR draft (de-identified by S.A.M.)" : "no MOR draft yet — run the analysis or write it", hint: "Only the de-identified text goes to the authority; the reporter's own words and identity stay in S.A.M." },
     { key: "weather", label: "Weather relevant", entity: A, attribute: E2_ATTR.WEATHER_RELEVANT, kind: "list", listId: L(A, E2_ATTR.WEATHER_RELEVANT), value: findValue(ctx, L(A, E2_ATTR.WEATHER_RELEVANT), "No") },
@@ -159,4 +160,34 @@ export async function syncE2(db: SupabaseClient, entity: string): Promise<number
     } catch (e) { await db.from("eccairs_submissions").insert({ entity, report_id: r.id, kind: "sync", ok: false, e2_id: r.e2_id, error: (e as Error).message.slice(0, 500) }); }
   }
   return n;
+}
+
+/** "Equipment → 3200 Landing Gear System → 3230 …" (Centrik mirrors the ADREP wording) → the last segment, the one E2 names. */
+export const lastSegment = (v: string | null | undefined) => (v ? v.split(/\s*(?:→|->|\/|>)\s*/).filter(Boolean).pop() ?? null : null);
+
+/** ECC-03 · S.A.M. proposes the correspondences it can read from the names — occurrence classes, phases, event types — for the values
+ *  found in the entity's reports; only where nothing is set yet, noted as proposed. Report types and risk categories stay the desk's call. */
+export async function autoMaps(db: SupabaseClient, entity: string): Promise<{ proposed: number; unresolved: string[] }> {
+  const ctx = await e2Context(db, entity); if (!ctx.taxonomy) throw new Error("Load the taxonomy first.");
+  const { data: rp } = await db.from("reports").select("occurrence_class,phase,event_type").eq("entity", entity).limit(5000);
+  const rows = (rp ?? []) as { occurrence_class: string | null; phase: string | null; event_type: string | null }[];
+  const u = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x))];
+  const O = E2_ENTITIES.OCCURRENCE, A = E2_ENTITIES.AIRCRAFT, EV = E2_ENTITIES.EVENTS;
+  const want: { field: string; our: string; attribute: number; value: string | null }[] = [];
+  const lCls = listOf(ctx, O, E2_ATTR.OCC_CLASS), lPh = listOf(ctx, A, E2_ATTR.AC_FLIGHT_PHASE), lEv = listOf(ctx, EV, E2_ATTR.EVENT_TYPE);
+  for (const c of u(rows.map((r) => r.occurrence_class))) want.push({ field: "occurrence_class", our: c, attribute: E2_ATTR.OCC_CLASS, value: findValue(ctx, lCls, Object.entries(CLASS_WORDS).find(([k]) => c.toLowerCase().includes(k))?.[1] ?? c) });
+  for (const p of [...new Set([...PHASES, ...u(rows.map((r) => r.phase))])]) want.push({ field: "phase", our: p, attribute: E2_ATTR.AC_FLIGHT_PHASE, value: (PHASE_WORDS[p] ?? [p]).map((w) => findValue(ctx, lPh, w)).find(Boolean) ?? null });
+  for (const e of u(rows.map((r) => r.event_type))) {
+    const seg = lastSegment(e); const vs = ctx.values.filter((v) => v.value_list_id === lEv);
+    const exact = seg ? vs.find((v) => v.description.toLowerCase() === seg.toLowerCase()) : null;
+    want.push({ field: "event_type", our: e, attribute: E2_ATTR.EVENT_TYPE, value: exact ? String(exact.value_id) : null });
+  }
+  let proposed = 0; const unresolved: string[] = [];
+  for (const w of want) {
+    if (ctx.maps.some((m) => m.field === w.field && m.our_value === w.our)) continue;
+    if (!w.value) { unresolved.push(`${w.field}: ${w.our}`); continue; }
+    const { error } = await db.from("eccairs_value_maps").upsert({ entity, field: w.field, our_value: w.our, attribute_code: w.attribute, value_id: Number(w.value), note: "proposed by S.A.M. from the name — to confirm", updated_at: new Date().toISOString() }, { onConflict: "entity,field,our_value" });
+    if (error) throw new Error(error.message); proposed++;
+  }
+  return { proposed, unresolved };
 }

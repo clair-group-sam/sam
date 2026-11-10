@@ -7,7 +7,7 @@ import { ENT, ENTS4 } from "@/lib/nav";
 import { isSafetyDesk, PHASES } from "@/lib/safety";
 import { E2_ATTR, E2_ENTITIES, eccairsConfig, eccairsEnv } from "@/lib/eccairs";
 import { e2Context, withLongValues } from "@/lib/eccairs-map";
-import { loadTax, saveMap, testLink, loadLong } from "./actions";
+import { loadTax, saveMap, testLink, loadLong, proposeMaps } from "./actions";
 
 /* ECC-01 · Safety › MOR / ECCAIRS › E2 link: connection, cached taxonomy, and the correspondences S.A.M. uses to code a report
  * (occurrence class, phase, report type / risk category → occurrence category, event type, aircraft type, operator, State). */
@@ -59,7 +59,7 @@ export default async function E2Admin({ searchParams }: { searchParams: Promise<
           </div>
           {ctx.taxonomy && <p className="mini mt-2">Taxonomy <b>{ctx.taxonomy.name} {ctx.taxonomy.version}</b> loaded {ctx.taxonomy.loaded_at.slice(0, 16).replace("T", " ")} ({ctx.taxonomy.env}) · {ctx.attrs.length} attributes · {ctx.values.length} values in {new Set(ctx.values.map((v) => v.value_list_id)).size} lists{longCount ? ` · long lists: ${longCount} aircraft types and operators` : " · long lists not cached yet"}.</p>}
         </div></section>
-      <section className="card mb-4"><div className="ch"><span className="eyebrow">Correspondences, S.A.M. value → E2 value</span><span className="flex gap-2 items-center"><form method="get" className="flex gap-1 items-center"><input type="hidden" name="ent" value={entity} /><input name="q" className="inp" defaultValue={sp.q ?? ""} placeholder="search the long lists (e.g. Mustang, Astonjet)" style={{ marginTop: 0, width: 280 }} /><button className="btn sm">Search</button></form><span className="mini">{ctx.maps.length} set</span></span></div>
+      <section className="card mb-4"><div className="ch"><span className="eyebrow">Correspondences, S.A.M. value → E2 value</span><span className="flex gap-2 items-center"><form action={proposeMaps}><input type="hidden" name="entity" value={entity} /><button className="btn sm" disabled={!ctx.taxonomy} title="Occurrence classes, phases and event types that S.A.M. can read from the names — where nothing is set yet; the desk confirms">Propose by name</button></form><form method="get" className="flex gap-1 items-center"><input type="hidden" name="ent" value={entity} /><input name="q" className="inp" defaultValue={sp.q ?? ""} placeholder="search the long lists (e.g. Mustang, Astonjet)" style={{ marginTop: 0, width: 280 }} /><button className="btn sm">Search</button></form><span className="mini">{ctx.maps.length} set</span></span></div>
         <div className="cb" style={{ padding: 0 }}>
           {!ctx.taxonomy ? <p className="p-4 mini">Load the taxonomy first: the lists come from it.</p> : <table className="tbl"><thead><tr><th>Field</th><th>Our value</th><th>E2 value</th><th></th></tr></thead><tbody>
             {FIELDS.flatMap((F) => { const lid = listOf(F.entity, F.attribute); const list = vals(lid); return F.ours(o, entity).map((our) => { const m = ctx.maps.find((x) => x.field === F.field && x.our_value === our); return (
@@ -67,7 +67,7 @@ export default async function E2Admin({ searchParams }: { searchParams: Promise<
                 <td><form action={saveMap} className="flex gap-1" id={`m-${F.field}-${our}`}><input type="hidden" name="entity" value={entity} /><input type="hidden" name="field" value={F.field} /><input type="hidden" name="our_value" value={our} /><input type="hidden" name="attribute_code" value={F.attribute} />
                   {list.length ? <select name="value_id" className="inp" defaultValue={m?.value_id ?? ""} style={{ marginTop: 0, maxWidth: 420 }}><option value="">—</option>{list.map((v) => <option key={v.value_id} value={v.value_id}>{v.level && v.level > 1 ? "· ".repeat(v.level - 1) : ""}{v.description}</option>)}</select> : <input name="value_id" className="inp mono" defaultValue={m?.value_id ?? ""} placeholder="E2 value id" style={{ marginTop: 0, width: 140 }} />}
                   <button className="btn sm">Save</button>{m && <button className="btn sm" name="what" value="remove">×</button>}</form></td>
-                <td className="mini">{m ? "set" : <span className="late">missing</span>}</td></tr>); }); })}
+                <td className="mini">{m ? (m.note?.startsWith("proposed") ? <span title={m.note}>proposed, to confirm</span> : "set") : <span className="late">missing</span>}</td></tr>); }); })}
           </tbody></table>}
         </div></section>
       {(subs ?? []).length > 0 && <section className="card"><div className="ch"><span className="eyebrow">Last exchanges with E2</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((subs ?? []) as { at: string; kind: string; requested_status: string | null; ok: boolean; e2_id: string | null; e2_status: string | null; error: string | null; report_id: string }[]).map((h, i) => <tr key={i}><td className="mini">{h.at.slice(0, 16).replace("T", " ")}</td><td><Link href={`/safe/reports/${h.report_id}`} className="mono">{h.report_id}</Link></td><td>{h.kind}{h.requested_status ? ` → ${h.requested_status}` : ""}</td><td>{h.ok ? <span className="pill green">{h.e2_id} {h.e2_status}</span> : <span className="pill red">refused</span>}{h.error && <div className="mini">{h.error}</div>}</td></tr>)}</tbody></table></div></section>}

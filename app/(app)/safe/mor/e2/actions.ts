@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isSafetyDesk } from "@/lib/safety";
 import { eccairsConfig, loadLongLists, loadTaxonomy, taxonomyVersion } from "@/lib/eccairs";
+import { autoMaps } from "@/lib/eccairs-map";
 
 /* ECC-01 · the link with E2 for the safety desk: test, taxonomy cache, correspondences between S.A.M. values and E2 value ids. */
 const db = () => supabaseAdmin();
@@ -32,6 +33,13 @@ export async function loadLong(fd: FormData) {
   let note: string;
   try { const r = await loadLongLists(db(), entity); note = `Long lists cached: ${r.values} values in ${r.lists} lists (aircraft make/model, operators)`; } catch (e) { note = (e as Error).message; }
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "eccairs", object_id: null, action: "eccairs_taxonomy_loaded", after: { note } });
+  touch(); redirect(`/safe/mor/e2?ent=${entity}&msg=${encodeURIComponent(note)}`);
+}
+export async function proposeMaps(fd: FormData) {
+  const entity = String(fd.get("entity")); const s = await me(entity);
+  let note: string;
+  try { const r = await autoMaps(db(), entity); note = `${r.proposed} correspondence(s) proposed from the names${r.unresolved.length ? ` · not found: ${r.unresolved.slice(0, 12).join("; ")}${r.unresolved.length > 12 ? "…" : ""}` : ""}`; } catch (e) { note = (e as Error).message; }
+  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "eccairs", object_id: null, action: "eccairs_maps_proposed", after: { note } });
   touch(); redirect(`/safe/mor/e2?ent=${entity}&msg=${encodeURIComponent(note)}`);
 }
 export async function saveMap(fd: FormData) {
