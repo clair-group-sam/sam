@@ -83,7 +83,7 @@ export function stateFromLocation(location: string | null | undefined): string |
   return ICAO_STATE[p] ?? (m[1][0] === "K" ? "United States" : null);
 }
 /** Our phases of flight → the usual E2 wording (desk confirms). */
-const PHASE_WORDS: Record<string, string[]> = { "Parked / ground": ["Standing", "Parked"], Taxi: ["Taxi"], "Take-off": ["Take-off", "Takeoff"], "Initial climb": ["Initial climb", "Climb"], Climb: ["En route", "Climb"], Cruise: ["En route", "Cruise"], Descent: ["En route", "Descent"], Approach: ["Approach"], Landing: ["Landing"], "After landing": ["Taxi", "Landing"], "Training / simulator": ["Unknown"], Maintenance: ["Standing", "Maintenance"], "Not in flight": ["Standing"] };
+const PHASE_WORDS: Record<string, string[]> = { "Parked / ground": ["Standing", "Parked"], Taxi: ["Taxi"], "Take-off": ["Take-off", "Takeoff"], "Initial climb": ["Initial climb", "Take-off"], Climb: ["En route", "Climb"], Cruise: ["En route", "Cruise"], Descent: ["En route", "Descent"], Approach: ["Approach"], Landing: ["Landing"], "After landing": ["Taxi", "Landing"], "Training / simulator": ["Unknown"], Maintenance: ["Standing", "Maintenance"], "Not in flight": ["Standing"] };
 const CLASS_WORDS: Record<string, string> = { accident: "Accident", "serious incident": "Serious incident", incident: "Incident", "major incident": "Major incident", "significant incident": "Significant incident", observation: "Observation", "occurrence without safety effect": "Occurrence without safety effect", "not determined": "Not determined" };
 
 /** The fields S.A.M. proposes for the report, each with where it comes from. Lists are resolved through the maps, then by name. */
@@ -163,7 +163,7 @@ export async function syncE2(db: SupabaseClient, entity: string): Promise<number
 }
 
 /** "Equipment → 3200 Landing Gear System → 3230 …" (Centrik mirrors the ADREP wording) → the last segment, the one E2 names. */
-export const lastSegment = (v: string | null | undefined) => (v ? v.split(/\s*(?:→|->|\/|>)\s*/).filter(Boolean).pop() ?? null : null);
+export const lastSegment = (v: string | null | undefined) => (v ? v.split(/\s*(?:→|->|>)\s*/).filter(Boolean).pop() ?? null : null);
 
 /** ECC-03 · S.A.M. proposes the correspondences it can read from the names — occurrence classes, phases, event types — for the values
  *  found in the entity's reports; only where nothing is set yet, noted as proposed. Report types and risk categories stay the desk's call. */
