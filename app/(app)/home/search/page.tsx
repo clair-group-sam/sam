@@ -34,9 +34,10 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
     const none = Promise.resolve({ data: [] as unknown[] });
     const [man, rules, rep, haz, act, fnd, aud, wat, prj, fil, com, ppl] = await Promise.all([
       db.from("manuals").select("id,entity,code,title").in("entity", scope).or(`title.ilike.${like},code.ilike.${like}`).limit(8),
+      // the rules: by reference (ORO.FTL.2), else in the titles and the full text of IR, AMC and GM of the version in force
       /^[A-Z]{2,5}\.[A-Z0-9.]+/.test(code)
-        ? db.from("regulation_items").select("code,ref,title,kind,regulations!inner(key,title,items_version),version").eq("kind", "ir").ilike("code", `${code}%`).order("ord").limit(40)
-        : db.from("regulation_items").select("code,ref,title,kind,regulations!inner(key,title,items_version),version").eq("kind", "ir").ilike("title", like).order("ord").limit(40),
+        ? db.from("regulation_items").select("code,ref,title,kind,body_text,regulations!inner(key,title,items_version),version").ilike("code", `${code}%`).order("kind").order("ord").limit(60)
+        : db.from("regulation_items").select("code,ref,title,kind,body_text,regulations!inner(key,title,items_version),version").or(`title.ilike.${like},body_text.ilike.${like}`).order("ord").limit(120),
       desk ? db.from("reports").select("id,entity,headline,headline_en,status,received_at").in("entity", scope).or(`headline.ilike.${like},headline_en.ilike.${like},id.ilike.${like},aircraft.ilike.${like}`).order("received_at", { ascending: false }).limit(8) : none,
       office ? db.from("hazards").select("id,entity,ref,title").in("entity", scope).eq("proposed", false).or(`title.ilike.${like},ref.ilike.${like}`).limit(8) : none,
       office ? db.from("safety_actions").select("id,entity,number,title,status").in("entity", scope).or(`title.ilike.${like},number.ilike.${like}`).order("created_at", { ascending: false }).limit(8) : none,
@@ -53,7 +54,13 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
     const add = (label: string, all: string | undefined, hits: Hit[]) => { if (hits.length) groups.push({ label, all, hits }); };
     add("Manuals", `/docs/lib?q=${encodeURIComponent(q)}`, rows(man).map((m) => ({ href: `/docs/manual/${m.id}`, code: m.code ?? "", title: m.title ?? "", entity: m.entity ?? undefined })));
     groups.push({ label: "Text of the published manuals", hits: [{ href: `/docs/lib?q=${encodeURIComponent(q)}`, title: `Search “${q}” in the text of the manuals`, sub: "chapters and passages, in the Library" }] });
-    add("Easy Access Rules", "/reg/ear", rows(rules).filter((r) => r.regulations && r.version === r.regulations.items_version).slice(0, 8).map((r) => ({ href: `/reg/ear/${r.regulations!.key}?code=${encodeURIComponent(r.code ?? "")}`, code: r.ref ?? r.code ?? "", title: r.title ?? "", sub: r.regulations!.title })));
+    // a passage of the text around the first match, so the rule can be recognised without opening it
+    const snippet = (text: string | null | undefined) => { if (!text) return ""; const i = text.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return ""; const a = Math.max(0, i - 70), b = Math.min(text.length, i + q.length + 110); return `${a ? "…" : ""}${text.slice(a, b).replace(/\s+/g, " ")}${b < text.length ? "…" : ""}`; };
+    const KIND: Record<string, string> = { ir: "rule", amc: "AMC", gm: "GM", cs: "CS", other: "" };
+    const inForce = rows(rules).filter((r) => r.regulations && r.version === r.regulations.items_version);
+    const byRule = [...inForce.filter((r) => r.kind === "ir"), ...inForce.filter((r) => r.kind !== "ir")].slice(0, 10);
+    add("Easy Access Rules", `/reg/ear`, byRule.map((r) => ({ href: `/reg/ear/${r.regulations!.key}?code=${encodeURIComponent(r.code ?? "")}`, code: r.ref ?? r.code ?? "", title: `${r.title ?? ""}${r.kind && r.kind !== "ir" ? ` (${KIND[r.kind] ?? r.kind})` : ""}`, sub: `${r.regulations!.title}${(r.title ?? "").toLowerCase().includes(q.toLowerCase()) ? "" : ` — ${snippet(r.body_text)}`}` })));
+    if (inForce.length > byRule.length) { const rest = inForce.slice(byRule.length); const keys = [...new Map(rest.map((r) => [r.regulations!.key, r.regulations!.title])).entries()]; for (const [k, t] of keys) groups[groups.length - 1].hits.push({ href: `/reg/ear/${k}?q=${encodeURIComponent(q)}`, title: `${rest.filter((r) => r.regulations!.key === k).length} more in ${t}`, sub: "open the regulation with the search" }); }
     add("Safety reports", "/safe/reports", rows(rep).map((r) => ({ href: `/safe/reports/${r.id}`, code: r.id ?? "", title: r.headline_en || r.headline || "", sub: r.status ?? "", entity: r.entity ?? undefined })));
     add("Hazards", "/safe/risk", rows(haz).map((h) => ({ href: `/safe/risk/${h.id}`, code: h.ref ?? "", title: h.title ?? "", entity: h.entity ?? undefined })));
     add("Safety actions", "/safe/actions", rows(act).map((a) => ({ href: `/safe/actions/${a.id}`, code: a.number ?? "", title: a.title ?? "", sub: a.status ?? "", entity: a.entity ?? undefined })));
