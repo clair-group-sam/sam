@@ -923,11 +923,12 @@ html[data-size="large"] body,html[data-size="xlarge"] body{height:auto;min-heigh
 /* FB-116 · phone (under 640 px): one column, menus at the bottom, tables scroll sideways inside their card */
 @media (max-width:640px){
   .shellrow{flex-direction:column-reverse}
-  .sidewrap{width:100% !important;flex:0 0 56px;height:56px}
-  .rail,.rail.mini,.rail.mini.hover{width:100% !important;position:static;box-shadow:none;flex-direction:row;align-items:center;padding:4px 6px;border-right:0;border-top:1px solid var(--line);overflow-x:auto;position:sticky;bottom:0;z-index:20;height:56px;flex:0 0 56px}
-  .rail .brand,.rail .morebox .rl.more,.rail .railbottom .rl.lockrow{display:none}
-  .rail nav,.rail .railbottom,.rail .morebox,.rail .morebox.open{display:flex;flex-direction:row;align-items:center;gap:2px;margin:0;padding:0;border:0;background:none}
-  .rail .rl{width:46px;min-width:46px;height:46px;margin:0;padding:0;justify-content:center}.rail .rl span{display:none}
+  .sidewrap{width:100% !important;flex:0 0 58px;height:58px}
+  .rail,.rail.mini,.rail.mini.hover{width:100% !important;height:58px;position:static;box-shadow:none;flex-direction:row;align-items:center;gap:2px;padding:6px 8px;border-right:0;border-top:1px solid var(--line);overflow-x:auto;overflow-y:hidden}
+  .rail .brand,.rail .lockrow,.rail .mpill{display:none !important}
+  .rail>.menupills,.rail .railbottom,.rail .morebox,.rail .morebox.open{display:flex;flex-direction:row;align-items:center;gap:2px;flex:0 0 auto;overflow:visible;margin:0;padding:0;border:0;background:none}
+  .rail .rl,.rail.mini .rl,.rail.mini.hover .rl,.rail .morebox.open .rl{width:46px;min-width:46px;height:46px;margin:0;padding:0;justify-content:center;flex:0 0 46px}
+  .rail .rl span,.rail.mini.hover .rl span,.rail .rl .tgl{display:none}
   .subwrap,.sub{display:none}
   .mobsub{display:flex !important;gap:6px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--gray05)}
   .mobsub a{flex:0 0 auto;padding:8px 12px;border-radius:999px;background:var(--white);border:1px solid var(--line);font-size:13px;min-height:36px;display:flex;align-items:center}
