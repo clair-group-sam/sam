@@ -25,7 +25,7 @@ export function AuthorityAudit({ a, findings, desk, name }: { a: AA; findings: A
   return (
     <>
       <PageHeader eyebrow={`Compliance, Surveillance plan, authority audit, ${a.entity}`} title={`${a.number}, ${a.title}`}
-        sub={`${ENT[a.entity]?.name ?? a.entity}, ${a.authority ?? "authority"}${a.external_auditor && a.external_auditor !== a.authority ? ` (${a.external_auditor})` : ""}, ${a.planned_on ? `on ${a.planned_on}${a.planned_end && a.planned_end !== a.planned_on ? ` → ${a.planned_end}` : ""}` : monthLong(a.planned_month)}`}
+        sub={`${ENT[a.entity]?.name ?? a.entity}, ${a.authority ?? "authority"}${a.external_auditor && !(a.authority && a.external_auditor.startsWith(a.authority)) ? ` (${a.external_auditor})` : a.external_auditor && a.external_auditor !== a.authority ? a.external_auditor.slice((a.authority ?? "").length) : ""}, ${a.planned_on ? `on ${a.planned_on}${a.planned_end && a.planned_end !== a.planned_on ? ` → ${a.planned_end}` : ""}` : monthLong(a.planned_month)}`}
         tag={<span className={"pill " + stage[1]}>{stage[0]}</span>}
         right={<Link className="btn" href="/comp/audits?src=authority">All authority audits</Link>} />
       <SurvTabs on="audits" />
