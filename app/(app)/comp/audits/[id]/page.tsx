@@ -11,6 +11,8 @@ import { LEVEL_LABEL, OPEN_STATUSES, STATUS_LABEL as FND_STATUS, STATUS_TONE as 
 import { eligibility, type Auditor } from "@/lib/compliance-registers";
 import { RuleText } from "@/components/RuleText";
 import { ruleCodesIn } from "@/lib/regulation-items";
+import { AuthorityAudit } from "./AuthorityAudit";
+import type { AuthFinding } from "@/lib/authority-audit";
 import { addCheck, raiseFinding, refreshHints, reopenAudit, reportAudit, setCheck, startAudit } from "../actions";
 
 type Sp = { c?: string };
@@ -29,6 +31,12 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   const desk = s.role === "cmm" || s.roles.map(basePost).includes("CMM");
   const me = s.person?.id ?? null;
   const team = desk || a.lead_auditor === me || (!!me && a.auditors.includes(me));
+  // 10/11 · an authority audit has its own sheet: the report received and where each finding stands with the authority
+  if (a.kind === "authority") {
+    const [{ data: af }, { data: ap }] = await Promise.all([db.from("findings").select("*").eq("audit_id", a.id).order("number"), db.from("people").select("id,display_name").limit(800)]);
+    const pn = (pid: string | null) => ((ap ?? []) as { id: string; display_name: string }[]).find((p) => p.id === pid)?.display_name ?? "—";
+    return <AuthorityAudit a={a as never} findings={(af ?? []) as AuthFinding[]} desk={desk} name={pn} />;
+  }
   const [{ data: cd }, { data: ppl }, { data: ev }, { data: cls }, { data: fnd }] = await Promise.all([
     db.from("audit_checks").select("*").eq("audit_id", a.id).order("ord").limit(5000),
     db.from("people").select("id,display_name").limit(500),

@@ -195,3 +195,15 @@ export async function setFindingType(fd: FormData) {
   await log(x.f, "finding_type", s.person?.id ?? null, { type, by: t === "auto" ? "sam" : "user" });
   touch(x.f.id);
 }
+
+/** 10/11 · an authority finding: its reference, the authority's decisions (root cause, plan, proof), the proof sent, an extension of the deadline. Compliance desk. */
+export async function setAuthorityDecision(fd: FormData) {
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const dec = (k: string) => { const v = str(fd, k); return v && ["awaiting", "yes", "no", "na"].includes(v) ? v : null; };
+  const ext = str(fd, "extension");
+  const row = { authority_ref: str(fd, "authority_ref"), authority_rca: dec("authority_rca"), authority_pac: dec("authority_pac"), authority_proof: dec("authority_proof"), proof: str(fd, "proof"),
+    extension: ext && ["1m", "3m", "reworked"].includes(ext) ? ext : null, extension_reason: str(fd, "extension_reason"), finding_file: str(fd, "finding_file"), updated_at: new Date().toISOString() };
+  await db().from("findings").update(row).eq("id", x.f.id);
+  await log(x.f, "finding_authority", s.person?.id ?? null, row);
+  touch(x.f.id);
+}

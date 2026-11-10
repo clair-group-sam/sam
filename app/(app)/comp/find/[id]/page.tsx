@@ -7,9 +7,10 @@ import EntityBand from "@/components/EntityBand";
 import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS } from "@/lib/actions-shared";
 import { CHANGE_LABEL, guessType, LEVEL_LABEL, loadFinding, TYPE_GUIDE, TYPE_LABEL, TYPES, needsAuthority, plan, progress, ROUTE_LABEL, SOURCE_LABEL, STATUS_LABEL, STATUS_TONE, stepOf, STEPS_PATH, type Assistant, type Point, type Round } from "@/lib/findings";
-import { addChange, checkPlan, decideClosure, gotoStep, openDossier, recordChangeAuthority, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, setFindingType, updateFinding, verifyChange } from "../actions";
+import { addChange, checkPlan, decideClosure, gotoStep, openDossier, recordChangeAuthority, removeChange, requestClosure, reviewAnswer, saveRootCause, sendAnalysis, setAuthorityDecision, setFindingType, updateFinding, verifyChange } from "../actions";
 import { rulesCited } from "@/lib/regulation-items";
 import { RuleText } from "@/components/RuleText";
+import { authorityStep, DECISION_LABEL, DECISION_TONE, effectiveDue, EXT_LABEL } from "@/lib/authority-audit";
 import { Icon } from "@/lib/icons";
 
 /* FND-03 · the finding sheet. The NP writes in order — ① root cause, read by S.A.M. with them; ② corrective action plan, read by S.A.M.
@@ -144,6 +145,25 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
             <div className="cb"><p style={{ whiteSpace: "pre-wrap" }}>{f.description ?? <span className="mini">No text pasted.</span>}</p>
               {audit && <p className="mini mt-2">From the audit <Link href={`/comp/audits/${audit.id}`}><b className="mono">{audit.number}</b> {audit.title}</Link>{audit.done_on ? `, ${audit.done_on}` : ""}</p>}</div>
           </section>
+
+          {f.source === "authority" && (() => { const st = authorityStep(f); const d = effectiveDue({ due: f.due, extension: f.extension ?? null }); const D = ({ v }: { v: string | null | undefined }) => v ? <span className={"pill " + (DECISION_TONE[v] ?? "")}>{DECISION_LABEL[v] ?? v}</span> : <span className="mini">—</span>; return (
+          <section className="card">
+            <div className="ch"><span className="eyebrow">With the authority{f.authority ? `, ${f.authority}` : ""}</span><span className={"pill " + st.tone}>{st.label}</span></div>
+            <div className="cb grid gap-2">
+              <div className="grid grid-cols-4 gap-2 mini"><div>Reference<div className="mono" style={{ fontSize: 14 }}>{f.authority_ref ?? "—"}</div></div><div>Root cause<div><D v={f.authority_rca} /></div></div><div>Plan<div><D v={f.authority_pac} /></div></div><div>Proof<div><D v={f.authority_proof} /></div></div></div>
+              <p className="mini">Deadline {d ?? "—"}{f.extension ? ` (${EXT_LABEL[f.extension]}, initially ${f.due})` : ""}{f.notified ? `, notified ${f.notified}` : ""}{f.finding_file ? <> · <a href={f.finding_file} target="_blank" rel="noreferrer">finding sheet ↗</a></> : null}</p>
+              {f.proof && <div><div className="eyebrow">Proof of implementation sent</div><p className="mini" style={{ whiteSpace: "pre-wrap" }}>{f.proof}</p></div>}
+              {f.extension_reason && <p className="mini" style={{ whiteSpace: "pre-wrap" }}><b>Note:</b> {f.extension_reason}</p>}
+              {compliance && <details><summary className="mini">Record the authority's answer</summary><form action={setAuthorityDecision} className="grid gap-2 grid-cols-2 mt-2"><input type="hidden" name="id" value={f.id} />
+                <label><span className="mini">Authority reference (METEOR…)</span><input name="authority_ref" className="inp mono" defaultValue={f.authority_ref ?? ""} /></label>
+                <label><span className="mini">Finding sheet (link)</span><input name="finding_file" className="inp" defaultValue={f.finding_file ?? ""} /></label>
+                {(["authority_rca", "authority_pac", "authority_proof"] as const).map((k) => <label key={k}><span className="mini">{k === "authority_rca" ? "Root cause" : k === "authority_pac" ? "Plan" : "Proof"}, authority's decision</span><select name={k} className="inp" defaultValue={f[k] ?? ""}><option value="">— not sent yet</option>{Object.entries(DECISION_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>)}
+                <label><span className="mini">Extension granted</span><select name="extension" className="inp" defaultValue={f.extension ?? ""}><option value="">None</option>{Object.entries(EXT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+                <label className="col-span-2"><span className="mini">Proof of implementation sent</span><textarea name="proof" className="inp" rows={3} defaultValue={f.proof ?? ""} /></label>
+                <label className="col-span-2"><span className="mini">Note (extension reason, authority's comment)</span><textarea name="extension_reason" className="inp" rows={2} defaultValue={f.extension_reason ?? ""} /></label>
+                <div className="col-span-2 flex justify-end"><button className="btn sm primary">Save</button></div></form></details>}
+            </div>
+          </section>); })()}
 
           <section className="card">
             <div className="ch"><span className="eyebrow">Type of finding</span><span className="mini">{typeBySam ? "proposed by S.A.M. from the text, change it if wrong" : "set by hand"}</span></div>

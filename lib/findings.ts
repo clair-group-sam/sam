@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Action } from "@/lib/actions-shared";
 import { today } from "@/lib/authority";
+import { authorityStep } from "@/lib/authority-audit";
 
 /* FND-03 · Compliance › Findings (30/10). The finding sheet, the NP's answer rounds, the corrective action plan (expected manual
  * changes FND-01/02 + actions), S.A.M.'s pre-reading of each answer (suggestions for Compliance, never a verdict shown to the NP),
@@ -9,6 +10,7 @@ import { today } from "@/lib/authority";
 export type Finding = { id: string; entity: string; number: string; source: string; authority: string | null; audit_ref: string | null; level: string; requirement: string | null; title: string; description: string | null;
   owner_role: string | null; owner_person: string | null; notified: string | null; due: string | null; status: string; current_round: number; plan_round: number; authority_file_id: string | null;
   finding_type?: string | null; finding_type_by?: string | null; imported_from?: string | null; audit_id?: string | null;
+  authority_ref?: string | null; authority_rca?: string | null; authority_pac?: string | null; authority_proof?: string | null; proof?: string | null; extension?: string | null; extension_reason?: string | null; finding_file?: string | null;
   draft_root_cause: string | null; draft_factors: string | null; draft_immediate: string | null; draft_comment: string | null; draft_step: number; rca_check: Assistant | null; plan_check: Assistant | null; effective_closed_on: string | null;
   closed_at: string | null; closed_by: string | null; closed_note: string | null; created_by: string | null; created_at: string; updated_at: string };
 export type Point = { code: string; label: string; detail: string; part?: "rca" | "plan" };
@@ -70,7 +72,7 @@ export function effectiveClosure(changes: Change[], actions: Action[]): string |
 
 /** FND-04 · One glance at how far the work has gone — on the list, without opening the finding. */
 export type Progress = { label: string; tone: "" | "amber" | "green" | "red"; detail: string[]; pct: number };
-export function progress(f: Pick<Finding, "status" | "draft_step" | "current_round" | "effective_closed_on"> & { draft_root_cause?: string | null; imported_from?: string | null }, changes: Change[], actions: Action[]): Progress {
+export function progress(f: Pick<Finding, "status" | "draft_step" | "current_round" | "effective_closed_on"> & { draft_root_cause?: string | null; imported_from?: string | null; source?: string; authority_rca?: string | null; authority_pac?: string | null; authority_proof?: string | null }, changes: Change[], actions: Action[]): Progress {
   const ch = changes.filter((c) => c.status !== "removed"), ac = actions.filter((a) => a.status !== "cancelled");
   const total = ch.length + ac.length;
   const n = (st: string[]) => ch.filter((c) => st.includes(c.status)).length;
@@ -84,6 +86,8 @@ export function progress(f: Pick<Finding, "status" | "draft_step" | "current_rou
   if (acOpen) detail.push(`${acOpen} action${acOpen > 1 ? "s" : ""} open`);
   if (acClosed) detail.push(`${acClosed} action${acClosed > 1 ? "s" : ""} done, to verify`);
   const pct = total ? Math.round((100 * done) / total) : 0;
+  // 10/11 · an authority finding whose answer went to the authority: what the authority still has to decide comes first
+  if (f.source === "authority" && !["closed", "cancelled"].includes(f.status) && (f.authority_rca || f.authority_pac)) { const st = authorityStep(f); return { label: st.label, tone: (st.tone as Progress["tone"]) || "", detail, pct }; }
   switch (f.status) {
     case "open": // 10/11 · nothing written yet is "not started", not "being written"
       if (f.draft_step >= 2) return { label: "Plan being written", tone: "amber", detail, pct };

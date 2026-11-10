@@ -120,3 +120,13 @@ export async function refreshHints(fd: FormData) {
   await hintsFor(db(), a.entity, c, text, h.previous, true);
   touch(a.id);
 }
+
+/** 10/11 · authority audit: the report received (date, links) and the closure by the authority. Compliance desk. */
+export async function saveAuthorityAudit(fd: FormData) {
+  const s = await me(); if (!desk(s)) throw new Error("Compliance desk only.");
+  const a = await audit(String(fd.get("id"))); if (a.kind !== "authority") throw new Error("Not an authority audit.");
+  const files = String(fd.get("report_files") ?? "").split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  const closed = str(fd, "closed_on");
+  await db().from("audits").update({ report_received_on: str(fd, "report_received_on"), report_files: files, closed_at: closed ? `${closed}T12:00:00Z` : null, status: closed ? "closed" : a.status === "closed" ? "in_progress" : a.status, done_on: a.done_on ?? a.planned_end ?? a.planned_on }).eq("id", a.id);
+  touch(a.id, a.programme_id);
+}
