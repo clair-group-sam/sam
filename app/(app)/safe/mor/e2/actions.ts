@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isSafetyDesk } from "@/lib/safety";
-import { eccairsConfig, loadLongLists, loadTaxonomy, taxonomyVersion } from "@/lib/eccairs";
+import { eccairsConfig, eccairsEnv, loadLongLists, loadTaxonomy, taxonomyVersion } from "@/lib/eccairs";
 import { autoMaps } from "@/lib/eccairs-map";
 
 /* ECC-01 · the link with E2 for the safety desk: test, taxonomy cache, correspondences between S.A.M. values and E2 value ids. */
@@ -24,7 +24,14 @@ export async function testLink(fd: FormData) {
 export async function loadTax(fd: FormData) {
   const entity = String(fd.get("entity")); const s = await me(entity);
   let note: string;
-  try { const r = await loadTaxonomy(db(), entity); note = `Taxonomy ${r.name} ${r.version}: ${r.attributes} attributes, ${r.values} values cached`; } catch (e) { note = (e as Error).message; }
+  try { const r = await loadTaxonomy(db(), entity); note = `Taxonomy ${r.name} ${r.version}: ${r.attributes} attributes, ${r.values} values cached`; }
+  catch (e) {
+    note = (e as Error).message;
+    // the proxy or E2 is down: the released taxonomy is the same for every entity on the same environment — reuse what another entity cached
+    const { data: other } = await db().from("eccairs_taxonomies").select("*").neq("entity", entity).order("loaded_at", { ascending: false }).limit(5);
+    const src = ((other ?? []) as { entity: string; env: string | null; taxonomy_id: number; name: string; version: string; loaded_at: string; attributes: number; values: number }[]).find((o) => o.env === eccairsEnv(entity));
+    if (src) { await db().from("eccairs_taxonomies").upsert({ entity, taxonomy_id: src.taxonomy_id, name: src.name, version: src.version, env: src.env, loaded_at: src.loaded_at, attributes: src.attributes, values: src.values }, { onConflict: "entity" }); note = `E2 not reachable (${note}) — taxonomy ${src.name} ${src.version} reused from ${src.entity}'s cache (same environment, loaded ${src.loaded_at.slice(0, 16).replace("T", " ")})`; }
+  }
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "eccairs", object_id: null, action: "eccairs_taxonomy_loaded", after: { note } });
   touch(); redirect(`/safe/mor/e2?ent=${entity}&msg=${encodeURIComponent(note)}`);
 }
