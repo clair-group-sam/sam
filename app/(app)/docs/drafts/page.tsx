@@ -22,7 +22,7 @@ export default async function Drafts() {
           <tbody>
             {rows.map(({ manual, working }) => (
               <tr key={working.id}><td className="entcol"><span className={"ent " + manual.entity}>{manual.entity}</span></td>
-                <td><Link href={working.step === "draft" || working.step === "approved_np" ? `/docs/editor/${working.id}` : `/docs/manual/${manual.id}?rev=${working.id}`}><b>{manual.code}, {manual.title}</b></Link></td>
+                <td><Link href={`/docs/editor/${working.id}`}><b>{manual.code}, {manual.title}</b></Link></td>
                 <td className="mono">Iss {working.issue} Rev {working.rev}</td><td><span className="pill amber">{STEP_LABEL[working.step]}</span></td><td className="mono">{working.created_at.slice(0, 10)}</td></tr>
             ))}
             {!rows.length && <tr><td colSpan={5} className="p-6 text-slate6">No draft in progress. The revision editor (Write / Publish) arrives with the first revision written in S.A.M.</td></tr>}

@@ -1,3 +1,5 @@
+import { AudienceCount } from "@/components/AudienceCount";
+import { basePost } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -20,7 +22,7 @@ export default async function NewCommunication({ searchParams }: { searchParams:
   const { data: p } = await db.from("app_params").select("value").eq("key", "comm_ack_days").maybeSingle();
   const days = Number((p as { value: string } | null)?.value ?? 14) || 14;
   const due = draft?.due ?? new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
-  const aud = new Set(draft?.audience ?? ["ALL"]);
+  const aud = new Set(draft?.audience ?? []); // FB-106 · nothing pre-ticked: the sender chooses who receives it
   return (
     <>
       <PageHeader eyebrow="Communication, New" title={draft ? "Edit the draft" : "New communication"} sub="Each recipient gets an Inbox item and a personal Teams card, plus an e-mail if you keep it ticked. Acknowledgements are tracked person by person." />
@@ -43,9 +45,10 @@ export default async function NewCommunication({ searchParams }: { searchParams:
           <div className="flex flex-wrap gap-6 items-end">
             <label className="flex gap-2 items-center"><input type="checkbox" name="require_ack" defaultChecked={draft?.require_ack ?? true} /> Ask each person to acknowledge</label>
             <label className="block"><span className="eyebrow">Acknowledge by</span><input type="date" name="due" className="inp" defaultValue={due} /></label>
-            <label className="flex gap-2 items-center"><input type="checkbox" name="email" defaultChecked={draft?.email ?? true} /> Also send by e-mail</label>
+            <label className="flex gap-2 items-center"><input type="checkbox" name="email" defaultChecked={draft?.email ?? false} /> Also send by e-mail</label>
           </div>
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end items-center flex-wrap">
+            <AudienceCount people={people.map((x) => ({ id: x.id, staff: x.home_entity === entity || (x.entities ?? []).includes(entity), group: !!x.is_group_function, posts: (x.roles ?? []).map(basePost) }))} />
             <button className="btn" type="submit" name="send" value="0">Save as draft</button>
             <button className="btn primary" type="submit" name="send" value="1">Send now</button>
           </div>

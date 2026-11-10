@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { closeActivation, logEvent, mayActivate, startActivation, tickAction } from "../actions";
 import { INFO, SCENARIOS, after, appliesTo } from "@/lib/erp";
+import { ErpStartBar } from "@/components/ErpStartBar";
 
 type Act = { id: string; entity: string; plan_id: string | null; exercise: boolean; level: string; scenario: string; info: Record<string, string> | null; is_incident: string | null; teams_chat_url: string | null; title: string; started_at: string; started_by: string | null; status: string; closed_at: string | null; summary: string | null };
 type Ev = { id: number; at: string; person_id: string | null; kind: string; text: string; ref: string | null };
@@ -110,10 +111,7 @@ export default async function Activation() {
               <datalist id="erp-regs">{regs.map((r) => <option key={r} value={r} />)}</datalist>
               <div className="grid grid-cols-3 gap-3 mt-3">{INFO.map(([k, l, ph]) => <label key={k} className="block"><span className="eyebrow">{l}</span><input name={`i_${k}`} className="inp" placeholder={ph} list={k === "reg" ? "erp-regs" : undefined} /></label>)}</div>
             </details>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <label className="flex gap-2 items-center"><input type="checkbox" name="exercise" /> This is an exercise</label>
-              <button className="btn erp" type="submit">Start</button>
-            </div>
+            <ErpStartBar defaultExercise={process.env.VERCEL_ENV !== "production"} unit={contacts.filter((c) => /unit/i.test(c.kind)).length} />
           </form></div></section>
       ) : <section className="card"><div className="cb">Only the AM, SM, CMM and nominated persons can raise an alert. In an emergency, call the crisis director: <Link className="underline" href="/erp/contacts">Crisis directory</Link>.</div></section>}
       {acts.filter((a) => a.status === "closed").length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Past activations and exercises</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>

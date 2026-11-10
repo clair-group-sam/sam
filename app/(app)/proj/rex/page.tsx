@@ -33,10 +33,10 @@ export default async function Rex({ searchParams }: { searchParams: Promise<{ en
     <>
       <PageHeader eyebrow="Projects, Closed & lessons learned" title="Closed projects and files" sub="Durations, rounds and lessons, the numbers that tell whether the one-round workflow holds." />
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Closed files" value={closed.length} />
-        <Metric label="Approved in one round" value={`${oneRound} %`} tone={closed.length && oneRound < 80 ? "amber" : undefined} hint="target 100 %" />
-        <Metric label="Days trigger → submission" value={toSubmit} hint="average" />
-        <Metric label="Days at the authority" value={atAuth} hint={`average, fees ${fees ? `${fees.toLocaleString("fr-FR")} €` : "—"}`} />
+        <Metric label="Files decided by the authority" value={closed.length} hint={files.length - closed.length ? `${files.length - closed.length} more closed without a submission (standby, cancelled)` : "closed after a submission"} />
+        <Metric label="Approved in one round" value={closed.length ? `${oneRound} %` : "—"} tone={closed.length && oneRound < 80 ? "amber" : undefined} hint="target 100 %" />
+        <Metric label="Days trigger → submission" value={closed.length ? toSubmit : "—"} hint="average" />
+        <Metric label="Days at the authority" value={closed.length ? atAuth : "—"} hint={`average, fees ${fees ? `${fees.toLocaleString("fr-FR")} €` : "—"}`} />
       </div>
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">Closed projects</span><span className="mini">{projects.length}</span></div>

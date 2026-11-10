@@ -18,7 +18,8 @@ export default async function AuditLog({ searchParams }: { searchParams: Promise
   const rows = (data ?? []) as L[];
   const P = new Map(((ppl ?? []) as { id: string; display_name: string }[]).map((p) => [p.id, p.display_name]));
   // chain check on the page shown: each entry carries the hash of the one before it
-  let broken = 0; for (let i = 0; i < rows.length - 1; i++) if (rows[i].prev_hash && rows[i + 1].hash && rows[i].prev_hash !== rows[i + 1].hash) broken++;
+  // FB-085 · only two entries that follow each other in the journal (consecutive ids) can be compared: a filtered page skips entries
+  let broken = 0, links = 0; for (let i = 0; i < rows.length - 1; i++) if (rows[i].id === rows[i + 1].id + 1 && rows[i].prev_hash && rows[i + 1].hash) { links++; if (rows[i].prev_hash !== rows[i + 1].hash) broken++; }
   const types = [...new Set(rows.map((r) => r.object_type))].sort();
   const qs = (x: Record<string, string | number | undefined>) => "?" + Object.entries({ o: sp.o, a: sp.a, ...x }).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
   return (
@@ -26,7 +27,7 @@ export default async function AuditLog({ searchParams }: { searchParams: Promise
       <PageHeader eyebrow="Registers, Audit log" title="Audit log" sub="Every change S.A.M. records, newest first. Entries cannot be edited; each one carries the hash of the previous one, so a gap or an edit shows." />
       <div className="flex flex-wrap gap-3 items-center mb-3">
         <form className="findbar" action="/admin/log" style={{ flex: "1 1 280px" }}>{sp.o && <input type="hidden" name="o" value={sp.o} />}<input name="a" defaultValue={sp.a ?? ""} placeholder="Filter by action (published, created, step_…)" aria-label="Filter by action" /></form>
-        <span className={"pill " + (broken ? "red" : "green")}>{broken ? `${broken} break(s) in the chain on this page` : "Chain intact on this page"}</span>
+        <span className={"pill " + (broken ? "red" : links ? "green" : "")} title="Each entry carries the hash of the one written just before it. Entries of other entities or objects are not on a filtered page, so only consecutive entries are compared.">{broken ? `${broken} break(s) in the chain on this page` : links ? `Chain intact, ${links} link${links === 1 ? "" : "s"} checked on this page` : "No consecutive entries on this page to check"}</span>
       </div>
       <div className="flex flex-wrap gap-2 mb-3"><Link className={"pill" + (!sp.o ? " green" : "")} href={`/admin/log${qs({ o: undefined, p: undefined })}`}>All objects</Link>{types.map((t) => <Link key={t} className={"pill" + (sp.o === t ? " green" : "")} href={`/admin/log${qs({ o: t, p: undefined })}`}>{t.replace(/_/g, " ")}</Link>)}</div>
       <section className="card"><div className="cb" style={{ padding: 0 }}>{!rows.length ? <p className="p-4 mini">No entry.</p> : (

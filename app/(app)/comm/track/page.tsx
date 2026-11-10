@@ -31,7 +31,7 @@ export default async function ReadTracking({ searchParams }: { searchParams: Pro
   const total = recs.length, ack = recs.filter((r) => r.acknowledged_at).length;
   return (
     <>
-      <PageHeader eyebrow="Communication, Read tracking" title="Read tracking" sub="Who acknowledged each communication. Late acknowledgements follow the relance and escalation ladder of the Inbox." />
+      <PageHeader eyebrow="Communication, Read tracking" title="Read tracking" sub="Who acknowledged each communication. Late acknowledgements follow the reminder and escalation ladder of the Inbox." />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Acknowledged" value={total ? `${Math.round((ack / total) * 100)} %` : "0"} hint={`${ack} of ${total} deliveries`} tone={total && ack === total ? "green" : undefined} />
         <Metric label="Late" value={late} tone={late ? "red" : "green"} hint={late ? "past the acknowledgement date" : "nobody late"} />

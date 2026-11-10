@@ -2,6 +2,7 @@ import { cache } from "react";
 import { normEntity } from "@/lib/entity-codes";
 import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/supabase-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENTS4, entMode, homeFor, singleEntity, type RoleKey } from "@/lib/nav";
 
 export type Person = {
@@ -49,8 +50,11 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const sb = await supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-  const { data: p } = await sb.from("people").select("id,email,display_name,home_entity,entities,roles,is_group_function,job_title").eq("auth_uid", user.id).maybeSingle();
+  const { data: p } = await sb.from("people").select("id,email,display_name,home_entity,entities,roles,is_group_function,job_title,last_seen_at").eq("auth_uid", user.id).maybeSingle();
   const person = (p as Person | null) ?? null;
+  // FB-094 · "last seen" followed the sign-in only; a session lasts for days. One write a day at most.
+  const seen = (p as { last_seen_at?: string | null } | null)?.last_seen_at ?? null;
+  if (person && (!seen || seen.slice(0, 10) < new Date().toISOString().slice(0, 10))) { try { await supabaseAdmin().from("people").update({ last_seen_at: new Date().toISOString() }).eq("id", person.id); } catch { /* never blocks a page */ } }
   const roles = person?.roles ?? [];
   const role = roleKeyFrom(roles);
   const group = !!person?.is_group_function;

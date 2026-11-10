@@ -37,7 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
         <Metric label="Plans past their review" value={late.length} tone={late.length ? "amber" : undefined} hint={late.map((p) => p.entity).join(", ") || "all within date"} />
         <Metric label="No exercise in 12 months" value={noEx.length} tone={noEx.length ? "red" : undefined} hint={noEx.join(", ") || "exercises up to date"} />
         <Metric label="Numbers to enter" value={noPhone.length} tone={noPhone.length ? "amber" : undefined} hint="unit members and investigation bureau without a phone" />
-        <Metric label="Checklists, response times" value={`${(cl ?? []).length}, ${(ms ?? []).length}`} hint="run as clocks and ticks in Activation mode" />
+        <Metric label="Activation checklists" value={(cl ?? []).length} hint={`${(ms ?? []).length} response times, run as clocks in Activation mode`} />
       </div>
       <Register reg="erp_plans" s={s} open={sp.open} adding={sp.new === "1"} empty="No emergency plan recorded yet." />
     </>

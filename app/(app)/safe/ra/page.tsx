@@ -1,3 +1,4 @@
+import { BulkConfirm } from "@/components/BulkConfirm";
 import Link from "next/link";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
@@ -95,7 +96,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
               const ch = msmChecks(a, (byRa.get(a.id) ?? []) as Hz[]); const okN = ch.filter((c) => c.ok).length;
               return (
                 <tr key={a.id}>
-                  {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" defaultChecked={!!a.conducted_on && a.conducted_on < old && a.status !== "validated"} title="Close, case over" /></td>}
+                  {edit && sp.st !== "archived" && <td><input type="checkbox" name="ids" value={a.id} form="bulk-ra" data-suggest={!!a.conducted_on && a.conducted_on < old && a.status !== "validated" ? "1" : "0"} aria-label={`Select ${a.number}`} title="Tick to close, case over" /></td>}
                   <td className="mono"><Link className="underline" href={`/safe/risk/a/${a.id}`}>{a.number}</Link><SourceMark source={a.source} /></td>
                   <td className="entcol"><span className={"ent " + a.entity}>{a.entity}</span></td>
                   <td><Link href={`/safe/risk/a/${a.id}`}><b>{a.name}</b></Link><div className="mini">{KINDS[a.kind]}{a.domain ? `, ${a.domain}` : ""}{a.top_risk ? ", top risk" : ""}{hs.some((h) => h.needs_review) ? ", to reassess" : ""}</div></td>
@@ -110,7 +111,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
           </tbody>
         </table>
       </section>
-      {edit && sp.st !== "archived" && rows.length > 0 && <form id="bulk-ra" action={bulkAssessments} className="flex gap-2 items-center mb-3"><input type="hidden" name="op" value="close" /><button className="btn">Close the ticked assessments, case over</button><span className="mini">pre-ticked: conducted more than 2 weeks ago (not the ones waiting for the AM). They stay readable under “Closed”.</span></form>}
+      {edit && sp.st !== "archived" && rows.length > 0 && <form id="bulk-ra" action={bulkAssessments} className="flex gap-2 items-center mb-3"><input type="hidden" name="op" value="close" /><BulkConfirm formId="bulk-ra" label="Close the ticked assessments, case over" verb="Close" suggestLabel="tick the ones conducted more than 2 weeks ago" /><span className="mini">Nothing is ticked by default. Closed assessments stay readable under “Closed”.</span></form>}
       <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: sp.st === "archived" ? undefined : "archived" })}>{sp.st === "archived" ? "Back to current assessments" : "Closed and cancelled assessments"}</Link></p>
 
       {edit && (

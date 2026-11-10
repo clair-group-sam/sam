@@ -32,7 +32,8 @@ type Meta = { id: string; ord: number; ref: string; title: string | null; change
 
 export default async function Editor({ params, searchParams }: { params: Promise<{ rev: string }>; searchParams: Promise<{ tab?: string; sec?: string; ai?: string }> }) {
   const { rev: revId } = await params;
-  const { tab = "write", sec, ai: aiReq } = await searchParams;
+  const { tab: tabRaw, sec, ai: aiReq } = await searchParams;
+  const tab = tabRaw === "publish" ? "publish" : "write"; // FB-098 · any other value falls back on Write instead of an empty page
   const s = await getSession();
   if (!s) redirect("/login");
   const sb = await supabaseServer();

@@ -32,7 +32,7 @@ export default async function Core() {
         </div>
         <table className="tbl"><thead><tr><th>Version</th><th>Name</th><th>Status</th><th /></tr></thead>
           <tbody>
-            {local.map((m) => <tr key={m.version}><td className="mono">{m.version}</td><td>{m.name}</td><td>{applied.has(m.version) ? <span className="pill green">applied</span> : done.ok ? <span className="pill amber">pending</span> : <span className="mini">unknown</span>}</td>
+            {local.map((m) => <tr key={m.version}><td className="mono">{m.version}</td><td>{m.name}</td><td>{applied.has(m.version) ? <span className="pill green">applied</span> : done.ok ? <span className="pill amber">pending</span> : <span className="mini" title="The status needs SUPABASE_ACCESS_TOKEN, which is not set on this deployment">not readable here</span>}</td>
               <td className="text-right">{admin && done.ok && !applied.has(m.version) && <form action={applyPending}><input type="hidden" name="up_to" value={m.version} /><button className="btn" type="submit">Apply up to here</button></form>}</td></tr>)}
             {unknown.map((v) => <tr key={v}><td className="mono">{v}</td><td className="mini">applied on the project, not in this build</td><td><span className="pill">project only</span></td><td /></tr>)}
           </tbody></table>

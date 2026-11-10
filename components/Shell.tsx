@@ -190,11 +190,11 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
     { label: "Project", href: canCreateFile ? "/proj/boards/new" : undefined, hint: "aircraft addition, NP change, new approval… blank or from a template" },
     { label: "CAA application", href: canCreateFile ? "/proj/auth/new" : undefined, hint: "application, notification, report to the authority" },
     { label: "Manual or internal document", href: "/docs/new", hint: "a new manual in the library" },
-    { label: "To-do", href: "/home/todo", hint: "personal reminder" },
     { label: "Finding", href: session.role === "cmm" ? "/comp/find/new" : undefined, hint: session.role === "cmm" ? "authority or internal audit finding, answered by a nominated person" : "raised by the Compliance department" },
-    { label: "Action", hint: "Compliance, step 6" },
-    { label: "Safety report", hint: "Safety, step 5" },
-    { label: "Communication", hint: "Communication module" },
+    { label: "Safety report", href: "/safe/new", hint: "occurrence, hazard, anything that could affect safety" },
+    { label: "Safety action", href: canCreateFile ? "/safe/actions/new" : undefined, hint: "corrective or preventive action, with an owner and a due date" },
+    { label: "Management of change", href: canCreateFile ? "/safe/moc/new" : undefined, hint: "a change with its risk assessment" },
+    { label: "Communication", href: canCreateFile ? "/comm/new" : undefined, hint: "message to the staff, acknowledged one by one" },
   ];
   // the working entity: one at a time, always shown in full at the top-left; group view only for group functions
   const [entOpen, setEntOpen] = useState(false);
@@ -299,7 +299,7 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
             <div className="mi" style={{ cursor: "default" }}><b>{session.name}</b><small style={{ display: "block", color: "var(--slate6)" }}>{session.person?.job_title ?? roleTitle(session)}</small></div>
             <div className="mi muted">{session.email}</div>
             <div className="mi muted">Scope: {session.group ? "Group function" : session.entities.join(", ") || "none"}. Roles: {session.roles.join(", ") || "none"}</div>
-            <Link href="/api/me" className="mi" target="_blank">My access (JSON)</Link>
+            <Link href="/api/me" className="mi" target="_blank">My access rights</Link>
             <form action="/auth/signout" method="post"><button type="submit" className="mi">Sign out</button></form>
           </div>
         )}

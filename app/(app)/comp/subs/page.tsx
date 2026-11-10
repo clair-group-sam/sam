@@ -39,8 +39,8 @@ export default async function Subcontractors({ searchParams }: { searchParams: P
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Subcontractors" value={subs.length} hint={`${subs.filter((x) => x.access_clause).length} with access clause`} />
         <Metric label="Under control" value={rows.filter((r) => r.c.status === "under_control").length} tone="green" />
-        <Metric label="Control due / overdue" value={`${rows.filter((r) => r.c.status === "control_due").length}, ${rows.filter((r) => r.c.status === "control_overdue").length}`} tone={rows.some((r) => r.c.status === "control_overdue") ? "red" : rows.some((r) => r.c.status === "control_due") ? "amber" : undefined} />
-        <Metric label="Never controlled, contract expired" value={`${rows.filter((r) => r.c.status === "not_controlled").length}, ${rows.filter((r) => r.c.status === "contract_expired").length}`} tone={rows.some((r) => r.c.status === "contract_expired") ? "red" : undefined} />
+        <Metric label="Control due" value={rows.filter((r) => r.c.status === "control_due" || r.c.status === "control_overdue").length} hint={`${rows.filter((r) => r.c.status === "control_overdue").length} overdue`} tone={rows.some((r) => r.c.status === "control_overdue") ? "red" : rows.some((r) => r.c.status === "control_due") ? "amber" : undefined} />
+        <Metric label="Never controlled" value={rows.filter((r) => r.c.status === "not_controlled").length} hint={`${rows.filter((r) => r.c.status === "contract_expired").length} contract(s) expired`} tone={rows.some((r) => r.c.status === "contract_expired") ? "red" : undefined} />
       </div>
       <section className="card mb-4"><div className="cb" style={{ padding: 0 }}>{!rows.length ? <p className="p-4 mini">No subcontractor in your scope.</p> : (
         <table className="tbl"><thead><tr><th>Subcontractor</th><th>Service</th><th>Contract</th><th>Clauses</th><th>Last control</th><th>Next</th><th>Status</th></tr></thead><tbody>{rows.map(({ x, c }) => (
