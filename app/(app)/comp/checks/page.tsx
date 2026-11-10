@@ -4,7 +4,7 @@ import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
-import { CHECK_RESULT_LABEL, CHECK_RESULT_TONE, daysTo, nextDueOf, type CCheck, type CRun } from "@/lib/compliance-registers";
+import { CHECK_RESULT_LABEL, CHECK_RESULT_TONE, daysTo, nextDueOf, type CCheck, type CRun, withProgrammeHistory } from "@/lib/compliance-registers";
 import { LEVEL_LABEL } from "@/lib/findings";
 import { today } from "@/lib/authority";
 import { archiveCheck, recordRun, saveCheck } from "./actions";
@@ -19,7 +19,7 @@ export default async function ComplianceChecks({ searchParams }: { searchParams:
   let q = db.from("compliance_checks").select("*").eq("active", true).order("entity").order("code");
   if (scope) q = q.in("entity", scope);
   const { data } = await q;
-  const checks = ((data ?? []) as CCheck[]).map((c) => ({ ...c, due: nextDueOf(c), days: daysTo(nextDueOf(c), t0) }));
+  const checks = (await withProgrammeHistory(db, (data ?? []) as CCheck[])).map((c) => ({ ...c, due: nextDueOf(c), days: daysTo(nextDueOf(c), t0) }));
   const open = checks.find((c) => c.id === sp.c) ?? null;
   const [{ data: ppl }, { data: runs }, { data: cls }] = await Promise.all([
     db.from("people").select("id,display_name").limit(500),
@@ -52,7 +52,7 @@ export default async function ComplianceChecks({ searchParams }: { searchParams:
       <section className="card mb-4"><div className="cb" style={{ padding: 0 }}>{!checks.length ? <p className="p-4 mini">No check in your scope.</p> : (
         <table className="tbl"><thead><tr><th>Check</th><th>Reference</th><th>Every</th><th>Owner</th><th>Last</th><th>Next due</th><th></th></tr></thead><tbody>{checks.map((c) => (
           <tr key={c.id} className={open?.id === c.id ? "on" : ""}><td><Link href={`/comp/checks?c=${c.id}#check`}><b className="mono">{c.code}</b> {c.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[c.entity] ?? "var(--field)" }} />{c.entity}{c.domain ? `, ${c.domain}` : ""}</div></td>
-            <td className="mono mini">{c.reference ?? "—"}</td><td>{c.every_months} mo</td><td>{c.owner_person ? name(c.owner_person) : c.owner_role ?? "—"}</td><td className="mono mini">{c.last_done_on ?? "never"}</td>
+            <td className="mono mini">{c.reference ?? "—"}</td><td>{c.every_months} mo</td><td>{c.owner_person ? name(c.owner_person) : c.owner_role ?? "—"}</td><td className="mono mini">{c.last_done_on ?? "never"}{c.history_from && <div title="No passage recorded in S.A.M. yet: date of the last audit done under the linked programme module">from audit {c.history_from}</div>}</td>
             <td className={c.days !== null && c.days < 0 ? "late" : ""}>{c.due ?? "—"}{c.days !== null && <div className="mini">{c.days < 0 ? `${-c.days} d late` : c.days === 0 ? "today" : `in ${c.days} d`}</div>}</td>
             <td>{owns(c) && <Link className="btn sm" href={`/comp/checks?c=${c.id}#check`}>Record</Link>}</td></tr>))}</tbody></table>)}</div></section>
 

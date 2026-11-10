@@ -1,3 +1,4 @@
+import { lastErpExercises } from "@/lib/erp-exercises";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -25,8 +26,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
   const limit = new Date(Date.now() - months * 30.44 * 86_400_000).toISOString().slice(0, 10);
   const plans = (pl ?? []) as { entity: string; next_review: string | null }[];
   const late = plans.filter((p) => p.next_review && p.next_review < t0);
-  const lastEx = new Map<string, string>(); for (const e of (ex ?? []) as { entity: string; held_on: string | null }[]) if (e.held_on && (lastEx.get(e.entity) ?? "") < e.held_on) lastEx.set(e.entity, e.held_on);
-  const noEx = [...new Set(plans.map((p) => p.entity))].filter((e) => (lastEx.get(e) ?? "") < limit);
+  void ex; const lastEx = await lastErpExercises(db, scope);
+  const noEx = [...new Set(plans.map((p) => p.entity))].filter((e) => (lastEx.get(e)?.on ?? "") < limit);
   const noPhone = ((ct ?? []) as { kind: string; phone: string | null }[]).filter((c) => (c.kind === "internal" || c.kind === "investigation") && !c.phone);
   const single = scope.length === 1 ? scope[0] : null;
   return (
@@ -35,7 +36,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
         right={<div className="flex gap-2">{single && <Link className="btn" href={`/print/erp/${single}`} target="_blank">Print the ERP binder</Link>}{await RegisterAdd({ reg: "erp_plans", s })}</div>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Plans past their review" value={late.length} tone={late.length ? "amber" : undefined} hint={late.map((p) => p.entity).join(", ") || "all within date"} />
-        <Metric label="No exercise in 12 months" value={noEx.length} tone={noEx.length ? "red" : undefined} hint={noEx.join(", ") || "exercises up to date"} />
+        <Metric label="No exercise in 12 months" value={noEx.length} tone={noEx.length ? "red" : undefined} hint={noEx.join(", ") || `exercises up to date${[...lastEx.values()].some((x) => x.from === "committee") ? ", last one read from Safety › Committees" : ""}`} />
         <Metric label="Numbers to enter" value={noPhone.length} tone={noPhone.length ? "amber" : undefined} hint="unit members and investigation bureau without a phone" />
         <Metric label="Activation checklists" value={(cl ?? []).length} hint={`${(ms ?? []).length} response times, run as clocks in Activation mode`} />
       </div>

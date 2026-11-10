@@ -855,3 +855,9 @@ td.due{font-variant-numeric:tabular-nums;white-space:nowrap}td.due.red{color:var
 
 /* KPI-01 · snapshot cells */
 .matrix td.k-on_target{background:var(--green-s);color:#0b6b32}.matrix td.k-alert{background:var(--amber-s);color:#8a5a00}.matrix td.k-off_target{background:var(--terra-s);color:#9a1a1a}
+
+/* FB-100 · the heat map stays beside the list instead of leaving an empty band above it */
+.heatside{position:sticky;top:76px}
+@media (max-width:1200px){.heatside{position:static}}
+.withside{grid-template-columns:minmax(0,1fr) 360px}
+@media (max-width:1200px){.withside{grid-template-columns:minmax(0,1fr)}.withside>.heatside{order:-1;max-width:420px}}

@@ -19,6 +19,7 @@ export default async function Mocs({ searchParams }: { searchParams: Promise<{ s
   const all = (data ?? []) as unknown as (Ra & { hazards: (Hz & { log_hazard_id: string | null })[] })[];
   const toMatch = await toMatchCount(scope);
   const live = (r: Ra) => !["closed", "cancelled"].includes(r.moc_status ?? "") && r.status !== "cancelled";
+  all.sort((x, y) => y.number.localeCompare(x.number, undefined, { numeric: true })); // FB-100 · numbers in natural order, latest first
   const rows = st === "closed" ? all.filter((r) => !live(r)) : st === "all" ? all : all.filter(live);
   return (
     <>

@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { addMonths, coverage, current, type Audit, type AuditModule, type Programme } from "@/lib/audit-programme";
-import { controlOf, daysTo, nextDueOf, type Auditor, type CCheck, type Subcontractor } from "@/lib/compliance-registers";
+import { controlOf, daysTo, nextDueOf, type Auditor, type CCheck, type Subcontractor, withProgrammeHistory } from "@/lib/compliance-registers";
 import { OPEN_STATUSES as FND_OPEN } from "@/lib/findings";
 import { OPEN_STATUSES as WATCH_OPEN } from "@/lib/watch";
 import { today } from "@/lib/authority";
@@ -28,7 +28,7 @@ export default async function ComplianceOverview() {
     db.from("subcontractors").select("*").in("entity", scope).eq("active", true),
     db.from("audit_modules").select("*"),
   ]);
-  const progs = (pd ?? []) as Programme[], audits = (ad ?? []) as (Audit & { subcontractor_id: string | null })[], checks = (cd ?? []) as CCheck[];
+  const progs = (pd ?? []) as Programme[], audits = (ad ?? []) as (Audit & { subcontractor_id: string | null })[], checks = await withProgrammeHistory(db, (cd ?? []) as CCheck[]);
   const findings = (fd ?? []) as { id: string; entity: string; status: string; due: string | null; level: string; source: string }[];
   const watch = (wd ?? []) as { id: string; entity: string; status: string; applicability: string; due: string | null }[];
   const regs = (rd ?? []) as { id: string; entities: string[]; check_result: string | null; items_count: number | null }[];

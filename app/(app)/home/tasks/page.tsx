@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { getSession, basePost } from "@/lib/session";
 import { PageHeader, Metric } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { KIND, myInbox, groupProjects } from "@/lib/inbox";
@@ -15,6 +15,11 @@ export default async function Inbox() {
   const s = await getSession();
   if (!s) redirect("/login");
   const all = await myInbox(s);
+  // FB-071 · working in one entity: say what waits in the others of the scope, instead of "Nothing to do"
+  const elsewhere = new Map<string, number>();
+  if (s.entity !== "ALL" && (s.group || s.entities.length > 1)) for (const t of groupProjects(await myInbox({ ...s, entity: "ALL" }), parisParts().day)) if (t.entity && t.entity !== s.entity && !isTestData(t.title, (t as { ctx?: string }).ctx)) elsewhere.set(t.entity, (elsewhere.get(t.entity) ?? 0) + 1);
+  const elseTotal = [...elsewhere.values()].reduce((a, b) => a + b, 0);
+  const elseText = [...elsewhere.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${ENT[e]?.name ?? e} ${n}`).join(", ");
   const [recap, connected] = s.person ? await Promise.all([todaysRecap(s.person.id), hasGraph(s.person.id)]) : [null, false];
   const { day: today, hour } = parisParts();
   // FB-024 · test objects are labelled and left out of the counters
@@ -33,7 +38,7 @@ export default async function Inbox() {
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? `, + ${testCount} test` : "") + (tasks.length !== all.length ? `, ${tasks.length} lines (a project = one line)` : "")} />
         <Metric label="Overdue tasks" value={late} tone={late ? "red" : "green"} hint={late ? "past due date" : "nothing late"} />
-        <Metric label="Scope" value={s.group ? "Group" : s.entities.join(", ") || "—"} hint={s.roles.join(", ") || "no role yet"} />
+        {s.entity !== "ALL" && (s.group || s.entities.length > 1) ? <Metric label="In your other entities" value={elseTotal} tone={elseTotal ? "amber" : "green"} hint={elseTotal ? `${elseText}; switch entity at the top, or Group to see all` : "nothing waiting elsewhere"} /> : <Metric label="Your posts" value={s.roles.map(basePost).filter((r, i, a) => a.indexOf(r) === i).slice(0, 3).join(", ") || "—"} hint={s.group ? "group function, every entity" : s.entities.join(", ") || "no entity yet"} />}
       </div>
       <section className="card">
         <table className="tbl">
@@ -52,7 +57,7 @@ export default async function Inbox() {
             ))}
             {!tasks.length && (
               <tr><td colSpan={4} className="p-6 text-slate6">
-                {s.person ? "Nothing to do." : "Your account is not yet attached to a person in S.A.M. Ask the CMM to add you."}
+                {s.person ? (elseTotal ? `Nothing to do in ${ENT[s.entity]?.name ?? s.entity}. ${elseTotal} line${elseTotal === 1 ? "" : "s"} wait${elseTotal === 1 ? "s" : ""} in ${elseText}.` : "Nothing to do.") : "Your account is not yet attached to a person in S.A.M. Ask the CMM to add you."}
               </td></tr>
             )}
           </tbody>

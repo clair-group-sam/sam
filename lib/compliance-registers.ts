@@ -25,11 +25,29 @@ export function nextDueOf(c: Pick<CCheck, "last_done_on" | "every_months" | "nex
   return c.last_done_on ? addMonthsD(c.last_done_on, c.every_months) : c.next_due;
 }
 
+/** FB-073 · a recurring check with no passage recorded in S.A.M. yet takes its last date from the last audit done under the
+ *  programme module it is linked to (history imported from the previous tool): same rule as the programme grid, used everywhere. */
+export async function withProgrammeHistory<T extends Pick<CCheck, "id" | "last_done_on">>(db: SupabaseClient, checks: T[]): Promise<(T & { history_from?: string })[]> {
+  const missing = checks.filter((c) => !c.last_done_on).map((c) => c.id);
+  if (!missing.length) return checks;
+  const { data: mods } = await db.from("audit_modules").select("id,check_ids").overlaps("check_ids", missing);
+  const M = (mods ?? []) as { id: string; check_ids: string[] | null }[];
+  if (!M.length) return checks;
+  const { data: au } = await db.from("audits").select("number,module_id,done_on").in("module_id", M.map((m) => m.id)).eq("status", "closed").not("done_on", "is", null).order("done_on", { ascending: false }).limit(2000);
+  const A = (au ?? []) as { number: string; module_id: string; done_on: string }[];
+  return checks.map((c) => {
+    if (c.last_done_on) return c;
+    const ids = M.filter((m) => m.check_ids?.includes(c.id)).map((m) => m.id);
+    const last = A.find((a) => ids.includes(a.module_id));
+    return last ? { ...c, last_done_on: last.done_on.slice(0, 10), history_from: last.number } : c;
+  });
+}
+
 /** Open Inbox tasks for checks due within 30 days (kind 'check'); closed when the check is run. Daily job. */
 export async function sweepChecks(db: SupabaseClient): Promise<number> {
   const { data } = await db.from("compliance_checks").select("*").eq("active", true);
   const t0 = today(); let n = 0;
-  for (const c of (data ?? []) as CCheck[]) {
+  for (const c of await withProgrammeHistory(db, (data ?? []) as CCheck[])) {
     const due = nextDueOf(c); const d = daysTo(due, t0);
     if (d === null || d > 30) { await db.from("tasks").update({ status: "done" }).eq("ref_id", c.id).eq("kind", "check").eq("status", "open"); continue; }
     const { data: ex } = await db.from("tasks").select("id").eq("ref_id", c.id).eq("kind", "check").eq("status", "open").limit(1);

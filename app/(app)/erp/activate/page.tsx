@@ -111,7 +111,7 @@ export default async function Activation() {
               <datalist id="erp-regs">{regs.map((r) => <option key={r} value={r} />)}</datalist>
               <div className="grid grid-cols-3 gap-3 mt-3">{INFO.map(([k, l, ph]) => <label key={k} className="block"><span className="eyebrow">{l}</span><input name={`i_${k}`} className="inp" placeholder={ph} list={k === "reg" ? "erp-regs" : undefined} /></label>)}</div>
             </details>
-            <ErpStartBar defaultExercise={process.env.VERCEL_ENV !== "production"} unit={contacts.filter((c) => /unit/i.test(c.kind)).length} />
+            <ErpStartBar defaultExercise={process.env.VERCEL_ENV !== "production"} unit={contacts.filter((c) => c.kind === "internal").length} />
           </form></div></section>
       ) : <section className="card"><div className="cb">Only the AM, SM, CMM and nominated persons can raise an alert. In an emergency, call the crisis director: <Link className="underline" href="/erp/contacts">Crisis directory</Link>.</div></section>}
       {acts.filter((a) => a.status === "closed").length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Past activations and exercises</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>

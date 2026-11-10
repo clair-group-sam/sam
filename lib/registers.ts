@@ -96,7 +96,7 @@ export const REGS: Record<string, Reg> = {
     table: "erp_milestones", path: "/erp/times", noun: "milestone", posts: ["SM", "AM"],
     fields: [
       { k: "label", label: "What must be done", required: true, span: 3, placeholder: "Passengers and crew on board sent to the authority" },
-      { k: "minutes", label: "Minutes after the start (0 = at once)", type: "number" },
+      { k: "minutes", label: "After the start (entered in minutes, 0 = at once)", type: "number" },
       { k: "owner_role", label: "Who", mono: true, placeholder: ROLE_PH },
       { k: "applies", label: "Scenario", type: "select", options: APPLIES },
       { k: "ord", label: "Order", type: "number" },
@@ -199,6 +199,7 @@ export const REGS: Record<string, Reg> = {
 
 /** Text shown in a list cell. */
 export function cell(f: Field | undefined, v: unknown): string {
+  if (f?.k === "minutes" && typeof v === "number") return !v ? "at once" : v < 60 ? `${v} min` : v % 60 ? `${Math.floor(v / 60)} h ${v % 60}` : `${v / 60} h`; // FB-103 · 4320 → 72 h
   if (v === null || v === undefined || v === "") return "";
   if (f?.type === "bool") return v ? "Yes" : "No";
   if (f?.type === "select") return f.options?.find(([k]) => k === v)?.[1] ?? String(v);

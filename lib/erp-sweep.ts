@@ -1,3 +1,4 @@
+import { lastErpExercises } from "@/lib/erp-exercises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { risksOf, type IsRiskLite } from "@/lib/is-shared";
 
@@ -14,8 +15,8 @@ export async function sweepErpIs(db: SupabaseClient): Promise<number> {
   const limit = new Date(Date.now() - months * 30.44 * 86_400_000).toISOString().slice(0, 10);
 
   const { data: plans } = await db.from("erp_plans").select("id,entity,title,next_review,owner_role").eq("active", true);
-  const { data: exs } = await db.from("erp_exercises").select("entity,held_on").eq("status", "done");
-  const last = new Map<string, string>(); for (const e of (exs ?? []) as { entity: string; held_on: string | null }[]) if (e.held_on && (last.get(e.entity) ?? "") < e.held_on) last.set(e.entity, e.held_on);
+  const lastEx = await lastErpExercises(db);
+  const last = new Map<string, string>([...lastEx.entries()].map(([e, x]) => [e, x.on]));
   const seen = new Set<string>();
   for (const p of (plans ?? []) as { id: string; entity: string; title: string; next_review: string | null; owner_role: string | null }[]) {
     if (p.next_review && p.next_review < t0) {

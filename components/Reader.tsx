@@ -97,7 +97,7 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
                   <span className="s">…{h.snippet}…</span>
                 </Link>
               ))}
-              {!hits.length && <div className="p-4 text-slate6 text-sm">No passage contains these words.</div>}
+              {!hits.length && <div className="p-4 text-slate6 text-sm">No chapter contains {q.trim().split(/\s+/).length > 1 ? "all these words" : "this word"} (preliminary pages are left out). Try fewer or shorter words.</div>}
             </div>
           )}
           {(mode === "toc" || !hits) && grouped.map(({ part, items }) => (

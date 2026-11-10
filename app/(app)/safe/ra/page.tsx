@@ -34,6 +34,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
   const tolOf = (h: H) => tolerability(post ? (h.lik_after ?? h.lik_before) : h.lik_before, post ? (h.sev_after ?? h.sev_before) : h.sev_before, schemeOf(h.entity));
   const today = new Date().toISOString().slice(0, 10);
   // filters on assessments
+  all.sort((x, y) => y.number.localeCompare(x.number, undefined, { numeric: true })); // FB-100 · RA 60 before RA 7
   let rows = all.filter((a) => (sp.st === "archived" ? ["archived", "cancelled"].includes(a.status) : !["archived", "cancelled"].includes(a.status)));
   if (sp.kind) rows = rows.filter((a) => a.kind === sp.kind);
   if (sp.domain) rows = rows.filter((a) => (a.domain ?? "") === sp.domain);
@@ -62,7 +63,7 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
         <Metric label="Red. AM decision" value={openRa.filter((a) => a.status === "validated").length} tone={openRa.some((a) => a.status === "validated") ? "amber" : undefined} />
       </div>
 
-      <div className="grid gap-4 mb-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 360px" }}>
+      <div className="withside grid gap-4 mb-4 items-start">
         <div>
           <div className="flex gap-2 mb-2 flex-wrap items-center">
             <form className="ml-auto flex gap-2" action="/safe/risk">
@@ -74,17 +75,6 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
             </form>
           </div>
           {(sp.cell || sp.tol || sp.domain || sp.q) && <p className="mini mb-2">{rows.length} assessments, {shownH.length} hazards, <Link className="underline" href={qs({ kind: sp.kind, m: sp.m }, {})}>clear filters</Link></p>}
-        </div>
-        <section className="card">
-          <div className="ch"><span className="eyebrow">Heat map, {post ? "post-mitigation" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
-          <div className="cb">
-            <table className="rmx heat"><thead><tr><th />{SEVERITIES.map((v) => <th key={v.id} title={v.label}>{v.id}</th>)}</tr></thead>
-              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)}, ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
-            <p className="mini mt-2">{sch === "centrik" ? "Scores as in Centrik: green 1–10, yellow 20–100, red 300–2500." : "ICAO tolerability table."} Click a cell to filter.</p>
-          </div>
-        </section>
-      </div>
-
       <section className="card mb-5">
         <table className="tbl">
           <thead><tr>{edit && sp.st !== "archived" && <th style={{ width: 30 }} title="Select to close" />}<th style={{ width: 120 }}>Number</th><th className="entcol" style={{ width: 55 }}>Entity</th><th>Assessment</th><th style={{ width: 70 }}>Hazards</th><th style={{ width: 150 }}>Highest pre → post</th><th style={{ width: 100 }}>Next due</th><th style={{ width: 150 }}>Status</th><th style={{ width: 80 }}>MSM</th></tr></thead>
@@ -113,6 +103,17 @@ export default async function RiskAssessments({ searchParams }: { searchParams: 
       </section>
       {edit && sp.st !== "archived" && rows.length > 0 && <form id="bulk-ra" action={bulkAssessments} className="flex gap-2 items-center mb-3"><input type="hidden" name="op" value="close" /><BulkConfirm formId="bulk-ra" label="Close the ticked assessments, case over" verb="Close" suggestLabel="tick the ones conducted more than 2 weeks ago" /><span className="mini">Nothing is ticked by default. Closed assessments stay readable under “Closed”.</span></form>}
       <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: sp.st === "archived" ? undefined : "archived" })}>{sp.st === "archived" ? "Back to current assessments" : "Closed and cancelled assessments"}</Link></p>
+        </div>
+        <section className="card heatside">
+          <div className="ch"><span className="eyebrow">Heat map, {post ? "post-mitigation" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
+          <div className="cb">
+            <table className="rmx heat"><thead><tr><th />{SEVERITIES.map((v) => <th key={v.id} title={v.label}>{v.id}</th>)}</tr></thead>
+              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)}, ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
+            <p className="mini mt-2">{sch === "centrik" ? "Scores as in Centrik: green 1–10, yellow 20–100, red 300–2500." : "ICAO tolerability table."} Click a cell to filter.</p>
+          </div>
+        </section>
+      </div>
+
 
       {edit && (
         <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New risk assessment</span><span className="mini">hazards are added on its page. SAM checks them against the hazard log</span></summary>

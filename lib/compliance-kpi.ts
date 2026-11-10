@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { today } from "@/lib/authority";
 import { addMonths, current, DONE, type Audit, type Programme } from "@/lib/audit-programme";
-import { controlOf, nextDueOf, type CCheck, type Subcontractor } from "@/lib/compliance-registers";
+import { controlOf, nextDueOf, type CCheck, type Subcontractor, withProgrammeHistory } from "@/lib/compliance-registers";
 import { OPEN_STATUSES } from "@/lib/findings";
 
 /* KPI-01 · ENR-CM-06 compliance indicators (C1…C11), computed from what S.A.M. holds — nothing typed by hand. Each one keeps
@@ -69,7 +69,7 @@ export async function computeKpis(db: SupabaseClient, entity: string, asOf = tod
     push("C1", pct(done, inScope.length), done, inScope.length, `${p.title}`);
   } else push("C1", null, null, null, "no programme in force");
   // C2 · recurring checks on time
-  const checks = (cd ?? []) as CCheck[]; const withDue = checks.map((c) => nextDueOf(c)).filter((d): d is string => !!d); const onTime = withDue.filter((d) => d >= asOf).length;
+  const checks = await withProgrammeHistory(db, (cd ?? []) as CCheck[]); const withDue = checks.map((c) => nextDueOf(c)).filter((d): d is string => !!d); const onTime = withDue.filter((d) => d >= asOf).length;
   push("C2", pct(onTime, withDue.length), onTime, withDue.length, withDue.length ? null : "no check with a due date");
   // C3 · C4 · C5
   const internal = findings.filter((f) => f.source !== "authority"), authority = findings.filter((f) => f.source === "authority");

@@ -7,7 +7,7 @@ import { ENT, ENTS4 } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { postsOf, snapshotOf } from "@/lib/np";
 import { chartKey, chartsIn, orgChartSvg } from "@/lib/orgchart";
-import { savePost, deletePost } from "./actions";
+import { savePost, deletePost, seedPostsFromErp } from "./actions";
 import { Icon } from "@/lib/icons";
 
 const STATUS: Record<string, [string, string]> = { accepted: ["green", "accepted by the authority"], pending: ["amber", "acceptance pending"], not_required: ["", "no acceptance required"] };
@@ -29,6 +29,8 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
   const posts = entity ? await postsOf(db, entity) : [];
   const snap = snapshotOf(entity ?? "", posts);
   const cmm = isCmm(s);
+  const { data: ec } = !posts.length && entity ? await db.from("erp_contacts").select("post").eq("entity", entity).eq("active", true).eq("kind", "internal").not("post", "is", null).order("ord") : { data: [] };
+  const erpPosts = [...new Set(((ec ?? []) as { post: string }[]).flatMap((c) => c.post.split(/[,;\/\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)))];
 
   // manuals of the entity that carry this chart: published revision and drafts, up to date or not
   type Use = { manualId: string; code: string; title: string; revId: string; rev: string; step: string; ref: string; upToDate: boolean };
@@ -53,7 +55,8 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
 
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">Organisation chart</span><span className="mini">as it is today in NP management</span></div>
-        <div className="cb"><figure className="orgchart">{posts.length ? <span dangerouslySetInnerHTML={{ __html: orgChartSvg(snap) }} /> : <span className="mini">No post defined yet for this entity.</span>}</figure></div>
+        <div className="cb"><figure className="orgchart">{posts.length ? <span dangerouslySetInnerHTML={{ __html: orgChartSvg(snap) }} /> : <span className="mini">No post defined yet for {ENT[entity ?? ""]?.name ?? entity}.{erpPosts.length > 0 && <> The Crisis directory of the entity names {erpPosts.length} post{erpPosts.length === 1 ? "" : "s"} ({erpPosts.join(", ")}).</>}</span>}
+          {!posts.length && cmm && entity && erpPosts.length > 0 && <form action={seedPostsFromErp} className="mt-3"><input type="hidden" name="entity" value={entity} /><button className="btn primary">Create these {erpPosts.length} posts from the Crisis directory</button> <span className="mini">created as “pending”: check the titles, the reporting lines and the acceptance by the authority afterwards.</span></form>}</figure></div>
       </section>
 
       {uses.length > 0 && (

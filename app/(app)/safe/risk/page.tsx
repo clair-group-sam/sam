@@ -68,7 +68,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
         <Metric label="Study hazards to match" value={toMatch} tone={toMatch ? "amber" : undefined} hint={dup ? `${dup} possible duplicates` : "MOC / RA"} />
       </div>
 
-      <div className="grid gap-4 mb-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 360px" }}>
+      <div className="withside grid gap-4 mb-4 items-start">
         <div>
           <div className="flex gap-2 mb-2 flex-wrap items-center">
             {flag("review", "To reassess", live.filter((h) => h.needs_review).length, "amber")}
@@ -83,20 +83,9 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
             </form>
           </div>
           {(sp.cell || sp.tol || sp.domain || sp.q || sp.flag) && <p className="mini mb-2">{rows.length} hazards, <Link className="underline" href={qs({ m: sp.m }, {})}>clear filters</Link></p>}
-        </div>
-        <section className="card">
-          <div className="ch"><span className="eyebrow">Heat map, {post ? "current (post-mitigation)" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
-          <div className="cb">
-            <table className="rmx heat"><thead><tr><th />{SEVERITIES.map((v) => <th key={v.id} title={v.label}>{v.id}</th>)}</tr></thead>
-              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)}, ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
-            <p className="mini mt-2">{sch === "centrik" ? "Scores as in Centrik: green 1–10, yellow 20–100, red 300–2500." : "ICAO tolerability table."} Click a cell to filter.</p>
-          </div>
-        </section>
-      </div>
-
       {[...groups.entries()].sort((x, y) => x[0].localeCompare(y[0])).map(([d, hs]) => (
         <section key={d} className="card mb-4">
-          <div className="ch"><span className="eyebrow">{d}</span><span className="mini">{hs.length} hazard{hs.length === 1 ? "" : "s"}</span></div>
+          <div className="ch"><span className="eyebrow">{/^[-—\s]*$/.test(d) ? "No domain set" : d}</span><span className="mini">{hs.length} hazard{hs.length === 1 ? "" : "s"}</span></div>
           <table className="tbl">
             <thead><tr><th style={{ width: 120 }}>Ref</th><th className="entcol" style={{ width: 55 }}>Entity</th><th>Hazard → consequence</th><th style={{ width: 150 }}>Pre → current</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 100 }}>Next review</th><th style={{ width: 110 }}>Fed by</th><th style={{ width: 130 }}>Entry</th></tr></thead>
             <tbody>{hs.map((h) => {
@@ -119,6 +108,17 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
       ))}
       {!rows.length && <section className="card mb-4"><p className="p-6 text-slate6">No hazard{sp.cell || sp.q || sp.tol || sp.domain || sp.flag ? " matching the filters" : " in the log yet, create an entry below, or import Centrik / Monday in Settings › Integrations"}.</p></section>}
       <p className="mini mb-4"><Link className="underline" href={qs(sp, { st: archived ? undefined : "archived" })}>{archived ? "Back to the current log" : "Closed and archived hazards"}</Link></p>
+        </div>
+        <section className="card heatside">
+          <div className="ch"><span className="eyebrow">Heat map, {post ? "current (post-mitigation)" : "pre-mitigation"}</span><span className="mini"><Link className="underline" href={qs(sp, { m: post ? "pre" : undefined, cell: undefined })}>show {post ? "pre" : "post"}</Link></span></div>
+          <div className="cb">
+            <table className="rmx heat"><thead><tr><th />{SEVERITIES.map((v) => <th key={v.id} title={v.label}>{v.id}</th>)}</tr></thead>
+              <tbody>{LIKELIHOODS.map((l) => <tr key={l.id}><th title={l.label}>{l.id}</th>{SEVERITIES.map((v) => { const i = `${l.id}${v.id}`; const n = cnt.get(i) ?? 0; const t = tolerability(l.id, v.id, sch); return <td key={v.id} className={tolTone(t)}><Link href={qs(sp, { cell: sp.cell === i ? undefined : i })} className={"cell" + (sp.cell === i ? " on" : "") + (n ? "" : " zero")} title={`${riskLabel(l.id, v.id, sch)}, ${n} hazard${n === 1 ? "" : "s"}`}>{n || ""}</Link></td>; })}</tr>)}</tbody></table>
+            <p className="mini mt-2">{sch === "centrik" ? "Scores as in Centrik: green 1–10, yellow 20–100, red 300–2500." : "ICAO tolerability table."} Click a cell to filter.</p>
+          </div>
+        </section>
+      </div>
+
 
       {edit && (
         <details className="card"><summary className="ch cursor-pointer"><span className="eyebrow">+ New hazard log entry</span><span className="mini">a lasting hazard, for a change use a MOC, for a one-off case a risk assessment</span></summary>

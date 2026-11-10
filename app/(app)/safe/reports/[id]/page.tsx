@@ -48,22 +48,32 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const { data: iv } = await db.from("investigations").select("id,number,status,lead_name,due").eq("report_id", id).order("created_at");
   const invs = (iv ?? []) as { id: string; number: string; status: string; lead_name: string | null; due: string | null }[];
   const actions = (acts ?? []) as { id: string; number: string; title: string; status: string; due: string | null; owner_role: string | null }[];
-  const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number));
+  const hazOpts = ((hzo ?? []) as unknown as { id: string; ref: string; title: string; risk_assessments: { number: string } }[]).map((h) => ({ id: h.id, title: h.title, number: h.risk_assessments.number })).sort((x, y) => x.number.localeCompare(y.number, undefined, { numeric: true }) || x.title.localeCompare(y.title));
+  const hazGroups = [...new Set(hazOpts.map((h) => h.number.replace(/[\s-]*\d+\s*$/, "").trim()))]; // FB-099 · HZ OPS, HZ CAMO, HZ IS…: one group each, numbers in natural order
   const linked = ((lk ?? []) as unknown as { hazards: { id: string; ref: string; title: string } | null }[]).map((x) => x.hazards).filter(Boolean) as { id: string; ref: string; title: string }[];
   const who = rep.data as { display_name: string; email: string; job_title: string | null } | null;
   const clock = morClock(r.received_at, r.mor_filed_at, a?.confirmed_at ? a.mor_status : null, Date.now(), !!(r as { history?: boolean | null }).history);
   const erc = a?.erc_value ?? ercValue(a?.erc_outcome, a?.erc_barriers);
   const translated = r.narrative_en && r.language && r.language !== "en";
   const closed = r.status === "closed";
+  // FB-099 · one line saying what the report waits for, and a status that follows the investigation
+  const invOpen = invs.find((x) => !["closed", "cancelled"].includes(x.status));
+  const invDone = r.status === "investigation" && invs.length > 0 && !invOpen;
+  const fedBack = events.some((e) => /feedback/i.test(e.kind) || /^feedback/i.test(e.note ?? ""));
+  const nextStep = !a?.confirmed_at ? "decide whether it is a mandatory occurrence (MOR card on the right); the 72 h clock runs until then."
+    : invOpen ? `investigation ${invOpen.number} is in progress${invOpen.due ? `, due ${invOpen.due}` : ""}.`
+    : !fedBack ? "send the feedback to the reporter (Reporter card), then close the report."
+    : "everything is done: close the report (bottom of the right column).";
 
   return (
     <>
       <PageHeader eyebrow={`Safety, Report ${r.id}, ${ENT[r.entity]?.name ?? r.entity}`} title={r.headline_en && translated ? r.headline_en : r.headline}
-        tag={<span className="flex gap-2 items-center"><span className={"pill " + (STATUS[r.status]?.[1] ?? "")}>{STATUS[r.status]?.[0] ?? r.status}</span>
+        tag={<span className="flex gap-2 items-center"><span className={"pill " + (STATUS[r.status]?.[1] ?? "")}>{invDone ? "Investigation closed, to conclude" : STATUS[r.status]?.[0] ?? r.status}</span>
           <span className={"pill " + (clock.state === "late" ? "red" : clock.state === "running" ? (clock.left <= 24 ? "red" : "amber") : "green")}>MOR, {clock.label}</span>
           {erc != null && <span className={"pill " + ercTone(erc)}>ERC {erc}</span>}</span>}
         sub={`Received ${when(r.received_at)}, the 72 h run from receipt (EU 376/2014 art. 4(8)), deadline ${when(clock.deadline.toISOString())}`}
         right={<Link href="/safe/reports" className="btn">All reports</Link>} />
+      {!closed && <div className="lockbar mb-4" style={{ margin: "0 0 16px" }}><b>Next step:</b> {nextStep}</div>}
 
       <div className="repgrid2">
         <div>
@@ -187,7 +197,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               {mt && !sugg.length && !linked.length && <p className="mini">SAM found no hazard of the log for this occurrence, create a new entry if it is a lasting hazard.</p>}
               {hazOpts.length > 0 && (
                 <form action={linkReport} className="flex gap-2"><input type="hidden" name="report_id" value={r.id} />
-                  <select name="hazard_id" className="inp flex-1" style={{ marginTop: 0 }} required defaultValue="">{[<option key="" value="" disabled>Link to a hazard of the log…</option>, ...hazOpts.map((h) => <option key={h.id} value={h.id}>{h.number}, {h.title}</option>)]}</select>
+                  <select name="hazard_id" className="inp flex-1" style={{ marginTop: 0 }} required defaultValue="">{[<option key="" value="" disabled>Link to a hazard of the log…</option>, ...hazGroups.map((g) => <optgroup key={g} label={g}>{hazOpts.filter((h) => h.number.replace(/[\s-]*\d+\s*$/, "").trim() === g).map((h) => <option key={h.id} value={h.id}>{h.number}, {h.title}</option>)}</optgroup>)]}</select>
                   <button className="btn">Link</button></form>
               )}
               <form action={createAssessment} className="grid gap-2"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="kind" value="hazard_log" />
@@ -209,7 +219,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Investigation</span><span className="mini">{invs.length}</span></div>
             <div className="cb grid gap-1">
-              {invs.map((x) => <div key={x.id} className="flex gap-2 items-center"><Link className="underline mono" href={`/safe/inv/${x.id}`}>{x.number}</Link><span className="flex-1">{x.lead_name ?? ""}{x.due ? `, due ${x.due}` : ""}</span><span className={"pill " + (INV_STATUS[x.status]?.[1] ?? "")}>{INV_STATUS[x.status]?.[0] ?? x.status}</span></div>)}
+              {invs.map((x) => <div key={x.id} className="flex gap-2 items-center"><Link className="underline mono" href={`/safe/inv/${x.id}`}>{x.number}</Link><span className="flex-1">{x.lead_name ?? ""}{x.due && !["closed", "cancelled"].includes(x.status) ? `, due ${x.due}` : ""}</span><span className={"pill " + (INV_STATUS[x.status]?.[1] ?? "")}>{INV_STATUS[x.status]?.[0] ?? x.status}</span></div>)}
               {!invs.length && <p className="mini">{(r as { investigation?: string | null }).investigation ? "Investigation recorded in the source tool (above)." : "No internal investigation."}</p>}
               {!closed && !invs.some((x) => !["closed", "cancelled"].includes(x.status)) && <form action={openInvestigation} className="flex gap-2 mt-1"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} />
                 <select name="level" className="inp" defaultValue="standard" style={{ marginTop: 0, width: 230 }}>{Object.entries(INV_LEVEL).map(([k, [l, d]]) => <option key={k} value={k}>{l}, {d} d</option>)}</select><button className="btn">Open an investigation</button></form>}

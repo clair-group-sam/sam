@@ -24,6 +24,8 @@ export default async function Mor({ searchParams }: { searchParams: Promise<{ t?
   // in the register: S.A.M. reports classified as mandatory (or filed), and every imported report (mirror of the source tool / ECCAIRS)
   const reg = all.filter((r) => (r.source ?? "sam") !== "sam" || r.mor_filed_at || (r.a?.confirmed_at && r.a.mor_status === "mandatory")).map((r) => ({ ...r, st: stageOf(r, now) as Stage }));
   const todo = reg.filter((r) => ["to_file", "late", "followup", "final"].includes(r.st));
+  // FB-072 · a S.A.M. report whose MOR decision is not taken yet is not in the register, but its 72 h clock runs: shown and counted here too
+  const undecided = all.filter((r) => (r.source ?? "sam") === "sam" && !r.mor_filed_at && !r.a?.confirmed_at && r.status !== "closed").map((r) => ({ ...r, late: now > due72(r.received_at).getTime() }));
   const rows = sp.t === "sam" ? reg.filter((r) => (r.source ?? "sam") === "sam") : sp.t === "imported" ? reg.filter((r) => (r.source ?? "sam") !== "sam") : sp.t === "all" ? reg : todo;
   const y = sp.y ?? String(new Date().getUTCFullYear());
   const imp = reg.filter((r) => (r.source ?? "sam") !== "sam" && r.received_at.startsWith(y));
@@ -33,13 +35,21 @@ export default async function Mor({ searchParams }: { searchParams: Promise<{ t?
     <>
       <PageHeader eyebrow="Safety, Reporting to the authority" title="MOR / ECCAIRS" sub="Mandatory occurrence reports: filed within 72 h of receipt in S.A.M. (376/2014 art. 4(8)), then the 30-day and final (3-month) reports to the authority (art. 13(4)). Imported reports show what ECCAIRS holds: sent or not sent." />
       <div className="grid grid-cols-5 gap-4 mb-5">
-        <Metric label="To file (72 h)" value={reg.filter((r) => r.st === "to_file").length} tone={reg.some((r) => r.st === "to_file") ? "amber" : undefined} />
-        <Metric label="Past 72 h" value={reg.filter((r) => r.st === "late").length} tone={reg.some((r) => r.st === "late") ? "red" : undefined} />
+        <Metric label="To decide or file (72 h)" value={reg.filter((r) => r.st === "to_file").length + undecided.filter((r) => !r.late).length} tone={reg.some((r) => r.st === "to_file") || undecided.some((r) => !r.late) ? "amber" : undefined} hint={undecided.some((r) => !r.late) ? `${undecided.filter((r) => !r.late).length} waiting for the MOR decision` : undefined} />
+        <Metric label="Past 72 h" value={reg.filter((r) => r.st === "late").length + undecided.filter((r) => r.late).length} tone={reg.some((r) => r.st === "late") || undecided.some((r) => r.late) ? "red" : undefined} hint={undecided.some((r) => r.late) ? `${undecided.filter((r) => r.late).length} with the MOR decision not taken` : undefined} />
         <Metric label="30-day reports due" value={reg.filter((r) => r.st === "followup").length} tone={reg.some((r) => r.st === "followup" && now > due30(r.mor_filed_at!).getTime()) ? "red" : undefined} />
         <Metric label="Final reports due" value={reg.filter((r) => r.st === "final").length} />
         <Metric label={`Imported ${y}, sent to ECCAIRS`} value={`${imp.filter((r) => r.st === "sent_imported").length} / ${imp.length}`} hint="mirror of ECCAIRS" />
       </div>
-      <div className="flex gap-2 mb-3 flex-wrap">{TABS.map(([k, l]) => <Link key={k} href={`/safe/mor${k ? `?t=${k}` : ""}`} className={"btn" + ((sp.t ?? "") === k ? " on" : "")}>{l} <span className="pill">{k === "" ? todo.length : k === "sam" ? reg.filter((r) => (r.source ?? "sam") === "sam").length : k === "imported" ? reg.filter((r) => (r.source ?? "sam") !== "sam").length : reg.length}</span></Link>)}</div>
+      <div className="flex gap-2 mb-3 flex-wrap">{TABS.map(([k, l]) => <Link key={k} href={`/safe/mor${k ? `?t=${k}` : ""}`} className={"btn" + ((sp.t ?? "") === k ? " on" : "")}>{l} <span className="pill">{k === "" ? todo.length + undecided.length : k === "sam" ? reg.filter((r) => (r.source ?? "sam") === "sam").length : k === "imported" ? reg.filter((r) => (r.source ?? "sam") !== "sam").length : reg.length}</span></Link>)}</div>
+      {!sp.t && undecided.length > 0 && (
+        <section className="card mb-4"><div className="ch"><span className="eyebrow">MOR decision to take</span><span className="mini">mandatory or voluntary: decided on the report, the 72 h run from receipt</span></div>
+          <table className="tbl"><tbody>{undecided.map((r) => { const h = Math.round((due72(r.received_at).getTime() - now) / 3600e3); return (
+            <tr key={r.id}><td className="mono" style={{ width: 130 }}><Link className="underline" href={`/safe/reports/${r.id}`}>{r.id}</Link>{scope.length > 1 && <div><span className={"ent " + r.entity}>{r.entity}</span></div>}</td>
+              <td><Link href={`/safe/reports/${r.id}`}><b>{r.headline_en || r.headline}</b></Link><div className="mini">received {d(r.received_at)}</div></td>
+              <td style={{ width: 240 }}><span className={"pill " + (r.late ? "red" : "amber")}>{r.late ? `${-h} h past the 72 h` : `${h} h left`}</span></td>
+              <td style={{ width: 200 }}><Link className="btn" href={`/safe/reports/${r.id}`}>Decide on the report</Link></td></tr>); })}</tbody></table>
+        </section>)}
       <section className="card mb-5">
         <table className="tbl">
           <thead><tr><th style={{ width: 130 }}>Report</th><th>Occurrence</th><th style={{ width: 130 }}>Authority</th><th style={{ width: 180 }}>ECCAIRS</th><th style={{ width: 110 }}>Next due</th><th style={{ width: 200 }}>Status</th></tr></thead>
@@ -55,7 +65,7 @@ export default async function Mor({ searchParams }: { searchParams: Promise<{ t?
                   {desk && (r.st === "followup" || r.st === "final") && <form action={recordFollowup} className="flex gap-1 mt-1"><input type="hidden" name="id" value={r.id} /><input type="hidden" name="kind" value={r.st === "final" ? "final" : "followup"} /><input name="ref" className="inp mono" placeholder="ref (optional)" style={{ marginTop: 0, width: 110 }} /><button className="btn">{r.st === "final" ? "Final sent" : "30-day sent"}</button></form>}
                   {(r.st === "to_file" || r.st === "late") && <div className="mini mt-1"><Link className="underline" href={`/safe/reports/${r.id}`}>file it from the report</Link></div>}</td>
               </tr>); })}
-            {!rows.length && <tr><td colSpan={6} className="p-6 mini">{sp.t ? "Nothing here." : "Nothing to do, no MOR to file, no follow-up due."}</td></tr>}
+            {!rows.length && <tr><td colSpan={6} className="p-6 mini">{sp.t ? "Nothing here." : undecided.length ? "No MOR to file and no follow-up due; the decision above comes first." : "Nothing to do, no MOR to file, no follow-up due."}</td></tr>}
           </tbody>
         </table>
       </section>
