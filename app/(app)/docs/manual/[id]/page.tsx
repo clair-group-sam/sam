@@ -164,7 +164,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
               <select name="nature" className="nature" defaultValue={(manual as Manual & { internal?: boolean }).internal ? "internal" : "regulated"} style={{ cursor: "pointer" }}>
                 <option value="regulated">regulated manual</option><option value="internal">internal document</option>
               </select>
-              <button type="submit" className="btn" style={{ height: 24, padding: "0 8px", fontSize: 11, marginLeft: 4 }}>Set</button>
+              <button type="submit" className="btn" style={{ height: 28, padding: "0 8px", fontSize: 12, marginLeft: 4 }}>Set</button>
             </form>
           ) : <span className="nature" style={{ alignSelf: "center" }}>{(manual as Manual & { internal?: boolean }).internal ? "internal document" : "regulated manual"}</span>}
           <form action={toggleFavourite}><input type="hidden" name="manual_id" value={manual.id} /><button type="submit" className={"star" + (fav ? "" : " off")} title={fav ? "Remove from my favourites" : "Add to my favourites (Library shortcuts)"}><Icon name="star" size={18} filled={fav} /></button></form>

@@ -31,7 +31,7 @@ function TemplateForm({ t, isNew }: { t: ProjectTemplate | null; isNew?: boolean
       </div>
       <div className="grid grid-cols-3 gap-3">
         <label><span className="mini">Phases, one per line: <code>key | Label</code></span><textarea name="phases" className="inp mono" rows={Math.max(8, (t?.phases.length ?? 0) + 2)} defaultValue={txt.phases} /></label>
-        <label className="col-span-2"><span className="mini">Tasks, one per line: <code>key | phase | Title | ROLE | days | dep1,dep2 | link:REF | detail</code> (link = manual:OM-A, authority_file:AC-NEW, certificate:insurance, moc)</span><textarea name="tasks" className="inp mono" rows={Math.max(8, (t?.tasks.length ?? 0) + 2)} defaultValue={txt.tasks} style={{ fontSize: 11.5 }} /></label>
+        <label className="col-span-2"><span className="mini">Tasks, one per line: <code>key | phase | Title | ROLE | days | dep1,dep2 | link:REF | detail</code> (link = manual:OM-A, authority_file:AC-NEW, certificate:insurance, moc)</span><textarea name="tasks" className="inp mono" rows={Math.max(8, (t?.tasks.length ?? 0) + 2)} defaultValue={txt.tasks} style={{ fontSize: 12.5 }} /></label>
       </div>
       <div className="flex items-center gap-3"><button className="btn primary" type="submit">{isNew ? "+ Create the template" : "Save"}</button><span className="mini">Applies to projects opened afterwards; running projects keep their own tasks. Keys are what dependencies point to, keep them stable.</span></div>
     </form>

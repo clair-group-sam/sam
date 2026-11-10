@@ -5,6 +5,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ENT, ENT_COLOR, entMode, singleEntity, type EntMode, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
+import { A11y } from "@/components/A11y";
+import { applyPrefs, readPrefs } from "@/lib/prefs";
 
 type Props = { session: Session; children: React.ReactNode };
 
@@ -116,7 +118,9 @@ export default function Shell({ session, children }: Props) {
   };
 
   return (
-    <div className={"flex h-screen overflow-hidden" + (compact ? " compact" : "")} data-ent={ent}>
+    <div className={"shellrow flex h-screen overflow-hidden" + (compact ? " compact" : "")} data-ent={ent}>
+      <a className="skip" href="#main">Skip to the page</a>
+      <A11y />
       <div className={"sidewrap" + (compact ? " compact-w" : "")} style={compact ? { width: subs.length > 0 ? 88 : 62 } : undefined}
         onMouseLeave={() => { rail.leave(); subH.leave(); }}>
       <nav className={"rail" + (compact ? (rail.on ? " mini hover" : " mini") : "")} onMouseEnter={() => { if (compact) { rail.enter(); subH.leave(); } }}>
@@ -166,7 +170,8 @@ export default function Shell({ session, children }: Props) {
         {/* entity switch, after the reload: the new page slides in from the side the click went to. Runs while the HTML is parsed,
             before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
         <script dangerouslySetInnerHTML={{ __html: ENT_ARRIVE }} />
-        <main className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
+        {subs.length > 0 && <nav className="mobsub" aria-label={curMod ? modLabel(role, curMod) : mod}>{subs.filter((x) => isBuilt(mod, x.id) || sub === x.id).map((x) => <Link key={x.id} href={`/${mod}/${x.id}`} className={sub === x.id ? "on" : ""} aria-current={sub === x.id ? "page" : undefined}>{subLabel(role, mod, x)}</Link>)}</nav>}
+        <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
   );
@@ -174,7 +179,7 @@ export default function Shell({ session, children }: Props) {
 
 function RailLink({ m, role, on, small }: { m: Module; role: RoleKey; on: boolean; small?: boolean }) {
   return (
-    <Link href={`/${m.id}`} className={"rl" + (on ? " on" : "") + (m.erp ? " erp" : "") + (small ? " sm" : "")} title={modLabel(role, m)}>
+    <Link href={`/${m.id}`} aria-current={on ? "page" : undefined} className={"rl" + (on ? " on" : "") + (m.erp ? " erp" : "") + (small ? " sm" : "")} title={modLabel(role, m)}>
       <Icon name={m.icon} size={small ? 16 : 18} /><span>{modLabel(role, m)}</span>
     </Link>
   );
@@ -185,6 +190,8 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
   const [menu, setMenu] = useState(false);
   // UX-03 §7: one "+ Create" for the office — what exists opens, what is not built yet is listed greyed with its step
   const [create, setCreate] = useState(false);
+  const [prefs, setPrefs] = useState({ theme: "light", size: "standard" });
+  useEffect(() => { setPrefs(readPrefs()); }, []);
   const canCreateFile = session.role !== "user";
   const CREATE: { label: string; href?: string; hint: string }[] = [
     { label: "Project", href: canCreateFile ? "/proj/boards/new" : undefined, hint: "aircraft addition, NP change, new approval… blank or from a template" },
@@ -280,9 +287,9 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
           {create && (
             <div className="menu" style={{ width: 300 }} onMouseLeave={() => setCreate(false)}>
               {CREATE.map((c) => c.href ? (
-                <button key={c.label} type="button" className="mi" onClick={() => { setCreate(false); router.push(c.href!); }}><b>{c.label}</b><small style={{ display: "block", color: "var(--slate6)", fontSize: 11.5 }}>{c.hint}</small></button>
+                <button key={c.label} type="button" className="mi" onClick={() => { setCreate(false); router.push(c.href!); }}><b>{c.label}</b><small style={{ display: "block", color: "var(--slate6)", fontSize: 12.5 }}>{c.hint}</small></button>
               ) : (
-                <div key={c.label} className="mi muted" style={{ fontStyle: "italic" }}>{c.label}<small style={{ display: "block", fontSize: 11 }}>{c.hint}</small></div>
+                <div key={c.label} className="mi muted" style={{ fontStyle: "italic" }}>{c.label}<small style={{ display: "block", fontSize: 12 }}>{c.hint}</small></div>
               ))}
             </div>
           )}
@@ -299,6 +306,10 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
             <div className="mi" style={{ cursor: "default" }}><b>{session.name}</b><small style={{ display: "block", color: "var(--slate6)" }}>{session.person?.job_title ?? roleTitle(session)}</small></div>
             <div className="mi muted">{session.email}</div>
             <div className="mi muted">Scope: {session.group ? "Group function" : session.entities.join(", ") || "none"}. Roles: {session.roles.join(", ") || "none"}</div>
+            <div className="prefs" role="group" aria-label="Appearance">
+              <div className="row"><span className="lab">Theme</span><span className="seg3">{(["light", "dark", "auto"] as const).map((t) => <button key={t} type="button" className={prefs.theme === t ? "on" : ""} aria-pressed={prefs.theme === t} onClick={() => { applyPrefs(t); setPrefs(readPrefs()); }}>{t === "auto" ? "System" : t === "dark" ? "Dark" : "Light"}</button>)}</span></div>
+              <div className="row"><span className="lab">Text size</span><span className="seg3">{([["standard", "A"], ["large", "A+"], ["xlarge", "A++"]] as const).map(([z, l]) => <button key={z} type="button" className={prefs.size === z ? "on" : ""} aria-pressed={prefs.size === z} title={z === "standard" ? "Standard" : z === "large" ? "Large (110 %)" : "Extra large (122 %)"} onClick={() => { applyPrefs(undefined, z); setPrefs(readPrefs()); }}>{l}</button>)}</span></div>
+            </div>
             <Link href="/api/me" className="mi" target="_blank">My access rights</Link>
             <form action="/auth/signout" method="post"><button type="submit" className="mi">Sign out</button></form>
           </div>

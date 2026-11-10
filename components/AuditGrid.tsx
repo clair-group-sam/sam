@@ -27,7 +27,7 @@ export function AuditGrid({ p, mods, audits, checks = [], t0 }: { p: Programme; 
               {r.list.filter((a) => a.planned_month === m && a.status !== "cancelled").map((a) => {
                 const late = a.status === "planned" && addMonths(a.planned_month, 1) <= t0;
                 const cls = a.status === "closed" ? "closed" : late ? "late" : a.kind === "authority" ? "authority" : a.kind === "checks" ? "checks" : "";
-                return <a key={a.id} href={`#${a.number}`} className={`au ${cls}${a.replanned ? " repl" : ""}`} title={`${a.number}, ${a.title}, ${STATUS_LABEL[a.status] ?? a.status}${a.replanned ? `, replanned ×${a.replanned}` : ""}`}>{a.status === "closed" ? <Icon name="check" size={11} /> : KIND_LETTER[a.kind] ?? "P"}</a>;
+                return <a key={a.id} href={`#${a.number}`} className={`au ${cls}${a.replanned ? " repl" : ""}`} aria-label={`${a.number}, ${a.title}, ${STATUS_LABEL[a.status] ?? a.status}${late ? ", month passed" : ""}`} title={`${a.number}, ${a.title}, ${STATUS_LABEL[a.status] ?? a.status}${a.replanned ? `, replanned ×${a.replanned}` : ""}`}>{a.status === "closed" ? <Icon name="check" size={13} /> : late ? `${KIND_LETTER[a.kind] ?? "P"}!` : KIND_LETTER[a.kind] ?? "P"}</a>;
               })}
               {r.checks.flatMap((c) => c.runs.filter((x) => x.done_on.slice(0, 7) + "-01" === m).map((x) => <a key={x.id} href="/comp/checks" className={`au ${RESULT_CLS[x.result] ?? "closed"}`} title={`${c.code} · ${c.title} · ${x.done_on} · ${x.result.replace("_", " ")}`}>✓</a>))}
               {r.checks.map((c) => { // next due: from the check's own passages, else from the last audit done under the module (imported history)
@@ -37,7 +37,7 @@ export function AuditGrid({ p, mods, audits, checks = [], t0 }: { p: Programme; 
           )),
         ])}
       </div>
-      <div className="mini mt-2"><span className="pill">P</span> planned, <span className="pill green"><Icon name="check" size={11} /></span> done, <span className="pill amber">C</span> compliance checks, <span className="pill" style={{ background: "var(--purple-s)", color: "var(--purple)" }}>A</span> authority, <span className="pill red">P</span> month passed, not done, dashed = replanned</div>
+      <div className="mini mt-2"><span className="pill">P</span> planned, <span className="pill green"><Icon name="check" size={11} /></span> done, <span className="pill amber">C</span> compliance checks, <span className="pill" style={{ background: "var(--purple-s)", color: "var(--purple)" }}>A</span> authority, <span className="pill red">P!</span> month passed, not done, dashed = replanned</div>
     </div>
   );
 }

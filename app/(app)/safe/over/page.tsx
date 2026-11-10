@@ -85,12 +85,12 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
       <section className="card mb-5">
         <div className="ch"><span className="eyebrow">Safety performance indicators {year}</span>
           <span className="mini">data up to {monthShort(board.upTo)}, Q{board.quarter}</span>
-          <span className="ml-auto flex gap-2"><span className="pill green">{count("ok")} on target</span><span className="pill amber">{count("improve")} to improve</span><span className="pill red">{count("far")} far off</span><span className="pill">{count("nodata") + count("none")} no data / target</span></span></div>
+          <span className="ml-auto flex gap-2"><span className="spilegend mini" aria-label="How to read the month cells"><span><span className="spicell ok" aria-hidden>0</span>on target</span><span><span className="spicell improve" aria-hidden>0</span>to improve (hatched)</span><span><span className="spicell far" aria-hidden>0</span>far off (bar)</span></span><span className="pill green">{count("ok")} on target</span><span className="pill amber">{count("improve")} to improve</span><span className="pill red">{count("far")} far off</span><span className="pill">{count("nodata") + count("none")} no data / target</span></span></div>
         {proposed.length > 0 && <div className="cb banner">{proposed.length} SPIs are <b>proposed</b> (taken from the ASJFR set, same MSM family) and counted above as such, {edit ? <Link className="underline" href={`/safe/over/set?y=${year}`}>review and confirm the set</Link> : "the safety desk confirms them at the SRB"}.</div>}
         {needsHours && <div className="cb banner">No activity hours entered for {year}, the rates per 1000 BH / 100 FH stay empty.{edit && <> <Link className="underline" href={`/safe/over/data?y=${year}`}>Enter the hours</Link>.</>}</div>}
         {!rows.length && <div className="cb mini">No SPI defined for this entity yet.{edit && <> <Link className="underline" href={`/safe/over/set?y=${year}`}>Define the SPI set</Link>.</>}</div>}
         {rows.length > 0 && <table className="tbl spitbl">
-          <thead><tr><th>Indicator</th><th style={{ width: 130 }}>Target {year}</th><th style={{ width: 290 }}>{board.months.map((m) => monthShort(m)[0]).join("  ")}</th><th style={{ width: 80 }}>Q{board.quarter}</th><th style={{ width: 80 }}>YTD</th><th style={{ width: 130 }}>Status</th></tr></thead>
+          <thead><tr><th>Indicator</th><th style={{ width: 130 }}>Target {year}</th><th style={{ width: 330 }}><span className="spihead" aria-hidden>{board.months.map((m) => <span key={m}>{monthShort(m)[0]}</span>)}</span><span className="sr-only">Month by month</span></th><th style={{ width: 80 }}>Q{board.quarter}</th><th style={{ width: 80 }}>YTD</th><th style={{ width: 130 }}>Status</th></tr></thead>
           {groups.map((g) => (
             <tbody key={g}>
               <tr className="grp"><td colSpan={6}>{g}</td></tr>

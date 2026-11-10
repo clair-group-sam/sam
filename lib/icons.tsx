@@ -1,5 +1,6 @@
 // Line icons of the prototype rail (24×24, stroke).
 const P: Record<string, string> = {
+  ledger: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 12.5h8M8 16h5"/>',
   home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   docs: '<path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4z"/><path d="M14 4v6h6"/>',
   comp: '<path d="M9 4h6v3H9z"/><path d="M6 6h12v14H6z"/><path d="M9 13l2 2 4-4"/>',

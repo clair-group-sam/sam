@@ -47,7 +47,7 @@ export function daysUntil(d: string | null): number | null {
 /* ---------- reading structure ---------- */
 export type Heading = { level: number; text: string; id: string };
 export type Part = { key: string; label: string; color: string };
-const PART_COLORS = ["#7d166d", "#0e8cc4", "#248a3d", "#b86e00", "#b43a0f", "#0d2a3f", "#6b5bd2", "#006c9c"];
+const PART_COLORS = ["#7d166d", "#0a74a3", "#1c7636", "#8f5500", "#b43a0f", "#0d2a3f", "#5b4bc4", "#006c9c"]; // FB-111 · every one ≥ 4.5:1 under white text and on white
 export function partOf(ref: string): string {
   const m = /^([A-Za-z]+|\d+)/.exec(ref);
   return m ? m[1].toUpperCase() : "?";
