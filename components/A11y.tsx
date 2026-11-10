@@ -30,7 +30,11 @@ export function A11y() {
     const main = document.querySelector("main");
     const mo = main ? new MutationObserver(() => { clearTimeout(t); t = setTimeout(pass, 250); }) : null;
     if (main && mo) mo.observe(main, { childList: true, subtree: true });
-    return () => { mo?.disconnect(); clearTimeout(t); };
+    // the framework writes the default <title> after the page has streamed in: put the page's own title back when that happens
+    const retitle = () => { const h1 = document.querySelector("main h1")?.textContent?.trim(); if (h1 && !document.title.startsWith(h1)) document.title = `${h1} · S.A.M.`; };
+    const ho = new MutationObserver(retitle); ho.observe(document.head, { childList: true, subtree: true, characterData: true });
+    const late = setTimeout(retitle, 1200);
+    return () => { mo?.disconnect(); ho.disconnect(); clearTimeout(t); clearTimeout(late); };
   }, [path]);
   return null;
 }

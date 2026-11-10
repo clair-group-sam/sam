@@ -971,3 +971,5 @@ html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="da
 html[data-theme="dark"] .rail .brand img{filter:brightness(1.35)}
 html[data-theme="dark"] ::selection{background:#2c4a5c;color:#fff}
 html[data-theme="dark"] .groupband{background:#2e1a2b;color:#e0a2d6}
+html[data-theme="dark"] .tocpart .ph{color:var(--navy) !important}
+html[data-theme="dark"] .topbar .btn.primary{color:#fff;background:color-mix(in srgb,var(--entc,#0b2a4a) 75%,#000);border-color:transparent}
