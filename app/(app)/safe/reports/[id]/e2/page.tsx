@@ -19,13 +19,15 @@ export default async function E2Review({ params }: { params: Promise<{ id: strin
   const r = data as (ReportForE2 & { status: string; mor_filed_at: string | null; e2_status: string | null; e2_version: string | null; e2_sent_at: string | null }) | null;
   if (!r || !s.entities.includes(r.entity)) notFound();
   const cfg = eccairsConfig(r.entity); const env = eccairsEnv(r.entity);
-  const [{ data: an }, ctx, { data: ac }, { data: subs }] = await Promise.all([
-    db.from("report_analysis").select("mor_draft,adrep,mor_status").eq("report_id", id).maybeSingle(), e2Context(db, r.entity),
-    r.aircraft ? db.from("aircraft").select("registration,type_code,model,msn").ilike("registration", r.aircraft.trim()).maybeSingle() : Promise.resolve({ data: null }),
-    db.from("eccairs_submissions").select("at,kind,requested_status,ok,e2_id,e2_version,e2_status,error").eq("report_id", id).order("at", { ascending: false }).limit(10),
-  ]);
+  let prepError: string | null = null;
+  const { data: an } = await db.from("report_analysis").select("mor_draft,adrep,mor_status").eq("report_id", id).maybeSingle();
+  let ctx: Awaited<ReturnType<typeof e2Context>> = { taxonomy: null, attrs: [], values: [], maps: [] };
+  try { ctx = await e2Context(db, r.entity); } catch (e) { prepError = `taxonomy: ${(e as Error).message}`; }
+  const { data: ac } = r.aircraft ? await db.from("aircraft").select("registration,type_code,model,msn").ilike("registration", r.aircraft.trim()).limit(1).maybeSingle() : { data: null };
+  const { data: subs } = await db.from("eccairs_submissions").select("at,kind,requested_status,ok,e2_id,e2_version,e2_status,error").eq("report_id", id).order("at", { ascending: false }).limit(10);
   const a = an as AnalysisForE2;
-  const fields = ctx.taxonomy ? proposeFields(r, a, ctx, { registry: ac as { registration: string; type_code: string | null; model: string | null; msn: string | null } | null }) : [];
+  let fields: ReturnType<typeof proposeFields> = [];
+  try { fields = ctx.taxonomy ? proposeFields(r, a, ctx, { registry: ac as { registration: string; type_code: string | null; model: string | null; msn: string | null } | null }) : []; } catch (e) { prepError = (e as Error).message + "\n" + ((e as Error).stack ?? "").split("\n").slice(0, 4).join("\n"); }
   const { codes, missing } = buildTaxonomyCodes(fields);
   const vals = (listId: number | null | undefined) => (listId ? ctx.values.filter((v) => v.value_list_id === listId) : []);
   const history = (subs ?? []) as { at: string; kind: string; requested_status: string | null; ok: boolean; e2_id: string | null; e2_version: string | null; e2_status: string | null; error: string | null }[];
@@ -35,6 +37,7 @@ export default async function E2Review({ params }: { params: Promise<{ id: strin
         sub={`${env ?? "not connected"} · ${ctx.taxonomy ? `${ctx.taxonomy.name} ${ctx.taxonomy.version}, loaded ${ctx.taxonomy.loaded_at.slice(0, 10)}` : "taxonomy not loaded"} · S.A.M. proposes, you decide; nothing leaves without the button below.`}
         right={<Link className="btn" href={`/safe/reports/${r.id}`}>Back to the report</Link>} />
       {!cfg && <section className="card mb-4"><div className="cb">ECCAIRS is not connected for {r.entity} (environment variables). The report is filed in the <a className="underline" href="https://e2.aviationreporting.eu/home" target="_blank" rel="noreferrer">E2 portal</a> and its reference recorded on the report.</div></section>}
+      {prepError && <section className="card mb-4"><div className="cb"><b>S.A.M. could not build the proposal:</b><pre className="mini" style={{ whiteSpace: "pre-wrap" }}>{prepError}</pre></div></section>}
       {cfg && !ctx.taxonomy && <section className="card mb-4"><div className="cb">The taxonomy of the authority is not loaded yet: <Link className="underline" href="/safe/mor/e2">Safety › MOR / ECCAIRS › Load the taxonomy</Link>.</div></section>}
       {cfg && ctx.taxonomy && (
         <form action={sendToE2}>
