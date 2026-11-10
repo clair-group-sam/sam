@@ -6,12 +6,12 @@ import { PageHeader } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { isSafetyDesk, PHASES } from "@/lib/safety";
 import { E2_ATTR, E2_ENTITIES, eccairsConfig, eccairsEnv } from "@/lib/eccairs";
-import { e2Context } from "@/lib/eccairs-map";
-import { loadTax, saveMap, testLink } from "./actions";
+import { e2Context, withLongValues } from "@/lib/eccairs-map";
+import { loadTax, saveMap, testLink, loadLong } from "./actions";
 
 /* ECC-01 · Safety › MOR / ECCAIRS › E2 link: connection, cached taxonomy, and the correspondences S.A.M. uses to code a report
  * (occurrence class, phase, report type / risk category → occurrence category, event type, aircraft type, operator, State). */
-type Sp = { ent?: string; msg?: string };
+type Sp = { ent?: string; msg?: string; q?: string };
 const FIELDS: { field: string; label: string; entity: number; attribute: number; ours: (db: Awaited<ReturnType<typeof ours>>, entity: string) => string[] }[] = [
   { field: "occurrence_class", label: "Occurrence class", entity: E2_ENTITIES.OCCURRENCE, attribute: E2_ATTR.OCC_CLASS, ours: (o) => o.classes },
   { field: "phase", label: "Phase of flight", entity: E2_ENTITIES.AIRCRAFT, attribute: E2_ATTR.AC_FLIGHT_PHASE, ours: () => PHASES },
@@ -34,7 +34,13 @@ export default async function E2Admin({ searchParams }: { searchParams: Promise<
   const sp = await searchParams; const scope = s.entity === "ALL" ? (s.group ? ENTS4 : s.entities) : [s.entity];
   const entity = sp.ent && scope.includes(sp.ent) ? sp.ent : scope[0];
   const db = supabaseAdmin();
-  const [ctx, o, { data: subs }] = await Promise.all([e2Context(db, entity), ours(db, entity), db.from("eccairs_submissions").select("at,kind,requested_status,ok,e2_id,e2_status,error,report_id").eq("entity", entity).order("at", { ascending: false }).limit(15)]);
+  const [ctx0, o, { data: subs }] = await Promise.all([e2Context(db, entity), ours(db, entity), db.from("eccairs_submissions").select("at,kind,requested_status,ok,e2_id,e2_status,error,report_id").eq("entity", entity).order("at", { ascending: false }).limit(15)]);
+  // long lists: the fleet's types and the entity's name are looked up by name, plus whatever the desk searches (?q=)
+  const { data: fleet } = await db.from("aircraft").select("type_code,model").eq("entity", entity);
+  let ctx = ctx0;
+  for (const f of ((fleet ?? []) as { type_code: string | null; model: string | null }[]).slice(0, 12)) ctx = await withLongValues(db, ctx, { entity, registry: f });
+  ctx = await withLongValues(db, ctx, { entity, q: sp.q ?? null });
+  const longCount = ctx.taxonomy && ctx.long.length ? (await db.from("eccairs_values").select("value_id", { count: "exact", head: true }).eq("taxonomy_id", ctx.taxonomy.taxonomy_id).in("value_list_id", ctx.long)).count ?? 0 : 0;
   const cfg = !!eccairsConfig(entity); const env = eccairsEnv(entity);
   const vals = (listId: number | null | undefined) => (listId ? ctx.values.filter((v) => v.value_list_id === listId) : []);
   const listOf = (e: number, a: number) => ctx.attrs.find((x) => x.entity_code === e && x.attribute_code === a)?.value_list_id ?? null;
@@ -49,10 +55,11 @@ export default async function E2Admin({ searchParams }: { searchParams: Promise<
           <div className="flex gap-2 flex-wrap">
             <form action={testLink}><input type="hidden" name="entity" value={entity} /><button className="btn" disabled={!cfg}>Test the connection</button></form>
             <form action={loadTax}><input type="hidden" name="entity" value={entity} /><button className="btn primary" disabled={!cfg}>{ctx.taxonomy ? "Reload the taxonomy" : "Load the taxonomy"}</button></form>
+            <form action={loadLong}><input type="hidden" name="entity" value={entity} /><button className="btn" disabled={!cfg || !ctx.taxonomy} title="Aircraft make/model (~20 000) and operators (~17 000): cached once, searched by name">{longCount ? "Reload the long lists" : "Load the long lists (aircraft types, operators)"}</button></form>
           </div>
-          {ctx.taxonomy && <p className="mini mt-2">Taxonomy <b>{ctx.taxonomy.name} {ctx.taxonomy.version}</b> loaded {ctx.taxonomy.loaded_at.slice(0, 16).replace("T", " ")} ({ctx.taxonomy.env}) · {ctx.attrs.length} attributes · {ctx.values.length} values in {new Set(ctx.values.map((v) => v.value_list_id)).size} lists.</p>}
+          {ctx.taxonomy && <p className="mini mt-2">Taxonomy <b>{ctx.taxonomy.name} {ctx.taxonomy.version}</b> loaded {ctx.taxonomy.loaded_at.slice(0, 16).replace("T", " ")} ({ctx.taxonomy.env}) · {ctx.attrs.length} attributes · {ctx.values.length} values in {new Set(ctx.values.map((v) => v.value_list_id)).size} lists{longCount ? ` · long lists: ${longCount} aircraft types and operators` : " · long lists not cached yet"}.</p>}
         </div></section>
-      <section className="card mb-4"><div className="ch"><span className="eyebrow">Correspondences, S.A.M. value → E2 value</span><span className="mini">{ctx.maps.length} set</span></div>
+      <section className="card mb-4"><div className="ch"><span className="eyebrow">Correspondences, S.A.M. value → E2 value</span><span className="flex gap-2 items-center"><form method="get" className="flex gap-1 items-center"><input type="hidden" name="ent" value={entity} /><input name="q" className="inp" defaultValue={sp.q ?? ""} placeholder="search the long lists (e.g. Mustang, Astonjet)" style={{ marginTop: 0, width: 280 }} /><button className="btn sm">Search</button></form><span className="mini">{ctx.maps.length} set</span></span></div>
         <div className="cb" style={{ padding: 0 }}>
           {!ctx.taxonomy ? <p className="p-4 mini">Load the taxonomy first: the lists come from it.</p> : <table className="tbl"><thead><tr><th>Field</th><th>Our value</th><th>E2 value</th><th></th></tr></thead><tbody>
             {FIELDS.flatMap((F) => { const lid = listOf(F.entity, F.attribute); const list = vals(lid); return F.ours(o, entity).map((our) => { const m = ctx.maps.find((x) => x.field === F.field && x.our_value === our); return (

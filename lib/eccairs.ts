@@ -121,6 +121,24 @@ export const E2_LISTS_TO_CACHE: { entity: number; attributes: number[] }[] = [
   { entity: 22, attributes: [E2_ATTR.NARRATIVE_LANG] },
   { entity: 53, attributes: [E2_ATTR.REPORTER_LANG] },
 ];
+/** The long lists (20 000 aircraft make/models, 17 000 operators): cached on demand, never read whole on a screen — searched by name. */
+export const E2_LONG_LISTS: { entity: number; attribute: number }[] = [{ entity: 4, attribute: E2_ATTR.AC_TYPE }, { entity: 4, attribute: E2_ATTR.AC_OPERATOR }];
+export async function loadLongLists(db: SupabaseClient, entity: string): Promise<{ lists: number; values: number }> {
+  const { data: tx } = await db.from("eccairs_taxonomies").select("taxonomy_id").eq("entity", entity).maybeSingle();
+  const tid = (tx as { taxonomy_id: number } | null)?.taxonomy_id; if (!tid) throw new Error("Load the taxonomy first.");
+  let nL = 0, nV = 0;
+  for (const L of E2_LONG_LISTS) {
+    const { data: a } = await db.from("eccairs_attributes").select("value_list_id").eq("taxonomy_id", tid).eq("entity_code", L.entity).eq("attribute_code", L.attribute).maybeSingle();
+    const vl = (a as { value_list_id: number | null } | null)?.value_list_id; if (!vl) continue;
+    const j = await e2(entity, `/taxonomy-service/external/value-lists/${vl}?taxonomyId=${tid}`);
+    type VLV = { identifier?: number; valueId?: number; id?: number; description?: string; detailed?: string; parent?: number | null; level?: number | null; active?: boolean | number | null };
+    const d = j.data as { listOfValues?: VLV[]; valueListModels?: VLV[] } | null;
+    const rows = (d?.listOfValues ?? d?.valueListModels ?? []).map((v) => ({ taxonomy_id: tid, value_list_id: vl, value_id: v.identifier ?? v.valueId ?? v.id ?? 0, description: v.description ?? v.detailed ?? String(v.identifier ?? v.id), detailed: v.detailed ?? null, parent: v.parent ?? null, level: v.level ?? null, active: v.active !== false && v.active !== 0 })).filter((r) => r.value_id);
+    for (let i = 0; i < rows.length; i += 1000) { const { error } = await db.from("eccairs_values").upsert(rows.slice(i, i + 1000), { onConflict: "taxonomy_id,value_list_id,value_id" }); if (error) throw new Error(`eccairs_values list ${vl}: ${error.message}`); }
+    nL++; nV += rows.length;
+  }
+  return { lists: nL, values: nV };
+}
 type TaxAttr = { taxonomyCode: number; description: string; detailed?: string; explanation?: string; minInstance?: number | string | null; maxInstance?: number | string | null; attributeDataType?: { name?: string } | string | null; dataType?: { name?: string } | string | null; valueList?: { id?: number } | null; attributeValueListId?: number | null; valueListId?: number | null };
 type TaxEntity = { taxonomyCode: number; description: string; attributesList?: { childrenAttributes?: TaxAttr[] } };
 const dtName = (a: TaxAttr) => { const d = a.attributeDataType ?? a.dataType; return typeof d === "string" ? d : d?.name ?? null; };

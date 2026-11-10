@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { E2_ATTR, E2_ENTITIES, getOccurrence, type TaxonomyCodes, E2_SHAPE } from "@/lib/eccairs";
+import { E2_ATTR, E2_ENTITIES, E2_LONG_LISTS, E2_SHAPE, getOccurrence, type TaxonomyCodes } from "@/lib/eccairs";
 import { ENT } from "@/lib/nav";
 
 /* ECC-02 · From a S.A.M. safety report to an E2 original report (taxonomyCodes JSON, ECCAIRS Aviation 5.1).
@@ -18,18 +18,49 @@ type Map = { field: string; our_value: string; attribute_code: number; value_id:
 export async function e2Context(db: SupabaseClient, entity: string) {
   const { data: tx } = await db.from("eccairs_taxonomies").select("*").eq("entity", entity).maybeSingle();
   const t = tx as { taxonomy_id: number; name: string; version: string; loaded_at: string; env: string | null } | null;
-  if (!t) return { taxonomy: null, attrs: [] as Attr[], values: [] as Val[], maps: [] as Map[] };
+  if (!t) return { taxonomy: null, attrs: [] as Attr[], values: [] as Val[], maps: [] as Map[], long: [] as number[] };
   const [{ data: at }, { data: mp }] = await Promise.all([
     db.from("eccairs_attributes").select("entity_code,attribute_code,description,data_type,value_list_id,min_instance").eq("taxonomy_id", t.taxonomy_id).range(0, 4999),
     db.from("eccairs_value_maps").select("field,our_value,attribute_code,value_id").eq("entity", entity),
   ]);
+  const attrs = (at ?? []) as Attr[];
+  // the long lists (aircraft types, operators) stay in the database and are searched by name (longValues); the others are read whole
+  const long = E2_LONG_LISTS.map((L) => attrs.find((a) => a.entity_code === L.entity && a.attribute_code === L.attribute)?.value_list_id).filter((x): x is number => !!x);
   // PostgREST caps a page at 1 000 rows: the values are read page by page
   const values: Val[] = [];
   for (let from = 0; from < 60000; from += 1000) {
-    const { data } = await db.from("eccairs_values").select("value_list_id,value_id,description,parent,level").eq("taxonomy_id", t.taxonomy_id).eq("active", true).order("value_list_id").order("value_id").range(from, from + 999);
+    let q = db.from("eccairs_values").select("value_list_id,value_id,description,parent,level").eq("taxonomy_id", t.taxonomy_id).eq("active", true);
+    if (long.length) q = q.not("value_list_id", "in", `(${long.join(",")})`);
+    const { data } = await q.order("value_list_id").order("value_id").range(from, from + 999);
     const page = (data ?? []) as Val[]; values.push(...page); if (page.length < 1000) break;
   }
-  return { taxonomy: t, attrs: (at ?? []) as Attr[], values, maps: (mp ?? []) as Map[] };
+  return { taxonomy: t, attrs, values, maps: (mp ?? []) as Map[], long };
+}
+/** Values of a long list whose name contains one of the terms (or given ids) — a handful, for a select. */
+export async function longValues(db: SupabaseClient, ctx: E2Context, listId: number | null, terms: (string | null | undefined)[], ids: (number | null | undefined)[] = [], limit = 40): Promise<Val[]> {
+  if (!ctx.taxonomy || !listId) return [];
+  const out = new globalThis.Map<number, Val>();
+  const idList = ids.filter((x): x is number => x != null);
+  if (idList.length) { const { data } = await db.from("eccairs_values").select("value_list_id,value_id,description,parent,level").eq("taxonomy_id", ctx.taxonomy.taxonomy_id).eq("value_list_id", listId).in("value_id", idList); for (const v of (data ?? []) as Val[]) out.set(v.value_id, v); }
+  for (const term of [...new Set(terms.map((x) => (x ?? "").trim()).filter((x) => x.length >= 2))]) {
+    const { data } = await db.from("eccairs_values").select("value_list_id,value_id,description,parent,level").eq("taxonomy_id", ctx.taxonomy.taxonomy_id).eq("value_list_id", listId).eq("active", true).ilike("description", `%${term.replace(/[%_]/g, "")}%`).order("description").limit(limit);
+    for (const v of (data ?? []) as Val[]) out.set(v.value_id, v);
+  }
+  return [...out.values()];
+}
+/** Adds to the context the long-list values a review screen needs: the fleet's type, the entity as operator, whatever is already mapped. */
+export async function withLongValues(db: SupabaseClient, ctx: E2Context, extra: { entity: string; registry?: { type_code: string | null; model: string | null } | null; q?: string | null }): Promise<E2Context> {
+  if (!ctx.taxonomy || !ctx.long.length) return ctx;
+  const A = E2_ENTITIES.AIRCRAFT; const lType = listOf(ctx, A, E2_ATTR.AC_TYPE), lOp = listOf(ctx, A, E2_ATTR.AC_OPERATOR);
+  const mappedIds = (field: string) => ctx.maps.filter((m) => m.field === field).map((m) => m.value_id);
+  const name = ENT[extra.entity]?.name ?? extra.entity;
+  const [types, ops] = await Promise.all([
+    longValues(db, ctx, lType, [extra.registry?.model, extra.registry?.type_code, extra.q], mappedIds("aircraft_type")),
+    longValues(db, ctx, lOp, [name.split(" ")[0], extra.q], mappedIds("operator")),
+  ]);
+  const have = new Set(ctx.values.map((v) => `${v.value_list_id}:${v.value_id}`));
+  const add = [...types, ...ops].filter((v) => !have.has(`${v.value_list_id}:${v.value_id}`));
+  return { ...ctx, values: [...ctx.values, ...add] };
 }
 export type E2Context = Awaited<ReturnType<typeof e2Context>>;
 const listOf = (ctx: E2Context, entity: number, attribute: number) => ctx.attrs.find((a) => a.entity_code === entity && a.attribute_code === attribute)?.value_list_id ?? null;
@@ -76,10 +107,10 @@ export function proposeFields(r: ReportForE2, a: AnalysisForE2, ctx: E2Context, 
     { key: "narrative", label: "Narrative (de-identified)", entity: N, attribute: E2_ATTR.NARRATIVE, kind: "text", value: narrative, required: true, from: narrative ? "MOR draft (de-identified by S.A.M.)" : "no MOR draft yet — run the analysis or write it", hint: "Only the de-identified text goes to the authority; the reporter's own words and identity stay in S.A.M." },
     { key: "weather", label: "Weather relevant", entity: A, attribute: E2_ATTR.WEATHER_RELEVANT, kind: "list", listId: L(A, E2_ATTR.WEATHER_RELEVANT), value: findValue(ctx, L(A, E2_ATTR.WEATHER_RELEVANT), "No") },
     { key: "ac_registration", label: "Aircraft registration", entity: A, attribute: E2_ATTR.AC_REGISTRATION, kind: "text", value: reg, from: "report / fleet" },
-    { key: "ac_type", label: "Aircraft type (manufacturer / model)", entity: A, attribute: E2_ATTR.AC_TYPE, kind: "list", listId: L(A, E2_ATTR.AC_TYPE), value: mapped(ctx, "aircraft_type", extra.registry?.type_code) ?? mapped(ctx, "aircraft_type", extra.registry?.model), from: extra.registry?.type_code ? `fleet: ${extra.registry.type_code}` : "fleet registry", hint: "Long ICAO list — mapped once per type in Safety › MOR / ECCAIRS › Correspondences." },
+    { key: "ac_type", label: "Aircraft type (manufacturer / model)", entity: A, attribute: E2_ATTR.AC_TYPE, kind: "list", listId: L(A, E2_ATTR.AC_TYPE), value: mapped(ctx, "aircraft_type", extra.registry?.type_code) ?? mapped(ctx, "aircraft_type", extra.registry?.model) ?? findValue(ctx, L(A, E2_ATTR.AC_TYPE), extra.registry?.model), from: extra.registry?.type_code ? `fleet: ${extra.registry.type_code}` : "fleet registry", hint: "Long ICAO list — mapped once per type in Safety › MOR / ECCAIRS › Correspondences." },
     { key: "ac_msn", label: "Aircraft serial number", entity: A, attribute: E2_ATTR.AC_MSN, kind: "text", value: extra.registry?.msn ?? null, from: "fleet" },
     { key: "ac_callsign", label: "Call sign", entity: A, attribute: E2_ATTR.AC_CALLSIGN, kind: "text", value: r.flight_ref?.replace(/[\s-]/g, "") ?? null, from: "flight reference" },
-    { key: "ac_operator", label: "Operator", entity: A, attribute: E2_ATTR.AC_OPERATOR, kind: "list", listId: L(A, E2_ATTR.AC_OPERATOR), value: mapped(ctx, "operator", r.entity), from: "entity (mapped once)" },
+    { key: "ac_operator", label: "Operator", entity: A, attribute: E2_ATTR.AC_OPERATOR, kind: "list", listId: L(A, E2_ATTR.AC_OPERATOR), value: mapped(ctx, "operator", r.entity) ?? findValue(ctx, L(A, E2_ATTR.AC_OPERATOR), ENT[r.entity]?.name), from: "entity (mapped once)" },
     { key: "ac_operation_type", label: "Operation type", entity: A, attribute: E2_ATTR.AC_OPERATION_TYPE, kind: "list", listId: L(A, E2_ATTR.AC_OPERATION_TYPE), value: mapped(ctx, "operation_type", r.entity) ?? findValue(ctx, L(A, E2_ATTR.AC_OPERATION_TYPE), OPERATION_TYPE[r.entity]), from: ENT[r.entity]?.qual ?? "entity" },
     { key: "ac_phase", label: "Flight phase", entity: A, attribute: E2_ATTR.AC_FLIGHT_PHASE, kind: "list", listId: L(A, E2_ATTR.AC_FLIGHT_PHASE), value: mapped(ctx, "phase", r.phase) ?? (PHASE_WORDS[r.phase ?? ""] ?? [r.phase?.split(" / ")[0]]).map((w) => findValue(ctx, L(A, E2_ATTR.AC_FLIGHT_PHASE), w)).find(Boolean) ?? null, from: r.phase ? `phase “${r.phase}”` : "to choose" },
     { key: "ac_departure", label: "Last departure point", entity: A, attribute: E2_ATTR.AC_LAST_DEPARTURE, kind: "text", value: r.complements?.departure ?? r.complements?.from ?? null, from: "complements" },

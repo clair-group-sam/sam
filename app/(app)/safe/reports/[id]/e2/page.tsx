@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { isSafetyDesk } from "@/lib/safety";
 import { eccairsConfig, eccairsEnv } from "@/lib/eccairs";
-import { buildTaxonomyCodes, e2Context, proposeFields, type AnalysisForE2, type ReportForE2 } from "@/lib/eccairs-map";
+import { buildTaxonomyCodes, e2Context, proposeFields, withLongValues, type AnalysisForE2, type ReportForE2 } from "@/lib/eccairs-map";
 import { sendToE2 } from "./actions";
 
 /* ECC-02 · Review before sending to ECCAIRS 2: each attribute with S.A.M.'s proposal and where it comes from; lists from the cached
@@ -21,9 +21,10 @@ export default async function E2Review({ params, searchParams }: { params: Promi
   const cfg = eccairsConfig(r.entity); const env = eccairsEnv(r.entity);
   let prepError: string | null = null;
   const { data: an } = await db.from("report_analysis").select("mor_draft,adrep,mor_status").eq("report_id", id).maybeSingle();
-  let ctx: Awaited<ReturnType<typeof e2Context>> = { taxonomy: null, attrs: [], values: [], maps: [] };
+  let ctx: Awaited<ReturnType<typeof e2Context>> = { taxonomy: null, attrs: [], values: [], maps: [], long: [] };
   try { ctx = await e2Context(db, r.entity); } catch (e) { prepError = `taxonomy: ${(e as Error).message}`; }
   const { data: ac } = r.aircraft ? await db.from("aircraft").select("registration,type_code,model,msn").ilike("registration", r.aircraft.trim()).limit(1).maybeSingle() : { data: null };
+  try { ctx = await withLongValues(db, ctx, { entity: r.entity, registry: ac as { type_code: string | null; model: string | null } | null }); } catch (e) { prepError = `long lists: ${(e as Error).message}`; }
   const { data: subs } = await db.from("eccairs_submissions").select("at,kind,requested_status,ok,e2_id,e2_version,e2_status,error").eq("report_id", id).order("at", { ascending: false }).limit(10);
   const a = an as AnalysisForE2;
   let fields: ReturnType<typeof proposeFields> = [];

@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isSafetyDesk } from "@/lib/safety";
 import { changeOccurrenceStatus, createOccurrence, eccairsConfig, eccairsEnv, editOccurrence, type TaxonomyCodes } from "@/lib/eccairs";
-import { buildTaxonomyCodes, e2Context, proposeFields, type AnalysisForE2, type ReportForE2 } from "@/lib/eccairs-map";
+import { buildTaxonomyCodes, e2Context, proposeFields, withLongValues, type AnalysisForE2, type ReportForE2 } from "@/lib/eccairs-map";
 import { markMorFiled } from "@/lib/mor-filed";
 
 /* ECC-02 · the safety desk reviews the E2 report S.A.M. proposes, then saves it as DRAFT in E2 or sends it (SENT = the authority receives it).
@@ -22,9 +22,10 @@ async function load(id: string) {
 }
 /** Reads the reviewed form back into fields: the proposal gives the shape, the form the values. */
 async function fieldsFrom(fd: FormData, r: ReportForE2, a: AnalysisForE2) {
-  const ctx = await e2Context(db(), r.entity);
+  let ctx = await e2Context(db(), r.entity);
   if (!ctx.taxonomy) throw new Error("Load the taxonomy first (Safety › MOR / ECCAIRS).");
-  const { data: ac } = r.aircraft ? await db().from("aircraft").select("registration,type_code,model,msn").ilike("registration", r.aircraft.trim()).maybeSingle() : { data: null };
+  const { data: ac } = r.aircraft ? await db().from("aircraft").select("registration,type_code,model,msn").ilike("registration", r.aircraft.trim()).limit(1).maybeSingle() : { data: null };
+  ctx = await withLongValues(db(), ctx, { entity: r.entity, registry: ac as { type_code: string | null; model: string | null } | null });
   const fields = proposeFields(r, a, ctx, { registry: ac as { registration: string; type_code: string | null; model: string | null; msn: string | null } | null });
   for (const f of fields) {
     if (f.kind === "lists") f.value = fd.getAll(`f_${f.key}`).map(String).filter(Boolean);
