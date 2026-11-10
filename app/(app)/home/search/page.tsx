@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { isSafetyDesk } from "@/lib/safety";
+import { BUILT, MODULES, ROLES, SUB } from "@/lib/nav";
 
 type Hit = { href: string; code?: string; title: string; sub?: string; entity?: string };
 type Group = { label: string; all?: string; hits: Hit[] };
@@ -16,6 +17,16 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
   const office = s.role !== "user"; const desk = isSafetyDesk(s);
   const groups: Group[] = [];
+  // Ctrl K as a command palette too: the screens of the person's menu whose name matches ("kpi", "hazard", "crisis directory")
+  if (q.length >= 2) {
+    const R = ROLES[s.role]; const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const screens: Hit[] = [];
+    for (const m of MODULES) { if (!R.mods.includes(m.id)) continue;
+      for (const sub of SUB[m.id] ?? []) { if (sub.hidden || !(R.subs[m.id] ?? []).includes(sub.id) || !(BUILT[m.id] ?? []).includes(sub.id)) continue;
+        const hay = `${m.label} ${sub.label} ${m.id} ${sub.id}`.toLowerCase();
+        if (words.every((w) => hay.includes(w))) screens.push({ href: `/${m.id}/${sub.id}`, title: sub.label, sub: m.label }); } }
+    if (screens.length) groups.push({ label: "Screens", hits: screens.slice(0, 8) });
+  }
   if (q.length >= 2 && scope.length) {
     const db = supabaseAdmin();
     const like = `%${q.replace(/[%_,()]/g, " ").trim()}%`;
@@ -58,7 +69,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
   return (
     <>
       <PageHeader eyebrow="S.A.M., Search" title={q ? `Search: ${q}` : "Search"} sub={q.length >= 2 ? `${total} result${total === 1 ? "" : "s"} in ${s.entity === "ALL" ? "every entity of your scope" : "the working entity"}, 8 at most per kind; each heading opens its full list.` : "Type at least 2 letters: a word, a number (2026-002, MOC 39), a registration, a rule code (ORO.GEN.200)."} />
-      <form className="card cb mb-4" style={{ display: "flex", gap: 8 }} action="/home/search"><input name="q" className="inp" defaultValue={q} placeholder="bird strike, 9H-AJD, ORO.FTL.120, MOC 39, Leon…" aria-label="Search S.A.M." style={{ flex: 1, marginTop: 0 }} autoFocus /><button className="btn primary">Search</button></form>
+      <form className="card cb mb-4" style={{ display: "flex", gap: 8 }} action="/home/search"><input name="q" className="inp" defaultValue={q} placeholder="bird strike, 9H-AJD, ORO.FTL.120, MOC 39, Leon, indicators, crisis directory…" aria-label="Search S.A.M." style={{ flex: 1, marginTop: 0 }} autoFocus /><button className="btn primary">Search</button></form>
       {q.length >= 2 && total === 0 && <p className="mini mb-4">Nothing found outside the text of the manuals. Try a shorter word, or the Group view at the top to search every entity.</p>}
       <div className="searchgrid">
         {groups.map((g) => (
