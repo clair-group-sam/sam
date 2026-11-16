@@ -50,7 +50,8 @@ export async function saveFile(formData: FormData) {
   const { s, db, f, cmm, owner } = await guard(id);
   if (!cmm && !owner) throw new Error("Not allowed");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  const fields = ["title", "trigger_kind", "trigger_note", "finding_ref", "aircraft_reg", "np_post_code", "moc_ref", "portal_ref", "portal_url", "target_date", "lessons", "revision_id", "owner_role"];
+  const fields = ["title", "trigger_kind", "trigger_note", "finding_ref", "aircraft_reg", "np_post_code", "moc_ref", "portal_ref", "portal_url", "target_date", "lessons", "revision_id", "owner_role", "next_task", "next_owner", "assessor", "portal_status", "portal_read_on", "last_exchange", "last_exchange_on"];
+  if (formData.has("ball_override")) { const b = str(formData, "ball_override"); patch.ball_override = b === "us" || b === "authority" ? b : null; }
   for (const k of fields) if (formData.has(k)) patch[k] = opt(formData, k);
   if (cmm) { if (formData.has("category")) patch.category = opt(formData, "category"); if (formData.has("portal")) patch.portal = opt(formData, "portal"); if (formData.has("fee")) patch.fee = str(formData, "fee") ? Number(str(formData, "fee")) : null; }
   await db.from("authority_files").update(patch).eq("id", id);

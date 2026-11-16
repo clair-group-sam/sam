@@ -92,6 +92,7 @@ function OneEntity({ r }: { r: Review }) {
         </Area>
         <Area title="Authority and documents" link={{ href: "/proj/auth", label: "Open the applications" }} tone={tone(0, r.files.late + r.docs.atAuthority)}>
           <Fig label="applications open" value={r.files.open} href="/proj/auth" />
+          <Fig label="our turn" value={r.files.ours} tone={r.files.lateOurs ? "red" : r.files.ours ? "amber" : undefined} href="/proj/auth" hint={r.files.lateOurs ? `${r.files.lateOurs} past target on our side` : undefined} />
           <Fig label="past target date" value={r.files.late} tone={r.files.late ? "amber" : undefined} href="/proj/auth" />
           <Fig label="manuals with civil aviation" value={r.docs.atAuthority} tone={r.docs.atAuthority ? "amber" : undefined} href="/proj/auth" />
           <Fig label="manuals in revision" value={r.docs.drafts} href="/docs/drafts" />

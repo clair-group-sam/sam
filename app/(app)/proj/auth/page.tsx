@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader, Metric } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
-import { AT_AUTHORITY, OPEN_STAGES, STAGE_LABEL, STAGE_TONE, daysAtAuthority, fr, nextAction, today, type AuthorityFile, type FileItem, type FileType, type Stage } from "@/lib/authority";
+import { AT_AUTHORITY, OPEN_STAGES, STAGE_LABEL, STAGE_TONE, daysAtAuthority, fr, nextAction, today, type AuthorityFile, type FileItem, type FileType, type Stage, ballOf, dueState } from "@/lib/authority";
 
 /** Projects › CAA applications: every application, notification and report to the authority, by stage. */
 export default async function AuthorityFiles({ searchParams }: { searchParams: Promise<{ entity?: string; stage?: string; type?: string; q?: string }> }) {
@@ -29,25 +29,33 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
   for (const it of (itemRows ?? []) as (Pick<FileItem, "file_id" | "required" | "done" | "label">)[]) { const a = itemsBy.get(it.file_id) ?? []; a.push(it); itemsBy.set(it.file_id, a); }
 
   // metrics over the open files of the scope (independent of the stage filter)
-  let mq = db.from("authority_files").select("stage,target_date,submitted_at").in("stage", OPEN_STAGES);
+  // last exchange per file: the desk's one-liner, else the latest round
+  const { data: rd } = ids.length ? await db.from("authority_rounds").select("file_id,at,direction,note").in("file_id", ids).order("at", { ascending: false }).limit(2000) : { data: [] };
+  const lastRound = new Map<string, { at: string; direction: string; note: string }>();
+  for (const r of (rd ?? []) as { file_id: string; at: string; direction: string; note: string }[]) if (!lastRound.has(r.file_id)) lastRound.set(r.file_id, r);
+  let mq = db.from("authority_files").select("stage,target_date,submitted_at,ball_override").in("stage", OPEN_STAGES);
   mq = entity !== "ALL" ? mq.eq("entity", entity) : mq.in("entity", ents);
   const { data: open } = await mq;
-  const o = (open ?? []) as { stage: Stage; target_date: string | null; submitted_at: string | null }[];
+  const o = (open ?? []) as { stage: Stage; target_date: string | null; submitted_at: string | null; ball_override: "us" | "authority" | null }[];
   const t0 = today();
   const atAuth = o.filter((x) => AT_AUTHORITY.includes(x.stage)).length;
   const remarks = o.filter((x) => x.stage === "remarks").length;
-  const late = o.filter((x) => AT_AUTHORITY.includes(x.stage) && x.target_date && x.target_date < t0).length;
+  const late = o.filter((x) => x.target_date && x.target_date < t0).length;
+  const ours = o.filter((x) => ballOf(x) === "us").length;
+  const lateOurs = o.filter((x) => x.target_date && x.target_date < t0 && ballOf(x) === "us").length;
+  const soon = o.filter((x) => dueState(x.target_date, t0).state === "soon").length;
   const link = (p: Record<string, string | undefined>) => { const u = new URLSearchParams(); const all = { entity, stage, type: sp.type, q: sp.q, ...p }; for (const [k, v] of Object.entries(all)) if (v) u.set(k, v); return `/proj/auth?${u}`; };
 
   return (
     <>
       <PageHeader eyebrow="Projects, CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC, one file per change, from the trigger to the close-out."
         right={<Link href="/proj/auth/new" className="btn primary">+ New file</Link>} />
-      <div className="grid grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
-        <Metric label="At the authority" value={atAuth} hint="submitted, waiting for a decision" />
-        <Metric label="Remarks to answer" value={remarks} tone={remarks ? "amber" : undefined} hint="authority rounds in progress" />
-        <Metric label="Past target date" value={late} tone={late ? "red" : undefined} hint="follow-up due" />
+        <Metric label="Our turn" value={ours} tone={ours ? "amber" : undefined} hint="an action is expected from us" />
+        <Metric label="At the authority" value={o.length - ours} hint={`${remarks} with remarks to answer, ${atAuth} submitted`} />
+        <Metric label="Past target date" value={late} tone={late ? "red" : undefined} hint={late ? `${lateOurs} on our side, ${late - lateOurs} waiting on the authority` : "none"} />
+        <Metric label="Due within 15 days" value={soon} tone={soon ? "amber" : undefined} hint="target date" />
       </div>
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         {ents.length > 1 && <div className="chips">{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={link({ entity: e })} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
@@ -56,11 +64,11 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
       </div>
       <section className="card">
         <table className="tbl">
-          <thead><tr><th className="entcol">Entity</th><th>Type</th><th>File</th><th>Stage</th><th>Reference</th><th>Owner</th><th>At authority</th><th>Target</th><th>Next action</th></tr></thead>
+          <thead><tr><th className="entcol">Entity</th><th>Type</th><th>File</th><th>Stage</th><th>Reference</th><th>Turn</th><th>Target</th><th>Last exchange</th><th>Next task</th></tr></thead>
           <tbody>
             {files.map((f) => {
               const d = daysAtAuthority(f);
-              const late = AT_AUTHORITY.includes(f.stage) && f.target_date && f.target_date < t0;
+              const b = ballOf(f); const due = dueState(f.target_date, t0); const lr = lastRound.get(f.id);
               return (
                 <tr key={f.id}>
                   <td className="entcol"><span className={"ent " + f.entity}>{f.entity}</span></td>
@@ -68,10 +76,10 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
                   <td><Link href={`/proj/auth/${f.id}`} className="underline"><b>{f.title}</b></Link><div className="mini">{f.portal ?? f.authority}{f.trigger_note ? `, ${f.trigger_note}` : ""}</div></td>
                   <td><span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{f.rounds > 0 && <div className="mini">{f.rounds} round{f.rounds > 1 ? "s" : ""}</div>}</td>
                   <td className="mono">{f.portal_url ? <a className="underline" href={f.portal_url} target="_blank" rel="noreferrer">{f.portal_ref ?? "portal"}</a> : f.portal_ref ?? "—"}</td>
-                  <td className="mono">{f.owner_role ?? "—"}</td>
-                  <td className={"mono" + (late ? " red" : "")}>{d !== null && AT_AUTHORITY.includes(f.stage) ? `${d} d` : f.decision_at && d !== null ? `${d} d` : "—"}</td>
-                  <td className={"mono" + (late ? " red" : "")}>{fr(f.target_date)}</td>
-                  <td className="mini">{nextAction(f, itemsBy.get(f.id) ?? [])}</td>
+                  <td>{b ? <span className={"pill " + (b === "us" ? "amber" : "")}>{b === "us" ? "Ours" : f.authority ?? "Authority"}</span> : "—"}{f.portal_status && <div className="mini">{f.portal_status}</div>}{d !== null && AT_AUTHORITY.includes(f.stage) && <div className="mini">{d} d there</div>}</td>
+                  <td className="mono">{fr(f.target_date)}{due.days !== null && b && <div className={"mini" + (due.state === "late" ? " red" : "")}>{due.days < 0 ? `${-due.days} d past` : `in ${due.days} d`}</div>}</td>
+                  <td className="mini" style={{ maxWidth: 260 }}>{f.last_exchange ? <>{f.last_exchange_on ? <b>{fr(f.last_exchange_on)} </b> : null}{f.last_exchange}</> : lr ? <><b>{fr(lr.at)} </b>{lr.direction === "sent" ? "Sent: " : "Received: "}{lr.note.slice(0, 110)}</> : "—"}{f.assessor && <div>{f.assessor}</div>}</td>
+                  <td className="mini" style={{ maxWidth: 240 }}>{nextAction(f, itemsBy.get(f.id) ?? [])}{!f.next_owner && f.owner_role ? <div className="mono">{f.owner_role}</div> : null}</td>
                 </tr>);
             })}
             {!files.length && <tr><td colSpan={9} className="p-6 text-slate6">No file {stage === "open" ? "open" : stage === "all" ? "" : `in stage “${STAGE_LABEL[stage as Stage] ?? stage}”`} in this scope. <Link className="underline" href="/proj/auth/new">Open one</Link>.</td></tr>}

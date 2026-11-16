@@ -7,7 +7,7 @@ import EntityBand from "@/components/EntityBand";
 import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
-import { CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
+import { BALL_LABEL, ballOf, dueState, CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
 import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, removeAttachment, saveFile, toggleItem } from "../actions";
 import { Icon } from "@/lib/icons";
 
@@ -179,6 +179,21 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
 
         <div className="grid gap-4">
           {/* route & portal */}
+          <section className="card">
+            <div className="ch"><span className="eyebrow">Where it stands</span>{ballOf(f) && <span className={"pill " + (ballOf(f) === "us" ? "amber" : "")}>{ballOf(f) === "us" ? "Our turn" : `${f.authority ?? "Authority"}'s turn`}</span>}</div>
+            <form action={saveFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />
+              {(() => { const d = dueState(f.target_date); return d.days !== null && ballOf(f) ? <div className="mini">Target {fr(f.target_date)}: <b className={d.state === "late" ? "red" : ""}>{d.days < 0 ? `${-d.days} days past` : `in ${d.days} days`}</b>{d.state === "late" ? (ballOf(f) === "authority" ? `, waiting on ${f.authority ?? "the authority"}` : ", on our side") : ""}</div> : null; })()}
+              <label><span className="mini">Next task, in one line</span><input name="next_task" className="inp" defaultValue={f.next_task ?? ""} placeholder={nextAction({ ...f, next_task: null }, items)} disabled={!mayEdit} /></label>
+              <label><span className="mini">Who</span><input name="next_owner" className="inp" defaultValue={f.next_owner ?? ""} placeholder={f.owner_role ?? "post or name"} disabled={!mayEdit} /></label>
+              <label><span className="mini">Whose turn</span><select name="ball_override" className="inp" defaultValue={f.ball_override ?? ""} disabled={!mayEdit}><option value="">From the stage ({BALL_LABEL[ballOf({ stage: f.stage, ball_override: null }) ?? ""] ?? "none"})</option><option value="us">Ours</option><option value="authority">The authority&apos;s</option></select></label>
+              <label><span className="mini">Status on the portal</span><input name="portal_status" className="inp" defaultValue={f.portal_status ?? ""} placeholder="Assessing, Requires Info, Ouvert…" disabled={!mayEdit} /></label>
+              <label><span className="mini">Assessor / agent</span><input name="assessor" className="inp" defaultValue={f.assessor ?? ""} disabled={!mayEdit} /></label>
+              <label><span className="mini">Last exchange, in one line</span><input name="last_exchange" className="inp" defaultValue={f.last_exchange ?? ""} placeholder={rounds[0] ? `${rounds[0].direction === "sent" ? "Sent" : "Received"}: ${rounds[0].note.slice(0, 80)}` : ""} disabled={!mayEdit} /></label>
+              <div className="grid grid-cols-2 gap-2"><label><span className="mini">Exchange on</span><input name="last_exchange_on" type="date" className="inp" defaultValue={f.last_exchange_on ?? ""} disabled={!mayEdit} /></label><label><span className="mini">Portal read on</span><input name="portal_read_on" type="date" className="inp" defaultValue={f.portal_read_on ?? ""} disabled={!mayEdit} /></label></div>
+              {mayEdit && <button className="btn" type="submit">Save</button>}
+            </form>
+          </section>
+
           <section className="card">
             <div className="ch"><span className="eyebrow">Route and portal</span></div>
             <form action={saveFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />

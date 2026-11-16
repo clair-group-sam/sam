@@ -16,7 +16,22 @@ export type AuthorityFile = {
   np_post_code: string | null; moc_ref: string | null; outcome: string | null; rounds: number; fee: number | null; fee_currency: string | null;
   triggered_at: string; target_date: string | null; submitted_at: string | null; decision_at: string | null; closed_at: string | null;
   lessons: string | null; created_by: string | null; created_at: string; updated_at: string; project_id?: string | null;
+  ball_override?: "us" | "authority" | null; next_task?: string | null; next_owner?: string | null; assessor?: string | null;
+  portal_status?: string | null; portal_read_on?: string | null; last_exchange?: string | null; last_exchange_on?: string | null;
 };
+/** Whose turn it is on an open file: the authority's once submitted, ours otherwise; the desk can say otherwise (portal wording). */
+export type Ball = "us" | "authority" | null;
+export function ballOf(f: Pick<AuthorityFile, "stage" | "ball_override">): Ball {
+  if (f.stage === "closed" || f.stage === "standby") return null;
+  return f.ball_override ?? (f.stage === "submitted" ? "authority" : "us");
+}
+export const BALL_LABEL: Record<string, string> = { us: "Ours", authority: "Authority" };
+/** Days to the target date (negative = past), and the state the deadlines calendar colours by. */
+export function dueState(target: string | null | undefined, t0 = today()): { days: number | null; state: "late" | "soon" | "later" | "none" } {
+  if (!target) return { days: null, state: "none" };
+  const days = Math.round((new Date(target).getTime() - new Date(t0).getTime()) / 86_400_000);
+  return { days, state: days < 0 ? "late" : days < 15 ? "soon" : "later" };
+}
 export type FileItem = { id: string; file_id: string; ord: number; key: string; label: string; role: string | null; required: boolean; done: boolean; done_by: string | null; done_at: string | null; note: string | null };
 export type FileEvent = { id: number; file_id: string; at: string; kind: string; who: string | null; note: string | null; meta: Record<string, unknown> | null };
 export type FileAttachment = { id: string; file_id: string; name: string; kind: string | null; path: string | null; size: number | null; at: string };
@@ -74,6 +89,7 @@ export const fr = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-
 
 /** What the file is waiting for, in one line. */
 export function nextAction(f: AuthorityFile, items: Pick<FileItem, "required" | "done" | "label">[] = []): string {
+  if (f.next_task?.trim() && f.stage !== "closed") return f.next_task.trim() + (f.next_owner ? `, ${f.next_owner}` : "");
   const missing = items.filter((i) => i.required && !i.done);
   switch (f.stage) {
     case "draft": return missing.length ? `Dossier: ${missing.length} required item(s) to complete` : "Hand over to Compliance";
