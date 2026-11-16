@@ -115,7 +115,6 @@ async function readMeteor() {
       const [num, title, level, limit, state, act] = c;
       if (/observation/i.test(level) || /class[ée]e|non suivie/i.test(state)) { observations++; continue; }
       if (/^(sans suite|cl[oô]tur|clos|ferm)/i.test(state)) continue;
-      if (/^en cours,\s*ouvert$/i.test(state) === false && false) continue;
       lines.push({ entity, kind: "finding", number: `#${num}`, title, level, due: iso(limit), status: state, origin: act, url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#constatation/${num}`, turn: /attente de correction|à traiter|réponse attendue|refus/i.test(state) ? "us" : "authority" });
     }
   } else skipped.push("Constatations: the list did not load");
