@@ -4,7 +4,7 @@
 importScripts("readers.js");
 const PORTALS = {
   tmcad: { label: "TMCAD (Transport Malta)", url: "https://tmcad.totalaoc.com/Registry/ApplicationForms.aspx?RegistrySubsystemId=ae125e83-db96-470f-a65e-03fa3339d90d&menusrc=menu", reader: readTmcad },
-  meteor: { label: "METEOR (DSAC)", url: "https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/", reader: readMeteor, world: "MAIN" },
+  meteor: { label: "METEOR (DSAC)", url: "https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/", reader: readMeteor, world: "MAIN", visible: true } // a single-page application only draws and scrolls its lists in a visible tab,
 };
 const loaded = (tabId) => new Promise((res) => { const t = setTimeout(() => { chrome.tabs.onUpdated.removeListener(l); res(); }, 30000);
   const l = (id, info) => { if (id === tabId && info.status === "complete") { clearTimeout(t); chrome.tabs.onUpdated.removeListener(l); res(); } }; chrome.tabs.onUpdated.addListener(l); });
@@ -19,12 +19,12 @@ chrome.runtime.onConnect.addListener((port) => {
       say({ progress: `Opening ${P.label}…` });
       let tab;
       try {
-        tab = await chrome.tabs.create({ url: P.url, active: false }); await loaded(tab.id);
+        tab = await chrome.tabs.create({ url: P.url, active: !!P.visible }); await loaded(tab.id);
         say({ progress: `Reading ${P.label}…` });
         const [inj] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: P.reader, world: P.world || "ISOLATED" });
         results.push({ portal: key, label: P.label, ...(inj?.result ?? { error: "Nothing read" }) });
       } catch (e) { results.push({ portal: key, label: P.label, error: String(e && e.message || e) }); }
-      finally { if (tab) try { await chrome.tabs.remove(tab.id); } catch { /* already closed */ } }
+      finally { if (tab) try { await chrome.tabs.remove(tab.id); } catch { /* already closed */ } if (P.visible && port.sender?.tab?.id) try { await chrome.tabs.update(port.sender.tab.id, { active: true }); } catch { /* S.A.M. tab gone */ } }
     }
     say({ done: true, results }); try { port.disconnect(); } catch { /* */ }
   });

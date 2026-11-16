@@ -75,7 +75,7 @@ async function readMeteor() {
     window.fetch = async function (i) { const r = await F.apply(this, arguments); try { const u = typeof i === "string" ? i : i.url; if (/\/api\//.test(u)) r.clone().text().then((t) => window.__samReaderHook.cap.push({ u, res: t })); } catch { /* */ } return r; };
   } else window.__samReaderHook.cap = cap;
   const got = (re) => { const c = [...cap].reverse().find((x) => re.test(x.u)); if (!c) return undefined; try { return JSON.parse(c.res); } catch { return null; } };
-  const go = async (hash, re, ms = 15000) => { cap.length = 0; if (location.hash === hash) { location.hash = "#"; await sleep(700); cap.length = 0; } location.hash = hash; const t0 = Date.now(); while (Date.now() - t0 < ms) { if (got(re) !== undefined) { await sleep(900); return true; } await sleep(250); } return false; };
+  const go = async (hash, re, ms = 15000) => { cap.length = 0; if (location.hash === hash || /^#(dossiers|constatations)$/.test(hash)) { location.hash = "#"; await sleep(900); cap.length = 0; } location.hash = hash; const t0 = Date.now(); while (Date.now() - t0 < ms) { if (got(re) !== undefined) { await sleep(900); return true; } await sleep(250); } return false; };
   // the lists load 50 lines, then more as the page is scrolled: scroll until nothing new comes
   const rowsOf = () => { const T = [...document.querySelectorAll("table")].sort((x, y) => y.rows.length - x.rows.length)[0]; return T ? T.rows.length : 0; };
   const loadAll = async () => { let n = rowsOf(); for (let i = 0; i < 12 && n >= 50; i++) { window.scrollTo(0, document.documentElement.scrollHeight); for (const el of document.querySelectorAll("*")) if (el.scrollHeight > el.clientHeight + 40 && el.clientHeight > 200) el.scrollTop = el.scrollHeight; await sleep(1500); const m = rowsOf(); if (m <= n) break; n = m; } return n; };
@@ -84,15 +84,17 @@ async function readMeteor() {
   if (await go("#dossiers", /\/dossier\/listForSearch/)) {
     await loadAll();
     const seen = new Set(); const list = cap.filter((x) => /\/dossier\/listForSearch/.test(x.u)).flatMap((x) => { try { return JSON.parse(x.res) || []; } catch { return []; } }).filter((d) => d && d.dosId && !seen.has(d.dosId) && seen.add(d.dosId));
-    for (const d of list) {
+    // closed dossiers (CLOS - Approuvé, Remplacé, Accusé de réception, refusé…) stay on the portal: only the running ones are followed
+    const running = list.filter((d) => !/^clos/i.test(String(d.statutAffichage || "")) && d.etaCd !== "CLO");
+    for (const d of running) {
       const l = { entity, kind: "file", number: `#${d.identifiant}`, title: String(d.objet || "").trim(), status: String(d.statutAffichage || "").trim(), due: iso(d.echeanceSouhaitee), type_hint: String(d.categorie || "").split(".").pop(),
         url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#dossiers/${d.verIdLastVersion}`, submitted_on: iso(d.derniereVersion) };
       if (d.verIdLastVersion && await go(`#dossiers/${d.verIdLastVersion}`, /\/filEchange/)) {
-        const v = got(/\/dossier\/getVersionDossier\//) || {}; const ag = got(/\/agentDsac/) || []; const fils = got(/\/filEchange/) || [];
+        const arr = (x) => (Array.isArray(x) ? x : []); const v = got(/\/dossier\/getVersionDossier\//) || {}; const ag = arr(got(/\/agentDsac/)); const fils = arr(got(/\/filEchange/));
         l.assessor = ag.map((a) => a.prenomNomConcat || [a.prenom, a.nom].filter(Boolean).join(" ")).filter(Boolean).join(", ") || null;
-        if (v.typeDossierListDto?.length) l.type_hint = `${l.type_hint} ${v.typeDossierListDto.map((t) => t.titre).join(", ")}`.trim();
+        if (Array.isArray(v.typeDossierListDto) && v.typeDossierListDto.length) l.type_hint = `${l.type_hint} ${v.typeDossierListDto.map((t) => t.titre).join(", ")}`.trim();
         const sent = v.demandeEnvoyee !== false;
-        const all = fils.flatMap((f) => (f.commentaireListDto || []).map((c) => ({ on: String(c.dateAjout || "").slice(0, 10), at: String(c.dateAjout || ""), dsac: !!c.utilisateur?.isDsac, who: [c.utilisateur?.prenom, c.utilisateur?.nom].filter(Boolean).join(" "), text: plain(c.valeur) }))).sort((a, b) => (a.at < b.at ? 1 : -1));
+        const all = fils.flatMap((f) => arr(f.commentaireListDto).map((c) => ({ on: String(c.dateAjout || "").slice(0, 10), at: String(c.dateAjout || ""), dsac: !!c.utilisateur?.isDsac, who: [c.utilisateur?.prenom, c.utilisateur?.nom].filter(Boolean).join(" "), text: plain(c.valeur) }))).sort((a, b) => (a.at < b.at ? 1 : -1));
         if (all[0]) { l.last_exchange = `${all[0].dsac ? "DSAC, " : ""}${all[0].who}: ${all[0].text}`.slice(0, 400); l.last_exchange_on = all[0].on || null; l.comments = all.length; }
         const open = fils.some((f) => f.ouvert);
         l.turn = !sent || /remarques dsac|à traiter|non envoy|préparation|incomplet/i.test(l.status) ? "us" : all[0] && all[0].dsac && open ? "us" : "authority";
@@ -102,7 +104,7 @@ async function readMeteor() {
     }
   } else skipped.push("Dossiers: the list did not load");
   // 2. constatations (the table as displayed: number, title, level, limit date, state and status, surveillance act)
-  let observations = 0;
+  let observations = 0; const closedCount = 0;
   if (await go("#constatations", /\/constatations\/(\?|$)/)) {
     await sleep(1200); await loadAll();
     const T = [...document.querySelectorAll("table")].find((t) => /Intitul/i.test(txt(t.tHead || t.rows[0])));
@@ -117,5 +119,5 @@ async function readMeteor() {
     }
   } else skipped.push("Constatations: the list did not load");
   location.hash = "#";
-  return { account: head, entity, lines, observations, skipped };
+  return { account: head, entity, lines, observations, skipped, closed: typeof closedCount === "number" ? closedCount : 0 };
 }

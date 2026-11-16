@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "S.A.M. Reader",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Reads the authority portals (TMCAD, METEOR) in your own signed-in session, read-only, when you click « Read the portals » in S.A.M.",
   "permissions": ["tabs", "scripting"],
   "host_permissions": ["https://tmcad.totalaoc.com/*", "https://meteor-app.dsac.aviation-civile.gouv.fr/*"],
