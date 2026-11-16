@@ -6,7 +6,7 @@ import { receivePortalReading } from "@/app/(app)/proj/auth/sync/actions";
 
 /* PRJ-05 · « Read the portals »: asks the S.A.M. Reader extension to open the authority portals in the person's own Chrome session,
  * read them (read-only) and hand the lines back; S.A.M. applies what mirrors the portal and shows only the exceptions. */
-type Result = { portal: string; label?: string; account?: string | null; lines?: unknown[]; signIn?: boolean; error?: string; skipped?: string[] };
+type Result = { portal: string; label?: string; account?: string | null; entity?: string | null; observations?: number; lines?: unknown[]; signIn?: boolean; error?: string; skipped?: string[] };
 type Summary = Awaited<ReturnType<typeof receivePortalReading>>;
 export default function PortalReadButton({ portals }: { portals: { key: string; label: string }[] }) {
   const router = useRouter(); const [ext, setExt] = useState<string | null | undefined>(undefined);
@@ -21,7 +21,8 @@ export default function PortalReadButton({ portals }: { portals: { key: string; 
       if (m.done && !m.results) { if (m.disconnected) setBusy((b) => (b ? null : b)); return; }
       if (m.done && m.results) {
         reqId.current = ""; const n: string[] = [];
-        for (const r of m.results) { if (r.signIn) n.push(`${r.label ?? r.portal}: sign in on the portal in Chrome, then click again.`); else if (r.error) n.push(`${r.label ?? r.portal}: ${r.error}`); for (const sk of r.skipped ?? []) n.push(sk); }
+        for (const r of m.results) { if (r.signIn) n.push(`${r.label ?? r.portal}: sign in on the portal in Chrome, then click again.`); else if (r.error) n.push(`${r.label ?? r.portal}: ${r.error}`); for (const sk of r.skipped ?? []) n.push(sk);
+          if (r.portal === "meteor" && r.entity) n.push(`METEOR read with the ${r.entity === "ASFFR" ? "ASTONFLY" : "ASTONJET"} account (${r.lines?.length ?? 0} open lines, ${r.observations ?? 0} observations not followed). METEOR allows one account at a time: sign in with the ${r.entity === "ASFFR" ? "ASTONJET" : "ASTONFLY"} account and click again to read the other entity.`); }
         setNotes(n);
         const ok = m.results.filter((r) => Array.isArray(r.lines) && r.lines.length);
         if (!ok.length) { setBusy(null); return; }

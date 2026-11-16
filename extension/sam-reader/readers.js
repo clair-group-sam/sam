@@ -50,3 +50,72 @@ async function readTmcad() {
   const account = txt(document.querySelector('[id*="UserName"], .userName, .user-name')) || null;
   return { account, organisation: [...new Set(lines.map((l) => l.organisation).filter(Boolean))].join(", ") || null, lines, read, registries: regs.length, skipped };
 }
+
+// METEOR (DSAC) is a single-page application: its screens load their data themselves. The reader listens to what the page receives
+// (it never builds a request of its own and never touches the session token), moves from screen to screen by the address only
+// (#dossiers, #dossiers/<version>, #constatations) and keeps a few fields per line. Runs in the page's own world.
+async function readMeteor() {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const txt = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
+  const iso = (s) => { const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(s || ""); return m ? `${m[3]}-${m[2]}-${m[1]}` : /^\d{4}-\d{2}-\d{2}/.test(s || "") ? s.slice(0, 10) : null; };
+  const plain = (h) => String(h ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  for (let i = 0; i < 20 && !/DECONNEXION/i.test(document.body.innerText) && !document.querySelector('input[type="password"]'); i++) await sleep(500);
+  if (document.querySelector('input[type="password"]') || !/DECONNEXION/i.test(document.body.innerText)) return { signIn: true };
+  const head = (document.body.innerText.match(/[^\n]*-\s*[^\n]*DECONNEXION/i) || [""])[0].replace(/DECONNEXION/i, "").trim();
+  const entity = /ASTONFLY/i.test(head) ? "ASFFR" : /ASTONJET/i.test(head) ? "ASJFR" : null;
+  if (!entity) return { error: `METEOR account not recognised (« ${head.slice(0, 60)} »): expected ASTONJET or ASTONFLY` };
+  // what the page receives, kept while we read
+  const cap = [];
+  if (!window.__samReaderHook) {
+    window.__samReaderHook = { cap };
+    const O = XMLHttpRequest.prototype.open, S = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__samU = String(u); return O.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function () { this.addEventListener("load", () => { try { if (/\/api\//.test(this.__samU)) window.__samReaderHook.cap.push({ u: this.__samU, res: this.responseText }); } catch { /* not text */ } }); return S.apply(this, arguments); };
+    const F = window.fetch;
+    window.fetch = async function (i) { const r = await F.apply(this, arguments); try { const u = typeof i === "string" ? i : i.url; if (/\/api\//.test(u)) r.clone().text().then((t) => window.__samReaderHook.cap.push({ u, res: t })); } catch { /* */ } return r; };
+  } else window.__samReaderHook.cap = cap;
+  const got = (re) => { const c = [...cap].reverse().find((x) => re.test(x.u)); if (!c) return undefined; try { return JSON.parse(c.res); } catch { return null; } };
+  const go = async (hash, re, ms = 15000) => { cap.length = 0; if (location.hash === hash) { location.hash = "#"; await sleep(700); cap.length = 0; } location.hash = hash; const t0 = Date.now(); while (Date.now() - t0 < ms) { if (got(re) !== undefined) { await sleep(900); return true; } await sleep(250); } return false; };
+  // the lists load 50 lines, then more as the page is scrolled: scroll until nothing new comes
+  const rowsOf = () => { const T = [...document.querySelectorAll("table")].sort((x, y) => y.rows.length - x.rows.length)[0]; return T ? T.rows.length : 0; };
+  const loadAll = async () => { let n = rowsOf(); for (let i = 0; i < 12 && n >= 50; i++) { window.scrollTo(0, document.documentElement.scrollHeight); for (const el of document.querySelectorAll("*")) if (el.scrollHeight > el.clientHeight + 40 && el.clientHeight > 200) el.scrollTop = el.scrollHeight; await sleep(1500); const m = rowsOf(); if (m <= n) break; n = m; } return n; };
+  const lines = [], skipped = [];
+  // 1. dossiers (the list shows the open ones)
+  if (await go("#dossiers", /\/dossier\/listForSearch/)) {
+    await loadAll();
+    const seen = new Set(); const list = cap.filter((x) => /\/dossier\/listForSearch/.test(x.u)).flatMap((x) => { try { return JSON.parse(x.res) || []; } catch { return []; } }).filter((d) => d && d.dosId && !seen.has(d.dosId) && seen.add(d.dosId));
+    for (const d of list) {
+      const l = { entity, kind: "file", number: `#${d.identifiant}`, title: String(d.objet || "").trim(), status: String(d.statutAffichage || "").trim(), due: iso(d.echeanceSouhaitee), type_hint: String(d.categorie || "").split(".").pop(),
+        url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#dossiers/${d.verIdLastVersion}`, submitted_on: iso(d.derniereVersion) };
+      if (d.verIdLastVersion && await go(`#dossiers/${d.verIdLastVersion}`, /\/filEchange/)) {
+        const v = got(/\/dossier\/getVersionDossier\//) || {}; const ag = got(/\/agentDsac/) || []; const fils = got(/\/filEchange/) || [];
+        l.assessor = ag.map((a) => a.prenomNomConcat || [a.prenom, a.nom].filter(Boolean).join(" ")).filter(Boolean).join(", ") || null;
+        if (v.typeDossierListDto?.length) l.type_hint = `${l.type_hint} ${v.typeDossierListDto.map((t) => t.titre).join(", ")}`.trim();
+        const sent = v.demandeEnvoyee !== false;
+        const all = fils.flatMap((f) => (f.commentaireListDto || []).map((c) => ({ on: String(c.dateAjout || "").slice(0, 10), at: String(c.dateAjout || ""), dsac: !!c.utilisateur?.isDsac, who: [c.utilisateur?.prenom, c.utilisateur?.nom].filter(Boolean).join(" "), text: plain(c.valeur) }))).sort((a, b) => (a.at < b.at ? 1 : -1));
+        if (all[0]) { l.last_exchange = `${all[0].dsac ? "DSAC, " : ""}${all[0].who}: ${all[0].text}`.slice(0, 400); l.last_exchange_on = all[0].on || null; l.comments = all.length; }
+        const open = fils.some((f) => f.ouvert);
+        l.turn = !sent || /remarques dsac|à traiter|non envoy|préparation|incomplet/i.test(l.status) ? "us" : all[0] && all[0].dsac && open ? "us" : "authority";
+        if (!sent) l.status = `${l.status} (not sent)`;
+      } else { skipped.push(`${l.number}: detail not read`); l.turn = /remarques dsac|à traiter|préparation|incomplet/i.test(l.status) ? "us" : "authority"; }
+      lines.push(l);
+    }
+  } else skipped.push("Dossiers: the list did not load");
+  // 2. constatations (the table as displayed: number, title, level, limit date, state and status, surveillance act)
+  let observations = 0;
+  if (await go("#constatations", /\/constatations\/(\?|$)/)) {
+    await sleep(1200); await loadAll();
+    const T = [...document.querySelectorAll("table")].find((t) => /Intitul/i.test(txt(t.tHead || t.rows[0])));
+    const rows = T ? [...T.tBodies[0].rows] : [];
+
+    for (const r of rows) {
+      const c = [...r.cells].map(txt); if (c.length < 6) continue;
+      const [num, title, level, limit, state, act] = c;
+      if (/observation/i.test(level) || /class[ée]e|non suivie/i.test(state)) { observations++; continue; }
+      if (/^(sans suite|cl[oô]tur|clos|ferm)/i.test(state)) continue;
+      lines.push({ entity, kind: "finding", number: `#${num}`, title, level, due: iso(limit), status: state, origin: act, url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#constatation/${num}`, turn: /attente de correction|à traiter|réponse attendue|refus/i.test(state) ? "us" : "authority" });
+    }
+  } else skipped.push("Constatations: the list did not load");
+  location.hash = "#";
+  return { account: head, entity, lines, observations, skipped };
+}
