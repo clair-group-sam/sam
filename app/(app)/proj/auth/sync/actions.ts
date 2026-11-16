@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isCmm } from "@/lib/revisions";
-import { applySync, parseLines } from "@/lib/portal-sync";
+import { applySync, autoApply, parseLines } from "@/lib/portal-sync";
+import { basePost } from "@/lib/session";
 
 /* PRJ-05 · portal readings: record what was read, then apply the lines the Compliance desk ticked. */
 async function desk() { const s = await getSession(); if (!s) redirect("/login"); if (!isCmm(s)) throw new Error("Compliance desk only."); return s; }
@@ -25,4 +26,29 @@ export async function applyReading(fd: FormData) {
   const r = await applySync(supabaseAdmin(), { personId: s.person?.id ?? null, name: s.name }, id, picks);
   revalidatePath("/proj/auth"); revalidatePath("/comp/find"); revalidatePath("/dash/due"); revalidatePath("/home/tasks");
   redirect(`/proj/auth/sync/${id}?msg=${encodeURIComponent(`${r.created} file(s) opened, ${r.updated} updated`)}`);
+}
+
+/** Who may read the portals from S.A.M.: the CMM, the deputy CMM, and the people named in Settings › Parameters (portal_readers). */
+export async function mayReadPortals(): Promise<boolean> {
+  const s = await getSession(); if (!s) return false;
+  if (s.roles.some((r) => ["CMM", "SUPERADMIN"].includes(basePost(r)))) return true;
+  const { data } = await supabaseAdmin().from("app_params").select("value").eq("key", "portal_readers").maybeSingle();
+  const allowed = String((data as { value?: string } | null)?.value ?? "").toLowerCase().split(/[,;\s]+/).filter(Boolean);
+  return !!s.email && allowed.includes(s.email.toLowerCase());
+}
+/** Called by the « Read the portals » button with what the S.A.M. Reader extension read in the person's own session. */
+export async function receivePortalReading(payload: { portal: string; label?: string; account?: string | null; lines: unknown[] }[]): Promise<{ ok: boolean; error?: string; id?: string; created?: number; updated?: number; same?: number; info?: number; exceptions?: { kind: string; ref: string; text: string; href: string | null }[] }> {
+  const s = await getSession(); if (!s) return { ok: false, error: "Not signed in" };
+  if (!(await mayReadPortals())) return { ok: false, error: "Reading the portals is reserved to the Compliance desk." };
+  const raw = payload.flatMap((p) => (Array.isArray(p.lines) ? p.lines : [])); const lines = parseLines(raw);
+  if (!lines.length) return { ok: false, error: "The portals returned no line." };
+  if (lines.some((l) => !s.group && !s.entities.includes(l.entity))) return { ok: false, error: "The portal read belongs to an entity outside your scope." };
+  const db = supabaseAdmin(); const read_on = new Date().toISOString().slice(0, 10);
+  const { data, error } = await db.from("portal_readings").insert({ read_on, source: payload.map((p) => p.label ?? p.portal).join(", ") + " (S.A.M. Reader)", entities: [...new Set(lines.map((l) => l.entity))], lines: raw, created_by: s.person?.id ?? null }).select("id").single();
+  if (error || !data) return { ok: false, error: `Reading not saved: ${error?.message ?? "unknown"}` };
+  const id = (data as unknown as { id: string }).id;
+  try { const r = await autoApply(db, { personId: s.person?.id ?? null, name: s.name }, id);
+    revalidatePath("/proj/auth"); revalidatePath("/comp/find"); revalidatePath("/dash/due"); revalidatePath("/home/tasks");
+    return { ok: true, id, ...r }; }
+  catch (e) { return { ok: false, id, error: (e as Error).message }; }
 }

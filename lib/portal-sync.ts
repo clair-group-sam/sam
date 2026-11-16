@@ -6,19 +6,21 @@ import { ballOf, routeFor, syncTasks, type AuthorityFile, type FileType, type St
  * autorite/assessor, niveau/level, echeance/due, balle/turn, dernier/last_exchange, a_faire/next_task, qui/who.
  * Nothing is changed by the plan: it lists, per line, what S.A.M. holds and what would change. The desk ticks, then applies.
  * A stage is never moved by a reading (the stage carries tasks and signatures): the portal's wording is stored beside it. */
-export type PortalLine = { key: string; entity: string; kind: "file" | "finding" | "info"; number: string; title: string; status: string; assessor: string | null; level: string | null; due: string | null; turn: "us" | "authority" | null; last: string | null; next: string | null; who: string | null };
+export type PortalLine = { key: string; entity: string; kind: "file" | "finding" | "info"; number: string; title: string; status: string; assessor: string | null; level: string | null; due: string | null; turn: "us" | "authority" | null; last: string | null; lastOn: string | null; next: string | null; who: string | null; url: string | null; submitted: string | null; hint: string | null };
 const ENT: Record<string, string> = { AJD: "ASJMT", ASJ: "ASJFR", ASF: "ASFFR", TEC: "ASTFR", ASJMT: "ASJMT", ASJFR: "ASJFR", ASFFR: "ASFFR", ASTFR: "ASTFR" };
 const s = (v: unknown) => { const t = v == null ? "" : String(v).trim(); return t && t !== "—" && t !== "None" && t !== "null" ? t : ""; };
+const day = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(s(v)) ? s(v) : null);
 export function parseLines(raw: unknown): PortalLine[] {
   const arr = Array.isArray(raw) ? raw : Array.isArray((raw as { rows?: unknown[] })?.rows) ? (raw as { rows: unknown[] }).rows : [];
   return (arr as Record<string, unknown>[]).map((r, i) => {
     const nature = s(r.nature ?? r.kind).toLowerCase(); const counted = r.compte === undefined ? true : Number(r.compte) === 1;
-    const kind: PortalLine["kind"] = /cart|finding/.test(nature) ? (counted ? "finding" : "info") : /dossier|file|application/.test(nature) ? (counted || /approuv|approved|clos/i.test(s(r.statut ?? r.status)) ? "file" : "info") : "info";
+    const kind: PortalLine["kind"] = nature === "info" ? "info" : /cart|finding/.test(nature) ? (counted ? "finding" : "info") : /dossier|file|application/.test(nature) ? (counted || /approuv|approved|clos/i.test(s(r.statut ?? r.status)) ? "file" : "info") : "info";
     const turn = s(r.balle ?? r.turn).toLowerCase();
     const due = s(r.echeance ?? r.due);
     return { key: s(r.ref) || `L${i + 1}`, entity: ENT[s(r.entite ?? r.entity).toUpperCase()] ?? s(r.entite ?? r.entity), kind, number: s(r.numero ?? r.number), title: s(r.objet ?? r.title), status: s(r.statut ?? r.status),
       assessor: s(r.autorite ?? r.assessor) || null, level: s(r.niveau ?? r.level) || null, due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : null,
-      turn: (/nous|us|ours/.test(turn) ? "us" : /autorit|authority/.test(turn) ? "authority" : null) as PortalLine["turn"], last: s(r.dernier ?? r.last_exchange) || null, next: s(r.a_faire ?? r.next_task) || null, who: s(r.qui ?? r.who) || null };
+      turn: (/nous|us|ours/.test(turn) ? "us" : /autorit|authority/.test(turn) ? "authority" : null) as PortalLine["turn"], last: s(r.dernier ?? r.last_exchange) || null, next: s(r.a_faire ?? r.next_task) || null, who: s(r.qui ?? r.who) || null,
+      lastOn: day(r.last_exchange_on), url: /^https:\/\//.test(s(r.url)) ? s(r.url) : null, submitted: day(r.submitted_on), hint: s(r.type_hint) || null };
   }).filter((l) => l.entity && (l.number || l.title));
 }
 /** The numbers a portal reference is recognised by: every run of 4+ digits ("APP/AJD/OPS_6/36884" → 36884, "#252470" → 252470), or "2026-605". */
@@ -33,7 +35,7 @@ export function stageFromPortal(status: string): Stage {
 }
 /** A type for a file S.A.M. does not hold yet, guessed from the words of the portal; the desk corrects it in the review. */
 export function guessType(l: PortalLine, types: FileType[]): string | null {
-  const offered = types.filter((t) => t.active !== false && t.entities.includes(l.entity)); const t = `${l.number} ${l.title}`.toLowerCase();
+  const offered = types.filter((t) => t.active !== false && t.entities.includes(l.entity)); const t = `${l.number} ${l.title} ${l.hint ?? ""}`.toLowerCase();
   const pick = (...codes: string[]) => codes.find((c) => offered.some((o) => o.code === c)) ?? null;
   const byName = (re: RegExp) => offered.find((o) => re.test(`${o.code} ${o.name}`.toLowerCase()))?.code ?? null;
   return (/\bmel\b/.test(t) && (pick("MEL") ?? byName(/\bmel\b/))) || (/\bamp\b/.test(t) && (pick("AMP") ?? byName(/\bamp\b/))) || (/\bcame\b/.test(t) && pick("CAME"))
@@ -66,7 +68,7 @@ export async function planSync(db: SupabaseClient, lines: PortalLine[], readOn: 
       if (!f) { out.push({ line: l, object: "file", id: null, href: null, holds: null, action: "create", changes: [], note: `Not in S.A.M.: would be opened as « ${stageFromPortal(l.status)} »`, typeGuess: guessType(l, types), applied: done }); continue; }
       seen.add(f.id); const c: Change[] = [];
       ch(c, "portal_status", "Status on the portal", f.portal_status, l.status); ch(c, "target_date", "Target date", f.target_date, l.due); ch(c, "assessor", "Assessor", f.assessor, l.assessor);
-      ch(c, "last_exchange", "Last exchange", f.last_exchange, l.last); ch(c, "next_task", "Next task", f.next_task, l.next); ch(c, "next_owner", "Who", f.next_owner, l.who);
+      ch(c, "last_exchange", "Last exchange", f.last_exchange, l.last); ch(c, "last_exchange_on", "Exchange on", f.last_exchange_on, l.lastOn); ch(c, "portal_url", "Portal link", f.portal_url, l.url); ch(c, "next_task", "Next task", f.next_task, l.next); ch(c, "next_owner", "Who", f.next_owner, l.who);
       if (l.turn && ballOf(f) !== l.turn) c.push({ field: "ball_override", label: "Whose turn", from: ballOf(f), to: l.turn });
       const want = stageFromPortal(l.status); const note = want !== f.stage && !(want === "submitted" && f.stage === "remarks") ? `S.A.M. stage « ${f.stage} », the portal reads « ${l.status} »: move the stage on the file if it is right` : null;
       out.push({ line: l, object: "file", id: f.id, href: `/proj/auth/${f.id}`, holds: `${f.portal_ref ?? ""} ${f.title}`.trim(), action: c.length ? "update" : "same", changes: c, note, typeGuess: null, applied: done });
@@ -95,8 +97,8 @@ export async function applySync(db: SupabaseClient, actor: { personId: string | 
       const type = types.find((t) => t.code === (pk.type || p.typeGuess)); if (!type || !type.entities.includes(l.entity)) throw new Error(`${l.key}: choose a type offered for ${l.entity}`);
       const route = routeFor(type, l.entity); const stage = stageFromPortal(l.status); const authority = route.authority;
       const row = { entity: l.entity, type_code: type.code, title: (pk.title || l.title).slice(0, 200), stage, category: route.category, authority, portal: route.portal || null, portal_ref: l.number, owner_role: type.default_owner_role,
-        trigger_kind: "other", trigger_note: `Read on the portal on ${reading.read_on}`, triggered_at: reading.read_on, target_date: l.due, submitted_at: stage === "draft" ? null : reading.read_on, decision_at: stage === "approved" ? reading.read_on : null, outcome: stage === "approved" ? "approved" : null,
-        ball_override: l.turn && l.turn !== (stage === "submitted" ? "authority" : "us") ? l.turn : null, next_task: l.next, next_owner: l.who, assessor: l.assessor, portal_status: l.status, portal_read_on: reading.read_on, last_exchange: l.last, last_exchange_on: null, imported_from: `portal reading ${reading.read_on}`, created_by: actor.personId };
+        trigger_kind: "other", trigger_note: `Read on the portal on ${reading.read_on}`, triggered_at: l.submitted ?? reading.read_on, target_date: l.due, submitted_at: stage === "draft" ? null : l.submitted ?? reading.read_on, portal_url: l.url, decision_at: stage === "approved" ? reading.read_on : null, outcome: stage === "approved" ? "approved" : null,
+        ball_override: l.turn && l.turn !== (stage === "submitted" ? "authority" : "us") ? l.turn : null, next_task: l.next, next_owner: l.who, assessor: l.assessor, portal_status: l.status, portal_read_on: reading.read_on, last_exchange: l.last, last_exchange_on: l.lastOn, imported_from: `portal reading ${reading.read_on}`, created_by: actor.personId };
       const { data: cf, error } = await db.from("authority_files").insert(row).select("*").single(); if (error || !cf) throw new Error(`${l.key}: ${error?.message ?? "not created"}`);
       const f = cf as AuthorityFile;
       await db.from("authority_file_events").insert({ file_id: f.id, kind: "created", who: actor.name, actor: actor.personId, note: `File mirrored from the portal reading of ${reading.read_on} (${l.status})`, meta: { reading: reading.id, line: l.key } });
@@ -119,4 +121,23 @@ export async function applySync(db: SupabaseClient, actor: { personId: string | 
   }
   await db.from("portal_readings").update({ applied }).eq("id", readingId);
   return { created, updated };
+}
+
+/** The automatic path (button « Read the portals »): everything that mirrors the portal is applied at once — files opened, status,
+ *  date, turn, last exchange. What needs a person comes back as exceptions: a finding S.A.M. does not hold, a file S.A.M. believes at
+ *  the authority that the portal no longer lists, a stage that disagrees with the portal's wording. */
+export async function autoApply(db: SupabaseClient, actor: { personId: string | null; name: string }, readingId: string): Promise<{ created: number; updated: number; same: number; info: number; exceptions: { kind: string; ref: string; text: string; href: string | null }[] }> {
+  const { data: rd } = await db.from("portal_readings").select("read_on,lines").eq("id", readingId).maybeSingle();
+  const reading = rd as { read_on: string; lines: unknown } | null; if (!reading) throw new Error("Reading not found");
+  const plan = await planSync(db, parseLines(reading.lines), reading.read_on, {});
+  const ex: { kind: string; ref: string; text: string; href: string | null }[] = [];
+  const picks = plan.proposals.filter((p) => (p.action === "create" && p.typeGuess) || p.action === "update" || (p.action === "same" && p.id)).map((p) => ({ key: p.line.key }));
+  for (const p of plan.proposals) {
+    if (p.action === "create" && !p.typeGuess) ex.push({ kind: "No type offered", ref: p.line.number, text: `${p.line.title}: no application type is offered for ${p.line.entity}, open it by hand`, href: "/proj/auth/new" });
+    if (p.action === "missing") ex.push({ kind: "Finding not in S.A.M.", ref: p.line.number, text: p.line.title, href: "/comp/find" });
+    if (p.note && p.action !== "create" && p.action !== "missing" && p.action !== "info") ex.push({ kind: "To check", ref: p.line.number, text: p.note, href: p.href });
+  }
+  for (const u of plan.unseen) ex.push({ kind: "No longer on the portal", ref: u.ref, text: `${u.title}: at the authority in S.A.M. (${u.stage}), absent from the open applications read. Decision received?`, href: `/proj/auth/${u.id}` });
+  const r = picks.length ? await applySync(db, actor, readingId, picks) : { created: 0, updated: 0 };
+  return { ...r, same: plan.proposals.filter((p) => p.action === "same").length, info: plan.proposals.filter((p) => p.action === "info").length, exceptions: ex };
 }

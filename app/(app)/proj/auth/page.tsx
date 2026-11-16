@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import PortalReadButton from "@/components/PortalReadButton";
+import { mayReadPortals } from "./sync/actions";
 import { PageHeader, Metric } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { AT_AUTHORITY, OPEN_STAGES, STAGE_LABEL, STAGE_TONE, daysAtAuthority, fr, nextAction, today, type AuthorityFile, type FileItem, type FileType, type Stage, ballOf, dueState } from "@/lib/authority";
@@ -37,7 +39,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
   mq = entity !== "ALL" ? mq.eq("entity", entity) : mq.in("entity", ents);
   const { data: open } = await mq;
   const o = (open ?? []) as { stage: Stage; target_date: string | null; submitted_at: string | null; ball_override: "us" | "authority" | null }[];
-  const t0 = today();
+  const t0 = today(); const reader = await mayReadPortals();
   const atAuth = o.filter((x) => AT_AUTHORITY.includes(x.stage)).length;
   const remarks = o.filter((x) => x.stage === "remarks").length;
   const late = o.filter((x) => x.target_date && x.target_date < t0).length;
@@ -49,7 +51,8 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader eyebrow="Projects, CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC, one file per change, from the trigger to the close-out."
-        right={<div className="flex gap-2"><Link href="/proj/auth/sync" className="btn">Portal readings</Link><Link href="/dash/due" className="btn">Deadlines</Link><Link href="/proj/auth/new" className="btn primary">+ New file</Link></div>} />
+        right={<div className="flex gap-2"><Link href="/dash/due" className="btn">Deadlines</Link><Link href="/proj/auth/new" className="btn primary">+ New file</Link></div>} />
+      {reader && <PortalReadButton portals={[{ key: "tmcad", label: "TMCAD" }]} />}
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
         <Metric label="Our turn" value={ours} tone={ours ? "amber" : undefined} hint="an action is expected from us" />
