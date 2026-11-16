@@ -49,7 +49,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader eyebrow="Projects, CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC, one file per change, from the trigger to the close-out."
-        right={<Link href="/proj/auth/new" className="btn primary">+ New file</Link>} />
+        right={<div className="flex gap-2"><Link href="/proj/auth/sync" className="btn">Portal readings</Link><Link href="/dash/due" className="btn">Deadlines</Link><Link href="/proj/auth/new" className="btn primary">+ New file</Link></div>} />
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
         <Metric label="Our turn" value={ours} tone={ours ? "amber" : undefined} hint="an action is expected from us" />

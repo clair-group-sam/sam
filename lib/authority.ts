@@ -17,7 +17,7 @@ export type AuthorityFile = {
   triggered_at: string; target_date: string | null; submitted_at: string | null; decision_at: string | null; closed_at: string | null;
   lessons: string | null; created_by: string | null; created_at: string; updated_at: string; project_id?: string | null;
   ball_override?: "us" | "authority" | null; next_task?: string | null; next_owner?: string | null; assessor?: string | null;
-  portal_status?: string | null; portal_read_on?: string | null; last_exchange?: string | null; last_exchange_on?: string | null;
+  portal_status?: string | null; portal_read_on?: string | null; last_exchange?: string | null; last_exchange_on?: string | null; imported_from?: string | null;
 };
 /** Whose turn it is on an open file: the authority's once submitted, ours otherwise; the desk can say otherwise (portal wording). */
 export type Ball = "us" | "authority" | null;
