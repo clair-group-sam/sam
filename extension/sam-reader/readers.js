@@ -23,7 +23,8 @@ async function readTmcad() {
       if (c(cAs)) assessors.add(c(cAs));
       const status = c(cSt); if (!status || CLOSED.test(status)) continue;
       const formId = a ? (/RegistryApplicationFormId=([0-9a-f-]+)/i.exec(a.getAttribute("href")) || [])[1] : null;
-      lines.push({ entity: "ASJMT", kind: /conflict zone/i.test(registry) || /^draft$/i.test(status) ? "info" : "file", // conflict-zone notifications and unsent drafts are listed, not followed number: c(cNo), title: c(cTitle) || c(cType), type_hint: c(cType), registry, organisation: c(cOrg), status, assessor: c(cAs) || null,
+      // conflict-zone notifications and unsent drafts are listed, not followed
+      lines.push({ entity: "ASJMT", kind: /conflict zone/i.test(registry) || /^draft$/i.test(status) ? "info" : "file", number: c(cNo), title: c(cTitle) || c(cType), type_hint: c(cType), registry, organisation: c(cOrg), status, assessor: c(cAs) || null,
         submitted_on: iso(c(cSub)), due: iso(c(cDue)), url: formId ? `https://tmcad.totalaoc.com/Registry/RegAppApplication.aspx?RegistryApplicationFormId=${formId}` : null, _form: formId });
     }
   }
