@@ -15,8 +15,8 @@ export async function recordReading(fd: FormData) {
   const lines = parseLines(raw); if (!lines.length) throw new Error("No line recognised (expected: entity, number or title, status…).");
   const out = lines.filter((l) => !s.group && !s.entities.includes(l.entity)); if (out.length) throw new Error(`Out of your scope: ${[...new Set(out.map((l) => l.entity))].join(", ")}.`);
   const { data, error } = await supabaseAdmin().from("portal_readings").insert({ read_on, source: String(fd.get("source") ?? "").trim() || null, entities: [...new Set(lines.map((l) => l.entity))], lines: raw, created_by: s.person?.id ?? null }).select("id").single();
-  if (error || !data) throw new Error(error?.message ?? "Reading not saved");
-  redirect(`/proj/auth/sync/${(data as { id: string }).id}`);
+  if (error || !data) redirect(`/proj/auth/sync?err=${encodeURIComponent(`Reading not saved: ${error?.message ?? "unknown"}`)}`);
+  redirect(`/proj/auth/sync/${(data as unknown as { id: string }).id}`);
 }
 export async function applyReading(fd: FormData) {
   const s = await desk(); const id = String(fd.get("id"));

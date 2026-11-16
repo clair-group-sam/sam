@@ -9,7 +9,8 @@ import { recordReading } from "./actions";
 
 /* PRJ-05 · Projects › CAA applications › Portal readings: paste what the portals showed (the CAA point), S.A.M. compares it with its
  * files and findings and proposes the changes. No portal password in S.A.M.: a person reads the portal, S.A.M. keeps the reading. */
-export default async function PortalReadings() {
+export default async function PortalReadings({ searchParams }: { searchParams: Promise<{ err?: string }> }) {
+  const { err } = await searchParams;
   const s = await getSession(); if (!s) redirect("/login"); if (!isCmm(s)) redirect("/proj/auth");
   const { data } = await supabaseAdmin().from("portal_readings").select("id,read_on,source,entities,lines,applied,created_at").order("read_on", { ascending: false }).limit(30);
   const rs = (data ?? []) as { id: string; read_on: string; source: string | null; entities: string[]; lines: unknown; applied: Record<string, unknown> | null }[];
@@ -17,6 +18,7 @@ export default async function PortalReadings() {
   return (
     <>
       <PageHeader eyebrow="Projects, CAA applications, Portal readings" title="Portal readings" sub="What TMCAD, METEOR and Centrik showed on a given day, compared line by line with the files and findings S.A.M. holds. S.A.M. proposes, you tick what to apply." right={<Link className="btn" href="/proj/auth">CAA applications</Link>} />
+      {err && <div className="card mb-4"><div className="cb"><span className="pill red">not saved</span> <span className="mini">{err}</span></div></div>}
       <section className="card mb-4"><div className="ch"><span className="eyebrow">New reading</span></div>
         <form action={recordReading} className="cb grid gap-2">
           <div className="grid grid-cols-2 gap-3"><label><span className="mini">Read on</span><input type="date" name="read_on" className="inp" defaultValue={today()} required /></label><label><span className="mini">Portals read</span><input name="source" className="inp" placeholder="TMCAD, Centrik AJD Compliance, METEOR ASTONJET, METEOR ASTONFLY" /></label></div>
