@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { PageHeader, Metric } from "@/components/Page";
-import { ENT } from "@/lib/nav";
+import { ENT, ENTS4 } from "@/lib/nav";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import DueBand, { dueWindow } from "@/components/DueBand";
 import { KIND, myInbox, groupProjects } from "@/lib/inbox";
 import { CoffeeBox } from "@/components/CoffeeBox";
 import { todaysRecap, parisParts } from "@/lib/coffee";
@@ -31,9 +33,13 @@ export default async function Inbox() {
   const tasks = groupProjects(all, today).sort((a, b) => Number(isTest(a)) - Number(isTest(b)));
   const first = s.name.split(" ")[0];
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // deadlines of the selected entity (all the entities of the scope in Group), same band as CODIR / SRB
+  const dueEnts = s.entity === "ALL" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
+  const due = ["cmm", "am", "np"].includes(s.role) && dueEnts.length ? await dueWindow(supabaseAdmin(), dueEnts) : null;
   return (
     <>
       <PageHeader eyebrow="S.A.M., Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
+      {due && <DueBand dues={due.dues} win={due.win} lanes={dueEnts} />}
       <CoffeeBox recap={recap} connected={connected} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? `, + ${testCount} test` : "") + (tasks.length !== all.length ? `, ${tasks.length} lines (a project = one line)` : "")} />
