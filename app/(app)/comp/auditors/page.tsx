@@ -4,7 +4,7 @@ import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { ENT_COLOR, ENTS4 } from "@/lib/nav";
-import { AUDITOR_DOMAINS, AUDITOR_STATUS, auditorRoster, daysTo, type Auditor, type AuditorDoc, type AuditorItem } from "@/lib/compliance-registers";
+import { AUDITOR_DOMAINS, AUDITOR_STATUS, auditorRoster, daysTo, type Auditor, type AuditorDoc, type AuditorItem, auditorByPost, domainInScope, holdsReviewPost } from "@/lib/compliance-registers";
 import { today } from "@/lib/authority";
 import { removeDoc, saveAuditor, saveItem, setStatus, uploadDoc } from "./actions";
 import { Icon } from "@/lib/icons";
@@ -28,6 +28,11 @@ export default async function Auditors({ searchParams }: { searchParams: Promise
   type AuRow = { id: string; number: string; entity: string; kind: string; status: string; planned_month: string; done_on: string | null; lead_auditor: string | null; auditors: string[]; external_auditor: string | null };
   const scopedAudits = ((aud ?? []) as AuRow[]).filter((x) => !scope || scope.includes(x.entity));
   const roster = auditorRoster(all, people, scopedAudits, (its ?? []) as { auditor_id: string; done: boolean }[], (dcs ?? []) as { auditor_id: string }[], t0);
+  // one entity at a time (UX-04): the working entity shows its own entities, domains and audits; Group shows them all
+  const posts = await auditorByPost(db, scope ?? ENTS4);
+  const postOf = (r: (typeof roster)[number]) => (scope ?? ENTS4).map((e) => ({ e, code: holdsReviewPost(posts, e, r.auditor?.person_id ?? (r.key.startsWith("p:") ? r.key.slice(2) : null), r.name) })).filter((x) => x.code) as { e: string; code: string }[];
+  // an auditor by post needs no register file for the entity of the post: nothing is "missing" when that entity is the whole scope
+  for (const r of roster) if (scope && scope.length === 1 && postOf(r).length) r.missing = [];
   const incomplete = roster.filter((r) => r.missing.length);
   const open = all.find((a) => a.id === sp.a) ?? null;
   const [{ data: items }, { data: docs }] = open ? await Promise.all([db.from("auditor_items").select("*").eq("auditor_id", open.id).order("ord"), db.from("auditor_docs").select("*").eq("auditor_id", open.id).order("at")]) : [{ data: [] }, { data: [] }];
@@ -59,13 +64,13 @@ export default async function Auditors({ searchParams }: { searchParams: Promise
         <table className="tbl"><thead><tr><th>Auditor</th><th>Entities</th><th>Domains, cannot audit</th><th>Approval</th><th>Audits</th><th>File</th></tr></thead><tbody>{roster.map((r) => { const a = r.auditor; const last = r.audits.map((x) => x.done_on ?? "").sort().pop(); const ents = [...new Set(r.audits.map((x) => x.entity))];
           return <tr key={r.key} style={r.missing.length ? { background: "var(--terra-s)" } : undefined}>
             <td>{a ? <Link href={`/comp/auditors?a=${a.id}#auditor`}><b>{r.name}</b></Link> : <b>{r.name}</b>}{a?.lead && <span className="pill" style={{ marginLeft: 6 }}>Lead</span>}{(a?.external ?? r.company) && <div className="mini">{a?.external ?? r.company}</div>}{!a?.person_id && a && <div className="mini">external, not in People</div>}</td>
-            <td>{(a ? a.entities : ents).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} />{e} </span>)}</td>
-            <td className="mini">{a ? (a.domains.join(", ") || "—") : "—"}{a && a.exclusions.length > 0 && <div style={{ color: "var(--amber-ink)" }}>Not: {a.exclusions.join(", ")}</div>}</td>
+            <td>{(a ? a.entities : ents).filter((e) => !scope || scope.includes(e)).map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} />{e} </span>)}{postOf(r).map((x) => <div key={x.e} className="mini"><span className="pill green">{x.code} of {x.e}</span> auditor by post</div>)}</td>
+            <td className="mini">{a ? (a.domains.filter((d) => domainInScope(d, scope)).join(", ") || "—") : "—"}{a && a.exclusions.length > 0 && <div style={{ color: "var(--amber-ink)" }}>Not: {a.exclusions.join(", ")}</div>}</td>
             <td className="mini">{a?.approved_on ? `${a.approved_on} → ${a.valid_until ?? "—"}` : "—"}{a?.approved_by && <div>by {name(a.approved_by)}</div>}</td>
             <td className="mini">{r.audits.length}{last ? `, last ${last}` : ""}{r.audits.length > 0 && <div className="mono">{r.audits.slice(0, 3).map((x) => x.number).join(", ")}{r.audits.length > 3 ? "…" : ""}</div>}</td>
             <td>{r.missing.length ? <><span className="pill red">{a ? "File incomplete" : "No file"}</span><div className="mini" style={{ color: "var(--red-ink)" }}>{r.missing.join(", ")}</div>
               {!a && desk && <form action={saveAuditor} className="mt-1">{r.key.startsWith("p:") ? <input type="hidden" name="person" value={r.key.slice(2)} /> : <><input type="hidden" name="name" value={r.name} /><input type="hidden" name="external" value={r.company ?? ""} /></>}{ents.map((e) => <input key={e} type="hidden" name="entities" value={e} />)}<input type="hidden" name="lead" value="1" /><button className="btn sm primary">Create the file</button></form>}</>
-              : <span className={"pill " + tone(a!)}>{AUDITOR_STATUS[a!.status]}{a!.status === "approved" && expiring(a!) ? `, ends ${a!.valid_until}` : ""}</span>}</td></tr>; })}</tbody></table>)}</div></section>
+              : !a ? <span className="pill green">By post</span> : <span className={"pill " + tone(a!)}>{AUDITOR_STATUS[a!.status]}{a!.status === "approved" && expiring(a!) ? `, ends ${a!.valid_until}` : ""}</span>}</td></tr>; })}</tbody></table>)}</div></section>
 
       {open && <div id="auditor" className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
         <section className="card"><div className="ch"><span><b>{open.name ?? name(open.person_id)}</b>, <span className={"pill " + tone(open)}>{AUDITOR_STATUS[open.status]}</span></span>

@@ -9,7 +9,7 @@ import { ENT, ENT_COLOR } from "@/lib/nav";
 import { KIND_LABEL, monthLong, STATUS_LABEL, type Audit, type AuditEvent } from "@/lib/audit-programme";
 import { breakdown, history, hintsFor, RESULT_LABEL, RESULT_TONE, RESULTS, textFor, type Check, type Checklist } from "@/lib/audit-run";
 import { LEVEL_LABEL, OPEN_STATUSES, STATUS_LABEL as FND_STATUS, STATUS_TONE as FND_TONE } from "@/lib/findings";
-import { eligibility, type Auditor } from "@/lib/compliance-registers";
+import { auditorByPost, eligibility, holdsReviewPost, type Auditor } from "@/lib/compliance-registers";
 import { RuleText } from "@/components/RuleText";
 import { ruleCodesIn } from "@/lib/regulation-items";
 import { AuthorityAudit } from "./AuthorityAudit";
@@ -58,7 +58,9 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   const prevC = idx > 0 ? checks[idx - 1] : null, nextC = idx >= 0 && idx < checks.length - 1 ? checks[idx + 1] : null;
   const checklists = (cls ?? []) as Checklist[];
   const { data: ar } = a.lead_auditor ? await db.from("auditors").select("*").eq("person_id", a.lead_auditor).maybeSingle() : { data: null };
-  const elig = a.lead_auditor && a.kind !== "authority" ? eligibility(ar as Auditor | null, a.entity, a.domain) : { ok: true, why: [] as string[] };
+  // the holder of the organisation-review post of the entity (RRO) audits it by the post itself
+  const byPost = a.lead_auditor && a.kind !== "authority" ? holdsReviewPost(await auditorByPost(db, [a.entity]), a.entity, a.lead_auditor, name(a.lead_auditor)) : null;
+  const elig = a.lead_auditor && a.kind !== "authority" && !byPost ? eligibility(ar as Auditor | null, a.entity, a.domain) : { ok: true, why: [] as string[] };
   const live = ["in_progress", "report"].includes(a.status) && team;
   return (
     <>

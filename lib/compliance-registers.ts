@@ -70,6 +70,25 @@ export function eligibility(a: Auditor | null | undefined, entity: string, domai
   return { ok: !why.length, why };
 }
 
+/** An auditor by post: the person who holds the organisation-review post of the entity (RRO at Astontec, CAE §A.6 / §B.1, accepted by the
+ *  authority with the exposition) audits that entity by the post itself — no separate approval in the register is asked for it. */
+export const REVIEW_POSTS = ["RRO"];
+const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
+export async function auditorByPost(db: SupabaseClient, entities: string[]): Promise<{ entity: string; code: string; person: string | null; name: string | null }[]> {
+  if (!entities.length) return [];
+  const { data } = await db.from("np_posts").select("entity,code,holder_person,holder_name").in("entity", entities).in("code", REVIEW_POSTS);
+  return ((data ?? []) as { entity: string; code: string; holder_person: string | null; holder_name: string | null }[]).map((p) => ({ entity: p.entity, code: p.code, person: p.holder_person, name: p.holder_name }));
+}
+export function holdsReviewPost(posts: { entity: string; code: string; person: string | null; name: string | null }[], entity: string, personId: string | null, displayName: string | null): string | null {
+  const words = (x: string) => new Set(fold(x).split(" ").filter(Boolean));
+  const same = (a: string, b: string) => { const A = words(a), B = words(b); return A.size > 1 && [...A].every((w) => B.has(w)); };
+  const hit = posts.find((p) => p.entity === entity && ((!!personId && p.person === personId) || (!!displayName && !!p.name && same(displayName, p.name))));
+  return hit ? hit.code : null;
+}
+/** Which entities an auditor domain belongs to (the others — management system, safety, Part-IS… — are common to all). */
+export const DOMAIN_ENTITIES: Record<string, string[]> = { OPS: ["ASJMT", "ASJFR"], "Ground Ops": ["ASJMT", "ASJFR"], Training: ["ASJMT", "ASJFR"], CAMO: ["ASJMT", "ASJFR"], CAE: ["ASTFR"], ATO: ["ASFFR"], FSTD: ["ASFFR"] };
+export const domainInScope = (domain: string, scope: string[] | null) => !scope || !DOMAIN_ENTITIES[domain] || DOMAIN_ENTITIES[domain].some((e) => scope.includes(e));
+
 /** Subcontractor control: last closed audit linked to it, next control = last + cadence. */
 export function controlOf(s: Subcontractor, audits: { subcontractor_id: string | null; status: string; done_on: string | null; planned_month: string }[], t0 = today()) {
   const mine = audits.filter((a) => a.subcontractor_id === s.id);

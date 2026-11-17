@@ -7,7 +7,7 @@ import { today } from "@/lib/authority";
 import { breakdown, hintsFor, history, instantiateChecks, RESULTS, textFor, type Check } from "@/lib/audit-run";
 import { nextFindingNumber, syncFindingTasks, type Finding } from "@/lib/findings";
 import type { Audit } from "@/lib/audit-programme";
-import { eligibility, type Auditor } from "@/lib/compliance-registers";
+import { auditorByPost, eligibility, holdsReviewPost, type Auditor } from "@/lib/compliance-registers";
 
 /* AUD-02 · the audit run: start, check by check (result, comment, evidence), finding from a check, report, close. Lead auditor / auditors / Compliance desk. */
 const db = () => supabaseAdmin();
@@ -28,7 +28,9 @@ export async function startAudit(fd: FormData) {
   // ENR-CM-09: the lead auditor must be approved for the entity and the domain (the desk may override with a reason, kept in the history)
   if (a.lead_auditor && a.kind !== "authority") {
     const { data: ar } = await db().from("auditors").select("*").eq("person_id", a.lead_auditor).maybeSingle();
-    const el = eligibility(ar as Auditor | null, a.entity, a.domain);
+    const { data: lp } = await db().from("people").select("display_name").eq("id", a.lead_auditor).maybeSingle();
+    const byPost = holdsReviewPost(await auditorByPost(db(), [a.entity]), a.entity, a.lead_auditor, (lp as { display_name: string } | null)?.display_name ?? null);
+    const el = byPost ? { ok: true, why: [] as string[] } : eligibility(ar as Auditor | null, a.entity, a.domain);
     if (!el.ok) { const why = str(fd, "override"); if (!why || !desk(s)) throw new Error(`Lead auditor not eligible: ${el.why.join(", ")}. Change the auditor, update the register, or (desk) start with an override reason.`); await db().from("audit_events").insert({ audit_id: a.id, by: s.person?.id ?? null, kind: "note", reason: `Started with a non-eligible lead auditor (${el.why.join(", ")}): ${why}` }); }
   }
   const checklistId = str(fd, "checklist") ?? a.checklist_id;
