@@ -103,7 +103,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
               </form> : <div><span className={"pill " + (RESULT_TONE[open.result ?? ""] ?? "")}>{open.result ? RESULT_LABEL[open.result] : "no result"}</span>{open.comment && <p className="mt-2" style={{ whiteSpace: "pre-wrap" }}>{open.comment}</p>}</div>}
               {open.evidence.length > 0 && <div className="mini mt-2">Evidence: {open.evidence.map((e, i) => <a key={i} href={`/api/files/${e.path}`} target="_blank" rel="noreferrer" style={{ marginRight: 10 }}>{e.name}</a>)}</div>}
               {open.checked_at && <div className="mini mt-1">Result by {name(open.checked_by)} · {open.checked_at.slice(0, 16).replace("T", " ")} UTC</div>}
-              {open.imported && <div className="mini mt-1">Imported from Centrik as read: {String((open.imported as { result?: string }).result ?? "")}{(open.imported as { comment?: string }).comment ? `, ${(open.imported as { comment: string }).comment}` : ""}</div>}
+              {open.imported && <div className="mini mt-1">Imported from {(open.imported as { source?: string }).source ?? "Centrik"} as read: {String((open.imported as { result?: string }).result ?? "")}{(open.imported as { comment?: string }).comment ? `, ${(open.imported as { comment: string }).comment}` : ""}</div>}
               <div className="flex items-center gap-2 mt-3" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
                 {open.finding_id ? <Link className="btn sm" href={`/comp/find/${open.finding_id}`}>Finding {findings.find((f) => f.id === open.finding_id)?.number ?? ""} ›</Link>
                   : live && <details className="inlineedit" style={{ position: "relative" }}><summary className="btn sm">Raise a finding</summary>
