@@ -106,7 +106,8 @@ async function readMeteor() {
         const arr = (x) => (Array.isArray(x) ? x : []); const v = got(/\/dossier\/getVersionDossier\//) || {}; const ag = arr(got(/\/agentDsac/)); const fils = arr(got(/\/filEchange/));
         l.assessor = ag.map((a) => a.prenomNomConcat || [a.prenom, a.nom].filter(Boolean).join(" ")).filter(Boolean).join(", ") || null;
         if (Array.isArray(v.typeDossierListDto) && v.typeDossierListDto.length) l.type_hint = `${l.type_hint} ${v.typeDossierListDto.map((t) => t.titre).join(", ")}`.trim();
-        const sent = v.demandeEnvoyee !== false;
+        // sent to the DSAC: the version says "Envoyé par ORGANISME" (visibilite ENV) and carries its publication date. (demandeEnvoyee is another matter: it is false on dossiers that were sent.)
+        const sent = !v.visibilite || v.visibilite === "ENV" || !!v.datePublication || /envoy/i.test(String(v.visibiliteAffichage || ""));
         const all = fils.flatMap((f) => arr(f.commentaireListDto).map((c) => ({ on: String(c.dateAjout || "").slice(0, 10), at: String(c.dateAjout || ""), dsac: !!c.utilisateur?.isDsac, who: [c.utilisateur?.prenom, c.utilisateur?.nom].filter(Boolean).join(" "), text: plain(c.valeur) }))).sort((a, b) => (a.at < b.at ? 1 : -1));
         if (all[0]) { l.last_exchange = `${all[0].dsac ? "DSAC, " : ""}${all[0].who}: ${all[0].text}`.slice(0, 400); l.last_exchange_on = all[0].on || null; l.comments = all.length; }
         const open = fils.some((f) => f.ouvert);

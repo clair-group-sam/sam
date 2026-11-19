@@ -277,7 +277,7 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
         if (file.portal_read_on && (file.stage === "submitted" || file.stage === "remarks")) {
           // first line of every card: whose turn it is, ours or theirs, and what there is to do. Then what the portal showed.
           // The portal is normally right: when it contradicts S.A.M., the card says so and the file asks whether to update S.A.M.
-          const unsent = /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(file.portal_status ?? "");
+          const unsent = /not sent|non envoy|\bdraft\b|brouillon/i.test(file.portal_status ?? "");
           const conflict = unsent && file.stage === "submitted";
           const lead = conflict ? { tone: "work" as const, text: `OUR TURN. To do: send the dossier to ${who} on the portal.` }
             : unsent ? { tone: "work" as const, text: `OUR TURN. To do: send our reply to ${who} on the portal (it is prepared, not sent).` }

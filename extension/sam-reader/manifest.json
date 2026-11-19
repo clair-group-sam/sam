@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "S.A.M. Reader",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Reads the authority portals (TMCAD, METEOR) in your own signed-in session, read-only, when you click \u00ab Read the portals \u00bb in S.A.M.",
   "permissions": [
     "tabs",

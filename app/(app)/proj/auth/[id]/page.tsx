@@ -40,7 +40,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
   const t0 = today();
   const late = (f.stage === "submitted" || f.stage === "remarks") && f.target_date && f.target_date < t0;
   // the portal is normally right: when it shows as "not sent" a dossier S.A.M. holds as submitted, Compliance is asked once
-  const unsent = /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(f.portal_status ?? "");
+  const unsent = /not sent|non envoy|\bdraft\b|brouillon/i.test(f.portal_status ?? "");
   const disagrees = f.stage === "submitted" && unsent && !events.some((e) => (e.meta as { portal_kept?: string } | null)?.portal_kept === f.portal_status);
 
   return (

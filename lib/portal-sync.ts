@@ -168,7 +168,7 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
       else if (f.stage === "remarks" && w.to === "submitted" && turnOf.get(f.id) === "authority") to = "submitted";
       const ref = f.portal_ref ?? f.title;
       // the portal is normally right, but S.A.M. is not rewound without a yes: a dossier held as submitted that the portal shows as not sent is a question
-      if (f.stage === "submitted" && /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(w.status)) { ex.push({ kind: "Portal contradicts S.A.M.", ref, text: `${f.title}: submitted in S.A.M., “${w.status}” on the portal, so the turn is ours. Open the file to update S.A.M. or keep it.`, href: `/proj/auth/${f.id}` }); continue; }
+      if (f.stage === "submitted" && /not sent|non envoy|\bdraft\b|brouillon/i.test(w.status)) { ex.push({ kind: "Portal contradicts S.A.M.", ref, text: `${f.title}: submitted in S.A.M., “${w.status}” on the portal, so the turn is ours. Open the file to update S.A.M. or keep it.`, href: `/proj/auth/${f.id}` }); continue; }
       if (!to) continue;
       try {
         await applyMove(db, { personId: actor.personId, name: `${actor.name} (portal reading)`, cmm: true, owner: false }, f, to, { note: `Read on the portal on ${reading.read_on}: “${w.status}”.${f.last_exchange ? ` Last exchange: ${f.last_exchange.slice(0, 300)}` : ""}`, decision_at: to === "approved" ? reading.read_on : null });
