@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession, type Session } from "@/lib/session";
@@ -9,20 +10,20 @@ import { agendaFor, buildPack, defaultAttendees, kindName, mayRun, nextNumber, p
 const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
 async function desk(entity: string | null): Promise<Session> {
-  const s = await getSession(); if (!s) throw new Error("Sign in again.");
-  if (!mayRun(s)) throw new Error("Reserved to the safety desk (SM / CMM / FSO).");
-  if (!entity || !s.entities.includes(entity)) throw new Error("Pick an entity in your scope.");
+  const s = await getSession(); if (!s) fail("Sign in again.");
+  if (!mayRun(s)) fail("Reserved to the safety desk (SM / CMM / FSO).");
+  if (!entity || !s.entities.includes(entity)) fail("Pick an entity in your scope.");
   return s;
 }
-async function load(id: string): Promise<Committee> { const { data } = await db().from("committees").select("*").eq("id", id).single(); if (!data) throw new Error("Meeting not found."); return data as Committee; }
+async function load(id: string): Promise<Committee> { const { data } = await db().from("committees").select("*").eq("id", id).single(); if (!data) fail("Meeting not found."); return data as Committee; }
 const log = (committee_id: string, kind: string, actor: string | null, note: string) => db().from("committee_events").insert({ committee_id, kind, actor, note });
 const touch = (id?: string) => { revalidatePath("/safe/comm"); if (id) revalidatePath(`/safe/comm/${id}`); revalidatePath("/safe/over"); };
 
 /** Plan a meeting: number, standing agenda of the MSM, attendees from the posts (SRB) or the SM (SAG). */
 export async function planCommittee(fd: FormData) {
   const entity = str(fd, "entity"); const s = await desk(entity);
-  const kind = str(fd, "kind") === "sag" ? "sag" : "srb"; const on = str(fd, "planned_on"); if (!on) throw new Error("Give the date.");
-  const topic = str(fd, "topic"); if (kind === "sag" && !topic) throw new Error("A SAG has a topic.");
+  const kind = str(fd, "kind") === "sag" ? "sag" : "srb"; const on = str(fd, "planned_on"); if (!on) fail("Give the date.");
+  const topic = str(fd, "topic"); if (kind === "sag" && !topic) fail("A SAG has a topic.");
   const also = fd.getAll("also").map(String).filter((e) => e !== entity && s.entities.includes(e)); const ents = [entity!, ...also];
   const number = await nextNumber(entity!, kind, on);
   const time = str(fd, "time");
@@ -30,7 +31,7 @@ export async function planCommittee(fd: FormData) {
     status: "planned", planned_on: on, starts_at: time ? new Date(`${on}T${time}:00Z`).toISOString() : null, location: str(fd, "location"),
     entities: ents, attendees: (await Promise.all(ents.map((e) => defaultAttendees(e, kind)))).flat().filter((a, i, l) => l.findIndex((b) => b.name.toLowerCase() === a.name.toLowerCase()) === i), agenda: agendaFor(entity!, kind, topic), parent_id: str(fd, "parent_id"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("committees").insert(row).select("id").single();
-  if (error || !data) throw new Error(error?.message ?? "Not created.");
+  if (error || !data) fail(error?.message ?? "Not created.");
   const id = (data as { id: string }).id;
   await log(id, "planned", s.person?.id ?? null, `${number} planned on ${on} by ${s.name}`);
   touch(id); redirect(`/safe/comm/${id}`);
@@ -58,7 +59,7 @@ export async function saveAttendees(fd: FormData) {
 /** Notes and decision of an agenda item (taken during the meeting). Items can be added or removed. */
 export async function saveItem(fd: FormData) {
   const c = await load(String(fd.get("id"))); await desk(c.entity);
-  if (c.status === "closed") throw new Error("The minutes are issued — they are not changed.");
+  if (c.status === "closed") fail("The minutes are issued — they are not changed.");
   const key = String(fd.get("key")); let agenda: Item[] = [...c.agenda];
   if (fd.get("remove") === "1") agenda = agenda.filter((x) => x.key !== key);
   else if (key === "__new") { const t = str(fd, "title"); if (!t) return; agenda.push({ key: `x${Date.now().toString(36)}`, title: t, notes: str(fd, "notes"), decision: str(fd, "decision") }); }
@@ -69,7 +70,7 @@ export async function saveItem(fd: FormData) {
 /** Freeze the figures presented (SPI, reports, hazard log, changes, actions, findings, SAG outputs) — again until the minutes are issued. */
 export async function preparePack(fd: FormData) {
   const c = await load(String(fd.get("id"))); const s = await desk(c.entity);
-  if (c.status === "closed") throw new Error("The minutes are issued.");
+  if (c.status === "closed") fail("The minutes are issued.");
   const pack = await buildPack(c);
   await db().from("committees").update({ pack, pack_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", c.id);
   await log(c.id, "pack", s.person?.id ?? null, "figures prepared"); touch(c.id);
@@ -97,15 +98,15 @@ export async function draftMinutes(fd: FormData) {
 }
 export async function saveMinutes(fd: FormData) {
   const c = await load(String(fd.get("id"))); await desk(c.entity);
-  if (c.status === "closed") throw new Error("The minutes are issued.");
+  if (c.status === "closed") fail("The minutes are issued.");
   await db().from("committees").update({ minutes: str(fd, "minutes"), updated_at: new Date().toISOString() }).eq("id", c.id); touch(c.id);
 }
 
 /** Issue the minutes: frozen; the AM and every attendee get a task to read them (SAG: report to the AM and participants, MSM §4.6). */
 export async function issueMinutes(fd: FormData) {
   const c = await load(String(fd.get("id"))); const s = await desk(c.entity);
-  if (c.status !== "held") throw new Error("Mark the meeting as held first.");
-  if (!c.attendees.some((a) => a.present)) throw new Error("Record who attended.");
+  if (c.status !== "held") fail("Mark the meeting as held first.");
+  if (!c.attendees.some((a) => a.present)) fail("Record who attended.");
   const now = new Date().toISOString();
   await db().from("committees").update({ status: "closed", closed_at: now, closed_by: s.person?.id ?? null, updated_at: now }).eq("id", c.id);
   const people = new Set(c.attendees.map((a) => a.person_id).filter(Boolean) as string[]);
@@ -118,13 +119,13 @@ export async function issueMinutes(fd: FormData) {
 }
 export async function cancelCommittee(fd: FormData) {
   const c = await load(String(fd.get("id"))); const s = await desk(c.entity);
-  if (c.status === "closed") throw new Error("The minutes are issued.");
+  if (c.status === "closed") fail("The minutes are issued.");
   await db().from("committees").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", c.id);
   await log(c.id, "cancelled", s.person?.id ?? null, str(fd, "reason") ?? "cancelled"); touch(c.id);
 }
 /** The person reads the minutes: their task is done. */
 export async function ackMinutes(fd: FormData) {
-  const s = await getSession(); if (!s?.person) throw new Error("Sign in again.");
+  const s = await getSession(); if (!s?.person) fail("Sign in again.");
   const id = String(fd.get("id"));
   await db().from("tasks").update({ status: "done" }).eq("kind", "committee_minutes").eq("ref_id", id).eq("owner_person", s.person.id).eq("status", "open");
   await log(id, "read", s.person.id, `${s.name} read the minutes`); touch(id);

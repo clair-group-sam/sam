@@ -163,7 +163,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
         {!cmm && !internal && <span className="mini"><span className="lockpill">Compliance</span> marks what the Compliance department decides and validates (DOC-06), shown to you, not editable.</span>}
       </div>
       {editable ? (
-        <div className="draftbar mb-4"><div><b>Draft. Rev {rev.rev}</b> is the working copy, based on {baseLabel}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
+        <div className="draftbar mb-4"><div><b>Draft. Rev {rev.rev}</b> is the working copy, {!baseRow && /^0+$/.test(String(rev.rev)) ? "first issue: nothing is published yet" : `based on ${baseLabel}`}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
       ) : (
         <div className="draftbar mb-4"><div><b>Rev {rev.rev}, {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
       )}
@@ -229,6 +229,9 @@ export default async function Editor({ params, searchParams }: { params: Promise
               {transitions.map((t) => (
                 <form key={t.to} action={moveStep} className="mb-3 p-3 border border-line rounded-lg">
                   <input type="hidden" name="revision_id" value={rev.id} /><input type="hidden" name="to" value={t.to} />
+                  {t.to === "published" && (() => { /* FB-131 · publishing cannot be undone and notifies the readers: one deliberate tick, with what is still open */
+                    const majors = ((rev.review as { comments?: { severity?: string }[] } | null)?.comments ?? []).filter((c) => c.severity === "major").length;
+                    return <label className="flex items-start gap-2 mini mb-2"><input type="checkbox" required className="mt-0.5" /><span>I publish Rev {rev.rev} as it is. {majors ? <b style={{ color: "var(--red)" }}>The review raised {majors} major comment{majors === 1 ? "" : "s"}. </b> : null}{!rev.summary?.trim() ? <b style={{ color: "var(--amber-ink)" }}>The revision summary is empty: readers will see “Initial issue” or nothing in “What changed”. </b> : null}Publication cannot be undone; a correction is a new revision.</span></label>; })()}
                   <div className="flex items-center gap-3"><button className="btn primary" type="submit" disabled={t.to === "published" && !rev.review}>{t.label}</button><span className="mini">No authority approval or notification. The update notice goes to every reader of the document.</span></div>
                 </form>
               ))}

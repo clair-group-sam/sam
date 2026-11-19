@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
@@ -11,21 +12,21 @@ const str = (fd: FormData, k: string) => { const v = String(fd.get(k) ?? "").tri
 const isCompliance = (s: Session) => s.role === "cmm" || s.roles.map(basePost).some((r) => ["CMM", "SUPERADMIN"].includes(r));
 const isOwner = (s: Session, f: Finding) => (!!f.owner_person && f.owner_person === s.person?.id) || (!!f.owner_role && s.entities.includes(f.entity) && s.roles.map(basePost).includes(basePost(f.owner_role)));
 async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); return s; }
-async function load(id: string) { const x = await loadFinding(db(), id); if (!x) throw new Error("Finding not found"); return x; }
+async function load(id: string) { const x = await loadFinding(db(), id); if (!x) fail("Finding not found"); return x; }
 const log = (f: Finding, action: string, actor: string | null, after: unknown) => db().from("audit_log").insert({ actor, entity: f.entity, object_type: "finding", object_id: f.id, action, after });
 const touch = (id: string) => { revalidatePath(`/comp/find/${id}`); revalidatePath("/comp/find"); revalidatePath("/home/tasks"); };
 
 /** Compliance raises a finding (from an authority letter, an internal audit, an inspection). The owner gets the Inbox task at once. */
 export async function createFinding(fd: FormData) {
-  const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
-  const entity = str(fd, "entity") ?? ""; if (!entity) throw new Error("Choose the entity.");
-  const title = str(fd, "title"); if (!title) throw new Error("Give the finding a title.");
-  if (!str(fd, "owner_role") && !str(fd, "owner_person")) throw new Error("Name the nominated person who answers (post or person).");
+  const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
+  const entity = str(fd, "entity") ?? ""; if (!entity) fail("Choose the entity.");
+  const title = str(fd, "title"); if (!title) fail("Give the finding a title.");
+  if (!str(fd, "owner_role") && !str(fd, "owner_person")) fail("Name the nominated person who answers (post or person).");
   const number = await nextFindingNumber(db(), entity);
   const row = { entity, number, source: str(fd, "source") ?? "authority", authority: str(fd, "authority"), audit_ref: str(fd, "audit_ref"), level: str(fd, "level") ?? "2", requirement: str(fd, "requirement"), title: title.slice(0, 300), description: str(fd, "description"),
     owner_role: str(fd, "owner_role")?.toUpperCase() ?? null, owner_person: str(fd, "owner_person"), notified: str(fd, "notified"), due: str(fd, "due"), status: "open", created_by: s.person?.id ?? null };
   const { data, error } = await db().from("findings").insert(row).select("*").single();
-  if (error || !data) throw new Error(error?.message ?? "Finding not created.");
+  if (error || !data) fail(error?.message ?? "Finding not created.");
   const f = data as Finding;
   await syncFindingTasks(db(), f);
   await log(f, "finding_created", s.person?.id ?? null, row);
@@ -35,7 +36,7 @@ export async function createFinding(fd: FormData) {
 
 const EDIT = ["title", "description", "requirement", "level", "source", "authority", "audit_ref", "notified", "due", "owner_role", "owner_person"] as const;
 export async function updateFinding(fd: FormData) {
-  const { f } = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const { f } = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
   const patch: Record<string, string | null> = {}; for (const k of EDIT) if (fd.has(k)) patch[k] = str(fd, k);
   if (patch.owner_role) patch.owner_role = patch.owner_role.toUpperCase();
   await db().from("findings").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", f.id);
@@ -46,10 +47,10 @@ export async function updateFinding(fd: FormData) {
 /** Step 1 — the NP saves the root cause draft; S.A.M. reads it for the author (suggestions, nothing sent). */
 export async function saveRootCause(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
-  if (!["open", "back"].includes(x.f.status)) throw new Error("This finding is not being answered.");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Reserved to the owner of the finding.");
+  if (!["open", "back"].includes(x.f.status)) fail("This finding is not being answered.");
   const draft = { draft_root_cause: str(fd, "root_cause"), draft_factors: str(fd, "factors") ?? x.f.draft_factors, draft_immediate: str(fd, "immediate") ?? x.f.draft_immediate }; // 10/11 · one field on screen; older answers keep theirs
-  if (!draft.draft_root_cause) throw new Error("Write the root cause.");
+  if (!draft.draft_root_cause) fail("Write the root cause.");
   const check = await preRead(x.f, { root_cause: draft.draft_root_cause, factors: draft.draft_factors, immediate: draft.draft_immediate, comment: null, n: x.f.current_round + 1 }, x.changes, x.actions, "rca", true);
   const next = str(fd, "next") === "1";
   await db().from("findings").update({ ...draft, rca_check: check, draft_step: next ? Math.max(2, x.f.draft_step) : x.f.draft_step, updated_at: new Date().toISOString() }).eq("id", x.f.id);
@@ -58,8 +59,8 @@ export async function saveRootCause(fd: FormData) {
 /** Step 2 — S.A.M. reads the draft plan (changes + actions attached) for the author. */
 export async function checkPlan(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
-  if (!["open", "back"].includes(x.f.status)) throw new Error("This finding is not being answered.");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Reserved to the owner of the finding.");
+  if (!["open", "back"].includes(x.f.status)) fail("This finding is not being answered.");
   const comment = str(fd, "comment");
   const check = await preRead(x.f, { root_cause: x.f.draft_root_cause, factors: x.f.draft_factors, immediate: x.f.draft_immediate, comment, n: x.f.current_round + 1 }, x.changes, x.actions, "plan", true);
   const next = str(fd, "next") === "1";
@@ -68,7 +69,7 @@ export async function checkPlan(fd: FormData) {
 }
 export async function gotoStep(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Not allowed");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Not allowed");
   const n = Math.min(3, Math.max(1, Number(fd.get("step") ?? 1)));
   await db().from("findings").update({ draft_step: n }).eq("id", x.f.id); touch(x.f.id);
 }
@@ -76,14 +77,14 @@ export async function gotoStep(fd: FormData) {
 /** Step 3 — the NP sends root cause + plan together: one round, pre-read as a whole for Compliance. */
 export async function sendAnalysis(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
-  if (!["open", "back"].includes(x.f.status)) throw new Error("This finding is not being answered.");
-  if (!x.f.draft_root_cause) throw new Error("Write the root cause first (step 1).");
-  if (!x.changes.length && !x.actions.length) throw new Error("Add at least one expected manual change or one action (step 2).");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Reserved to the owner of the finding.");
+  if (!["open", "back"].includes(x.f.status)) fail("This finding is not being answered.");
+  if (!x.f.draft_root_cause) fail("Write the root cause first (step 1).");
+  if (!x.changes.length && !x.actions.length) fail("Add at least one expected manual change or one action (step 2).");
   const n = x.f.current_round + 1;
   const row = { finding_id: x.f.id, stage: "full", n, root_cause: x.f.draft_root_cause, factors: x.f.draft_factors, immediate: x.f.draft_immediate, comment: x.f.draft_comment, answered_by: s.person?.id ?? null, via: "app" };
   const { data, error } = await db().from("finding_rounds").insert(row).select("*").single();
-  if (error || !data) throw new Error(error?.message ?? "Answer not sent.");
+  if (error || !data) fail(error?.message ?? "Answer not sent.");
   const r = data as Round;
   const assistant = await preRead(x.f, r, x.changes, x.actions, "full");
   await db().from("finding_rounds").update({ assistant }).eq("id", r.id);
@@ -94,15 +95,15 @@ export async function sendAnalysis(fd: FormData) {
 
 /** Compliance reads root cause + plan: accept both (plan starts) or send back with the points to address (ticked among S.A.M.'s suggestions + free note). */
 export async function reviewAnswer(fd: FormData) {
-  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
-  if (x.f.status !== "review") throw new Error("Nothing to review.");
-  const r = x.rounds.find((q) => q.n === x.f.current_round); if (!r) throw new Error("Round not found");
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
+  if (x.f.status !== "review") fail("Nothing to review.");
+  const r = x.rounds.find((q) => q.n === x.f.current_round); if (!r) fail("Round not found");
   const decision = str(fd, "decision") === "accept" ? "accepted" : "sent_back";
   const picked = fd.getAll("point").map(String);
   const points: Point[] = (r.assistant?.points ?? []).filter((p) => picked.includes(`${p.part ?? "rca"}:${p.code}`));
   const note = str(fd, "note");
   if (note) points.push({ code: "NOTE", label: note.slice(0, 80), detail: note, part: str(fd, "note_part") === "plan" ? "plan" : "rca" });
-  if (decision === "sent_back" && !points.length) throw new Error("Say what is to be completed: tick at least one point or write a note.");
+  if (decision === "sent_back" && !points.length) fail("Say what is to be completed: tick at least one point or write a note.");
   await db().from("finding_rounds").update({ decision, points: decision === "sent_back" ? points : null, decided_by: s.person?.id ?? null, decided_at: new Date().toISOString(), note }).eq("id", r.id);
   // sent back: the NP resumes at the first part with a point; the drafts already hold the text
   const backStep = points.some((p) => p.part !== "plan") ? 1 : 2;
@@ -114,8 +115,8 @@ export async function reviewAnswer(fd: FormData) {
 /* ---------- the plan ---------- */
 export async function addChange(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
-  const expected = str(fd, "expected"); if (!expected) throw new Error("Say what must change in the manual.");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Reserved to the owner of the finding.");
+  const expected = str(fd, "expected"); if (!expected) fail("Say what must change in the manual.");
   const manual = str(fd, "manual_id");
   let code = str(fd, "manual_code");
   if (manual) { const { data } = await db().from("manuals").select("code").eq("id", manual).maybeSingle(); code = (data as { code: string } | null)?.code ?? code; }
@@ -124,29 +125,29 @@ export async function addChange(fd: FormData) {
 }
 export async function removeChange(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Not allowed");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Not allowed");
   await db().from("finding_changes").update({ status: "removed" }).eq("id", String(fd.get("change"))).eq("finding_id", x.f.id).in("status", ["pending", "deferred"]);
   touch(x.f.id);
 }
 /** FND-04 · Compliance verifies an effective change against the text in force. A change that went through the authority is
  * verified with the dossier reference and the decision / acknowledgement date (MSM §2.3: that date closes it, not the writing). */
 export async function verifyChange(fd: FormData) {
-  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
-  const c = x.changes.find((q) => q.id === String(fd.get("change"))); if (!c) throw new Error("Change not found");
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
+  const c = x.changes.find((q) => q.id === String(fd.get("change"))); if (!c) fail("Change not found");
   const ok = str(fd, "verdict") === "ok";
   if (!ok) { await db().from("finding_changes").update({ status: "pending", revision_id: null, verified_note: str(fd, "note") }).eq("id", c.id); touch(x.f.id); return; }
   const authority_ref = str(fd, "authority_ref") ?? c.authority_ref, effective_on = str(fd, "effective_on") ?? c.effective_on;
-  if (needsAuthority(c) && (!authority_ref || !effective_on)) throw new Error("This change went to the authority: the dossier reference (METEOR / TM-CAD) and the decision or acknowledgement date are required to verify it.");
-  if (!effective_on) throw new Error("The publication date is required.");
+  if (needsAuthority(c) && (!authority_ref || !effective_on)) fail("This change went to the authority: the dossier reference (METEOR / TM-CAD) and the decision or acknowledgement date are required to verify it.");
+  if (!effective_on) fail("The publication date is required.");
   await db().from("finding_changes").update({ status: "verified", verified_at: new Date().toISOString(), verified_by: s.person?.id ?? null, verified_note: str(fd, "note"), authority_ref, effective_on }).eq("id", c.id).eq("finding_id", x.f.id);
   touch(x.f.id);
 }
 /** FND-04 · A change that waits for the authority, or was published outside S.A.M.: Compliance records the reference and the date by hand. */
 export async function recordChangeAuthority(fd: FormData) {
-  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
-  const c = x.changes.find((q) => q.id === String(fd.get("change"))); if (!c) throw new Error("Change not found");
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
+  const c = x.changes.find((q) => q.id === String(fd.get("change"))); if (!c) fail("Change not found");
   const authority_ref = str(fd, "authority_ref"), effective_on = str(fd, "effective_on"), route = str(fd, "route") ?? c.route ?? "publication";
-  if (!effective_on || ((route === "approval" || route === "notification") && !authority_ref)) throw new Error("Reference and date are required.");
+  if (!effective_on || ((route === "approval" || route === "notification") && !authority_ref)) fail("Reference and date are required.");
   await db().from("finding_changes").update({ status: "published", route, authority_ref, effective_on }).eq("id", c.id).eq("finding_id", x.f.id).in("status", ["included", "awaiting_authority", "pending", "deferred"]);
   await log(x.f, "finding_change_effective", s.person?.id ?? null, { change: c.id, route, authority_ref, effective_on }); touch(x.f.id);
 }
@@ -154,10 +155,10 @@ export async function recordChangeAuthority(fd: FormData) {
 /** The NP asks for the closure once the plan is done. */
 export async function requestClosure(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding.");
-  if (x.f.status !== "accepted") throw new Error("The plan must be accepted first.");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Reserved to the owner of the finding.");
+  if (x.f.status !== "accepted") fail("The plan must be accepted first.");
   const pendingDoc = x.changes.filter((c) => c.status !== "verified");
-  if (pendingDoc.length) throw new Error(`${pendingDoc.length} manual change${pendingDoc.length > 1 ? "s are" : " is"} not effective yet (approved / acknowledged by the authority, or published, then verified by Compliance). A documentary finding is closed on that date, not when the text is written (MSM §2.3).`);
+  if (pendingDoc.length) fail(`${pendingDoc.length} manual change${pendingDoc.length > 1 ? "s are" : " is"} not effective yet (approved / acknowledged by the authority, or published, then verified by Compliance). A documentary finding is closed on that date, not when the text is written (MSM §2.3).`);
   await db().from("findings").update({ status: "closure_requested", updated_at: new Date().toISOString() }).eq("id", x.f.id);
   await db().from("tasks").update({ status: "done" }).eq("ref_id", x.f.id).eq("kind", "finding_closure").eq("status", "open");
   const { f } = await load(x.f.id); await syncFindingTasks(db(), f);
@@ -165,11 +166,11 @@ export async function requestClosure(fd: FormData) {
 }
 /** Compliance closes (evidence checked), reopens the plan, or cancels. */
 export async function decideClosure(fd: FormData) {
-  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
   const what = str(fd, "what"); const note = str(fd, "note");
   const now = new Date().toISOString();
   if (what === "close") await db().from("findings").update({ status: "closed", closed_at: now, closed_by: s.person?.id ?? null, closed_note: note, effective_closed_on: effectiveClosure(x.changes, x.actions) ?? now.slice(0, 10), updated_at: now }).eq("id", x.f.id);
-  else if (what === "cancel") { if (!s.roles.includes("SUPERADMIN") && !s.roles.includes("CMM")) throw new Error("Not allowed"); await db().from("findings").update({ status: "cancelled", closed_at: now, closed_by: s.person?.id ?? null, closed_note: note, updated_at: now }).eq("id", x.f.id); }
+  else if (what === "cancel") { if (!s.roles.includes("SUPERADMIN") && !s.roles.includes("CMM")) fail("Not allowed"); await db().from("findings").update({ status: "cancelled", closed_at: now, closed_by: s.person?.id ?? null, closed_note: note, updated_at: now }).eq("id", x.f.id); }
   else await db().from("findings").update({ status: "accepted", updated_at: now }).eq("id", x.f.id);
   const { f } = await load(x.f.id); await syncFindingTasks(db(), f);
   await log(f, `finding_${what ?? "reopened"}`, s.person?.id ?? null, { note }); touch(f.id);
@@ -177,7 +178,7 @@ export async function decideClosure(fd: FormData) {
 
 /** Opens the OM-FND dossier (manual revision for finding closure) linked to this finding. */
 export async function openDossier(fd: FormData) {
-  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
   if (x.f.authority_file_id) redirect(`/proj/auth/${x.f.authority_file_id}`);
   const f = await createAuthorityFile(db(), { personId: s.person?.id ?? null, name: s.name }, { entity: x.f.entity, type_code: "OM-FND", title: `${x.f.number} — ${x.f.title}`.slice(0, 200), trigger_kind: "finding", trigger_note: `${x.f.number} · ${x.f.requirement ?? ""}`.trim(), finding_ref: x.f.number, target_date: x.f.due });
   await db().from("findings").update({ authority_file_id: f.id, updated_at: new Date().toISOString() }).eq("id", x.f.id);
@@ -188,7 +189,7 @@ export async function openDossier(fd: FormData) {
 /** 10/11 · the type of finding (documentary, procedure, training…): S.A.M. proposes it, the owner or Compliance sets it; it steers the root-cause advice. */
 export async function setFindingType(fd: FormData) {
   const x = await load(String(fd.get("id"))); const s = await me();
-  if (!isOwner(s, x.f) && !isCompliance(s)) throw new Error("Reserved to the owner of the finding or Compliance.");
+  if (!isOwner(s, x.f) && !isCompliance(s)) fail("Reserved to the owner of the finding or Compliance.");
   const t = str(fd, "type");
   const type = t === "auto" ? guessType(x.f) : t && (TYPES as readonly string[]).includes(t) ? t : null;
   await db().from("findings").update({ finding_type: type, finding_type_by: t === "auto" ? "sam" : type ? "user" : null, updated_at: new Date().toISOString() }).eq("id", x.f.id);
@@ -198,7 +199,7 @@ export async function setFindingType(fd: FormData) {
 
 /** 10/11 · an authority finding: its reference, the authority's decisions (root cause, plan, proof), the proof sent, an extension of the deadline. Compliance desk. */
 export async function setAuthorityDecision(fd: FormData) {
-  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) throw new Error("Compliance department only.");
+  const x = await load(String(fd.get("id"))); const s = await me(); if (!isCompliance(s)) fail("Compliance department only.");
   const dec = (k: string) => { const v = str(fd, k); return v && ["awaiting", "yes", "no", "na"].includes(v) ? v : null; };
   const ext = str(fd, "extension");
   const row = { authority_ref: str(fd, "authority_ref"), authority_rca: dec("authority_rca"), authority_pac: dec("authority_pac"), authority_proof: dec("authority_proof"), proof: str(fd, "proof"),

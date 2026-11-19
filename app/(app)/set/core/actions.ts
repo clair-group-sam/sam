@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -9,10 +10,10 @@ export type ApplyResult = { applied: string[]; error: string | null };
 /** Settings › Core: apply the pending migrations, in order, stopping at the first error. SUPERADMIN / CMM only. */
 export async function applyPending(formData: FormData): Promise<void> {
   const s = await getSession();
-  if (!s || !(s.roles.includes("SUPERADMIN") || s.roles.includes("CMM"))) throw new Error("Not allowed");
+  if (!s || !(s.roles.includes("SUPERADMIN") || s.roles.includes("CMM"))) fail("Not allowed");
   const upTo = String(formData.get("up_to") ?? "");
   const done = await appliedVersions();
-  if (!done.ok) throw new Error(done.error);
+  if (!done.ok) fail(done.error);
   const pending = localMigrations().filter((m) => !done.versions.includes(m.version)).filter((m) => !upTo || m.version <= upTo);
   const db = supabaseAdmin();
   const applied: string[] = []; let error: string | null = null;
@@ -23,5 +24,5 @@ export async function applyPending(formData: FormData): Promise<void> {
   }
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "database", object_id: "migrations", action: error ? "migrations_failed" : "migrations_applied", after: { applied, error } });
   revalidatePath("/set/core");
-  if (error) throw new Error(error);
+  if (error) fail(error);
 }

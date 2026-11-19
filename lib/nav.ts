@@ -97,3 +97,20 @@ export function singleEntity(home: string | null | undefined, entities: string[]
 export const VIEW_BASE: { code: string; label: string }[] = [{ code: "AM", label: "Accountable Manager" }, { code: "USER", label: "User (pilot, instructor…)" }];
 export const VIEW_RE = /^[A-Z][A-Z0-9_-]{1,23}(@[A-Z]{5})?$/;
 export type ViewOption = { value: string; code: string; entity: string | null; label: string };
+
+/** FB-122 · may this profile open this menu screen? The menus already hide what a profile does not use; this closes the
+ *  same screens when their address is typed. Only menu screens (/<module>/<screen>) are checked: a record's own page
+ *  (three segments) is reached from a task or a card and checks its own rights. Returns false when the screen is closed. */
+export function mayOpen(role: RoleKey, path: string): boolean {
+  const seg = path.split("?")[0].split("/").filter(Boolean);
+  if (!seg.length || seg.length > 2) return true;
+  const [mod, sub] = seg;
+  if (!MODULES.some((m) => m.id === mod)) return true; // not a module of the menu (print, login…)
+  const R = ROLES[role];
+  if (!R.mods.includes(mod)) return false;
+  if (!sub) return true;
+  if (!(SUB[mod] ?? []).some((x) => x.id === sub)) return true; // a helper screen of the module (new, manual, search…)
+  const allowed = R.subs[mod] ?? [];
+  const parent = SUB_PARENT[`${mod}/${sub}`];
+  return allowed.includes(sub) || (!!parent && allowed.includes(parent));
+}

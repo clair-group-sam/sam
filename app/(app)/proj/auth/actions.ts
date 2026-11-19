@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
@@ -14,12 +15,12 @@ const opt = (fd: FormData, k: string) => str(fd, k) || null;
 
 async function guard(id: string): Promise<{ s: Session; db: Db; f: AuthorityFile; cmm: boolean; owner: boolean }> {
   const s = await getSession();
-  if (!s) throw new Error("Not signed in");
+  if (!s) fail("Not signed in");
   const db = supabaseAdmin();
   const { data } = await db.from("authority_files").select("*").eq("id", id).maybeSingle();
-  if (!data) throw new Error("File not found");
+  if (!data) fail("File not found");
   const f = data as AuthorityFile;
-  if (!s.group && !s.entities.includes(f.entity)) throw new Error("Out of scope");
+  if (!s.group && !s.entities.includes(f.entity)) fail("Out of scope");
   const cmm = isCmm(s);
   const owner = f.owner_person ? s.person?.id === f.owner_person : !!f.owner_role && s.roles.map(basePost).includes(basePost(f.owner_role));
   return { s, db, f, cmm, owner };
@@ -35,9 +36,9 @@ function paths(id?: string) { revalidatePath("/proj/auth"); revalidatePath("/pro
 /** New file from a type: route and checklist copied from the type at creation (the type can change later, the file keeps its own list). */
 export async function createFile(formData: FormData) {
   const s = await getSession();
-  if (!s) throw new Error("Not signed in");
+  if (!s) fail("Not signed in");
   const entity = str(formData, "entity");
-  if (!s.group && !s.entities.includes(entity)) throw new Error("Out of scope");
+  if (!s.group && !s.entities.includes(entity)) fail("Out of scope");
   const f = await createAuthorityFile(supabaseAdmin(), { personId: s.person?.id ?? null, name: s.name }, {
     entity, type_code: str(formData, "type_code"), title: opt(formData, "title"), owner_role: opt(formData, "owner_role"), trigger_kind: opt(formData, "trigger_kind"), trigger_note: opt(formData, "trigger_note"),
     triggered_at: opt(formData, "triggered_at"), target_date: opt(formData, "target_date"), revision_id: opt(formData, "revision_id"), finding_ref: opt(formData, "finding_ref"), aircraft_reg: opt(formData, "aircraft_reg"), np_post_code: opt(formData, "np_post_code"), moc_ref: opt(formData, "moc_ref") }, "app");
@@ -48,7 +49,7 @@ export async function createFile(formData: FormData) {
 export async function saveFile(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f, cmm, owner } = await guard(id);
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   const fields = ["title", "trigger_kind", "trigger_note", "finding_ref", "aircraft_reg", "np_post_code", "moc_ref", "portal_ref", "portal_url", "target_date", "lessons", "revision_id", "owner_role", "next_task", "next_owner", "assessor", "portal_status", "portal_read_on", "last_exchange", "last_exchange_on"];
   if (formData.has("ball_override")) { const b = str(formData, "ball_override"); patch.ball_override = b === "us" || b === "authority" ? b : null; }
@@ -65,7 +66,7 @@ export async function saveFile(formData: FormData) {
 export async function toggleItem(formData: FormData) {
   const id = str(formData, "file_id"); const itemId = str(formData, "item_id");
   const { s, db, cmm, owner } = await guard(id);
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const { data: it } = await db.from("authority_file_items").select("*").eq("id", itemId).eq("file_id", id).maybeSingle();
   if (!it) return;
   const done = !(it as { done: boolean }).done;
@@ -77,7 +78,7 @@ export async function toggleItem(formData: FormData) {
 export async function addItem(formData: FormData) {
   const id = str(formData, "file_id");
   const { s, db, cmm, owner } = await guard(id);
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const label = str(formData, "label"); if (!label) return;
   const { count } = await db.from("authority_file_items").select("id", { count: "exact", head: true }).eq("file_id", id);
   await db.from("authority_file_items").insert({ file_id: id, ord: (count ?? 0) + 1, key: `x${Date.now().toString(36)}`, label, role: opt(formData, "role"), required: formData.get("required") === "on" });
@@ -109,7 +110,7 @@ export async function addNote(formData: FormData) {
 export async function addRound(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f, cmm, owner } = await guard(id);
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const note = str(formData, "note"); if (!note) return;
   const direction = str(formData, "direction") === "sent" ? "sent" : "received";
   const at = opt(formData, "at") ?? today();
@@ -124,17 +125,17 @@ export async function addRound(formData: FormData) {
 export async function addAttachment(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f, cmm, owner } = await guard(id);
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const file = formData.get("file");
   const name = str(formData, "name");
   const kind = opt(formData, "kind");
   if (file instanceof File && file.size > 0) {
-    if (file.size > 10 * 1024 * 1024) throw new Error("File larger than 10 MB: keep it on the server (MOC folder) and record its name here.");
+    if (file.size > 10 * 1024 * 1024) fail("File larger than 10 MB: keep it on the server (MOC folder) and record its name here.");
     const safe = file.name.replace(/[^\w.\-() ]+/g, "_");
     const path = `${f.entity}/authority/${f.id}/${safe}`;
     const buf = Buffer.from(await file.arrayBuffer());
     const { error } = await db.storage.from("evidence").upload(path, buf, { contentType: file.type || "application/octet-stream", upsert: true });
-    if (error) throw new Error(error.message);
+    if (error) fail(error.message);
     await db.from("authority_file_attachments").insert({ file_id: id, name: safe, kind, path: `evidence/${path}`, size: file.size, uploaded_by: s.person?.id ?? null });
     await event(db, s, id, "attachment", `Attached: ${safe} (${Math.round(file.size / 1024)} KB)`);
   } else if (name) {
@@ -147,7 +148,7 @@ export async function addAttachment(formData: FormData) {
 export async function removeAttachment(formData: FormData) {
   const id = str(formData, "id"); const aid = str(formData, "attachment_id");
   const { s, db, cmm } = await guard(id);
-  if (!cmm) throw new Error("Not allowed");
+  if (!cmm) fail("Not allowed");
   const { data: a } = await db.from("authority_file_attachments").select("*").eq("id", aid).eq("file_id", id).maybeSingle();
   if (!a) return;
   const att = a as { name: string; path: string | null };
@@ -163,7 +164,7 @@ export async function removeAttachment(formData: FormData) {
 export async function answerPortal(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f, cmm } = await guard(id);
-  if (!cmm) throw new Error("Compliance only");
+  if (!cmm) fail("Compliance only");
   const update = formData.get("answer") === "update";
   if (update && f.stage === "submitted") {
     await db.from("authority_files").update({ stage: "ready", submitted_at: null, ball_override: null, updated_at: new Date().toISOString() }).eq("id", id);
@@ -182,7 +183,7 @@ export async function answerPortal(formData: FormData) {
 export async function resendCard(formData: FormData) {
   const id = str(formData, "id");
   const { db, cmm } = await guard(id);
-  if (!cmm) throw new Error("Compliance only");
+  if (!cmm) fail("Compliance only");
   const { data } = await db.from("tasks").select("*").eq("ref_id", id).eq("status", "open");
   const { notifyTasks } = await import("@/lib/teams");
   if (data?.length) await notifyTasks(db, data as never);
@@ -193,9 +194,9 @@ export async function resendCard(formData: FormData) {
 export async function deleteFile(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f } = await guard(id);
-  if (!s.roles.includes("SUPERADMIN")) throw new Error("Super admin only");
-  if (formData.get("confirm") !== "on") throw new Error("Tick the confirmation to delete");
-  if (f.portal_ref || !["draft", "compliance", "signing", "ready", "standby"].includes(f.stage)) throw new Error("A file that reached the authority is never deleted — put it on standby or close it.");
+  if (!s.roles.includes("SUPERADMIN")) fail("Super admin only");
+  if (formData.get("confirm") !== "on") fail("Tick the confirmation to delete");
+  if (f.portal_ref || !["draft", "compliance", "signing", "ready", "standby"].includes(f.stage)) fail("A file that reached the authority is never deleted — put it on standby or close it.");
   const { data: atts } = await db.from("authority_file_attachments").select("path").eq("file_id", id);
   const keys = ((atts ?? []) as { path: string | null }[]).map((a) => a.path).filter((x): x is string => !!x && x.startsWith("evidence/")).map((x) => x.slice(9));
   if (keys.length) await db.storage.from("evidence").remove(keys);
@@ -212,8 +213,8 @@ export async function deleteFile(formData: FormData) {
 export async function recordGrantedOutside(formData: FormData) {
   const id = str(formData, "id");
   const { s, db, f, cmm } = await guard(id);
-  if (!cmm) throw new Error("Compliance only");
-  if (!["draft", "compliance", "signing", "ready", "standby"].includes(f.stage)) throw new Error("This file already has its own history.");
+  if (!cmm) fail("Compliance only");
+  if (!["draft", "compliance", "signing", "ready", "standby"].includes(f.stage)) fail("This file already has its own history.");
   const decision = opt(formData, "decision_at") ?? today();
   const submitted = opt(formData, "submitted_at") ?? decision;
   const outcome = opt(formData, "outcome") ?? (f.category === "notification" ? "acknowledged" : "approved");

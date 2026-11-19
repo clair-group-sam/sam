@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
@@ -11,13 +12,13 @@ import { runAnalysis } from "@/lib/safety-analysis";
 /** Step 1 · SAM reads the narrative and proposes 3 to 5 FACTUAL precisions, in the reporter's language. No chat, nothing stored. */
 export async function proposePrecisions(input: { narrative: string; known: Record<string, string> }): Promise<{ lang: string; items: Precision[] }> {
   const s = await getSession();
-  if (!s) throw new Error("Not signed in.");
+  if (!s) fail("Not signed in.");
   if (input.narrative.trim().length < 20) return { lang: "en", items: DEFAULT_PRECISIONS };
   try {
     const { text } = await callClaude({ agent: "safety", personId: s.person?.id ?? null, entity: null, maxTokens: 1200,
       system: `A crew or staff member of an aviation operator wrote a safety report. Propose 3 to 5 FACTUAL precisions that would help the Safety Manager, chosen from what the narrative does NOT already say (and not already given in "known"): time UTC, phase of flight, what alerted them, TCAS RA/TA, ATC informed, consequences (damage, injury, go-around, delay), weather, technical log entry, witnesses, location on the aerodrome. NEVER ask about causes, blame or human factors. Write the labels in the language of the narrative. Short answers: prefer "choice" with 2–6 options. Answer ONLY JSON: {"lang":"fr|en|…","items":[{"key":"snake_case","label":"…","type":"choice|text|time","options":["…"]}]}`,
       user: JSON.stringify({ narrative: input.narrative.slice(0, 6000), known: input.known }) });
-    const m = /\{[\s\S]*\}/.exec(text); if (!m) throw new Error("none");
+    const m = /\{[\s\S]*\}/.exec(text); if (!m) fail("none");
     const j = JSON.parse(m[0]) as { lang?: string; items?: Precision[] };
     const items = (j.items ?? []).filter((x) => x?.key && x?.label).slice(0, 5).map((x) => ({ key: String(x.key).slice(0, 40), label: String(x.label).slice(0, 160), type: (["choice", "text", "time"].includes(x.type) ? x.type : "text") as Precision["type"], options: Array.isArray(x.options) ? x.options.map(String).slice(0, 8) : undefined }));
     return { lang: j.lang ?? "en", items: items.length ? items : DEFAULT_PRECISIONS };

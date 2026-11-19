@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession, type Session } from "@/lib/session";
@@ -10,9 +11,9 @@ const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
 const num = (v: string | null) => { if (v == null) return null; const x = Number(v.replace(",", ".").replace(/\s|%/g, "")); return Number.isFinite(x) ? x : NaN; };
 async function desk(entity: string | null): Promise<Session> {
-  const s = await getSession(); if (!s) throw new Error("Sign in again.");
-  if (!mayEditSpi(s)) throw new Error("Reserved to the safety desk (SM / CMM / FSO).");
-  if (!entity || !s.entities.includes(entity)) throw new Error("Pick an entity in your scope.");
+  const s = await getSession(); if (!s) fail("Sign in again.");
+  if (!mayEditSpi(s)) fail("Reserved to the safety desk (SM / CMM / FSO).");
+  if (!entity || !s.entities.includes(entity)) fail("Pick an entity in your scope.");
   return s;
 }
 const touch = () => { revalidatePath("/safe/over"); revalidatePath("/safe/over/data"); revalidatePath("/safe/over/set"); revalidatePath("/safe/over/spi/[id]", "page"); };
@@ -30,8 +31,8 @@ export async function saveData(fd: FormData) {
     if (Number.isNaN(x) || (dx != null && Number.isNaN(dx))) { bad.push(`${key} ${m}`); continue; }
     ups.push({ entity, key, month: `${m}-01`, value: x, den: dx, source: "manual", entered_by: s.person?.id ?? null, entered_at: new Date().toISOString() });
   }
-  if (bad.length) throw new Error(`Not a number: ${bad.slice(0, 5).join(", ")}`);
-  if (ups.length) { const { error } = await db().from("spi_data").upsert(ups, { onConflict: "entity,key,month" }); if (error) throw new Error(error.message); }
+  if (bad.length) fail(`Not a number: ${bad.slice(0, 5).join(", ")}`);
+  if (ups.length) { const { error } = await db().from("spi_data").upsert(ups, { onConflict: "entity,key,month" }); if (error) fail(error.message); }
   for (const [key, m] of dels) await db().from("spi_data").delete().eq("entity", entity!).eq("key", key).eq("month", `${m}-01`);
   touch();
 }
@@ -41,7 +42,7 @@ export async function setMonth(fd: FormData) {
   const entity = str(fd, "entity"); const s = await desk(entity);
   const key = String(fd.get("key")); const m = String(fd.get("month")); const v = str(fd, "value");
   if (!v) { await db().from("spi_data").delete().eq("entity", entity!).eq("key", key).eq("month", `${m}-01`); touch(); return; }
-  const x = num(v); const d = num(str(fd, "den")); if (Number.isNaN(x) || Number.isNaN(d as number)) throw new Error("Not a number.");
+  const x = num(v); const d = num(str(fd, "den")); if (Number.isNaN(x) || Number.isNaN(d as number)) fail("Not a number.");
   await db().from("spi_data").upsert({ entity, key, month: `${m}-01`, value: x, den: d, source: "manual", note: str(fd, "note"), entered_by: s.person?.id ?? null, entered_at: new Date().toISOString() }, { onConflict: "entity,key,month" });
   touch();
 }
@@ -53,26 +54,26 @@ export async function saveDef(fd: FormData) {
   const id = str(fd, "id"); const year = Number(str(fd, "year") ?? new Date().getUTCFullYear());
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const k of DEF) if (fd.has(k)) row[k] = str(fd, k);
-  if (row.metric && !METRICS[String(row.metric)]) throw new Error("Unknown computed metric.");
-  if (row.basis && !(String(row.basis) in BASIS)) throw new Error("Unknown basis.");
+  if (row.metric && !METRICS[String(row.metric)]) fail("Unknown computed metric.");
+  if (row.basis && !(String(row.basis) in BASIS)) fail("Unknown basis.");
   let spiId = id;
-  if (id) { const { error } = await db().from("spi_defs").update(row).eq("id", id).eq("entity", entity!); if (error) throw new Error(error.message); }
+  if (id) { const { error } = await db().from("spi_defs").update(row).eq("id", id).eq("entity", entity!); if (error) fail(error.message); }
   else {
-    const code = str(fd, "code")?.toUpperCase(); if (!code || !row.label) throw new Error("Give the SPI a code and a name.");
+    const code = str(fd, "code")?.toUpperCase(); if (!code || !row.label) fail("Give the SPI a code and a name.");
     const { data: last } = await db().from("spi_defs").select("sort").eq("entity", entity!).order("sort", { ascending: false }).limit(1);
     const { data, error } = await db().from("spi_defs").insert({ ...row, entity, code, sort: (((last ?? [])[0] as { sort: number } | undefined)?.sort ?? 0) + 1, status: "active" }).select("id").single();
-    if (error || !data) throw new Error(error?.message.includes("duplicate") ? `${code} already exists.` : error?.message ?? "Not created."); spiId = (data as { id: string }).id;
+    if (error || !data) fail(error?.message.includes("duplicate") ? `${code} already exists.` : error?.message ?? "Not created."); spiId = (data as { id: string }).id;
   }
   if (fd.has("target") || fd.has("alert")) {
     const t = num(str(fd, "target")); const a = num(str(fd, "alert"));
-    if (Number.isNaN(t as number) || Number.isNaN(a as number)) throw new Error("Target and alert are numbers (empty = TBD).");
+    if (Number.isNaN(t as number) || Number.isNaN(a as number)) fail("Target and alert are numbers (empty = TBD).");
     await db().from("spi_targets").upsert({ spi_id: spiId, year, target: t, alert: a, note: str(fd, "target_note"), set_by: s.person?.id ?? null, set_at: new Date().toISOString() }, { onConflict: "spi_id,year" });
   }
   touch();
 }
 export async function setStatus(fd: FormData) {
   const entity = str(fd, "entity"); await desk(entity);
-  const st = String(fd.get("status")); if (!["active", "proposed", "retired"].includes(st)) throw new Error("Unknown status.");
+  const st = String(fd.get("status")); if (!["active", "proposed", "retired"].includes(st)) fail("Unknown status.");
   const id = str(fd, "id");
   const q = db().from("spi_defs").update({ status: st, updated_at: new Date().toISOString() }).eq("entity", entity!);
   if (id) await q.eq("id", id); else await q.eq("status", "proposed"); // no id: confirm the whole proposed set

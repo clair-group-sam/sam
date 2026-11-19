@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -11,23 +12,23 @@ import { isCmm } from "@/lib/revisions";
 /** New manual: Issue 1 Rev 00 as a draft with the chapters typed by its author, then the editor. */
 export async function createManual(formData: FormData) {
   const s = await getSession();
-  if (!s || !(await mayCreateManual(s))) throw new Error("You are not allowed to create a manual.");
+  if (!s || !(await mayCreateManual(s))) fail("You are not allowed to create a manual.");
   const entity = String(formData.get("entity") ?? "");
-  if (!s.group && !s.entities.includes(entity)) throw new Error("Entity outside your access.");
+  if (!s.group && !s.entities.includes(entity)) fail("Entity outside your access.");
   const code = String(formData.get("code") ?? "").trim().toUpperCase().replace(/\s+/g, "-");
   const title = String(formData.get("title") ?? "").trim();
   const folder = String(formData.get("folder_new") ?? "").trim() || String(formData.get("folder") ?? "").trim() || null;
   const owner = String(formData.get("owner") ?? "");
   const internal = formData.get("internal") === "on"; // chosen by the creator; afterwards only Compliance changes it, in a draft
-  if (!code || !title || !owner) throw new Error("Code, title and owner are required.");
+  if (!code || !title || !owner) fail("Code, title and owner are required.");
   const db = supabaseAdmin();
   const { data: dup } = await db.from("manuals").select("id").eq("entity", entity).eq("code", code).maybeSingle();
-  if (dup) throw new Error(`${entity} already has a manual ${code}.`);
+  if (dup) fail(`${entity} already has a manual ${code}.`);
   const ownerName = owner.startsWith("PERSON:") ? s.name : null;
   const { data: m, error } = await db.from("manuals").insert({ entity, code, title, owner_role: owner, owner_name: ownerName, path: folder, internal, created_by: s.person?.id ?? null, needs_signature: false, to_tmcad_repository: false }).select("id").single();
-  if (error || !m) throw new Error(error?.message ?? "Manual not created");
+  if (error || !m) fail(error?.message ?? "Manual not created");
   const { data: r, error: e2 } = await db.from("revisions").insert({ manual_id: m.id, issue: 1, rev: "00", step: "draft", authority_route: internal ? "none" : null, summary: "Initial issue", created_by: s.person?.id ?? null, step_changed_by: s.person?.id ?? null }).select("id").single();
-  if (e2 || !r) throw new Error(e2?.message ?? "Revision not created");
+  if (e2 || !r) fail(e2?.message ?? "Revision not created");
   // chapters: one per line, "1.2 Scope" keeps its number, a plain title is numbered in order
   const lines = String(formData.get("chapters") ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
   let n = 0;

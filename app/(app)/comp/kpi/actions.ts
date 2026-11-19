@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
@@ -14,17 +15,17 @@ async function me(): Promise<Session> { const s = await getSession(); if (!s) re
 const touch = () => { revalidatePath("/comp/kpi"); revalidatePath("/comp/over"); revalidatePath("/dash/cs"); };
 
 export async function takeSnapshot(fd: FormData) {
-  const s = await me(); if (!desk(s)) throw new Error("Compliance desk only.");
-  const entity = str(fd, "entity"); if (!entity || !(s.group || s.entities.includes(entity))) throw new Error("Entity out of scope");
+  const s = await me(); if (!desk(s)) fail("Compliance desk only.");
+  const entity = str(fd, "entity"); if (!entity || !(s.group || s.entities.includes(entity))) fail("Entity out of scope");
   const n = await snapshotKpis(db(), entity, str(fd, "as_of") ?? undefined);
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "kpi", object_id: null, action: "kpi_snapshot", after: { n, as_of: str(fd, "as_of") } });
   await db().from("tasks").update({ status: "done" }).eq("entity", entity).eq("kind", "kpi_month").eq("status", "open");
   touch();
 }
 export async function saveTarget(fd: FormData) {
-  const s = await me(); if (!desk(s) && !am(s)) throw new Error("Accountable Manager or Compliance desk.");
-  const entity = str(fd, "entity"), code = str(fd, "code"); if (!entity || !code) throw new Error("Missing");
-  const target = Number(fd.get("target")); if (!Number.isFinite(target)) throw new Error("Target must be a number");
+  const s = await me(); if (!desk(s) && !am(s)) fail("Accountable Manager or Compliance desk.");
+  const entity = str(fd, "entity"), code = str(fd, "code"); if (!entity || !code) fail("Missing");
+  const target = Number(fd.get("target")); if (!Number.isFinite(target)) fail("Target must be a number");
   const alertRaw = str(fd, "alert"); const alert = alertRaw === null ? null : Number(alertRaw);
   await db().from("kpi_targets").upsert({ entity, code, target, alert: alert !== null && Number.isFinite(alert) ? alert : null, origin: str(fd, "origin"), owner_role: str(fd, "owner_role") ?? "CMM", active: true }, { onConflict: "entity,code" });
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "kpi", object_id: null, action: "kpi_target_set", after: { code, target, alert, by: am(s) ? "AM" : "CMM" } });

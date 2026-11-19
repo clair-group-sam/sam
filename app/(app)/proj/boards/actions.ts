@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
@@ -16,12 +17,12 @@ const paths = (id?: string) => { revalidatePath("/proj/boards"); revalidatePath(
 
 async function guard(id: string): Promise<{ s: Session; db: Db; p: Project; cmm: boolean; owner: boolean }> {
   const s = await getSession();
-  if (!s) throw new Error("Not signed in");
+  if (!s) fail("Not signed in");
   const db = supabaseAdmin();
   const { data } = await db.from("projects").select("*").eq("id", id).maybeSingle();
-  if (!data) throw new Error("Project not found");
+  if (!data) fail("Project not found");
   const p = data as Project;
-  if (!s.group && !s.entities.includes(p.entity)) throw new Error("Out of scope");
+  if (!s.group && !s.entities.includes(p.entity)) fail("Out of scope");
   const cmm = isCmm(s);
   const owner = p.owner_person ? s.person?.id === p.owner_person : !!p.owner_role && s.roles.map(basePost).includes(basePost(p.owner_role));
   return { s, db, p, cmm, owner };
@@ -39,9 +40,9 @@ function mayWork(s: Session, cmm: boolean, owner: boolean, t: Task): boolean {
 /** New project: blank, or every phase and task of a template (dependencies kept). Any office role may open one. */
 export async function createProject(formData: FormData) {
   const s = await getSession();
-  if (!s || s.role === "user") throw new Error("Not allowed");
+  if (!s || s.role === "user") fail("Not allowed");
   const entity = str(formData, "entity");
-  if (!s.group && !s.entities.includes(entity)) throw new Error("Out of scope");
+  if (!s.group && !s.entities.includes(entity)) fail("Out of scope");
   const db = supabaseAdmin();
   const code = opt(formData, "template_code");
   const { data: t } = code ? await db.from("project_templates").select("*").eq("code", code).maybeSingle() : { data: null };
@@ -52,7 +53,7 @@ export async function createProject(formData: FormData) {
   const row = { entity, template_code: tpl?.code ?? null, title, description: opt(formData, "description") ?? tpl?.description ?? null, owner_role: opt(formData, "owner_role") ?? "CMM", owner_person: formData.get("owner_me") === "on" ? s.person?.id ?? null : null,
     pivot, started_at: opt(formData, "started_at") ?? today(), target_date: opt(formData, "target_date"), created_by: s.person?.id ?? null };
   const { data: created, error } = await db.from("projects").insert(row).select("*").single();
-  if (error || !created) throw new Error(error?.message ?? "Could not create the project");
+  if (error || !created) fail(error?.message ?? "Could not create the project");
   const p = created as Project;
   let n = 0;
   if (tpl) n = await instantiate(db, p.id, tpl);
@@ -64,7 +65,7 @@ export async function createProject(formData: FormData) {
 
 export async function saveProject(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const k of ["title", "description", "owner_role", "target_date", "started_at", "lessons"]) if (formData.has(k)) patch[k] = opt(formData, k);
   if (formData.has("status")) {
@@ -81,7 +82,7 @@ export async function saveProject(formData: FormData) {
 
 export async function addPhase(formData: FormData) {
   const { db, p, cmm, owner } = await guard(str(formData, "id"));
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const label = str(formData, "label"); if (!label) return;
   const { count } = await db.from("project_phases").select("id", { count: "exact", head: true }).eq("project_id", p.id);
   await db.from("project_phases").insert({ project_id: p.id, ord: (count ?? 0) + 1, key: `p${Date.now().toString(36)}`, label });
@@ -90,7 +91,7 @@ export async function addPhase(formData: FormData) {
 
 export async function addTask(formData: FormData) {
   const { db, p, cmm, owner } = await guard(str(formData, "id"));
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const title = str(formData, "title"); if (!title) return;
   const { count } = await db.from("project_tasks").select("id", { count: "exact", head: true }).eq("project_id", p.id);
   const link = opt(formData, "link_kind");
@@ -109,7 +110,7 @@ export async function updateTask(formData: FormData) {
   const { data: t } = await db.from("project_tasks").select("*").eq("id", taskId).eq("project_id", p.id).maybeSingle();
   if (!t) return;
   const task = t as Task;
-  if (!mayWork(s, cmm, owner, task)) throw new Error("Not allowed");
+  if (!mayWork(s, cmm, owner, task)) fail("Not allowed");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (formData.has("status")) {
     const st = str(formData, "status") as TaskStatus;
@@ -118,7 +119,7 @@ export async function updateTask(formData: FormData) {
       if (st === "done") { patch.done_at = opt(formData, "done_at") ?? today(); patch.done_by = s.person?.id ?? null; }
       else if (task.status === "done") { patch.done_at = null; patch.done_by = null; }
       if (st === "in_progress" && !task.started_at) patch.started_at = today();
-      if (st === "not_needed") { const why = opt(formData, "not_needed_reason"); if (!why) throw new Error("Say why this task is not needed for this project."); patch.not_needed_reason = why; }
+      if (st === "not_needed") { const why = opt(formData, "not_needed_reason"); if (!why) fail("Say why this task is not needed for this project."); patch.not_needed_reason = why; }
       else patch.not_needed_reason = null;
     }
   }
@@ -138,7 +139,7 @@ export async function updateTask(formData: FormData) {
 
 export async function deleteTask(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const taskId = str(formData, "task_id");
   const { data: t } = await db.from("project_tasks").select("title,link_id").eq("id", taskId).eq("project_id", p.id).maybeSingle();
   if (!t) return;
@@ -152,7 +153,7 @@ export async function openFileForTask(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
   const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) return;
   const f = await openFileForProjectTask(db, { personId: s.person?.id ?? null, name: s.name }, p, task, "Opened from the project");
-  if (!f) throw new Error(`Could not open a CAA application of type ${task.link_ref}`);
+  if (!f) fail(`Could not open a CAA application of type ${task.link_ref}`);
   await audit(db, s, p, "task_file_opened", { task: task.title, file: f.id });
   paths(p.id); revalidatePath(`/proj/auth/${f.id}`);
   redirect(`/proj/auth/${f.id}`);
@@ -162,9 +163,9 @@ export async function startDraftForTask(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
   const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task) || task.link_kind !== "manual" || !task.link_ref) return;
   const { data: m } = await db.from("manuals").select("id").eq("entity", p.entity).eq("code", task.link_ref).maybeSingle();
-  if (!m) throw new Error(`No manual ${task.link_ref} in ${p.entity}`);
+  if (!m) fail(`No manual ${task.link_ref} in ${p.entity}`);
   const d = await openDraft(db, (m as { id: string }).id, { personId: s.person?.id ?? null, name: s.name }, `Project: ${p.title}`);
-  if (!d) throw new Error("No revision to start from");
+  if (!d) fail("No revision to start from");
   await db.from("project_tasks").update({ link_id: d.id, status: "in_progress", started_at: task.started_at ?? today(), updated_at: new Date().toISOString() }).eq("id", task.id);
   paths(p.id); revalidatePath(`/docs/manual/${(m as { id: string }).id}`); revalidatePath("/docs/drafts");
   redirect(`/docs/editor/${d.id}`);
@@ -173,7 +174,7 @@ export async function startDraftForTask(formData: FormData) {
 /** Binds a task to a CAA application that already exists (opened from the editor or by hand). */
 export async function bindFileToTask(formData: FormData) {
   const { db, p, cmm, owner } = await guard(str(formData, "id"));
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const taskId = str(formData, "task_id"); const fileId = str(formData, "file_id");
   const { data: f } = await db.from("authority_files").select("id,entity,stage").eq("id", fileId).maybeSingle();
   if (!f || (f as { entity: string }).entity !== p.entity) return;
@@ -191,10 +192,10 @@ const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(
  */
 export async function pushToTemplate(formData: FormData) {
   const { s, db, p, cmm } = await guard(str(formData, "id"));
-  if (!cmm) throw new Error("Compliance only");
+  if (!cmm) fail("Compliance only");
   const mode = str(formData, "mode");
   const code = (mode === "new" ? str(formData, "code") : p.template_code ?? "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
-  if (!code) throw new Error(mode === "new" ? "A code is required for the new template" : "This project was not opened from a template: save it as a new one.");
+  if (!code) fail(mode === "new" ? "A code is required for the new template" : "This project was not opened from a template: save it as a new one.");
   const [{ data: phData }, { data: tData }] = await Promise.all([db.from("project_phases").select("*").eq("project_id", p.id).order("ord"), db.from("project_tasks").select("*").eq("project_id", p.id).order("ord")]);
   const phases = (phData ?? []) as Phase[]; const tasks = (tData ?? []) as Task[];
   const { data: dData } = tasks.length ? await db.from("project_task_deps").select("*").in("task_id", tasks.map((t) => t.id)) : { data: [] };
@@ -212,7 +213,7 @@ export async function pushToTemplate(formData: FormData) {
   const prev = (before as ProjectTemplate | null) ?? null;
   const row = { code, name: mode === "new" ? str(formData, "name") || code : prev?.name ?? code, description: prev?.description ?? p.description ?? null, entities: prev?.entities ?? [p.entity], phases: phases.map((ph) => ({ key: phaseKey.get(ph.id)!, label: ph.label })), tasks: tplTasks, pivots: prev?.pivots ?? Object.keys(p.pivot ?? {}), active: true, ord: prev?.ord ?? 99 };
   const { error } = prev ? await db.from("project_templates").update(row).eq("code", code) : await db.from("project_templates").insert(row);
-  if (error) throw new Error(error.message);
+  if (error) fail(error.message);
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: p.entity, object_type: "project_template", object_id: code, action: prev ? "template_updated_from_project" : "template_created_from_project", before: prev, after: { ...row, project: p.id } });
   await audit(db, s, p, "lessons_to_template", { code, tasks: tplTasks.length });
   revalidatePath("/ref/ptpl"); revalidatePath("/proj/boards/new"); paths(p.id);
@@ -242,14 +243,14 @@ export async function startTask(formData: FormData) {
 /** A document produced outside S.A.M. (contract, PPI report, form, evidence) attached to the task; the task starts if it had not. */
 export async function uploadTaskFile(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
-  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) throw new Error("Not allowed");
+  const task = await taskOf(db, p, str(formData, "task_id")); if (!task || !mayWork(s, cmm, owner, task)) fail("Not allowed");
   const file = formData.get("file"); const name = str(formData, "name");
   if (file instanceof File && file.size > 0) {
-    if (file.size > 25 * 1024 * 1024) throw new Error("File larger than 25 MB: keep it on the server and record its name here.");
+    if (file.size > 25 * 1024 * 1024) fail("File larger than 25 MB: keep it on the server and record its name here.");
     const safe = file.name.replace(/[^\w.\-() ]+/g, "_");
     const key = `${p.entity}/projects/${p.id}/${task.id}/${safe}`;
     const { error } = await db.storage.from("evidence").upload(key, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream", upsert: true });
-    if (error) throw new Error(error.message);
+    if (error) fail(error.message);
     await db.from("project_task_files").insert({ task_id: task.id, project_id: p.id, name: safe, path: `evidence/${key}`, size: file.size, uploaded_by: s.person?.id ?? null });
   } else if (name) {
     await db.from("project_task_files").insert({ task_id: task.id, project_id: p.id, name, path: null, size: null, uploaded_by: s.person?.id ?? null });
@@ -260,7 +261,7 @@ export async function uploadTaskFile(formData: FormData) {
 }
 export async function removeTaskFile(formData: FormData) {
   const { s, db, p, cmm, owner } = await guard(str(formData, "id"));
-  if (!cmm && !owner) throw new Error("Not allowed");
+  if (!cmm && !owner) fail("Not allowed");
   const { data } = await db.from("project_task_files").select("*").eq("id", str(formData, "file_id")).eq("project_id", p.id).maybeSingle();
   if (!data) return;
   const f = data as { id: string; name: string; path: string | null };
@@ -273,7 +274,7 @@ export async function removeTaskFile(formData: FormData) {
 /** Super admin only: cancel a project (kept, greyed, with its history) or delete it for good (tasks, dependencies, attached documents). */
 export async function cancelProject(formData: FormData) {
   const { s, db, p } = await guard(str(formData, "id"));
-  if (!s.roles.includes("SUPERADMIN")) throw new Error("Super admin only");
+  if (!s.roles.includes("SUPERADMIN")) fail("Super admin only");
   const reason = opt(formData, "reason");
   await db.from("projects").update({ status: "cancelled", closed_at: today(), lessons: reason ? `Cancelled: ${reason}${p.lessons ? `\n${p.lessons}` : ""}` : p.lessons, updated_at: new Date().toISOString() }).eq("id", p.id);
   await db.from("tasks").update({ status: "superseded" }).eq("status", "open").in("ref_id", [p.id]);
@@ -283,8 +284,8 @@ export async function cancelProject(formData: FormData) {
 }
 export async function deleteProject(formData: FormData) {
   const { s, db, p } = await guard(str(formData, "id"));
-  if (!s.roles.includes("SUPERADMIN")) throw new Error("Super admin only");
-  if (formData.get("confirm") !== "on") throw new Error("Tick the confirmation to delete");
+  if (!s.roles.includes("SUPERADMIN")) fail("Super admin only");
+  if (formData.get("confirm") !== "on") fail("Tick the confirmation to delete");
   const { data: fs } = await db.from("project_task_files").select("path").eq("project_id", p.id);
   const keys = ((fs ?? []) as { path: string | null }[]).map((f) => f.path).filter((x): x is string => !!x && x.startsWith("evidence/")).map((x) => x.slice(9));
   if (keys.length) await db.storage.from("evidence").remove(keys);

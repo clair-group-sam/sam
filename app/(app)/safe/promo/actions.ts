@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession, type Session } from "@/lib/session";
@@ -8,26 +9,26 @@ import { AUDIENCE, PROMO_KIND, audiencePeople, mayPublish, mayWrite, nextPromoNu
 
 const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
-async function sess(): Promise<Session> { const s = await getSession(); if (!s) throw new Error("Sign in again."); return s; }
-async function load(id: string): Promise<Promotion> { const { data } = await db().from("safety_promotions").select("*").eq("id", id).single(); if (!data) throw new Error("Not found."); return data as Promotion; }
+async function sess(): Promise<Session> { const s = await getSession(); if (!s) fail("Sign in again."); return s; }
+async function load(id: string): Promise<Promotion> { const { data } = await db().from("safety_promotions").select("*").eq("id", id).single(); if (!data) fail("Not found."); return data as Promotion; }
 async function draftOf(id: string) {
   const s = await sess(); const p = await load(id);
-  if (!s.entities.includes(p.entity) || !mayWrite(s)) throw new Error("Reserved to the safety desk, the NPs and the AM.");
-  if (p.status !== "draft") throw new Error("Published — it is not changed. Publish a new one (it can refer to this one).");
+  if (!s.entities.includes(p.entity) || !mayWrite(s)) fail("Reserved to the safety desk, the NPs and the AM.");
+  if (p.status !== "draft") fail("Published — it is not changed. Publish a new one (it can refer to this one).");
   return { s, p };
 }
 const touch = (id?: string) => { revalidatePath("/safe/promo"); if (id) revalidatePath(`/safe/promo/${id}`); revalidatePath("/home/tasks"); };
 
 export async function createPromotion(fd: FormData) {
   const s = await sess(); const entity = str(fd, "entity");
-  if (!entity || !s.entities.includes(entity) || !mayWrite(s)) throw new Error("Pick an entity in your scope.");
+  if (!entity || !s.entities.includes(entity) || !mayWrite(s)) fail("Pick an entity in your scope.");
   const kind = PROMO_KIND[str(fd, "kind") ?? ""] ? str(fd, "kind")! : "bulletin";
-  const title = str(fd, "title"); if (!title) throw new Error("Give it a title.");
+  const title = str(fd, "title"); if (!title) fail("Give it a title.");
   const audience = AUDIENCE[str(fd, "audience") ?? ""] ? str(fd, "audience")! : "all";
   const number = await nextPromoNumber(db(), entity, kind);
   const { data, error } = await db().from("safety_promotions").insert({ entity, kind, number, title: title.slice(0, 200), audience, ack_required: kind !== "bulletin" || fd.get("ack") === "1",
     report_id: str(fd, "report_id"), investigation_id: str(fd, "investigation_id"), anonymous: kind === "survey", body: str(fd, "notes"), created_by: s.person?.id ?? null }).select("id").single();
-  if (error || !data) throw new Error(error?.message ?? "Not created.");
+  if (error || !data) fail(error?.message ?? "Not created.");
   touch(); redirect(`/safe/promo/${(data as { id: string }).id}`);
 }
 
@@ -73,11 +74,11 @@ export async function draftPromotion(fd: FormData) {
 /** Publish: every person of the audience gets it in the Inbox (read / acknowledge / answer); then frozen. */
 export async function publishPromotion(fd: FormData) {
   const { s, p } = await draftOf(String(fd.get("id")));
-  if (!mayPublish(s)) throw new Error("Published by the safety desk (SM / CMM / FSO).");
-  if (!p.body?.trim() && p.kind !== "survey") throw new Error("Write the text first.");
-  if (p.kind === "survey" && !p.questions.length) throw new Error("Add at least one question.");
+  if (!mayPublish(s)) fail("Published by the safety desk (SM / CMM / FSO).");
+  if (!p.body?.trim() && p.kind !== "survey") fail("Write the text first.");
+  if (p.kind === "survey" && !p.questions.length) fail("Add at least one question.");
   const people = await audiencePeople(db(), p.entity, p.audience);
-  if (!people.length) throw new Error("Nobody in this audience yet.");
+  if (!people.length) fail("Nobody in this audience yet.");
   const now = new Date().toISOString();
   const due = p.due ?? (p.kind === "notice" ? new Date(Date.now() + 7 * 864e5) : new Date(Date.now() + 21 * 864e5)).toISOString().slice(0, 10);
   await db().from("safety_promotions").update({ status: "published", published_at: now, published_by: s.person?.id ?? null, due, updated_at: now }).eq("id", p.id);
@@ -88,7 +89,7 @@ export async function publishPromotion(fd: FormData) {
   touch(p.id);
 }
 
-const myRead = async (id: string) => { const s = await sess(); if (!s.person) throw new Error("Sign in again."); const p = await load(id); if (!s.entities.includes(p.entity)) throw new Error("Not in your scope."); return { s, p }; };
+const myRead = async (id: string) => { const s = await sess(); if (!s.person) fail("Sign in again."); const p = await load(id); if (!s.entities.includes(p.entity)) fail("Not in your scope."); return { s, p }; };
 const doneTask = (p: Promotion, person: string) => db().from("tasks").update({ status: "done" }).eq("kind", "promo_read").eq("ref_id", p.id).eq("owner_person", person).eq("status", "open");
 
 export async function ackPromotion(fd: FormData) {
@@ -98,11 +99,11 @@ export async function ackPromotion(fd: FormData) {
 }
 export async function answerSurvey(fd: FormData) {
   const { s, p } = await myRead(String(fd.get("id")));
-  if (p.kind !== "survey" || p.status !== "published") throw new Error("This survey is not open.");
+  if (p.kind !== "survey" || p.status !== "published") fail("This survey is not open.");
   const { data: r } = await db().from("safety_promotion_reads").select("answered_at").eq("promotion_id", p.id).eq("person_id", s.person!.id).maybeSingle();
-  if ((r as { answered_at: string | null } | null)?.answered_at) throw new Error("You already answered — thank you.");
+  if ((r as { answered_at: string | null } | null)?.answered_at) fail("You already answered — thank you.");
   const answers = Object.fromEntries(p.questions.map((q) => [q.key, str(fd, q.key)]).filter(([, v]) => v));
-  if (!Object.keys(answers).length) throw new Error("Answer at least one question.");
+  if (!Object.keys(answers).length) fail("Answer at least one question.");
   const now = new Date().toISOString();
   await db().from("safety_survey_answers").insert({ promotion_id: p.id, person_id: p.anonymous ? null : s.person!.id, answers, at: p.anonymous ? now.slice(0, 10) + "T00:00:00Z" : now });
   await db().from("safety_promotion_reads").upsert({ promotion_id: p.id, person_id: s.person!.id, read_at: now, answered_at: now }, { onConflict: "promotion_id,person_id" });
@@ -110,7 +111,7 @@ export async function answerSurvey(fd: FormData) {
 }
 export async function closePromotion(fd: FormData) {
   const s = await sess(); const p = await load(String(fd.get("id")));
-  if (!s.entities.includes(p.entity) || !mayPublish(s)) throw new Error("Reserved to the safety desk.");
+  if (!s.entities.includes(p.entity) || !mayPublish(s)) fail("Reserved to the safety desk.");
   await db().from("safety_promotions").update({ status: "closed", updated_at: new Date().toISOString() }).eq("id", p.id);
   await db().from("tasks").update({ status: "done" }).eq("kind", "promo_read").eq("ref_id", p.id).eq("status", "open");
   touch(p.id);

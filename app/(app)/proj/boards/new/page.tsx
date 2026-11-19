@@ -47,7 +47,7 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
             <input type="hidden" name="template_code" value={chosen?.code ?? ""} />
             {s.entity === "ALL" ? <label><span className="mini">Entity (group view: choose)</span><select name="entity" className="inp" defaultValue={entity} style={{ maxWidth: 320 }}>{ents.map((e) => <option key={e} value={e}>{ENT[e]?.name ?? e} ({e})</option>)}</select></label> : <input type="hidden" name="entity" value={entity} />}
             {chosen?.description && <p className="mini">{chosen.description}</p>}
-            <label><span className="mini">Title</span><input name="title" className="inp" placeholder={chosen ? `${chosen.name}, …` : "What this project achieves"} /></label>
+            <label><span className="mini">Title</span><input name="title" className="inp" required={!chosen} placeholder={chosen ? `${chosen.name}, …` : "What this project achieves"} /></label>
             {pivots.length > 0 && (
               <div className="grid grid-cols-3 gap-3">
                 {pivots.map((k) => <label key={k}><span className="mini">{PIVOT_LABEL[k] ?? k}</span><input name={`pivot_${k}`} className="inp mono" placeholder={k === "aircraft_type" ? "GL7T, C68A…" : k === "aircraft_reg" ? "9H-XXX / F-HXXX" : "NPFO, CMM, HT…"} /></label>)}

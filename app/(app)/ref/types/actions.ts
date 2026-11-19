@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -29,21 +30,21 @@ function parseChecklist(text: string[], previous: ChecklistItem[]): ChecklistIte
 /** References › Authority application types: Compliance maintains the catalogue. A change applies to files opened afterwards. */
 export async function saveType(formData: FormData) {
   const s = await getSession();
-  if (!s || !isCmm(s)) throw new Error("Compliance only");
+  if (!s || !isCmm(s)) fail("Compliance only");
   const db = supabaseAdmin();
   const code = str(formData, "code").toUpperCase().replace(/[^A-Z0-9-]/g, "");
-  if (!code) throw new Error("A code is required");
+  if (!code) fail("A code is required");
   const { data: before } = await db.from("authority_file_types").select("*").eq("code", code).maybeSingle();
   const prev = (before as FileType | null) ?? null;
   const entities = ENTS4.filter((e) => formData.get(`ent_${e}`) === "on");
   const routes: FileType["routes"] = {};
   for (const e of entities) {
     const portal = str(formData, `portal_${e}`); const category = str(formData, `category_${e}`) || "approval";
-    if (!(category in CATEGORY_LABEL)) throw new Error(`Unknown category for ${e}`);
+    if (!(category in CATEGORY_LABEL)) fail(`Unknown category for ${e}`);
     routes[e] = { portal, category };
   }
   const family = str(formData, "family");
-  if (!FAMILIES.includes(family)) throw new Error("Unknown family");
+  if (!FAMILIES.includes(family)) fail("Unknown family");
   const row = {
     code, family, name: str(formData, "name") || code, entities, routes,
     checklist: parseChecklist(lines(formData, "checklist"), prev?.checklist ?? []),
@@ -55,9 +56,9 @@ export async function saveType(formData: FormData) {
     active: formData.get("active") === "on",
     notes: str(formData, "notes") || null,
   };
-  if (!row.name) throw new Error("A name is required");
+  if (!row.name) fail("A name is required");
   const { error } = prev ? await db.from("authority_file_types").update(row).eq("code", code) : await db.from("authority_file_types").insert(row);
-  if (error) throw new Error(error.message);
+  if (error) fail(error.message);
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "authority_file_type", object_id: code, action: prev ? "type_updated" : "type_created", before: prev, after: row });
   revalidatePath("/ref/types"); revalidatePath("/proj/auth/new");
 }

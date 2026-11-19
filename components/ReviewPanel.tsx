@@ -16,7 +16,7 @@ export default function ReviewPanel({ revisionId, initial, editable }: { revisio
   return (
     <div>
       <div className="flex items-center gap-3 mb-3">
-        <span className="mini">{r ? `Reviewed ${r.at.slice(0, 16).replace("T", " ")} · ${r.comments.length} comment${r.comments.length === 1 ? "" : "s"}` : "Not reviewed yet."}</span>
+        <span className="mini">{r ? `Reviewed ${new Date(r.at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · ${r.comments.length} comment${r.comments.length === 1 ? "" : "s"}` : "Not reviewed yet."}</span>
         {editable && <button type="button" className="btn primary ml-auto" disabled={busy} onClick={run}>{busy ? "SAM is reading the document…" : r ? "Ask SAM to review again" : <><Icon name="bulb" size={14} /> Ask SAM to review</>}</button>}
       </div>
       {err && <p className="mini red mb-2">{err}</p>}

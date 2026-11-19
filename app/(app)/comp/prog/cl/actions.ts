@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
@@ -9,7 +10,7 @@ import { lines } from "@/lib/audit-programme";
 const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = String(fd.get(k) ?? "").trim(); return v || null; };
 const desk = (s: Session) => s.role === "cmm" || s.roles.map(basePost).some((r) => ["CMM", "SUPERADMIN"].includes(r));
-async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); if (!desk(s)) throw new Error("Compliance desk only."); return s; }
+async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); if (!desk(s)) fail("Compliance desk only."); return s; }
 const touch = (id: string) => { revalidatePath(`/comp/prog/cl/${id}`); revalidatePath("/comp/prog"); };
 
 /** Create a checklist for a module of a programme (same code), or from scratch. */
@@ -23,7 +24,7 @@ export async function createChecklist(fd: FormData) {
     let regulation = str(fd, "regulation");
     if (!regulation) { const key = domain === "CAMO" || domain === "CAE" ? "continuing-airworthiness" : domain === "ATO" || domain === "FSTD" ? "aircrew" : "air-operations"; const { data: r } = await db().from("regulations").select("id").eq("key", key).maybeSingle(); regulation = (r as { id: string } | null)?.id ?? null; }
     const { data, error } = await db().from("checklists").insert({ entity, code, title: str(fd, "title") ?? code, domain, regulation_id: regulation, created_by: s.person?.id ?? null }).select("id").single();
-    if (error) throw new Error(error.message); id = data.id;
+    if (error) fail(error.message); id = data.id;
   }
   const moduleId = str(fd, "module");
   if (moduleId) await db().from("audit_modules").update({ checklist_id: id }).eq("id", moduleId);
@@ -55,7 +56,7 @@ export async function addItems(fd: FormData) {
     const code = m ? m[2].toUpperCase() : head.toUpperCase(); const ref = m && (m[1] || m[3].trim()) ? head : null;
     return { checklist_id: cl, section_id: section, ord: ++ord, code, ref, regulation_id: reg, question: question || null, guidance: guidance || null };
   });
-  if (rows.length) { const { error } = await db().from("checklist_items").insert(rows); if (error) throw new Error(error.message); }
+  if (rows.length) { const { error } = await db().from("checklist_items").insert(rows); if (error) fail(error.message); }
   touch(cl);
 }
 export async function saveItem(fd: FormData) {

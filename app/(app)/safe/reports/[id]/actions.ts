@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -8,11 +9,11 @@ import { markMorFiled } from "@/lib/mor-filed";
 
 async function desk(id: string) {
   const s = await getSession();
-  if (!s || !isSafetyDesk(s)) throw new Error("Reserved to the Safety Manager / FSO / Compliance.");
+  if (!s || !isSafetyDesk(s)) fail("Reserved to the Safety Manager / FSO / Compliance.");
   const db = supabaseAdmin();
   const { data } = await db.from("reports").select("id,entity,status,reporter_person,anonymous").eq("id", id).maybeSingle();
   const r = data as { id: string; entity: string; status: string; reporter_person: string | null; anonymous: boolean } | null;
-  if (!r || !s.entities.includes(r.entity)) throw new Error("Report not found in your scope.");
+  if (!r || !s.entities.includes(r.entity)) fail("Report not found in your scope.");
   return { s, db, r };
 }
 const done = (id: string) => { revalidatePath(`/safe/reports/${id}`); revalidatePath("/safe/reports"); revalidatePath("/safe/mine"); revalidatePath("/home/tasks"); };

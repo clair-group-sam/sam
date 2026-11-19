@@ -11,7 +11,7 @@ export function ErpStartBar({ defaultExercise, unit }: { defaultExercise: boolea
       {!armed ? <button className="btn erp" type="button" onClick={() => setArmed(true)}>Start…</button> : (
         <span className="flex items-center gap-2 flex-wrap" role="alert">
           <b style={{ color: ex ? "var(--amber-ink)" : "var(--terra)" }}>{ex ? "Exercise" : "REAL alert"}</b>
-          <span className="mini">the response unit ({unit} contact{unit === 1 ? "" : "s"}) gets an Inbox item and a Teams card now, and the clocks start.</span>
+          <span className="mini">{unit} contact{unit === 1 ? "" : "s"} in the response unit: those who have a S.A.M. account get an Inbox item and a Teams card now, the log names the others to call by phone; the clocks start.</span>
           <button className="btn" type="button" onClick={() => setArmed(false)}>Cancel</button>
           <button className="btn erp" type="submit">{ex ? "Start the exercise" : "Confirm, this is real"}</button>
         </span>

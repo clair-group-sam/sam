@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
@@ -28,7 +29,7 @@ export type Existing = { id: string; title: string; kind: string; registration: 
 
 async function allowed() {
   const s = await getSession();
-  if (!s || !(await mayCreateManual(s))) throw new Error("Reserved to Compliance, the AM, nominated persons, their deputies and the people Compliance names.");
+  if (!s || !(await mayCreateManual(s))) fail("Reserved to Compliance, the AM, nominated persons, their deputies and the people Compliance names.");
   return s;
 }
 

@@ -1,4 +1,6 @@
 "use server";
+import { fail } from "@/lib/fail";
+import { recipientsOf } from "@/lib/teams";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
@@ -11,20 +13,20 @@ const db = () => supabaseAdmin();
 export async function mayActivate(s: Session): Promise<boolean> {
   return s.role === "cmm" || s.role === "np" || s.role === "am" || s.roles.map(basePost).some((r) => ["AM", "CMM", "SM", "SUPERADMIN"].includes(r));
 }
-async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); if (!(await mayActivate(s))) throw new Error("Your post cannot activate the ERP."); return s; }
+async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); if (!(await mayActivate(s))) fail("Your post cannot activate the ERP."); return s; }
 async function inScope(s: Session, activationId: string): Promise<{ id: string; entity: string; status: string; title: string; exercise: boolean }> {
   const { data } = await db().from("erp_activations").select("id,entity,status,title,exercise").eq("id", activationId).maybeSingle();
   const a = data as { id: string; entity: string; status: string; title: string; exercise: boolean } | null;
-  if (!a || (!s.group && !s.entities.includes(a.entity))) throw new Error("Out of your scope.");
+  if (!a || (!s.group && !s.entities.includes(a.entity))) fail("Out of your scope.");
   return a;
 }
 
 export async function startActivation(fd: FormData) {
   const s = await me();
   const entity = String(fd.get("entity") ?? "");
-  if (!entity || (!s.group && !s.entities.includes(entity))) throw new Error("Pick an entity in your scope.");
+  if (!entity || (!s.group && !s.entities.includes(entity))) fail("Pick an entity in your scope.");
   const title = String(fd.get("title") ?? "").trim();
-  if (!title) throw new Error("Say in a few words what happened.");
+  if (!title) fail("Say in a few words what happened.");
   const exercise = fd.get("exercise") === "on";
   const level = fd.get("level") === "activation" ? "activation" : "alert";
   const scenario = SCENARIOS.some(([k]) => k === String(fd.get("scenario"))) ? String(fd.get("scenario")) : "safety";
@@ -39,7 +41,7 @@ export async function startActivation(fd: FormData) {
   const cell = [...new Set(["AM", "SM", "CMM", ...posts(scenario === "security" || scenario === "cyber" ? P?.cell_security : P?.cell_safety)])];
   if (scenario === "cyber" && !cell.includes("ISM")) cell.push("ISM");
   const { data, error } = await db().from("erp_activations").insert({ entity, title: title.slice(0, 200), exercise, level, scenario, info: Object.keys(info).length ? info : null, plan_id: plan, started_by: s.person?.id ?? null }).select("id").single();
-  if (error) throw new Error(error.message);
+  if (error) fail(error.message);
   const id = (data as { id: string }).id;
   await db().from("erp_events").insert({ activation_id: id, person_id: s.person?.id ?? null, kind: "status", text: `${exercise ? "EXERCISE. " : ""}${level === "activation" ? "ERP activated" : "Alert raised"} by ${s.name} (${scenario}): ${title}` });
   if (Object.keys(info).length) await db().from("erp_events").insert({ activation_id: id, person_id: s.person?.id ?? null, kind: "log", text: "Primary information sheet: " + INFO.filter(([k]) => info[k]).map(([k, l]) => `${l}: ${info[k]}`).join("; ") });
@@ -51,7 +53,10 @@ export async function startActivation(fd: FormData) {
   // the response unit of the plan gets an Inbox item at once (and so a Teams card at the next sweep)
   const link = "/erp/activate";
   await db().from("tasks").insert(cell.map((role) => ({ entity, kind: "erp", title: `${exercise ? "Exercise: " : ""}ERP ${level === "activation" ? "activated" : "alert"}: ${title}`.slice(0, 200), detail: "Join the emergency response unit and open the activation log in S.A.M. Your checklist is there.", owner_role: role, status: "open", link, ref_id: id })));
-  await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "contact", text: `Called out in S.A.M. (Inbox and Teams): ${cell.join(", ")}` });
+  // FB-123 · say who was really reached: a post whose holder has no S.A.M. account receives nothing and must be phoned
+  const reached: string[] = [], silent: string[] = [];
+  for (const role of cell) { const ps = await recipientsOf(db(), { owner_person: null, owner_role: role, entity }); if (ps.length) reached.push(`${role} (${ps.map((x) => x.display_name).join(", ")})`); else silent.push(role); }
+  await db().from("erp_events").insert({ activation_id: id, person_id: null, kind: "contact", text: `${reached.length ? `Reached in S.A.M. (Inbox and Teams): ${reached.join(", ")}.` : "Nobody of the unit could be reached in S.A.M."}${silent.length ? ` NOT REACHED, no S.A.M. account, call them by phone now (Crisis directory): ${silent.join(", ")}.` : ""}` });
   // the response unit's Teams group chat, with the alert card (best effort: the reason is logged when it cannot be opened)
   const chat = await openCrisisChat(db(), { id, entity, title, exercise, level, scenario, info: Object.keys(info).length ? info : null }, cell);
   if (chat.ok) {
@@ -65,7 +70,7 @@ export async function startActivation(fd: FormData) {
 
 export async function logEvent(fd: FormData) {
   const s = await me(); const a = await inScope(s, String(fd.get("id")));
-  if (a.status !== "open") throw new Error("This activation is closed.");
+  if (a.status !== "open") fail("This activation is closed.");
   const text = String(fd.get("text") ?? "").trim(); if (!text) return;
   const kind = ["log", "decision", "contact"].includes(String(fd.get("kind"))) ? String(fd.get("kind")) : "log";
   await db().from("erp_events").insert({ activation_id: a.id, person_id: s.person?.id ?? null, kind, text: text.slice(0, 2000) });
@@ -74,7 +79,7 @@ export async function logEvent(fd: FormData) {
 
 export async function tickAction(fd: FormData) {
   const s = await me(); const a = await inScope(s, String(fd.get("id")));
-  if (a.status !== "open") throw new Error("This activation is closed.");
+  if (a.status !== "open") fail("This activation is closed.");
   const ref = String(fd.get("ref") ?? ""), text = String(fd.get("text") ?? "");
   const { data: done } = await db().from("erp_events").select("id").eq("activation_id", a.id).eq("kind", "check").eq("ref", ref).limit(1);
   if ((done ?? []).length) return;
@@ -85,7 +90,7 @@ export async function tickAction(fd: FormData) {
 export async function closeActivation(fd: FormData) {
   const s = await me(); const a = await inScope(s, String(fd.get("id")));
   const summary = String(fd.get("summary") ?? "").trim();
-  if (!summary) throw new Error("Write a short closing summary.");
+  if (!summary) fail("Write a short closing summary.");
   await db().from("erp_events").insert({ activation_id: a.id, person_id: s.person?.id ?? null, kind: "status", text: `Closed by ${s.name}: ${summary}`.slice(0, 2000) });
   await db().from("erp_activations").update({ status: "closed", closed_at: new Date().toISOString(), closed_by: s.person?.id ?? null, summary }).eq("id", a.id);
   await db().from("tasks").update({ status: "done" }).eq("kind", "erp").eq("ref_id", a.id).eq("status", "open");

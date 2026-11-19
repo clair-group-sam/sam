@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -9,7 +10,7 @@ const num = (v: FormDataEntryValue | null) => { const s = String(v ?? "").trim()
 /** Settings › Notification rules: one row per task kind, saved as a whole. CMM / SM only. */
 export async function saveRule(formData: FormData): Promise<void> {
   const s = await getSession();
-  if (!s || !cmm(s.roles)) throw new Error("Not allowed");
+  if (!s || !cmm(s.roles)) fail("Not allowed");
   const kind = String(formData.get("kind") ?? "");
   if (!kind) return;
   const to = String(formData.get("escalate_to") ?? "").trim().toUpperCase();
@@ -22,7 +23,7 @@ export async function saveRule(formData: FormData): Promise<void> {
 
 export async function addRule(formData: FormData): Promise<void> {
   const s = await getSession();
-  if (!s || !cmm(s.roles)) throw new Error("Not allowed");
+  if (!s || !cmm(s.roles)) fail("Not allowed");
   const kind = String(formData.get("kind") ?? "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
   const label = String(formData.get("label") ?? "").trim();
   if (!kind || !label) return;
@@ -33,7 +34,7 @@ export async function addRule(formData: FormData): Promise<void> {
 /** Runs the ladder now (what the daily cron does), for testing a rule. */
 export async function runNow(): Promise<void> {
   const s = await getSession();
-  if (!s || !cmm(s.roles)) throw new Error("Not allowed");
+  if (!s || !cmm(s.roles)) fail("Not allowed");
   const { runEscalations } = await import("@/lib/escalation");
   await runEscalations(supabaseAdmin(), "manual", s.person?.id ?? null);
   revalidatePath("/set/notif");

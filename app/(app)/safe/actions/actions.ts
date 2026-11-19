@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, type Session } from "@/lib/session";
@@ -9,11 +10,11 @@ import { completeAction, verifyActionCore } from "@/lib/actions-core";
 const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
 const log = (action_id: string, kind: string, actor: string | null, note: string) => db().from("safety_action_events").insert({ action_id, kind, actor, note });
-async function load(id: string): Promise<Action> { const { data } = await db().from("safety_actions").select("*").eq("id", id).single(); if (!data) throw new Error("Action not found."); return data as Action; }
+async function load(id: string): Promise<Action> { const { data } = await db().from("safety_actions").select("*").eq("id", id).single(); if (!data) fail("Action not found."); return data as Action; }
 async function me(entity?: string, check?: (s: Session) => boolean, msg = "Reserved to the safety desk, the nominated persons and the AM."): Promise<Session> {
-  const s = await getSession(); if (!s) throw new Error("Sign in again.");
-  if (check && !check(s)) throw new Error(msg);
-  if (entity && !s.entities.includes(entity)) throw new Error("Entity outside your scope.");
+  const s = await getSession(); if (!s) fail("Sign in again.");
+  if (check && !check(s)) fail(msg);
+  if (entity && !s.entities.includes(entity)) fail("Entity outside your scope.");
   return s;
 }
 const touch = (a: Pick<Action, "id" | "report_id" | "hazard_id" | "assessment_id">) => {
@@ -27,15 +28,15 @@ const ownerTask = (a: Pick<Action, "id" | "entity" | "number" | "title" | "due" 
 /** Raise an action — from a safety report (suggested by SAM or not), a hazard / planned mitigation, a risk assessment / MOC, a committee, or on its own. */
 export async function createAction(fd: FormData) {
   const entity = str(fd, "entity") ?? ""; const s = await me(entity, mayManageActions);
-  const title = str(fd, "title"); if (!title) throw new Error("Give the action a title.");
-  if (!str(fd, "owner_role") && !str(fd, "owner_person")) throw new Error("Name the owner (a post or a person).");
+  const title = str(fd, "title"); if (!title) fail("Give the action a title.");
+  if (!str(fd, "owner_role") && !str(fd, "owner_person")) fail("Name the owner (a post or a person).");
   const number = await nextActionNumber(db(), entity);
   const mitigation = str(fd, "mitigation_id");
   const finding = str(fd, "finding_id"); const watch = str(fd, "watch_entry_id");
   const row = { entity, number, module: finding || watch ? "compliance" : "safety", finding_id: finding, watch_entry_id: watch, kind: str(fd, "kind") ?? "corrective", title: title.slice(0, 300), description: str(fd, "description"), owner_role: str(fd, "owner_role")?.toUpperCase() ?? null, owner_person: str(fd, "owner_person"),
     due: str(fd, "due"), source_kind: str(fd, "source_kind") ?? "other", report_id: str(fd, "report_id"), hazard_id: str(fd, "hazard_id"), mitigation_id: mitigation, assessment_id: str(fd, "assessment_id"), spi_id: str(fd, "spi_id"), committee_id: str(fd, "committee_id"), investigation_id: str(fd, "investigation_id"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("safety_actions").insert(row).select("*").single();
-  if (error || !data) throw new Error(error?.message ?? "Action not created.");
+  if (error || !data) fail(error?.message ?? "Action not created.");
   const a = data as Action;
   await ownerTask(a);
   if (mitigation) { // the planned mitigation is now followed as this action: its own Inbox task is replaced
@@ -54,7 +55,7 @@ export async function createAction(fd: FormData) {
 const EDIT = ["title", "description", "kind", "due", "owner_role", "owner_person"] as const;
 export async function updateAction(fd: FormData) {
   const a = await load(String(fd.get("id"))); const s = await me(a.entity, mayManageActions);
-  if (["verified", "cancelled"].includes(a.status)) throw new Error("A closed action is not changed — raise a new one.");
+  if (["verified", "cancelled"].includes(a.status)) fail("A closed action is not changed — raise a new one.");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }; const changes: string[] = [];
   for (const k of EDIT) if (fd.has(k)) { const v = k === "owner_role" ? str(fd, k)?.toUpperCase() ?? null : str(fd, k); if ((a as unknown as Record<string, unknown>)[k] !== v) { patch[k] = v; changes.push(k.replace("_", " ")); } }
   if (!changes.length) return;
@@ -68,7 +69,7 @@ export async function updateAction(fd: FormData) {
 }
 export async function startAction(fd: FormData) {
   const a = await load(String(fd.get("id"))); const s = await me(a.entity);
-  if (!isOwner(s, a) && !mayManageActions(s)) throw new Error("Reserved to the owner.");
+  if (!isOwner(s, a) && !mayManageActions(s)) fail("Reserved to the owner.");
   if (a.status !== "open") return;
   await db().from("safety_actions").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("id", a.id);
   await log(a.id, "started", s.person?.id ?? null, `In progress (${s.name})`); touch(a);
@@ -77,10 +78,10 @@ export async function startAction(fd: FormData) {
 async function storeEvidence(s: Session, a: Action, fd: FormData): Promise<string | null> {
   const file = fd.get("file"); const name = str(fd, "evidence_name"); const note = str(fd, "evidence_note");
   if (file instanceof File && file.size > 0) {
-    if (file.size > 10 * 1024 * 1024) throw new Error("File larger than 10 MB: keep it on the server and record its name.");
+    if (file.size > 10 * 1024 * 1024) fail("File larger than 10 MB: keep it on the server and record its name.");
     const safe = file.name.replace(/[^\w.\-() ]+/g, "_"); const path = `${a.entity}/actions/${a.id}/${Date.now()}-${safe}`;
     const { error } = await db().storage.from("evidence").upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream", upsert: false });
-    if (error) throw new Error(error.message);
+    if (error) fail(error.message);
     await db().from("safety_action_evidence").insert({ action_id: a.id, name: safe, path: `evidence/${path}`, size: file.size, note, added_by: s.person?.id ?? null });
     return safe;
   }
@@ -90,16 +91,16 @@ async function storeEvidence(s: Session, a: Action, fd: FormData): Promise<strin
 }
 export async function addEvidence(fd: FormData) {
   const a = await load(String(fd.get("id"))); const s = await me(a.entity);
-  if (!isOwner(s, a) && !mayManageActions(s)) throw new Error("Reserved to the owner and the safety desk.");
+  if (!isOwner(s, a) && !mayManageActions(s)) fail("Reserved to the owner and the safety desk.");
   const got = await storeEvidence(s, a, fd); if (!got) return;
   await log(a.id, "evidence", s.person?.id ?? null, `Evidence added: ${got}`); touch(a);
 }
 /** The owner says it is done (with what was done and, ideally, evidence) → the safety desk verifies. */
 export async function markDone(fd: FormData) {
   const a = await load(String(fd.get("id"))); const s = await me(a.entity);
-  if (!isOwner(s, a) && !mayManageActions(s)) throw new Error("Reserved to the owner.");
+  if (!isOwner(s, a) && !mayManageActions(s)) fail("Reserved to the owner.");
   if (!["open", "in_progress"].includes(a.status)) return;
-  const note = str(fd, "done_note"); if (!note) throw new Error("Say what was done.");
+  const note = str(fd, "done_note"); if (!note) fail("Say what was done.");
   const got = await storeEvidence(s, a, fd);
   await completeAction(db(), { personId: s.person?.id ?? null, name: s.name }, a, note + (got ? ` (evidence: ${got})` : ""), null, "app"); touch(a);
 }
@@ -114,7 +115,7 @@ export async function checkEffectiveness(fd: FormData) {
   if (a.status !== "verified" || a.effectiveness) return;
   const verdict = str(fd, "effectiveness"); const note = str(fd, "effectiveness_note");
   if (!verdict || !["effective", "not_effective"].includes(verdict)) return;
-  if (verdict === "not_effective" && !note) throw new Error("Say why it did not work — it becomes the follow-up action.");
+  if (verdict === "not_effective" && !note) fail("Say why it did not work — it becomes the follow-up action.");
   let follow: string | null = null;
   if (verdict === "not_effective") {
     const number = await nextActionNumber(db(), a.entity);
@@ -129,7 +130,7 @@ export async function checkEffectiveness(fd: FormData) {
 }
 export async function cancelAction(fd: FormData) {
   const a = await load(String(fd.get("id"))); const s = await me(a.entity, mayVerifyActions, "Reserved to the safety desk.");
-  const note = str(fd, "note"); if (!note) throw new Error("Say why the action is cancelled.");
+  const note = str(fd, "note"); if (!note) fail("Say why the action is cancelled.");
   if (["verified", "cancelled"].includes(a.status)) return;
   await db().from("safety_actions").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", a.id);
   await closeTasks(a.id, ["action", "action_verify"]);

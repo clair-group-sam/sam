@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
@@ -12,18 +13,18 @@ import { markMorFiled } from "@/lib/mor-filed";
  * Every attempt is kept in eccairs_submissions with the payload and E2's answer. */
 const db = () => supabaseAdmin();
 async function load(id: string) {
-  const s = await getSession(); if (!s || !isSafetyDesk(s)) throw new Error("Reserved to the safety desk.");
+  const s = await getSession(); if (!s || !isSafetyDesk(s)) fail("Reserved to the safety desk.");
   const { data } = await db().from("reports").select("*").eq("id", id).maybeSingle();
   const r = data as (ReportForE2 & { entity: string; mor_filed_at: string | null }) | null;
-  if (!r || !s.entities.includes(r.entity)) throw new Error("Report not found in your scope.");
-  if (!eccairsConfig(r.entity)) throw new Error(`ECCAIRS is not connected for ${r.entity}.`);
+  if (!r || !s.entities.includes(r.entity)) fail("Report not found in your scope.");
+  if (!eccairsConfig(r.entity)) fail(`ECCAIRS is not connected for ${r.entity}.`);
   const { data: an } = await db().from("report_analysis").select("mor_draft,adrep,mor_status").eq("report_id", id).maybeSingle();
   return { s, r, a: an as AnalysisForE2 };
 }
 /** Reads the reviewed form back into fields: the proposal gives the shape, the form the values. */
 async function fieldsFrom(fd: FormData, r: ReportForE2, a: AnalysisForE2) {
   let ctx = await e2Context(db(), r.entity);
-  if (!ctx.taxonomy) throw new Error("Load the taxonomy first (Safety › MOR / ECCAIRS).");
+  if (!ctx.taxonomy) fail("Load the taxonomy first (Safety › MOR / ECCAIRS).");
   const { data: ac } = r.aircraft ? await db().from("aircraft").select("registration,type_code,model,msn").ilike("registration", r.aircraft.trim()).limit(1).maybeSingle() : { data: null };
   ctx = await withLongValues(db(), ctx, { entity: r.entity, registry: ac as { type_code: string | null; model: string | null } | null });
   const fields = proposeFields(r, a, ctx, { registry: ac as { registration: string; type_code: string | null; model: string | null; msn: string | null } | null });
@@ -36,10 +37,10 @@ async function fieldsFrom(fd: FormData, r: ReportForE2, a: AnalysisForE2) {
 export async function sendToE2(fd: FormData) {
   const id = String(fd.get("id")); const want = fd.get("status") === "SENT" ? "SENT" : "DRAFT";
   const { s, r, a } = await load(id);
-  if (want === "SENT" && fd.get("confirm") !== "on") throw new Error("Tick the confirmation before sending to the authority.");
+  if (want === "SENT" && fd.get("confirm") !== "on") fail("Tick the confirmation before sending to the authority.");
   const fields = await fieldsFrom(fd, r, a);
   const { codes, missing } = buildTaxonomyCodes(fields);
-  if (want === "SENT" && missing.length) throw new Error(`Required before sending: ${missing.join(", ")}.`);
+  if (want === "SENT" && missing.length) fail(`Required before sending: ${missing.join(", ")}.`);
   const env = eccairsEnv(r.entity); const by = s.person?.id ?? null;
   try {
     let res;

@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession, type Session } from "@/lib/session";
@@ -8,12 +9,12 @@ import { FACTOR_CAT, INV_LEVEL, INV_STEPS, mayEdit, mayOpen, nextInvNumber, type
 
 const db = () => supabaseAdmin();
 const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof v === "string" ? v.trim() : ""; return t || null; };
-async function sess(): Promise<Session> { const s = await getSession(); if (!s) throw new Error("Sign in again."); return s; }
-async function load(id: string): Promise<Investigation> { const { data } = await db().from("investigations").select("*").eq("id", id).single(); if (!data) throw new Error("Investigation not found."); return data as Investigation; }
+async function sess(): Promise<Session> { const s = await getSession(); if (!s) fail("Sign in again."); return s; }
+async function load(id: string): Promise<Investigation> { const { data } = await db().from("investigations").select("*").eq("id", id).single(); if (!data) fail("Investigation not found."); return data as Investigation; }
 async function editable(id: string) {
   const s = await sess(); const i = await load(id);
-  if (!s.entities.includes(i.entity) || !mayEdit(s, i)) throw new Error("Reserved to the safety desk and the investigation lead.");
-  if (["closed", "cancelled"].includes(i.status)) throw new Error("The investigation is closed — it is not changed.");
+  if (!s.entities.includes(i.entity) || !mayEdit(s, i)) fail("Reserved to the safety desk and the investigation lead.");
+  if (["closed", "cancelled"].includes(i.status)) fail("The investigation is closed — it is not changed.");
   return { s, i };
 }
 const log = (investigation_id: string, kind: string, actor: string | null, note: string) => db().from("investigation_events").insert({ investigation_id, kind, actor, note });
@@ -25,17 +26,17 @@ const atLeast = (cur: string, step: string) => (INV_STEPS.indexOf(cur as never) 
 /** Open an investigation on a report (or without one, on a topic). The report goes "Under investigation"; the lead gets an Inbox item. */
 export async function openInvestigation(fd: FormData) {
   const s = await sess(); const entity = str(fd, "entity");
-  if (!entity || !s.entities.includes(entity) || !mayOpen(s)) throw new Error("Reserved to the safety desk (SM / CMM / FSO).");
+  if (!entity || !s.entities.includes(entity) || !mayOpen(s)) fail("Reserved to the safety desk (SM / CMM / FSO).");
   const reportId = str(fd, "report_id");
   let title = str(fd, "title");
   if (reportId) {
     const { data: r } = await db().from("reports").select("id,entity,headline,status").eq("id", reportId).maybeSingle();
-    if (!r || (r as { entity: string }).entity !== entity) throw new Error("Report not found in this entity.");
+    if (!r || (r as { entity: string }).entity !== entity) fail("Report not found in this entity.");
     const { data: open } = await db().from("investigations").select("id").eq("report_id", reportId).not("status", "in", "(closed,cancelled)").limit(1);
     if (open?.length) redirect(`/safe/inv/${(open[0] as { id: string }).id}`);
     title = title ?? (r as { headline: string }).headline;
   }
-  if (!title) throw new Error("Give the investigation a title.");
+  if (!title) fail("Give the investigation a title.");
   const level = INV_LEVEL[str(fd, "level") ?? ""] ? str(fd, "level")! : "standard";
   const leadId = str(fd, "lead_person") ?? s.person?.id ?? null;
   let leadName: string | null = s.name;
@@ -44,7 +45,7 @@ export async function openInvestigation(fd: FormData) {
   const number = await nextInvNumber(db(), entity);
   const { data, error } = await db().from("investigations").insert({ entity, number, report_id: reportId, title: title.slice(0, 300), level, status: "open", lead_person: leadId, lead_name: leadName,
     team: leadId ? [{ name: leadName, role: "Lead", person_id: leadId }] : [], terms: str(fd, "terms"), due, created_by: s.person?.id ?? null }).select("id").single();
-  if (error || !data) throw new Error(error?.message ?? "Not created.");
+  if (error || !data) fail(error?.message ?? "Not created.");
   const id = (data as { id: string }).id;
   await log(id, "opened", s.person?.id ?? null, `${number} opened by ${s.name}${reportId ? ` on report ${reportId}` : ""} · ${INV_LEVEL[level][0]} · due ${due}`);
   if (reportId) {
@@ -125,8 +126,8 @@ export async function draftInvReport(fd: FormData) {
 /** Close: conclusions and report written; the report gets an entry; the desk gives the reporter feedback from the report page. */
 export async function closeInvestigation(fd: FormData) {
   const { s, i } = await editable(String(fd.get("id")));
-  if (!i.conclusions) throw new Error("Write the conclusions first.");
-  if (!i.report_text) throw new Error("Write (or draft) the investigation report first.");
+  if (!i.conclusions) fail("Write the conclusions first.");
+  if (!i.report_text) fail("Write (or draft) the investigation report first.");
   const now = new Date().toISOString();
   await db().from("investigations").update({ status: "closed", closed_at: now, closed_by: s.person?.id ?? null, updated_at: now }).eq("id", i.id);
   await db().from("tasks").update({ status: "done" }).eq("kind", "investigation").eq("ref_id", i.id).eq("status", "open");
@@ -137,7 +138,7 @@ export async function closeInvestigation(fd: FormData) {
 }
 export async function cancelInvestigation(fd: FormData) {
   const { s, i } = await editable(String(fd.get("id")));
-  const why = str(fd, "reason"); if (!why) throw new Error("Say why.");
+  const why = str(fd, "reason"); if (!why) fail("Say why.");
   await db().from("investigations").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", i.id);
   await db().from("tasks").update({ status: "done" }).eq("kind", "investigation").eq("ref_id", i.id).eq("status", "open");
   await log(i.id, "cancelled", s.person?.id ?? null, why);

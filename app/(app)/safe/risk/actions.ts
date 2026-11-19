@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -12,21 +13,21 @@ const str = (fd: FormData, k: string) => { const v = fd.get(k); const t = typeof
 const db = () => supabaseAdmin();
 async function who(entity?: string, check: (s: Session) => boolean = mayEditRisk, msg = "Reserved to the Safety Manager, Compliance, the AM and the nominated persons.") {
   const s = await getSession();
-  if (!s || !check(s)) throw new Error(msg);
-  if (entity && !s.entities.includes(entity)) throw new Error("Entity outside your scope.");
+  if (!s || !check(s)) fail(msg);
+  if (entity && !s.entities.includes(entity)) fail("Entity outside your scope.");
   return s;
 }
 const log = (x: { hazard_id?: string | null; assessment_id?: string | null; kind: string; actor: string | null; note: string }) => db().from("risk_events").insert(x);
 type HRow = { id: string; entity: string; assessment_id: string | null; proposed: boolean; report_id: string | null; ref: string; title: string };
 async function hazardOf(id: string): Promise<HRow> {
   const { data } = await db().from("hazards").select("id,entity,assessment_id,proposed,report_id,ref,title").eq("id", id).maybeSingle();
-  if (!data) throw new Error("Hazard not found.");
+  if (!data) fail("Hazard not found.");
   return data as HRow;
 }
 type ARow = { id: string; entity: string; kind: string; number: string; name: string; status: string; moc_status: string | null; project_id: string | null; project_task_id: string | null; owner_role: string | null; decision: string | null; participants: unknown[] };
 async function raOf(id: string): Promise<ARow> {
   const { data } = await db().from("risk_assessments").select("id,entity,kind,number,name,status,moc_status,project_id,project_task_id,owner_role,decision,participants").eq("id", id).maybeSingle();
-  if (!data) throw new Error("Risk assessment not found.");
+  if (!data) fail("Risk assessment not found.");
   return data as ARow;
 }
 const touchRa = (id: string | null) => { if (id) revalidatePath(`/safe/risk/a/${id}`); revalidatePath("/safe/risk"); revalidatePath("/safe/moc"); };
@@ -45,7 +46,7 @@ export async function createAssessment(fd: FormData) {
     participants: parseParticipants(str(fd, "participants")), moc_status: kind === "moc" ? "assessment" : null, category: str(fd, "category"), change_type: str(fd, "change_type"), start_date: str(fd, "start_date"), reason: str(fd, "reason"), requestor: str(fd, "requestor"),
     project_id: project, project_task_id: task, authority_file_id: str(fd, "authority_file_id"), created_by: s.person?.id ?? null };
   const { data, error } = await db().from("risk_assessments").insert(row).select("id").single();
-  if (error || !data) throw new Error(error?.message ?? "not created");
+  if (error || !data) fail(error?.message ?? "not created");
   const id = (data as { id: string }).id;
   if (task) await db().from("project_tasks").update({ link_kind: "moc", link_id: id, status: "in_progress", updated_at: new Date().toISOString() }).eq("id", task);
   await log({ assessment_id: id, kind: "created", actor: s.person?.id ?? null, note: `${number} opened (${KINDS[kind]})` });
@@ -59,7 +60,7 @@ export async function createAssessment(fd: FormData) {
 const FIELDS = ["name", "description", "domain", "owner_role", "next_due", "decision", "decision_comment", "category", "change_type", "start_date", "end_date", "reason", "requestor", "affected", "criticality", "prior_assessments", "actions_in_place", "authority_route"];
 export async function updateAssessment(fd: FormData) {
   const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity);
-  if (ra.status !== "draft") throw new Error("Reopen the assessment (new version) before changing it.");
+  if (ra.status !== "draft") fail("Reopen the assessment (new version) before changing it.");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const k of FIELDS) if (fd.has(k)) patch[k] = str(fd, k);
   if (fd.has("participants")) patch.participants = parseParticipants(str(fd, "participants"));
@@ -104,8 +105,8 @@ export async function validateAssessment(fd: FormData) {
   const decision = str(fd, "decision") ?? ra.decision;
   const { data: hz } = await db().from("hazards").select("proposed,lik_after,sev_after,status").eq("assessment_id", ra.id);
   const hs = ((hz ?? []) as { proposed: boolean; lik_after: number | null; sev_after: string | null; status: string }[]).filter((h) => h.status !== "closed");
-  if (!hs.length || hs.some((h) => h.proposed || !h.lik_after || !h.sev_after)) throw new Error("Every hazard must be kept and rated after mitigation before the sign-off.");
-  if (!decision) throw new Error("Choose the decision (continue / continue with conditions / stop).");
+  if (!hs.length || hs.some((h) => h.proposed || !h.lik_after || !h.sev_after)) fail("Every hazard must be kept and rated after mitigation before the sign-off.");
+  if (!decision) fail("Choose the decision (continue / continue with conditions / stop).");
   const red = hs.some((h) => tolerability(h.lik_after, h.sev_after, schemeOf(ra.entity)) === "intolerable");
   const signed = { decision_comment: str(fd, "decision_comment"), validated_by: s.person?.id ?? null, validated_name: s.name, validated_role: postOf(s), validated_at: new Date().toISOString(), accepted_by: null, accepted_name: null, accepted_at: null };
   if (red && decision !== "stop") {
@@ -122,9 +123,9 @@ export async function validateAssessment(fd: FormData) {
 /** Accountable Manager's decision on a red residual risk: forced approval (justification required) or stop. */
 export async function acceptAssessment(fd: FormData) {
   const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity, mayAccept, "The decision on a red residual risk rests with the Accountable Manager.");
-  if (ra.status !== "validated") throw new Error("Only an assessment whose residual risk stays red waits for the Accountable Manager.");
+  if (ra.status !== "validated") fail("Only an assessment whose residual risk stays red waits for the Accountable Manager.");
   const stop = fd.get("verdict") === "stop"; const comment = str(fd, "comment");
-  if (!stop && !comment) throw new Error("Give the justification for approving a red residual risk.");
+  if (!stop && !comment) fail("Give the justification for approving a red residual risk.");
   await finalise(ra, stop ? "stop" : (ra.decision ?? "continue_with_conditions"), { accepted_by: s.person?.id ?? null, accepted_name: s.name, accepted_at: new Date().toISOString() });
   await log({ assessment_id: ra.id, kind: "accepted", actor: s.person?.id ?? null, note: stop ? `Stopped by the AM (${s.name})${comment ? " — " + comment : ""}` : `Red residual risk approved by the AM (${s.name}) — ${comment}` });
   touchRa(ra.id);
@@ -145,7 +146,7 @@ export async function mocStep(fd: FormData) {
   const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity);
   const to = String(fd.get("to"));
   if (!["implemented", "closed", "cancelled"].includes(to) || ra.kind !== "moc") return;
-  if (to === "implemented" && ra.status !== "accepted") throw new Error("The MOC must be completed and accepted before the change is implemented (MSM §3.4).");
+  if (to === "implemented" && ra.status !== "accepted") fail("The MOC must be completed and accepted before the change is implemented (MSM §3.4).");
   await db().from("risk_assessments").update({ moc_status: to, status: to === "cancelled" ? "cancelled" : ra.status, updated_at: new Date().toISOString() }).eq("id", ra.id);
   await log({ assessment_id: ra.id, kind: "status", actor: s.person?.id ?? null, note: { implemented: "Change implemented", closed: "MOC closed", cancelled: "MOC cancelled" }[to]! });
   touchRa(ra.id);
@@ -154,7 +155,7 @@ export async function mocStep(fd: FormData) {
 /** A residual risk that stays red but was signed without the AM (e.g. imported from Centrik): send it to the AM for his decision in S.A.M. */
 export async function referToAm(fd: FormData) {
   const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity);
-  if (ra.status !== "accepted" || ra.decision === "stop") throw new Error("Only a signed assessment that continues can be referred to the AM.");
+  if (ra.status !== "accepted" || ra.decision === "stop") fail("Only a signed assessment that continues can be referred to the AM.");
   await db().from("risk_assessments").update({ status: "validated", accepted_by: null, accepted_name: null, accepted_at: null, updated_at: new Date().toISOString() }).eq("id", ra.id);
   await db().from("tasks").insert({ entity: ra.entity, kind: "risk_acceptance", title: `Red residual risk — decide on ${ra.number} ${ra.name}`.slice(0, 200), detail: "The residual risk stays red: approve the activity anyway (with justification) or stop it (MSM §3.5.3 / §3.4).", owner_role: "AM", status: "open", link: `/safe/risk/a/${ra.id}`, ref_id: ra.id });
   await log({ assessment_id: ra.id, kind: "referred", actor: s.person?.id ?? null, note: `Red residual risk referred to the Accountable Manager by ${s.name}` });
@@ -165,7 +166,7 @@ export async function recordAmDecision(fd: FormData) {
   const ra = await raOf(String(fd.get("id"))); const s = await who(ra.entity);
   const on = str(fd, "on"); const ref = str(fd, "reference"); const am = str(fd, "am_name") ?? "Accountable Manager";
   const stop = fd.get("verdict") === "stop";
-  if (!on || !ref) throw new Error("Give the date and the reference of the AM's decision (e.g. e-mail of 02/03/2026, subject …).");
+  if (!on || !ref) fail("Give the date and the reference of the AM's decision (e.g. e-mail of 02/03/2026, subject …).");
   await finalise(ra, stop ? "stop" : (ra.decision ?? "continue_with_conditions"), { accepted_by: null, accepted_name: am, accepted_at: new Date(on + "T12:00:00Z").toISOString() });
   await log({ assessment_id: ra.id, kind: "accepted", actor: s.person?.id ?? null, note: `${stop ? "Stopped" : "Red residual risk approved"} by the AM (${am}) outside S.A.M. on ${on} — ${ref} — recorded by ${s.name}` });
   touchRa(ra.id);
@@ -296,7 +297,7 @@ export async function proposeHazards(fd: FormData) {
   const { text } = await callClaude({ agent: "safety", personId: s.person?.id ?? null, entity: ra.entity, maxTokens: 3500,
     system: `You help the Safety Manager of an EASA organisation (${ra.entity}) write a risk assessment (${KINDS[ra.kind]}) with the hazard–consequence method of its MSM: severity A Catastrophic, B Hazardous, C Major, D Minor, E Negligible; likelihood 5 Frequent, 4 Occasional, 3 Remote, 2 Improbable, 1 Extremely improbable; consider the "reasonably worst case", not systematically the extreme one. ${sch === "centrik" ? "Scores: green 1–10 acceptable, yellow 20–100 tolerable, red 300–2500 intolerable." : "ICAO tolerability table."} Propose 3 to 6 hazards SPECIFIC to this subject (not generic), each with its consequence, the initial rating, current mitigations (barriers already in place), planned mitigations with the post that owns them (AM, NPFO, NPCT, NPGO, NPCA, CMM, SM, HT, CFI, ISM…), and the residual rating. Prefer hard mitigations (engineering, control) over personnel ones when realistic.${lg.length ? " The organisation's hazard log is given: when a hazard you propose IS one of the log (same hazard, same context), give its ref in log_ref and start from its wording; otherwise leave log_ref empty." : ""} Plain English, no markdown. Answer ONLY JSON: {"hazards":[{"log_ref":"","title":"…","consequence":"…","lik_before":4,"sev_before":"C","existing":["…"],"mitigations":[{"text":"…","owner_role":"NPFO"}],"lik_after":2,"sev_after":"C"}]}`,
     user: JSON.stringify({ subject: ra.name, description: f.description, reason: f.reason, affected: f.affected, category: f.category, domain: f.domain, already_listed: ((ex ?? []) as { title: string }[]).map((x) => x.title), hazard_log: lg.length ? lg.map((h) => ({ ref: h.ref, hazard: h.title, consequence: h.consequence ?? undefined })) : undefined }) });
-  const j = /\{[\s\S]*\}/.exec(text); if (!j) throw new Error("SAM did not return hazards.");
+  const j = /\{[\s\S]*\}/.exec(text); if (!j) fail("SAM did not return hazards.");
   const logRef = new Map(lg.map((h) => [h.ref, h.id]));
   type P = { log_ref?: string; title: string; consequence?: string; lik_before?: number; sev_before?: string; existing?: string[]; mitigations?: { text: string; owner_role?: string }[]; lik_after?: number; sev_after?: string };
   const list = ((JSON.parse(j[0]) as { hazards?: P[] }).hazards ?? []).slice(0, 6);
@@ -316,7 +317,7 @@ export async function proposeHazards(fd: FormData) {
 /** Settings › Integrations: a one-time import key (30 min) for the Centrik / FlightLogger export scripts. Shown once, stored hashed. */
 export async function createImportToken(): Promise<{ token: string; expires: string }> {
   const s = await getSession();
-  if (!s || s.role !== "cmm") throw new Error("Reserved to Compliance.");
+  if (!s || s.role !== "cmm") fail("Reserved to Compliance.");
   const { randomBytes, createHash } = await import("crypto");
   const token = randomBytes(24).toString("base64url");
   const expires = new Date(Date.now() + 30 * 60e3).toISOString();
@@ -331,7 +332,7 @@ const touchMatch = () => { revalidatePath("/safe/risk/match"); revalidatePath("/
 export async function linkToLog(fd: FormData) {
   const h = await hazardOf(String(fd.get("id"))); const s = await who(h.entity);
   const L = await hazardOf(String(fd.get("log_id")));
-  if (L.entity !== h.entity) throw new Error("The log hazard belongs to another entity.");
+  if (L.entity !== h.entity) fail("The log hazard belongs to another entity.");
   await db().from("hazards").update({ log_hazard_id: L.id, local_only: false, updated_at: new Date().toISOString() }).eq("id", h.id);
   await log({ hazard_id: h.id, assessment_id: h.assessment_id, kind: "linked", actor: s.person?.id ?? null, note: `Linked to the hazard log: ${L.ref} — ${L.title}` });
   await log({ hazard_id: L.id, assessment_id: L.assessment_id, kind: "linked", actor: s.person?.id ?? null, note: `Referenced by ${h.ref} — ${h.title}` });

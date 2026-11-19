@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -15,7 +16,7 @@ const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export async function mayWriteComm(s: Session): Promise<boolean> {
   return s.role === "cmm" || s.role === "np" || s.roles.map(basePost).some((r) => ["AM", "CMM", "SM", "SUPERADMIN"].includes(r));
 }
-async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); if (!(await mayWriteComm(s))) throw new Error("Your post cannot send communications."); return s; }
+async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); if (!(await mayWriteComm(s))) fail("Your post cannot send communications."); return s; }
 const KINDS = ["information", "instruction", "safety", "urgent"];
 
 /** Draft (new or edited). The audience is a list of tokens: ALL, ROLE:<post>, PERSON:<id>. */
@@ -23,9 +24,9 @@ export async function saveComm(fd: FormData) {
   const s = await me();
   const id = String(fd.get("id") ?? "");
   const entity = String(fd.get("entity") ?? "");
-  if (!entity || (!s.group && !s.entities.includes(entity))) throw new Error("Pick an entity in your scope.");
+  if (!entity || (!s.group && !s.entities.includes(entity))) fail("Pick an entity in your scope.");
   const title = String(fd.get("title") ?? "").trim(), body = String(fd.get("body") ?? "").trim();
-  if (!title || !body) throw new Error("A title and a message are required.");
+  if (!title || !body) fail("A title and a message are required.");
   const audience = fd.getAll("audience").map(String).filter(Boolean);
   const kind = String(fd.get("kind") ?? "information");
   const row = { entity, title: title.slice(0, 200), body: body.slice(0, 20_000), kind: KINDS.includes(kind) ? kind : "information", audience: audience.length ? audience : ["ALL"],
@@ -33,11 +34,11 @@ export async function saveComm(fd: FormData) {
   let cid = id;
   if (id) {
     const { data: cur } = await db().from("communications").select("status,entity").eq("id", id).maybeSingle();
-    if ((cur as { status: string } | null)?.status !== "draft") throw new Error("A sent communication cannot be edited.");
+    if ((cur as { status: string } | null)?.status !== "draft") fail("A sent communication cannot be edited.");
     await db().from("communications").update(row).eq("id", id);
   } else {
     const { data, error } = await db().from("communications").insert({ ...row, created_by: s.person?.id ?? null }).select("id").single();
-    if (error) throw new Error(error.message); cid = (data as { id: string }).id;
+    if (error) fail(error.message); cid = (data as { id: string }).id;
   }
   revalidatePath("/comm/camp");
   if (fd.get("send") === "1") return sendComm(cid);
@@ -49,11 +50,11 @@ async function sendComm(id: string) {
   const s = await me();
   const { data: c } = await db().from("communications").select("*").eq("id", id).maybeSingle();
   const com = c as { id: string; entity: string; title: string; body: string; kind: string; audience: string[]; require_ack: boolean; email: boolean; due: string | null; status: string } | null;
-  if (!com || com.status !== "draft") throw new Error("Already sent.");
-  if (!s.group && !s.entities.includes(com.entity)) throw new Error("Out of your scope.");
+  if (!com || com.status !== "draft") fail("Already sent.");
+  if (!s.group && !s.entities.includes(com.entity)) fail("Out of your scope.");
   const people = await peopleFor(db(), com.entity);
   const readers = resolveReaders(people, com.entity, com.audience);
-  if (!readers.length) throw new Error("Nobody matches this audience: check the posts or people chosen.");
+  if (!readers.length) fail("Nobody matches this audience: check the posts or people chosen.");
   const link = `/comm/camp?c=${com.id}`;
   await db().from("communication_recipients").upsert(readers.map((r) => ({ communication_id: com.id, person_id: r.id })), { onConflict: "communication_id,person_id" });
   await db().from("tasks").insert(readers.map((r) => ({ entity: com.entity, kind: "communication", title: `${com.kind === "urgent" ? "Urgent: " : ""}${com.title}`.slice(0, 200),
@@ -93,7 +94,7 @@ export async function archiveComm(fd: FormData) {
   const s = await me(); const id = String(fd.get("id") ?? "");
   const { data: c } = await db().from("communications").select("entity,status").eq("id", id).maybeSingle();
   const com = c as { entity: string; status: string } | null;
-  if (!com || (!s.group && !s.entities.includes(com.entity))) throw new Error("Out of your scope.");
+  if (!com || (!s.group && !s.entities.includes(com.entity))) fail("Out of your scope.");
   if (com.status === "draft") await db().from("communications").delete().eq("id", id);
   else { await db().from("communications").update({ status: "archived" }).eq("id", id); await db().from("tasks").update({ status: "superseded" }).eq("kind", "communication").eq("ref_id", id).eq("status", "open"); }
   revalidatePath("/comm/camp"); redirect("/comm/camp");

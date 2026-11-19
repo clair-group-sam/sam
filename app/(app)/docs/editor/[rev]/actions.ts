@@ -1,4 +1,5 @@
 "use server";
+import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { officialTextsFor, ruleCodesIn } from "@/lib/regulation-items";
@@ -21,14 +22,14 @@ import { followRevision } from "@/lib/authority";
 
 async function guard(revisionId: string) {
   const s = await getSession();
-  if (!s) throw new Error("Not signed in");
+  if (!s) fail("Not signed in");
   const db = supabaseAdmin();
   const { data: r } = await db.from("revisions").select("*").eq("id", revisionId).maybeSingle();
-  if (!r) throw new Error("Revision not found");
+  if (!r) fail("Revision not found");
   const rev = r as Revision;
   const { data: m } = await db.from("manuals").select("*").eq("id", rev.manual_id).maybeSingle();
   const manual = m as Manual;
-  if (!s.group && !s.entities.includes(manual.entity)) throw new Error("Out of scope");
+  if (!s.group && !s.entities.includes(manual.entity)) fail("Out of scope");
   const may = isCmm(s) || ownsManual(s, manual.owner_role);
   return { s, db, rev, manual, may };
 }
@@ -40,9 +41,9 @@ async function audit(db: ReturnType<typeof supabaseAdmin>, actor: string | null,
 export async function startRevision(formData: FormData) {
   const fromId = String(formData.get("from_revision") ?? "");
   const { s, db, manual, may } = await guard(fromId);
-  if (!may) throw new Error("Only the owner NP or Compliance can start a revision");
+  if (!may) fail("Only the owner NP or Compliance can start a revision");
   const d = await openDraft(db, manual.id, { personId: s.person?.id ?? null, name: s.name });
-  if (!d) throw new Error("No revision to start from");
+  if (!d) fail("No revision to start from");
   revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/drafts");
   redirect(`/docs/editor/${d.id}`);
 }
@@ -103,22 +104,22 @@ export async function moveStep(formData: FormData) {
   const note = String(formData.get("note") ?? "");
   const { s, db, rev, manual } = await guard(revisionId);
   const t = TRANSITIONS.find((x) => x.from === rev.step && x.to === to);
-  if (!t) throw new Error("Transition not allowed");
+  if (!t) fail("Transition not allowed");
   const internal = !!(manual as Manual & { internal?: boolean }).internal;
   if (t.from === "draft" && t.to === "published") {
-    if (!internal) throw new Error("A regulated manual goes through NP and Compliance approval.");
-    if (!(rev as Revision & { review?: unknown }).review) throw new Error("Run the review before publishing.");
+    if (!internal) fail("A regulated manual goes through NP and Compliance approval.");
+    if (!(rev as Revision & { review?: unknown }).review) fail("Run the review before publishing.");
   }
   const cmm = isCmm(s), owner = ownsManual(s, manual.owner_role);
-  if (!(t.by === "cmm" ? cmm : t.by === "owner" ? owner : owner || cmm)) throw new Error("Not allowed for your role");
+  if (!(t.by === "cmm" ? cmm : t.by === "owner" ? owner : owner || cmm)) fail("Not allowed for your role");
   if (to === "approved_np") {
     const { count } = await db.from("revision_sections").select("id", { count: "exact", head: true }).eq("revision_id", rev.id).not("conflict", "is", null);
-    if (count) throw new Error(`${count} chapter(s) in conflict must be resolved before submitting.`);
+    if (count) fail(`${count} chapter(s) in conflict must be resolved before submitting.`);
   }
   const r2 = rev as Revision & { return_kind?: string | null; return_pdf_path?: string | null };
   if (to === "published" && rev.step === "with_civil_aviation") {
     const kind = (r2.return_kind ?? expectedReturn(manual.entity, manual.code, rev.authority_route)) as ReturnKind;
-    if (kind !== "none" && !r2.return_pdf_path) throw new Error("The authority's return must be integrated before publication (DOC-03).");
+    if (kind !== "none" && !r2.return_pdf_path) fail("The authority's return must be integrated before publication (DOC-03).");
   }
   const patch: Record<string, unknown> = { step: to, step_changed_at: new Date().toISOString(), step_changed_by: s.person?.id ?? null };
   if (to === "approved_np") patch.submitted_at = new Date().toISOString();
@@ -332,31 +333,31 @@ async function shiftOrds(db: ReturnType<typeof supabaseAdmin>, list: Row[], from
 export async function addChapter(input: { revisionId: string; sectionId: string; mode: "after" | "child"; title: string }) {
   return structure(input.revisionId, async (list, db) => {
     const i = list.findIndex((x) => x.id === input.sectionId);
-    if (i < 0) throw new Error("Chapter not found");
+    if (i < 0) fail("Chapter not found");
     const [, end] = blockOf(list, i);
     const ref = input.mode === "child" ? `${list[i].ref}.9999` : (parentOf(list[i].ref) ? `${parentOf(list[i].ref)}.9999` : "9999");
     await shiftOrds(db, list, end, 1);
     const id = randomUUID();
     const { error } = await db.from("revision_sections").insert({ id, revision_id: input.revisionId, ord: end + 1, ref, title: input.title.trim() || "New chapter", changed: true, base_ref: null, body: { html: "<p></p>", text: "", headings: [], structured: true, base_html: "", base_norm: null, uid: randomUUID() } });
-    if (error) throw new Error(error.message);
+    if (error) fail(error.message);
     return id;
   });
 }
 export async function moveChapter(input: { revisionId: string; sectionId: string; dir: "up" | "down" }) {
   return structure(input.revisionId, async (list, db) => {
     const i = list.findIndex((x) => x.id === input.sectionId);
-    if (i < 0) throw new Error("Chapter not found");
+    if (i < 0) fail("Chapter not found");
     const [a, b] = blockOf(list, i);
     const p = parentOf(list[i].ref);
     const sib = (k: number) => !list[k].deleted && parentOf(list[k].ref) === p && list[k].ref.split(".").length === list[i].ref.split(".").length;
     let order: Row[];
     if (input.dir === "up") {
       let k = a - 1; while (k >= 0 && !sib(k)) k--;
-      if (k < 0) throw new Error("Already the first chapter at this level.");
+      if (k < 0) fail("Already the first chapter at this level.");
       order = [...list.slice(0, k), ...list.slice(a, b), ...list.slice(k, a), ...list.slice(b)];
     } else {
       let k = b; while (k < list.length && !sib(k)) k++;
-      if (k >= list.length) throw new Error("Already the last chapter at this level.");
+      if (k >= list.length) fail("Already the last chapter at this level.");
       const [, kb] = blockOf(list, k);
       order = [...list.slice(0, a), ...list.slice(b, kb), ...list.slice(a, b), ...list.slice(kb)];
     }
@@ -368,8 +369,8 @@ export async function moveChapter(input: { revisionId: string; sectionId: string
 export async function deleteChapter(input: { revisionId: string; sectionId: string }) {
   return structure(input.revisionId, async (list, db) => {
     const i = list.findIndex((x) => x.id === input.sectionId);
-    if (i < 0) throw new Error("Chapter not found");
-    if (list.filter((x) => !x.deleted).length <= 1) throw new Error("A manual keeps at least one chapter.");
+    if (i < 0) fail("Chapter not found");
+    if (list.filter((x) => !x.deleted).length <= 1) fail("A manual keeps at least one chapter.");
     const [a, b] = blockOf(list, i);
     for (const x of list.slice(a, b)) {
       if (x.base_ref) await db.from("revision_sections").update({ deleted_at: new Date().toISOString(), changed: true }).eq("id", x.id);
@@ -382,7 +383,7 @@ export async function deleteChapter(input: { revisionId: string; sectionId: stri
 export async function restoreChapter(input: { revisionId: string; sectionId: string }) {
   return structure(input.revisionId, async (list, db) => {
     const x = list.find((y) => y.id === input.sectionId);
-    if (!x) throw new Error("Chapter not found");
+    if (!x) fail("Chapter not found");
     await db.from("revision_sections").update({ deleted_at: null }).eq("id", x.id);
     return x.id;
   });
@@ -435,8 +436,8 @@ export async function orgSnapshot(input: { revisionId: string }): Promise<{ ok: 
 /** Regulated manual ↔ internal document: Compliance only, and only while the revision is a draft. */
 export async function setManualClass(formData: FormData) {
   const { s, db, rev, manual } = await guard(String(formData.get("revision_id") ?? ""));
-  if (!isCmm(s)) throw new Error("Only Compliance can change whether a manual is regulated or internal.");
-  if (rev.step !== "draft") throw new Error("This can only be changed while the revision is a draft.");
+  if (!isCmm(s)) fail("Only Compliance can change whether a manual is regulated or internal.");
+  if (rev.step !== "draft") fail("This can only be changed while the revision is a draft.");
   const internal = String(formData.get("internal") ?? "") === "1";
   await db.from("manuals").update({ internal }).eq("id", manual.id);
   await db.from("revisions").update({ authority_route: internal ? "none" : null, return_kind: null }).eq("id", rev.id);
@@ -450,7 +451,7 @@ export async function decideFindingChange(formData: FormData) {
   const revisionId = String(formData.get("rev") ?? ""), changeId = String(formData.get("change") ?? ""), what = String(formData.get("what") ?? "");
   const db = supabaseAdmin();
   const { data: rev } = await db.from("revisions").select("id,manual_id,step").eq("id", revisionId).maybeSingle();
-  if (!rev || (rev as { step: string }).step !== "draft") throw new Error("The draft is not editable.");
+  if (!rev || (rev as { step: string }).step !== "draft") fail("The draft is not editable.");
   const patch = what === "include" ? { status: "included", revision_id: revisionId } : what === "defer" ? { status: "deferred", revision_id: null } : { status: "pending", revision_id: null };
   await db.from("finding_changes").update(patch).eq("id", changeId).eq("manual_id", (rev as { manual_id: string }).manual_id).in("status", ["pending", "deferred", "included"]);
   revalidatePath(`/docs/editor/${revisionId}`);
