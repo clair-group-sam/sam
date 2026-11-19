@@ -10,7 +10,7 @@ export const mayWrite = (s: Session) => isSafetyDesk(s) || s.role === "np" || s.
 export const mayPublish = (s: Session) => isSafetyDesk(s);
 
 const OFFICE_NONE = new Set(["USER", "CREW", "EXT", ""]);
-const NP_POSTS = new Set(["AM", "SM", "CMM", "NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "QM", "NP"]);
+const NP_POSTS = new Set(["AM", "SM", "CMM", "NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "QM", "NP", "RE", "RN", "RRO"]);
 /** People of the entity in the audience (people.roles holds the posts; no post = crew / staff). */
 export async function audiencePeople(db: SupabaseClient, entity: string, audience: string): Promise<string[]> {
   const { data } = await db.from("people").select("id,roles").contains("entities", [entity]).limit(2000);
