@@ -15,7 +15,8 @@ type M = { subject_id: string; suggestions: Suggestion[]; ran_at: string };
 
 /** Safety › Hazard log › to match: each hazard written in a MOC / RA is either the same as a hazard of the log (link: its acceptance then triggers
  *  the log reassessment), a new lasting hazard (add to the log), or temporary (keep local). SAM suggests; the safety desk decides. Also: possible duplicates in the log. */
-export default async function MatchPage() {
+export default async function MatchPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
+  const showAll = (await searchParams).show === "all"; const PAGE = 100; // the list is long: the first hundred, the rest on demand
   const s = await getSession();
   if (!s) redirect("/login");
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
@@ -50,7 +51,7 @@ export default async function MatchPage() {
         <table className="tbl">
           <thead><tr><th style={{ width: 120 }}>Study</th><th>Hazard of the study</th><th style={{ width: 90 }}>Residual</th><th style={{ width: "40%" }}>In the hazard log?</th></tr></thead>
           <tbody>
-            {hs.map((h) => { const m = sug.get(h.id); const sc = schemeOf(h.entity); const t = tolerability(h.lik_after, h.sev_after, sc); return (
+            {(showAll ? hs : hs.slice(0, PAGE)).map((h) => { const m = sug.get(h.id); const sc = schemeOf(h.entity); const t = tolerability(h.lik_after, h.sev_after, sc); return (
               <tr key={h.id}>
                 <td className="mono"><Link className="underline" href={`/safe/risk/a/${h.risk_assessments.id}`}>{h.risk_assessments.number}</Link><div className="mini">{KINDS[h.risk_assessments.kind]}</div></td>
                 <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}<div className="mini">{h.risk_assessments.name}</div></td>
@@ -70,6 +71,7 @@ export default async function MatchPage() {
             {!hs.length && <tr><td colSpan={4} className="p-6 text-slate6">Every hazard of the MOCs and risk assessments is linked to the log or kept local.</td></tr>}
           </tbody>
         </table>
+        {!showAll && hs.length > PAGE && <p className="p-3 mini">The first {PAGE} of {hs.length} are shown; what you match leaves the list. <a className="underline" href="?show=all">Show all {hs.length}</a></p>}
       </section>
 
       <section className="card">

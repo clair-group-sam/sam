@@ -233,6 +233,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <section className="card">
             <div className="ch"><span className="eyebrow">Report status</span></div>
             <div className="cb flex gap-2">
+              {!closed && nextStep?.startsWith("send the feedback") && <p className="mini mb-2" style={{ color: "var(--amber-ink)" }}>No feedback sent to the reporter yet: it is due to every reporter (376/2014 art. 13(4)). Send it from the Reporter card before closing.</p>}
               {!closed && <form action={setReportStatus}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="closed" /><button className="btn" disabled={clock.state === "running" || clock.state === "late"} title={clock.state === "running" || clock.state === "late" ? "Decide on the MOR first" : ""}>Close the report</button></form>}
               {closed && <span className="mini">Closed.</span>}
             </div>

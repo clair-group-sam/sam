@@ -1,3 +1,4 @@
+import { isTestData } from "@/lib/testdata";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildPack, type Pack } from "@/lib/committees";
 import { overdueByOwner, type OverdueGroup } from "@/lib/escalation";
@@ -19,7 +20,7 @@ export type EntityDash = {
 export async function entityDash(db: SupabaseClient, entity: string): Promise<EntityDash> {
   const t0 = today();
   const [{ data: mans }, { data: files }, { data: fnd }, topics, { data: wen }, groups, pack] = await Promise.all([
-    db.from("manuals").select("id,internal").eq("entity", entity),
+    db.from("manuals").select("id,internal,code,title").eq("entity", entity),
     db.from("authority_files").select("stage,target_date,ball_override").eq("entity", entity).not("stage", "in", "(closed,standby)"),
     db.from("findings").select("status,due,level").eq("entity", entity).in("status", FND_OPEN),
     loadTopics(db, [entity]),
@@ -27,7 +28,7 @@ export async function entityDash(db: SupabaseClient, entity: string): Promise<En
     overdueByOwner(db, [entity]),
     buildPack({ id: "00000000-0000-0000-0000-000000000000", entity, kind: "srb", planned_on: t0, starts_at: null }).catch(() => null),
   ]);
-  const manualIds = ((mans ?? []) as { id: string }[]).map((m) => m.id);
+  const manualIds = ((mans ?? []) as { id: string; code?: string; title?: string }[]).filter((m) => !isTestData(m.code ?? "", m.title ?? "")).map((m) => m.id); // test manuals are not counted, as in the Library
   const { data: revs } = manualIds.length ? await db.from("revisions").select("step").in("manual_id", manualIds).not("step", "in", "(published,repository)") : { data: [] };
   const byStep: Record<string, number> = {};
   for (const r of (revs ?? []) as { step: string }[]) byStep[r.step] = (byStep[r.step] ?? 0) + 1;

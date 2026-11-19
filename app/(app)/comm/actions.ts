@@ -54,7 +54,7 @@ async function sendComm(id: string) {
   if (!s.group && !s.entities.includes(com.entity)) fail("Out of your scope.");
   const people = await peopleFor(db(), com.entity);
   const readers = resolveReaders(people, com.entity, com.audience);
-  if (!readers.length) fail("Nobody matches this audience: check the posts or people chosen.");
+  if (!readers.length) fail("Not sent: nobody matches this audience (a post without a holder who has a S.A.M. account reaches nobody). Your message is kept as a draft in Communication › Communications: open it there and change the audience.");
   const link = `/comm/camp?c=${com.id}`;
   await db().from("communication_recipients").upsert(readers.map((r) => ({ communication_id: com.id, person_id: r.id })), { onConflict: "communication_id,person_id" });
   await db().from("tasks").insert(readers.map((r) => ({ entity: com.entity, kind: "communication", title: `${com.kind === "urgent" ? "Urgent: " : ""}${com.title}`.slice(0, 200),

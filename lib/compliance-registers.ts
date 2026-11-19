@@ -181,7 +181,8 @@ export function auditorRoster(register: Auditor[], people: { id: string; display
  *  "Last, First (Department and Team)": the brackets are dropped and a single "Last, First" stays one person;
  *  several auditors are separated by / & + "et" "and". A dash alone is nobody. */
 export function auditorNames(raw: string): string[] {
-  const t = raw.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+  // Centrik glues the initials of its avatar in front of the name ("JPJanssens, Pierre-Franck"): two capitals followed by a capitalised word
+  const t = raw.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().replace(/^[A-Z]{2}(?=[A-Z][a-zà-ÿ])/, "");
   if (!t || /^[-—–.?]+$/.test(t)) return [];
   const one = t.match(/^([^,/&+]+),\s*([^,/&+]+)$/);
   if (one && !/\s(et|and)\s/i.test(t)) return [`${one[2].trim()} ${one[1].trim()}`];
