@@ -89,7 +89,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const entities = viewAs ? [viewEnt] : group ? ENTS4 : (person?.entities ?? []);
   const name = person?.display_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "";
   const wanted = (() => { const v = store.get("sam_ent")?.value; return v && v !== "ALL" ? normEntity(v) : v; })(); // old cookies (AJD…) still work
-  let entity = group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL");
+  let entity = viewAs ? viewEnt : group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL"); // a view works on its one entity
   if (wanted && (wanted === "ALL" ? group : entities.includes(wanted))) entity = wanted;
   // 09/11 · the Group view only on overviews and lists: a page that works on one entity gets the home entity instead
   // (the cookie keeps "ALL", so the overviews show the group again). x-sam-path is set by the middleware.
