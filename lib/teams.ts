@@ -262,9 +262,12 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
         // the portal of this file is read by S.A.M. (TMCAD, METEOR): while it is with the authority or waits for our reply there is nothing
         // to tell S.A.M. — it sees remarks, a decision or our reply at the next reading and moves the file itself. The card only informs.
         if (file.portal_read_on && (file.stage === "submitted" || file.stage === "remarks")) {
-          const info = [file.stage === "submitted" ? `**Nothing to do.** The file is with ${who}, which has not answered yet.` : `**Our turn: reply on the portal.** ${who} made remarks.`,
+          // the portal can contradict S.A.M.: a dossier prepared on the portal and never sent is not "with the authority"
+          const unsent = /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(file.portal_status ?? "");
+          const info = [unsent ? (file.stage === "submitted" ? `**Our turn: send it on the portal.** S.A.M. holds this file as submitted, but the portal shows it as prepared and not sent to ${who}.` : `**Our turn: send the reply on the portal.** ${who} made remarks; the portal shows our version as not sent.`)
+            : file.stage === "submitted" ? `**Nothing to do.** The file is with ${who}, which has not answered yet.` : `**Our turn: reply on the portal.** ${who} made remarks.`,
             ...(portal ? [portal + "."] : []),
-            file.stage === "submitted" ? "You have nothing to record here: when the portal shows remarks or a decision, S.A.M. moves the file at the next reading of the portals and tells you." : "Once the reply is sent on the portal, S.A.M. sees it at the next reading: nothing to record here."].join("\n\n");
+            unsent ? "Nothing to record here: once it is sent on the portal, S.A.M. sees it at the next reading." : file.stage === "submitted" ? "You have nothing to record here: when the portal shows remarks or a decision, S.A.M. moves the file at the next reading of the portals and tells you." : "Once the reply is sent on the portal, S.A.M. sees it at the next reading: nothing to record here."].join("\n\n");
           return taskCard(t, undefined, { info });
         }
         const help = [ASK[file.stage] ?? `Where the file stands: **${stageLabel}**.`, ...(portal ? [portal] : []), "If something did happen, say which (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
