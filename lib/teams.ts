@@ -192,7 +192,7 @@ export function stateOf(t: TaskRow, by?: string | null): CardState | undefined {
 }
 
 /** The card of one task: what it is, when, buttons Done / Not yet (+ comment) / Open in S.A.M. Once answered, the same card shows the answer and no button. */
-export type CardOpts = { actions?: unknown[]; hint?: string; doneTitle?: string; commentHint?: string };
+export type CardOpts = { actions?: unknown[]; hint?: string; doneTitle?: string; commentHint?: string; /** a card that only informs: the text, and Open in S.A.M. */ info?: string };
 export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): unknown {
   const kind = KIND_LABEL[t.kind] ?? t.kind.replace(/_/g, " ");
   const url = t.link ? `${origin()}${t.link}` : origin();
@@ -209,6 +209,8 @@ export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): un
   if (state) {
     const label = state.answered === "done" ? "✓ Done" : state.answered === "not_yet" ? "Not yet" : state.answered === "closed" ? "✓ Done" : "No longer needed";
     body.push({ type: "TextBlock", text: `${label}, ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" || state.answered === "closed" ? "Good" : state.answered === "not_yet" ? "Attention" : "Default", weight: "Bolder", spacing: "Medium" });
+  } else if (opts.info) {
+    body.push({ type: "TextBlock", text: opts.info, wrap: true, spacing: "Medium" });
   } else if (opts.actions) {
     if (opts.hint) body.push({ type: "TextBlock", text: opts.hint, wrap: true, isSubtle: true, spacing: "Medium" });
     body.push({ type: "Input.Text", id: "comment", placeholder: opts.commentHint ?? "Comment", isMultiline: true, spacing: "Small" });
@@ -257,6 +259,14 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
           published: "The change is published. **Is the close-out done** (decision filed, registers up to date)?",
         };
         const portal = file.portal_status ? `What the portal showed when S.A.M. last read it (${d(file.portal_read_on)}): “${file.portal_status}”${file.last_exchange ? `. Last exchange${file.last_exchange_on ? ` (${d(file.last_exchange_on)})` : ""}: ${file.last_exchange.slice(0, 220)}` : ""}` : null;
+        // the portal of this file is read by S.A.M. (TMCAD, METEOR): while it is with the authority or waits for our reply there is nothing
+        // to tell S.A.M. — it sees remarks, a decision or our reply at the next reading and moves the file itself. The card only informs.
+        if (file.portal_read_on && (file.stage === "submitted" || file.stage === "remarks")) {
+          const info = [file.stage === "submitted" ? `**Nothing to do.** The file is with ${who}, which has not answered yet.` : `**Our turn: reply on the portal.** ${who} made remarks.`,
+            ...(portal ? [portal + "."] : []),
+            file.stage === "submitted" ? "You have nothing to record here: when the portal shows remarks or a decision, S.A.M. moves the file at the next reading of the portals and tells you." : "Once the reply is sent on the portal, S.A.M. sees it at the next reading: nothing to record here."].join("\n\n");
+          return taskCard(t, undefined, { info });
+        }
         const help = [ASK[file.stage] ?? `Where the file stands: **${stageLabel}**.`, ...(portal ? [portal] : []), "If something did happen, say which (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
           ...(file.stage === "ready" ? ["- **Record the submission…**: asks for the portal reference, then records that the file was submitted."] : []),
           "- **Open in S.A.M.**: opens the file, changes nothing.", "The note is optional, except for the buttons marked *."].join("\n");

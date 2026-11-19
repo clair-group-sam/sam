@@ -157,6 +157,17 @@ export async function removeAttachment(formData: FormData) {
   paths(id);
 }
 
+/** Compliance: send the Teams card of the file again (its open tasks), as it reads today. */
+export async function resendCard(formData: FormData) {
+  const id = str(formData, "id");
+  const { db, cmm } = await guard(id);
+  if (!cmm) throw new Error("Compliance only");
+  const { data } = await db.from("tasks").select("*").eq("ref_id", id).eq("status", "open");
+  const { notifyTasks } = await import("@/lib/teams");
+  if (data?.length) await notifyTasks(db, data as never);
+  paths(id);
+}
+
 /** Super admin only: delete a CAA application that never left the house (draft / compliance / ready, no portal reference). Attachments go with it. */
 export async function deleteFile(formData: FormData) {
   const id = str(formData, "id");

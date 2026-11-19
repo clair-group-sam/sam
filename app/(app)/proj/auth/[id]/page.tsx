@@ -8,7 +8,7 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
 import { BALL_LABEL, ballOf, dueState, CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
-import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, removeAttachment, saveFile, toggleItem } from "../actions";
+import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, removeAttachment, resendCard, saveFile, toggleItem } from "../actions";
 import { Icon } from "@/lib/icons";
 
 const KIND_ICON: Record<string, string> = { created: "plus", stage: "arrow", note: "pencil", item: "check", submitted: "send", remarks: "mail", reply: "reply", decision: "check", attachment: "clip", link: "link", task: "clock", mail: "mail" };
@@ -227,6 +227,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
             </form>
           </section>
 
+          {cmm && <form action={resendCard} className="mb-3"><input type="hidden" name="id" value={f.id} /><button className="mini underline" type="submit">Send the Teams card of this file again</button></form>}
           {s.roles.includes("SUPERADMIN") && !f.portal_ref && ["draft", "compliance", "signing", "ready", "standby"].includes(f.stage) && (
             <details className="card"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">Delete this file</span><span className="mini">super admin, never submitted</span></summary>
               <form action={deleteFile} className="cb grid gap-2"><input type="hidden" name="id" value={f.id} />

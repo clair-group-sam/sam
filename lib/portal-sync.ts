@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ballOf, routeFor, syncTasks, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
+import { applyMove } from "@/lib/authority-moves";
 
 /* PRJ-05 · Reconciling a portal reading with S.A.M. A line = one application or one finding as the portal shows it. Accepted keys are
  * the ones of the CAA point (French) or their English names: ref, entite/entity, nature/kind, numero/number, objet/title, statut/status,
@@ -147,5 +148,28 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
     else ex.push({ kind: "No longer on the portal", ref: u.ref, text: `${u.title}: at the authority in S.A.M. (${u.stage}), absent from the open applications read. Decision received?`, href: `/proj/auth/${u.id}` });
   }
   const r = picks.length ? await applySync(db, actor, readingId, picks) : { created: 0, updated: 0 };
+  // 19/11 (Guillaume): S.A.M. reads the portal, so it is not for the user to tell it what the portal says. When the wording of the
+  // portal is unambiguous, the reading moves the file itself: remarks received, decision received, reply sent. The close-out stays a human act.
+  const want = new Map<string, { to: Stage; status: string; last: string | null }>();
+  for (const p of plan.proposals) if (p.object === "file" && p.id && p.line.kind === "file") want.set(p.id, { to: stageFromPortal(p.line.status), status: p.line.status, last: p.line.turn === "authority" ? "authority" : p.line.last });
+  for (const u of plan.unseen) { const c = decided.get(norm(u.ref)); if (c) want.set(u.id, { to: "approved", status: c.status, last: null }); }
+  const turnOf = new Map(plan.proposals.filter((p) => p.id).map((p) => [p.id!, p.line.turn]));
+  if (want.size) {
+    const { data: fs } = await db.from("authority_files").select("*").in("id", [...want.keys()]);
+    for (const f of (fs ?? []) as AuthorityFile[]) {
+      const w = want.get(f.id)!; let to: Stage | null = null;
+      if (f.stage === "submitted" && w.to === "remarks") to = "remarks";
+      // a favourable decision only: a refusal, a withdrawal or a replaced dossier is left to the desk, with the portal's wording
+      else if ((f.stage === "submitted" || f.stage === "remarks") && w.to === "approved" && /approuv|approved|signed off|accept|accus[ée] de r[ée]ception|acknowledg|completed|publish/i.test(w.status) && !/refus|reject|withdraw|cancel|annul|remplac/i.test(w.status)) to = "approved";
+      else if (f.stage === "remarks" && w.to === "submitted" && turnOf.get(f.id) === "authority") to = "submitted";
+      if (!to) continue;
+      const ref = f.portal_ref ?? f.title;
+      try {
+        await applyMove(db, { personId: actor.personId, name: `${actor.name} (portal reading)`, cmm: true, owner: false }, f, to, { note: `Read on the portal on ${reading.read_on}: “${w.status}”.${f.last_exchange ? ` Last exchange: ${f.last_exchange.slice(0, 300)}` : ""}`, decision_at: to === "approved" ? reading.read_on : null });
+        for (let i = ex.length - 1; i >= 0; i--) if (ex[i].href === `/proj/auth/${f.id}`) ex.splice(i, 1);
+        ex.push({ kind: "Stage moved", ref, text: `${f.title}: the portal reads “${w.status}”. ${to === "remarks" ? "Passed to “Remarks to answer”: the reply is ours." : to === "approved" ? "Passed to “Decision received”: publication and close-out remain." : "Reply seen on the portal: back with the authority."}`, href: `/proj/auth/${f.id}` });
+      } catch (e) { ex.push({ kind: "To check", ref, text: `${f.title}: the portal reads “${w.status}” but the file could not be moved (${e instanceof Error ? e.message : "error"})`, href: `/proj/auth/${f.id}` }); }
+    }
+  }
   return { ...r, same: plan.proposals.filter((p) => p.action === "same").length, info: plan.proposals.filter((p) => p.action === "info").length, exceptions: ex };
 }
