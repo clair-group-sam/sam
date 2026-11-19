@@ -82,10 +82,18 @@ async function readMeteor() {
   const lines = [], skipped = [];
   // 1. dossiers (the list shows the open ones)
   if (await go("#dossiers", /\/dossier\/listForSearch/)) {
+    // a search left in the list (an identifier typed earlier) would hide every other dossier: empty the search fields and let the page search again
+    const typed = [...document.querySelectorAll("input.form-control, input[type=text], input[type=search]")].filter((i) => i.offsetParent && i.value);
+    if (typed.length) {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      for (const i of typed) { set.call(i, ""); for (const ev of ["input", "change", "keyup"]) i.dispatchEvent(new Event(ev, { bubbles: true })); }
+      const btn = [...document.querySelectorAll("button, a, input[type=button], input[type=submit]")].find((x) => /^rechercher$/i.test(String(x.innerText || x.value || "").trim()));
+      if (btn) { cap.length = 0; btn.click(); const t0 = Date.now(); while (Date.now() - t0 < 15000 && got(/\/dossier\/listForSearch/) === undefined) await sleep(250); await sleep(900); skipped.push("Dossiers: a search was left in the list; it was emptied to read every dossier"); }
+    }
     await loadAll();
     const seen = new Set(); const list = cap.filter((x) => /\/dossier\/listForSearch/.test(x.u)).flatMap((x) => { try { return JSON.parse(x.res) || []; } catch { return []; } }).filter((d) => d && d.dosId && !seen.has(d.dosId) && seen.add(d.dosId));
     // closed dossiers (CLOS - Approuvé, Remplacé, Accusé de réception, refusé…) stay on the portal: only the running ones are followed
-    const running = list.filter((d) => !/^clos/i.test(String(d.statutAffichage || "")) && d.etaCd !== "CLO");
+    const running = list.filter((d) => !/^\s*clos/i.test(String(d.statutAffichage || "")) && d.etaCd !== "CLO");
     for (const d of running) {
       const l = { entity, kind: "file", number: `#${d.identifiant}`, title: String(d.objet || "").trim(), status: String(d.statutAffichage || "").trim(), due: iso(d.echeanceSouhaitee), type_hint: String(d.categorie || "").split(".").pop(),
         url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#dossiers/${d.verIdLastVersion}`, submitted_on: iso(d.derniereVersion) };

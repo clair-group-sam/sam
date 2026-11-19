@@ -1,10 +1,29 @@
 {
   "manifest_version": 3,
   "name": "S.A.M. Reader",
-  "version": "0.2.1",
-  "description": "Reads the authority portals (TMCAD, METEOR) in your own signed-in session, read-only, when you click « Read the portals » in S.A.M.",
-  "permissions": ["tabs", "scripting"],
-  "host_permissions": ["https://tmcad.totalaoc.com/*", "https://meteor-app.dsac.aviation-civile.gouv.fr/*"],
-  "background": { "service_worker": "background.js" },
-  "content_scripts": [{ "matches": ["https://sam-git-dev-sam-03e0.vercel.app/*", "https://sam.clair-group.com/*"], "js": ["bridge.js"], "run_at": "document_start" }]
+  "version": "0.2.2",
+  "description": "Reads the authority portals (TMCAD, METEOR) in your own signed-in session, read-only, when you click \u00ab Read the portals \u00bb in S.A.M.",
+  "permissions": [
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://tmcad.totalaoc.com/*",
+    "https://meteor-app.dsac.aviation-civile.gouv.fr/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sam-git-dev-sam-03e0.vercel.app/*",
+        "https://sam.clair-group.com/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
 }
