@@ -50,8 +50,36 @@ async function readTmcad() {
     l.turn = /requires info|draft|awaiting payment|returned/i.test(l.status) ? "us" : l._lastWho ? (isAuthority(l._lastWho) ? "us" : "authority") : "authority";
     delete l._lastWho;
   }
+  // findings raised by TM-CAD (Quality › Findings, the list behind "My findings"): those not closed by the authority, with their text
+  let findings = 0;
+  try {
+    const fl = document.querySelector('a[href*="/Quality/Finding/FindingList.aspx"]');
+    if (fl) {
+      const d = await get(fl.getAttribute("href")); const T = d.querySelector('table[id$="FindingDataTable"]');
+      const head = T ? [...T.rows[0].cells].map((c) => txt(c).toLowerCase()) : [];
+      let phase = "";
+      for (const r of T ? [...T.rows].slice(1) : []) {
+        const c = [...r.cells].map((x) => txt(x));
+        if (c.length === 1) { const m = /^Phase:\s*(.*?)\s*\(\d+\)$/.exec(c[0]); if (m) phase = m[1]; continue; }
+        if (c.length < 8 || /^closed$/i.test(phase)) continue;                       // closed by the authority: nothing left to follow
+        const off = head.length - c.length; const at = (n) => head.indexOf(n) - off;   // data rows have no cell under the first (selector) header
+        const a = r.querySelector('a[href*="FindingDetail.aspx"]'); const sev = c[at("severity")] || "";
+        const l = { entity: "ASJMT", kind: "finding", number: c[at("audit") + 1] || "", title: c[at("audit") + 2] || "", level: (/\d/.exec(sev) || [""])[0] || sev, status: phase || "Open", origin: c[at("audit")] || null,
+          notified: iso(c[at("date")]), due: iso(c[at("close by")]) || iso(c[at("respond by")]), url: a ? new URL(a.getAttribute("href"), location.origin).href : null,
+          turn: /closed by operator|responded|awaiting (authority|review|closure)|review/i.test(phase) ? "authority" : "us" };
+        if (a) try {
+          const f = await get(a.getAttribute("href")); f.querySelectorAll("script,style,select").forEach((e) => e.remove());
+          const t = txt(f.querySelector('[id*="MainContent"]') || f.body);
+          const m = /Specific [A-Za-z ]*Finding\s+(.*?)\s+Applies To/.exec(t); if (m) { l.description = m[1].slice(0, 4000); const rq = /^((?:AMC|GM)\d*\s+)?[A-Z]{2,5}\.[A-Z0-9.]+(\([a-z0-9]+\))*/.exec(m[1]); if (rq) l.requirement = rq[0]; }
+          const cl = /Closure Due By\s+(\d{2}\/\d{2}\/\d{4})/.exec(t); if (cl) l.due = iso(cl[1]);
+          const pl = /Action Plan Due By\s+(\d{2}\/\d{2}\/\d{4})/.exec(t); if (pl) l.next_task = `Action plan due ${pl[1]}, closure due ${cl ? cl[1] : "—"}`;
+        } catch (e) { skipped.push(`${l.number}: finding detail not read (${e.message})`); }
+        lines.push(l); findings++;
+      }
+    }
+  } catch (e) { skipped.push(`Findings: ${e.message}`); }
   const account = txt(document.querySelector('[id*="UserName"], .userName, .user-name')) || null;
-  return { account, organisation: [...new Set(lines.map((l) => l.organisation).filter(Boolean))].join(", ") || null, lines, read, registries: regs.length, skipped };
+  return { account, organisation: [...new Set(lines.map((l) => l.organisation).filter(Boolean))].join(", ") || null, lines, read, registries: regs.length, findings, skipped };
 }
 
 // METEOR (DSAC) is a single-page application: its screens load their data themselves. The reader listens to what the page receives
