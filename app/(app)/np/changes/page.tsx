@@ -17,8 +17,25 @@ const fr = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/"
 const days = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
 const ACCEPTED: Stage[] = ["approved", "published", "closed"];
 const AS: Record<string, [string, string]> = { accepted: ["accepted by the authority", "green"], pending: ["acceptance pending", "amber"], not_required: ["no acceptance required", ""] };
-/** MSM Astonjet Ltd 1.7.1: a planned change of nominated person is notified to the authority at least 20 days before. */
-const NOTICE: Record<string, number> = { ASJMT: 20 };
+/** Notice to the authority before a planned change of nominated person, as the regulation reads (Easy Access Rules in S.A.M., 19/11/2026):
+ *  AMC1 ORO.GEN.130(b) 20 days · AMC1 CAMO.A.130(b) 20 working days · AMC1 ORA.GEN.130(b) 10 days ·
+ *  CAO.A.105(a)(2) before the change takes place, no number of days. Unforeseen changes: at the earliest opportunity. */
+type Notice = { days: number; working: boolean; ref: string; text: string };
+const AIRWORTHINESS = /^(D?NPCA|CAM|CAMO|ARS)/;
+function noticeFor(entity: string, post: string): Notice | null {
+  if (entity === "ASJMT" && AIRWORTHINESS.test(post.toUpperCase())) return { days: 20, working: true, ref: "AMC1 CAMO.A.130(b)", text: "20 working days" };
+  if (entity === "ASJMT" || entity === "ASJFR") return { days: 20, working: false, ref: "AMC1 ORO.GEN.130(b)", text: "20 days" };
+  if (entity === "ASFFR") return { days: 10, working: false, ref: "AMC1 ORA.GEN.130(b)", text: "10 days" };
+  if (entity === "ASTFR") return { days: 0, working: false, ref: "CAO.A.105(a)(2)", text: "before the change takes place" };
+  return null;
+}
+const RULES: Record<string, string> = {
+  ASJMT: "AMC1 ORO.GEN.130(b): at least 20 days before; airworthiness posts, AMC1 CAMO.A.130(b): at least 20 working days before",
+  ASJFR: "AMC1 ORO.GEN.130(b): at least 20 days before", ASFFR: "AMC1 ORA.GEN.130(b): at least 10 days before", ASTFR: "CAO.A.105(a)(2): notified before the change takes place",
+};
+/** Monday to Friday between two dates (public holidays are not counted out). */
+function workingDays(from: string, to: string): number { let n = 0; const d = new Date(from + "T00:00:00Z"); const end = Date.parse(to + "T00:00:00Z"); const step = d.getTime() <= end ? 1 : -1;
+  while (d.getTime() !== end) { if (step > 0) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; d.setUTCDate(d.getUTCDate() + 1); } else { d.setUTCDate(d.getUTCDate() - 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; } } return n; }
 
 /* NP-02 · NP management › Changes & approvals: changes of holder or deputy, their CAA application, and the day they take effect. */
 export default async function Changes({ searchParams }: { searchParams: Promise<Sp> }) {
@@ -46,7 +63,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
   const people = ((ppl ?? []) as { id: string; display_name: string; entities: string[] | null; home_entity: string | null }[]).filter((p) => p.home_entity === entity || (p.entities ?? []).includes(entity));
   const linked = new Set(changes.map((c) => c.authority_file_id).filter(Boolean));
   const freeFiles = files.filter((f) => !linked.has(f.id) && !["closed"].includes(f.stage));
-  const notice = NOTICE[entity];
+  const rule = RULES[entity];
 
   return (
     <>
@@ -65,7 +82,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
 
       {cmm && (
         <section className="card mb-4">
-          <div className="ch"><span className="eyebrow">Prepare a change</span>{notice && <span className="mini">MSM 1.7.1: a planned change of nominated person is notified to the authority at least {notice} days before</span>}</div>
+          <div className="ch"><span className="eyebrow">Prepare a change</span>{rule && <span className="mini">Planned change, notice to the authority. {rule}</span>}</div>
           {posts.length ? (
             <form action={createChange} className="cb">
               <input type="hidden" name="entity" value={entity} />
@@ -90,7 +107,8 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
           <thead><tr><th>Post</th><th>Change</th><th>Takes effect</th><th>CAA application</th>{cmm && <th />}</tr></thead>
           <tbody>
             {open.map((c) => { const f = fileOf(c); const d = c.effective_on ? days(c.effective_on, t0) : null; const submitted = f?.submitted_at?.slice(0, 10) ?? null;
-              const short = notice && c.acceptance === "required" && c.effective_on && (submitted ? days(c.effective_on, submitted) < notice : d !== null && d < notice);
+              const nt = noticeFor(entity, c.post_code); const lead = (from: string) => (nt?.working ? workingDays(from, c.effective_on!) : days(c.effective_on!, from));
+              const short = !!nt && c.acceptance === "required" && !!c.effective_on && (nt.days ? lead(submitted ?? t0) < nt.days : !submitted && d !== null && d <= 0);
               return (
                 <tr key={c.id}>
                   <td className="mono">{c.post_code}{c.seat === "deputy" ? " (deputy)" : ""}<div className="mini" style={{ fontFamily: "inherit" }}>{c.post_title}</div></td>
@@ -99,7 +117,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
                   <td>{c.acceptance === "not_required" ? <span className="pill">no acceptance required</span>
                     : f ? <><Link className="underline" href={`/proj/auth/${f.id}`}>{f.portal_ref ?? f.title}</Link> <span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{submitted && <div className="mini">submitted {fr(submitted)}{c.effective_on ? `, ${days(c.effective_on, submitted)} d before` : ""}</div>}</>
                     : <span className="pill amber">no application yet</span>}
-                    {short && <div className="mini red">less than {notice} days of notice (MSM 1.7.1)</div>}
+                    {short && nt && <div className="mini red">{nt.days ? `${Math.max(lead(submitted ?? t0), 0)} ${nt.working ? "working days" : "days"} of notice, ${nt.ref} asks for at least ${nt.text}` : `not notified yet: ${nt.ref}, ${nt.text}`}</div>}
                     {cmm && c.acceptance === "required" && !f && <div className="flex flex-wrap gap-2 mt-2 items-center">
                       <form action={openApplication}><input type="hidden" name="id" value={c.id} /><button className="btn" type="submit">Open the CAA application</button></form>
                       {freeFiles.length > 0 && <form action={linkApplication} className="flex gap-1 items-center"><input type="hidden" name="id" value={c.id} /><select name="file_id" className="inp" style={{ marginTop: 0, width: 220 }}>{freeFiles.map((x) => <option key={x.id} value={x.id}>{x.portal_ref ?? x.title}</option>)}</select><button className="btn" type="submit">Link</button></form>}
