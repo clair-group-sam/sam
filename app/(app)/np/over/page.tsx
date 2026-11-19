@@ -10,6 +10,7 @@ import { postsOf, snapshotOf } from "@/lib/np";
 import { chartKey, chartsIn, orgChartSvg } from "@/lib/orgchart";
 import { savePost, deletePost, seedPostsFromErp } from "./actions";
 import { Icon } from "@/lib/icons";
+import { recipientsOf } from "@/lib/teams";
 
 const STATUS: Record<string, [string, string]> = { accepted: ["green", "accepted by the authority"], pending: ["amber", "acceptance pending"], not_required: ["", "no acceptance required"] };
 
@@ -28,6 +29,9 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
     entity = ents.find((e) => has.has(e)) ?? ents[0];
   }
   const posts = entity ? await postsOf(db, entity) : [];
+  // FB-157 · a post whose holder has no S.A.M. account receives nothing: say it here, where the posts are kept
+  const silent: string[] = [];
+  for (const p of posts) if (p.holder_name && entity && !(await recipientsOf(db, { owner_person: null, owner_role: p.code, entity })).length) silent.push(p.code);
   const snap = snapshotOf(entity ?? "", posts);
   const cmm = isCmm(s);
   const { data: ec } = !posts.length && entity ? await db.from("erp_contacts").select("post").eq("entity", entity).eq("active", true).eq("kind", "internal").not("post", "is", null).order("ord") : { data: [] };
@@ -77,6 +81,7 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
         </section>
       )}
 
+      {silent.length > 0 && <div className="card mb-4" style={{ boxShadow: "inset 3px 0 0 var(--amber)" }}><div className="cb mini"><b>No S.A.M. account behind {silent.join(", ")}.</b> A task, a communication or an ERP call-out addressed to {silent.length === 1 ? "this post" : "these posts"} reaches nobody: the holder is a name here, not yet a person who signs in. They arrive at their first sign-in once the Microsoft 365 groups are mapped (<Link className="underline" href="/set/groups">Settings › Entra groups sync</Link>).</div></div>}
       <section className="card">
         <div className="ch"><span className="eyebrow">Posts</span><span className="mini">{posts.length}</span></div>
         <table className="tbl nptbl">
