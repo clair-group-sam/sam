@@ -6,10 +6,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ENT, ENT_COLOR, entMode, singleEntity, type EntMode, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
+import { VIEWS } from "@/lib/nav";
 import { A11y } from "@/components/A11y";
 import { applyPrefs, readPrefs } from "@/lib/prefs";
 
 type Props = { session: Session; children: React.ReactNode };
+/** Super admin: look at S.A.M. as another profile (or come back). A full reload on Home: the page in front may not exist for that profile. */
+async function viewAs(view: string | null) { await fetch("/api/view", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ view }) }); window.location.assign("/"); }
 
 // Entity switch animation (09/11): ~0.4 s, all three moves in the direction of travel. The switch still reloads the page (FB-048);
 // the reload waits for both the request and the animation, whichever ends last.
@@ -173,6 +176,7 @@ export default function Shell({ session, children }: Props) {
             before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
         <script dangerouslySetInnerHTML={{ __html: ENT_ARRIVE }} />
         {subs.length > 0 && <nav className="mobsub" aria-label={curMod ? modLabel(role, curMod) : mod}>{subs.filter((x) => isBuilt(mod, x.id) || sub === x.id).map((x) => <Link key={x.id} href={`/${mod}/${x.id}`} className={sub === x.id ? "on" : ""} aria-current={sub === x.id ? "page" : undefined}>{subLabel(role, mod, x)}</Link>)}</nav>}
+        {session.viewAs && <div className="groupband"><b>Viewing as {VIEWS[session.viewAs]?.label ?? session.viewAs}, {ENT[session.entity]?.name ?? session.entity}</b>: the menus and the rights are those of this profile; what is personal (Inbox, own reports, own sheets) stays yours. <button type="button" className="underline" onClick={() => viewAs(null)}>Back to my own view</button></div>}
         <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
@@ -312,6 +316,13 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
               <div className="row"><span className="lab">Theme</span><span className="seg3">{(["light", "dark", "auto"] as const).map((t) => <button key={t} type="button" className={prefs.theme === t ? "on" : ""} aria-pressed={prefs.theme === t} onClick={() => { applyPrefs(t); setPrefs(readPrefs()); }}>{t === "auto" ? "System" : t === "dark" ? "Dark" : "Light"}</button>)}</span></div>
               <div className="row"><span className="lab">Text size</span><span className="seg3">{([["standard", "A"], ["large", "A+"], ["xlarge", "A++"]] as const).map(([z, l]) => <button key={z} type="button" className={prefs.size === z ? "on" : ""} aria-pressed={prefs.size === z} title={z === "standard" ? "Standard" : z === "large" ? "Large (110 %)" : "Extra large (122 %)"} onClick={() => { applyPrefs(undefined, z); setPrefs(readPrefs()); }}>{l}</button>)}</span></div>
             </div>
+            {session.superadmin && (
+              <div className="prefs" role="group" aria-label="View as">
+                <div className="mi muted" style={{ padding: "4px 10px" }}>View S.A.M. as (super admin){session.viewAs ? `: now ${session.viewAs}, ${session.entity}` : ""}</div>
+                {session.viewAs && <button type="button" className="mi" onClick={() => viewAs(null)}><b>Back to my own view</b></button>}
+                {Object.entries(VIEWS).filter(([k]) => k !== session.viewAs).map(([k, v]) => <button key={k} type="button" className="mi" onClick={() => viewAs(k)}>{v.label}</button>)}
+              </div>
+            )}
             <Link href="/api/me" className="mi" target="_blank">My access rights</Link>
             <form action="/auth/signout" method="post"><button type="submit" className="mi">Sign out</button></form>
           </div>

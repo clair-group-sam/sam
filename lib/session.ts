@@ -3,7 +3,7 @@ import { normEntity } from "@/lib/entity-codes";
 import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { ENTS4, entMode, homeFor, singleEntity, type RoleKey } from "@/lib/nav";
+import { ENTS4, VIEWS, entMode, homeFor, singleEntity, type RoleKey } from "@/lib/nav";
 
 export type Person = {
   id: string; email: string; display_name: string; home_entity: string | null; entities: string[]; roles: string[];
@@ -17,6 +17,10 @@ export type Session = {
   /** The entity chosen in the top bar ("ALL" stays "ALL" even on a page that works on one entity). The layout's Shell
    *  is not re-rendered on client navigation, so it works from this and the path, not from `entity`. */
   entityPref: string;
+  /** "View as" (super admin): the profile being looked at, e.g. "NPFO"; null in one's own view. */
+  viewAs: string | null;
+  /** The signed-in person is a super admin, whatever the view. */
+  superadmin: boolean;
 };
 
 export const NP_ROLES = ["NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "NP", "SMD", "QM"];
@@ -55,12 +59,18 @@ export const getSession = cache(async (): Promise<Session | null> => {
   // FB-094 · "last seen" followed the sign-in only; a session lasts for days. One write a day at most.
   const seen = (p as { last_seen_at?: string | null } | null)?.last_seen_at ?? null;
   if (person && (!seen || seen.slice(0, 10) < new Date().toISOString().slice(0, 10))) { try { await supabaseAdmin().from("people").update({ last_seen_at: new Date().toISOString() }).eq("id", person.id); } catch { /* never blocks a page */ } }
-  const roles = person?.roles ?? [];
-  const role = roleKeyFrom(roles);
-  const group = !!person?.is_group_function;
-  const entities = group ? ENTS4 : (person?.entities ?? []);
-  const name = person?.display_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "";
+  const realRoles = person?.roles ?? [];
+  const superadmin = realRoles.includes("SUPERADMIN");
   const store = await cookies();
+  // "View as": a super admin sees S.A.M. as another profile does — its roles (so its menus and its rights), one entity, no group view.
+  const view = superadmin ? store.get("sam_view")?.value : undefined;
+  const viewAs = view && VIEWS[view] ? view : null;
+  const roles = viewAs ? VIEWS[viewAs].roles : realRoles;
+  const role = roleKeyFrom(roles);
+  const group = viewAs ? false : !!person?.is_group_function;
+  const viewEnt = (() => { const v = store.get("sam_ent")?.value; const e = v && v !== "ALL" ? normEntity(v) : null; return e && ENTS4.includes(e) ? e : person?.home_entity ?? ENTS4[0]; })();
+  const entities = viewAs ? [viewEnt] : group ? ENTS4 : (person?.entities ?? []);
+  const name = person?.display_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "";
   const wanted = (() => { const v = store.get("sam_ent")?.value; return v && v !== "ALL" ? normEntity(v) : v; })(); // old cookies (AJD…) still work
   let entity = group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL");
   if (wanted && (wanted === "ALL" ? group : entities.includes(wanted))) entity = wanted;
@@ -69,5 +79,5 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const path = (await headers()).get("x-sam-path") ?? "";
   const entityPref = entity;
   if (entity === "ALL" && path && entMode(path) === "single") entity = singleEntity(person?.home_entity, entities);
-  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role) };
+  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role), viewAs, superadmin };
 });

@@ -92,3 +92,9 @@ export function entMode(path: string): EntMode {
 export function singleEntity(home: string | null | undefined, entities: string[]): string {
   return home && entities.includes(home) ? home : entities[0] ?? "ALL";
 }
+/** The profiles a super admin can look at: the roles the session takes, and the label shown. One entity at a time, as that profile works. */
+export const VIEWS: Record<string, { label: string; roles: string[] }> = {
+  AM: { label: "Accountable Manager", roles: ["AM"] }, NPFO: { label: "NPFO, flight operations", roles: ["NPFO"] }, NPCA: { label: "NPCA, continuing airworthiness", roles: ["NPCA"] },
+  NPCT: { label: "NPCT, crew training", roles: ["NPCT"] }, NPGO: { label: "NPGO, ground operations", roles: ["NPGO"] }, HT: { label: "Head of training (ATO)", roles: ["HT"] },
+  USER: { label: "User (pilot, instructor…)", roles: ["USER"] },
+};
