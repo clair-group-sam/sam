@@ -53,9 +53,8 @@ async function readTmcad() {
   // findings raised by TM-CAD (Quality › Findings, the list behind "My findings"): those not closed by the authority, with their text
   let findings = 0;
   try {
-    const fl = document.querySelector('a[href*="/Quality/Finding/FindingList.aspx"]');
-    if (fl) {
-      const d = await get(fl.getAttribute("href")); const T = d.querySelector('table[id$="FindingDataTable"]');
+    { // the list of the organisation's findings, as the portal serves it to the signed-in person (the dashboard link "My findings" shows the same)
+      const d = await get("/Quality/Finding/FindingList.aspx"); const T = d.querySelector('table[id$="FindingDataTable"]');
       const head = T ? [...T.rows[0].cells].map((c) => txt(c).toLowerCase()) : [];
       let phase = "";
       for (const r of T ? [...T.rows].slice(1) : []) {

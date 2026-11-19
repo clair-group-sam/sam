@@ -147,6 +147,7 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
   const decided = new Map(plan.proposals.filter((p) => p.line.kind === "info" && p.line.number && p.line.status).map((p) => [norm(p.line.number), p.line]));
   for (const u of plan.unseen) {
     const c = decided.get(norm(u.ref));
+    if (c && (u.stage === "approved" || u.stage === "published")) continue;   // the decision is already recorded here: only the close-out remains, no need to say it at every reading
     if (c) { await db.from("authority_files").update({ portal_status: c.status, portal_read_on: reading.read_on }).eq("id", u.id);
       ex.push({ kind: "Decided on the portal", ref: u.ref, text: `${u.title}: “${c.status}” on the portal, still “${u.stage}” in S.A.M. Record the decision and close the file.`, href: `/proj/auth/${u.id}` }); }
     else ex.push({ kind: "No longer on the portal", ref: u.ref, text: `${u.title}: at the authority in S.A.M. (${u.stage}), absent from the open applications read. Decision received?`, href: `/proj/auth/${u.id}` });
