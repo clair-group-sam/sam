@@ -10,6 +10,7 @@ async function readTmcad() {
   if (!regs.length) return { signIn: true };
   const CLOSED = /signed off|approved|closed|rejected|withdrawn|cancelled|completed|^published$/i;
   const lines = [], assessors = new Set(), skipped = []; let read = 0;
+  const recent = new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10);
   for (const [id, name] of regs) {
     let d; try { d = await get(`/Registry/ApplicationForms.aspx?RegistrySubsystemId=${id}&menusrc=menu`); } catch (e) { skipped.push(`${name}: ${e.message}`); continue; }
     const T = d.querySelector('table[id$="RegAppsDataTable"]'); if (!T) continue; read++;
@@ -21,7 +22,9 @@ async function readTmcad() {
       const off = head.length - r.cells.length; // data rows have no cell under the first (selector) header
       const c = (i) => (i >= 0 && r.cells[i - off] ? txt(r.cells[i - off]) : ""); const a = r.querySelector('a[href*="RegAppApplication.aspx"]');
       if (c(cAs)) assessors.add(c(cAs));
-      const status = c(cSt); if (!status || CLOSED.test(status)) continue;
+      const status = c(cSt); if (!status) continue;
+      // decided in the last 13 months: listed for information, so S.A.M. can say "Signed Off on the portal" on a file it still holds open
+      if (CLOSED.test(status)) { const sub = iso(c(cSub)); if (sub && sub >= recent) lines.push({ entity: "ASJMT", kind: "info", number: c(cNo), title: c(cTitle) || c(cType), registry, status, submitted_on: sub }); continue; }
       const formId = a ? (/RegistryApplicationFormId=([0-9a-f-]+)/i.exec(a.getAttribute("href")) || [])[1] : null;
       // conflict-zone notifications and unsent drafts are listed, not followed
       lines.push({ entity: "ASJMT", kind: /conflict zone/i.test(registry) || /^draft$/i.test(status) ? "info" : "file", number: c(cNo), title: c(cTitle) || c(cType), type_hint: c(cType), registry, organisation: c(cOrg), status, assessor: c(cAs) || null,
@@ -94,6 +97,8 @@ async function readMeteor() {
     const seen = new Set(); const list = cap.filter((x) => /\/dossier\/listForSearch/.test(x.u)).flatMap((x) => { try { return JSON.parse(x.res) || []; } catch { return []; } }).filter((d) => d && d.dosId && !seen.has(d.dosId) && seen.add(d.dosId));
     // closed dossiers (CLOS - Approuvé, Remplacé, Accusé de réception, refusé…) stay on the portal: only the running ones are followed
     const running = list.filter((d) => !/^\s*clos/i.test(String(d.statutAffichage || "")) && d.etaCd !== "CLO");
+    const recent = new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10);
+    for (const d of list) if (!running.includes(d) && iso(d.derniereVersion) && iso(d.derniereVersion) >= recent) lines.push({ entity, kind: "info", number: `#${d.identifiant}`, title: String(d.objet || "").trim(), status: String(d.statutAffichage || "").trim(), submitted_on: iso(d.derniereVersion) });
     for (const d of running) {
       const l = { entity, kind: "file", number: `#${d.identifiant}`, title: String(d.objet || "").trim(), status: String(d.statutAffichage || "").trim(), due: iso(d.echeanceSouhaitee), type_hint: String(d.categorie || "").split(".").pop(),
         url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#dossiers/${d.verIdLastVersion}`, submitted_on: iso(d.derniereVersion) };
