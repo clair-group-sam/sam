@@ -192,7 +192,13 @@ export function stateOf(t: TaskRow, by?: string | null): CardState | undefined {
 }
 
 /** The card of one task: what it is, when, buttons Done / Not yet (+ comment) / Open in S.A.M. Once answered, the same card shows the answer and no button. */
-export type CardOpts = { actions?: unknown[]; hint?: string; doneTitle?: string; commentHint?: string; /** a card that only informs: the text, and Open in S.A.M. */ info?: string };
+export type CardOpts = { actions?: unknown[]; hint?: string; doneTitle?: string; commentHint?: string; /** a card that only informs: the text, and Open in S.A.M. */ info?: string;
+  /** the coloured band on top: amber = we have something to do, green = we wait, red = something contradicts */ lead?: { text: string; tone: "work" | "wait" }; alert?: string };
+/** Coloured bands: whose turn it is (amber: ours, green: we wait), then a red one when something contradicts. */
+function bands(body: unknown[], opts: CardOpts) {
+  if (opts.lead) body.push({ type: "Container", style: opts.lead.tone === "work" ? "warning" : "good", spacing: "Medium", items: [{ type: "TextBlock", text: opts.lead.text, wrap: true, weight: "Bolder" }] });
+  if (opts.alert) body.push({ type: "Container", style: "attention", spacing: "Small", items: [{ type: "TextBlock", text: opts.alert, wrap: true }] });
+}
 export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): unknown {
   const kind = KIND_LABEL[t.kind] ?? t.kind.replace(/_/g, " ");
   const url = t.link ? `${origin()}${t.link}` : origin();
@@ -210,8 +216,10 @@ export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): un
     const label = state.answered === "done" ? "✓ Done" : state.answered === "not_yet" ? "Not yet" : state.answered === "closed" ? "✓ Done" : "No longer needed";
     body.push({ type: "TextBlock", text: `${label}, ${state.by}, ${state.at}${state.comment ? ` · “${state.comment}”` : ""}`, wrap: true, color: state.answered === "done" || state.answered === "closed" ? "Good" : state.answered === "not_yet" ? "Attention" : "Default", weight: "Bolder", spacing: "Medium" });
   } else if (opts.info) {
+    bands(body, opts);
     body.push({ type: "TextBlock", text: opts.info, wrap: true, spacing: "Medium" });
   } else if (opts.actions) {
+    bands(body, opts);
     if (opts.hint) body.push({ type: "TextBlock", text: opts.hint, wrap: true, isSubtle: true, spacing: "Medium" });
     body.push({ type: "Input.Text", id: "comment", placeholder: opts.commentHint ?? "Comment", isMultiline: true, spacing: "Small" });
     actions.push(...opts.actions);
@@ -252,13 +260,13 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
         const stageLabel = (await import("@/lib/authority")).STAGE_LABEL[file.stage as never] ?? file.stage;
         // the card asks one question; when nothing happened there is nothing to click
         const who = file.authority ?? "the authority"; const d = (x: string | null) => (x ? `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}` : "");
-        const ASK: Record<string, string> = {
-          submitted: `**Whose turn: ${who}.** Nothing to do unless ${who} has answered: S.A.M. cannot read this authority's answers itself.`,
-          remarks: `**Whose turn: ours.** To do: answer the remarks of ${who}. Record it here once the reply is sent.`,
-          approved: "**Whose turn: ours.** To do: integrate and publish the approved change, then record it here.",
-          published: "**Whose turn: ours.** To do: the close-out (decision filed, registers up to date), then record it here.",
-          compliance: "**Whose turn: ours (Compliance).** To do: check the file before it goes for signature or submission.",
-          signing: "**Whose turn: ours (Accountable Manager).** To do: sign.", ready: "**Whose turn: ours.** To do: submit on the portal, then record the submission here.",
+        const ASK: Record<string, { tone: "work" | "wait"; text: string }> = {
+          submitted: { tone: "wait", text: `${who.toUpperCase()}'S TURN. Nothing to do unless ${who} has answered: S.A.M. cannot read this authority's answers itself.` },
+          remarks: { tone: "work", text: `OUR TURN. To do: answer the remarks of ${who}, then record it here.` },
+          approved: { tone: "work", text: "OUR TURN. To do: integrate and publish the approved change, then record it here." },
+          published: { tone: "work", text: "OUR TURN. To do: the close-out (decision filed, registers up to date), then record it here." },
+          compliance: { tone: "work", text: "OUR TURN (Compliance). To do: check the file before it goes for signature or submission." },
+          signing: { tone: "work", text: "OUR TURN (Accountable Manager). To do: sign." }, ready: { tone: "work", text: "OUR TURN. To do: submit on the portal, then record the submission here." },
         };
         const portal = file.portal_status ? `What the portal showed when S.A.M. last read it (${d(file.portal_read_on)}): “${file.portal_status}”${file.last_exchange ? `. Last exchange${file.last_exchange_on ? ` (${d(file.last_exchange_on)})` : ""}: ${file.last_exchange.slice(0, 220)}` : ""}` : null;
         // the portal of this file is read by S.A.M. (TMCAD, METEOR): while it is with the authority or waits for our reply there is nothing
@@ -267,21 +275,19 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
           // first line of every card: whose turn it is, ours or theirs, and what there is to do. Then what the portal showed.
           // The portal is normally right: when it contradicts S.A.M., the card says so and the file asks whether to update S.A.M.
           const unsent = /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(file.portal_status ?? "");
-          const info = [
-            unsent && file.stage === "submitted" ? `**Whose turn: ours.** To do: send the dossier to ${who} on the portal.`
-              : unsent ? `**Whose turn: ours.** To do: send our reply to ${who} on the portal (it is prepared, not sent).`
-              : file.stage === "submitted" ? `**Whose turn: ${who}.** Nothing to do on our side: ${who} has not answered yet.`
-              : `**Whose turn: ours.** To do: answer the remarks of ${who} on the portal.`,
-            ...(portal ? [portal + "."] : []),
-            unsent && file.stage === "submitted" ? `**The portal contradicts S.A.M.**: S.A.M. holds this file as submitted, the portal shows it as prepared and not sent. Open the file: S.A.M. asks whether to update it to match the portal.`
-              : "Nothing to record here: S.A.M. reads the portal and moves the file itself when it shows remarks, a decision or our reply.",
-          ].join("\n\n");
-          return taskCard(t, undefined, { info });
+          const conflict = unsent && file.stage === "submitted";
+          const lead = conflict ? { tone: "work" as const, text: `OUR TURN. To do: send the dossier to ${who} on the portal.` }
+            : unsent ? { tone: "work" as const, text: `OUR TURN. To do: send our reply to ${who} on the portal (it is prepared, not sent).` }
+            : file.stage === "submitted" ? { tone: "wait" as const, text: `${who.toUpperCase()}'S TURN. Nothing to do on our side: no answer yet.` }
+            : { tone: "work" as const, text: `OUR TURN. To do: answer the remarks of ${who} on the portal.` };
+          const alert = conflict ? `**The portal contradicts S.A.M.** S.A.M. holds this file as submitted; the portal shows it as prepared and not sent. Open the file: S.A.M. asks whether to update it to match the portal.` : undefined;
+          const info = [...(portal ? [portal + "."] : []), ...(conflict ? [] : ["Nothing to record here: S.A.M. reads the portal and moves the file itself when it shows remarks, a decision or our reply."])].join("\n\n") || "Open the file for the detail.";
+          return taskCard(t, undefined, { info, lead, alert });
         }
-        const help = [ASK[file.stage] ?? `Where the file stands: **${stageLabel}**.`, ...(portal ? [portal] : []), "What each button records (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
+        const help = [...(ASK[file.stage] ? [] : [`Where the file stands: **${stageLabel}**.`]), ...(portal ? [portal] : []), "What each button records (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
           ...(file.stage === "ready" ? ["- **Record the submission…**: asks for the portal reference, then records that the file was submitted."] : []),
           "- **Open in S.A.M.**: opens the file, changes nothing.", "The note is optional, except for the buttons marked *."].join("\n");
-        if (actions.length) return taskCard(t, undefined, { hint: help, commentHint: "Note (required for the buttons marked *)", actions });
+        if (actions.length) return taskCard(t, undefined, { hint: help, lead: ASK[file.stage], commentHint: "Note (required for the buttons marked *)", actions });
       }
       return taskCard(t);
     }

@@ -52,7 +52,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
       {disagrees && (
         <section className="card mb-4" style={{ borderLeft: "4px solid var(--red, #c0392b)" }}>
           <div className="cb">
-            <p><b>The portal contradicts S.A.M.</b> S.A.M. holds this file as submitted{f.submitted_at ? ` on ${f.submitted_at.slice(8, 10)}/${f.submitted_at.slice(5, 7)}/${f.submitted_at.slice(0, 4)}` : ""}. The portal, read on {f.portal_read_on}, shows “{f.portal_status}”: prepared, not sent to {f.authority ?? "the authority"}. So the turn is ours.</p>
+            <p><b>The portal contradicts S.A.M.</b> S.A.M. holds this file as submitted{f.submitted_at ? ` on ${f.submitted_at.slice(8, 10)}/${f.submitted_at.slice(5, 7)}/${f.submitted_at.slice(0, 4)}` : ""}. The portal, read on {f.portal_read_on ? `${f.portal_read_on.slice(8, 10)}/${f.portal_read_on.slice(5, 7)}/${f.portal_read_on.slice(0, 4)}` : "—"}, shows “{f.portal_status}”: prepared, not sent to {f.authority ?? "the authority"}. So the turn is ours.</p>
             {cmm ? <div className="flex flex-wrap gap-2 items-center mt-2">
               <form action={answerPortal}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="answer" value="update" /><button className="btn primary" type="submit">Update S.A.M.: not sent, back to “Ready to submit”</button></form>
               <form action={answerPortal}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="answer" value="keep" /><button className="btn" type="submit">Keep S.A.M. as it is</button></form>
