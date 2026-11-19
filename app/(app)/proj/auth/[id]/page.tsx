@@ -8,7 +8,7 @@ import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { STEP_LABEL } from "@/lib/docs";
 import { BALL_LABEL, ballOf, dueState, CATEGORY_LABEL, STAGES, STAGE_LABEL, STAGE_TONE, TRIGGERS, daysAtAuthority, fr, loadFile, movesFrom, nextAction, today, type AuthorityFile } from "@/lib/authority";
-import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, removeAttachment, resendCard, saveFile, toggleItem } from "../actions";
+import { addAttachment, addItem, addNote, addRound, deleteFile, moveStage, recordGrantedOutside, answerPortal, removeAttachment, resendCard, saveFile, toggleItem } from "../actions";
 import { Icon } from "@/lib/icons";
 
 const KIND_ICON: Record<string, string> = { created: "plus", stage: "arrow", note: "pencil", item: "check", submitted: "send", remarks: "mail", reply: "reply", decision: "check", attachment: "clip", link: "link", task: "clock", mail: "mail" };
@@ -39,6 +39,9 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
   const days = daysAtAuthority(f);
   const t0 = today();
   const late = (f.stage === "submitted" || f.stage === "remarks") && f.target_date && f.target_date < t0;
+  // the portal is normally right: when it shows as "not sent" a dossier S.A.M. holds as submitted, Compliance is asked once
+  const unsent = /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(f.portal_status ?? "");
+  const disagrees = f.stage === "submitted" && unsent && !events.some((e) => (e.meta as { portal_kept?: string } | null)?.portal_kept === f.portal_status);
 
   return (
     <>
@@ -46,6 +49,17 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
       <PageHeader eyebrow={`Projects, CAA applications, ${f.type_code}`} title={f.title}
         sub={`${ENT[f.entity]?.name ?? f.entity}, ${type?.name ?? f.type_code}, ${f.portal ?? f.authority ?? ""}${f.category ? `, ${CATEGORY_LABEL[f.category] ?? f.category}` : ""}`}
         right={<><span className={"pill " + STAGE_TONE[f.stage]} style={{ alignSelf: "center" }}>{STAGE_LABEL[f.stage]}</span><Link href="/proj/auth" className="btn">All files</Link></>} />
+      {disagrees && (
+        <section className="card mb-4" style={{ borderLeft: "4px solid var(--red, #c0392b)" }}>
+          <div className="cb">
+            <p><b>The portal contradicts S.A.M.</b> S.A.M. holds this file as submitted{f.submitted_at ? ` on ${f.submitted_at.slice(8, 10)}/${f.submitted_at.slice(5, 7)}/${f.submitted_at.slice(0, 4)}` : ""}. The portal, read on {f.portal_read_on}, shows “{f.portal_status}”: prepared, not sent to {f.authority ?? "the authority"}. So the turn is ours.</p>
+            {cmm ? <div className="flex flex-wrap gap-2 items-center mt-2">
+              <form action={answerPortal}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="answer" value="update" /><button className="btn primary" type="submit">Update S.A.M.: not sent, back to “Ready to submit”</button></form>
+              <form action={answerPortal}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="answer" value="keep" /><button className="btn" type="submit">Keep S.A.M. as it is</button></form>
+              <span className="mini">Either answer is written in the history of the file.</span></div> : <p className="mini mt-1">Compliance decides whether S.A.M. is updated.</p>}
+          </div>
+        </section>
+      )}
 
       {f.stage !== "standby" && (
         <div className="steps mb-4">

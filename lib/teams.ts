@@ -253,24 +253,32 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
         // the card asks one question; when nothing happened there is nothing to click
         const who = file.authority ?? "the authority"; const d = (x: string | null) => (x ? `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}` : "");
         const ASK: Record<string, string> = {
-          submitted: `This is a reminder, not something to tick: the file is with ${who}. **Has ${who} answered?** If not, there is nothing to do: leave this card.`,
-          remarks: `${who} made remarks and waits for our reply. **Has the reply been sent on the portal?** If not, there is nothing to click yet.`,
-          approved: "The decision is in. **Is the change integrated and published?** If not yet, leave this card.",
-          published: "The change is published. **Is the close-out done** (decision filed, registers up to date)?",
+          submitted: `**Whose turn: ${who}.** Nothing to do unless ${who} has answered: S.A.M. cannot read this authority's answers itself.`,
+          remarks: `**Whose turn: ours.** To do: answer the remarks of ${who}. Record it here once the reply is sent.`,
+          approved: "**Whose turn: ours.** To do: integrate and publish the approved change, then record it here.",
+          published: "**Whose turn: ours.** To do: the close-out (decision filed, registers up to date), then record it here.",
+          compliance: "**Whose turn: ours (Compliance).** To do: check the file before it goes for signature or submission.",
+          signing: "**Whose turn: ours (Accountable Manager).** To do: sign.", ready: "**Whose turn: ours.** To do: submit on the portal, then record the submission here.",
         };
         const portal = file.portal_status ? `What the portal showed when S.A.M. last read it (${d(file.portal_read_on)}): “${file.portal_status}”${file.last_exchange ? `. Last exchange${file.last_exchange_on ? ` (${d(file.last_exchange_on)})` : ""}: ${file.last_exchange.slice(0, 220)}` : ""}` : null;
         // the portal of this file is read by S.A.M. (TMCAD, METEOR): while it is with the authority or waits for our reply there is nothing
         // to tell S.A.M. — it sees remarks, a decision or our reply at the next reading and moves the file itself. The card only informs.
         if (file.portal_read_on && (file.stage === "submitted" || file.stage === "remarks")) {
-          // the portal can contradict S.A.M.: a dossier prepared on the portal and never sent is not "with the authority"
+          // first line of every card: whose turn it is, ours or theirs, and what there is to do. Then what the portal showed.
+          // The portal is normally right: when it contradicts S.A.M., the card says so and the file asks whether to update S.A.M.
           const unsent = /not sent|non envoy|nouveau dossier|\bdraft\b|brouillon/i.test(file.portal_status ?? "");
-          const info = [unsent ? (file.stage === "submitted" ? `**Our turn: send it on the portal.** S.A.M. holds this file as submitted, but the portal shows it as prepared and not sent to ${who}.` : `**Our turn: send the reply on the portal.** ${who} made remarks; the portal shows our version as not sent.`)
-            : file.stage === "submitted" ? `**Nothing to do.** The file is with ${who}, which has not answered yet.` : `**Our turn: reply on the portal.** ${who} made remarks.`,
+          const info = [
+            unsent && file.stage === "submitted" ? `**Whose turn: ours.** To do: send the dossier to ${who} on the portal.`
+              : unsent ? `**Whose turn: ours.** To do: send our reply to ${who} on the portal (it is prepared, not sent).`
+              : file.stage === "submitted" ? `**Whose turn: ${who}.** Nothing to do on our side: ${who} has not answered yet.`
+              : `**Whose turn: ours.** To do: answer the remarks of ${who} on the portal.`,
             ...(portal ? [portal + "."] : []),
-            unsent ? "Nothing to record here: once it is sent on the portal, S.A.M. sees it at the next reading." : file.stage === "submitted" ? "You have nothing to record here: when the portal shows remarks or a decision, S.A.M. moves the file at the next reading of the portals and tells you." : "Once the reply is sent on the portal, S.A.M. sees it at the next reading: nothing to record here."].join("\n\n");
+            unsent && file.stage === "submitted" ? `**The portal contradicts S.A.M.**: S.A.M. holds this file as submitted, the portal shows it as prepared and not sent. Open the file: S.A.M. asks whether to update it to match the portal.`
+              : "Nothing to record here: S.A.M. reads the portal and moves the file itself when it shows remarks, a decision or our reply.",
+          ].join("\n\n");
           return taskCard(t, undefined, { info });
         }
-        const help = [ASK[file.stage] ?? `Where the file stands: **${stageLabel}**.`, ...(portal ? [portal] : []), "If something did happen, say which (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
+        const help = [ASK[file.stage] ?? `Where the file stands: **${stageLabel}**.`, ...(portal ? [portal] : []), "What each button records (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
           ...(file.stage === "ready" ? ["- **Record the submission…**: asks for the portal reference, then records that the file was submitted."] : []),
           "- **Open in S.A.M.**: opens the file, changes nothing.", "The note is optional, except for the buttons marked *."].join("\n");
         if (actions.length) return taskCard(t, undefined, { hint: help, commentHint: "Note (required for the buttons marked *)", actions });

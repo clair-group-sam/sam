@@ -157,6 +157,27 @@ export async function removeAttachment(formData: FormData) {
   paths(id);
 }
 
+/** The portal shows a dossier S.A.M. holds as submitted as prepared and not sent. The portal is normally right: Compliance answers
+ *  "update S.A.M." (the file goes back to Ready to submit, the submission date is removed) or "keep S.A.M." (the question is not asked
+ *  again for this wording of the portal). Either answer is written in the history of the file. */
+export async function answerPortal(formData: FormData) {
+  const id = str(formData, "id");
+  const { s, db, f, cmm } = await guard(id);
+  if (!cmm) throw new Error("Compliance only");
+  const update = formData.get("answer") === "update";
+  if (update && f.stage === "submitted") {
+    await db.from("authority_files").update({ stage: "ready", submitted_at: null, ball_override: null, updated_at: new Date().toISOString() }).eq("id", id);
+    await db.from("authority_file_events").insert({ file_id: id, kind: "stage", who: s.name, actor: s.person?.id ?? null, note: `Updated to match the portal (“${f.portal_status}”, read on ${f.portal_read_on}): not sent, back to Ready to submit`, meta: { from: "submitted", to: "ready", portal_status: f.portal_status, was_submitted_at: f.submitted_at } });
+    await audit(db, s, f, "authority_file_aligned_with_portal", { from: "submitted", to: "ready", portal_status: f.portal_status });
+    const { data: fresh } = await db.from("authority_files").select("*").eq("id", id).maybeSingle();
+    if (fresh) await syncTasks(db, fresh as AuthorityFile);
+  } else if (!update) {
+    await db.from("authority_file_events").insert({ file_id: id, kind: "note", who: s.name, actor: s.person?.id ?? null, note: `The portal reads “${f.portal_status}”; S.A.M. kept as it is (${f.stage})`, meta: { portal_kept: f.portal_status } });
+    await audit(db, s, f, "authority_file_kept_despite_portal", { stage: f.stage, portal_status: f.portal_status });
+  }
+  paths(id);
+}
+
 /** Compliance: send the Teams card of the file again (its open tasks), as it reads today. */
 export async function resendCard(formData: FormData) {
   const id = str(formData, "id");
