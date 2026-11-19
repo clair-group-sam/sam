@@ -238,7 +238,20 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
         const actions: unknown[] = moves.map((m) => ({ type: "Action.Execute", title: `${m.label}${m.needsNote ? " *" : ""}`, verb: "file_move", style: m.primary ? "positive" : undefined, data: { taskId: t.id, fileId: file.id, to: m.to } }));
         // COM-03 · the submission is recorded in two steps: this button opens a confirmation card asking for the portal reference
         if (file.stage === "ready") actions.unshift({ type: "Action.Execute", title: "Record the submission…", verb: "file_submit_prep", style: "positive", data: { taskId: t.id, fileId: file.id } });
-        if (actions.length) return taskCard(t, undefined, { hint: `Stage: ${file.stage}. Compliance only.`, commentHint: "Note (required for the moves marked *)", actions });
+        // what each button does, in one line each: the card is read by people who do not have the file open
+        const WHAT: Record<string, string> = {
+          remarks: "the authority came back with remarks or a question. Write them in the note: the file passes to “Remarks to answer” and the turn is ours",
+          approved: "the authority approved, accepted or acknowledged. The file passes to “Decision received”; publication and close-out follow",
+          submitted: "our reply or new version has been sent on the portal. Say what was sent in the note: the file goes back to the authority",
+          signing: "the Compliance check is done: the file goes to the Accountable Manager for signature", ready: "checked (and signed): the file is ready to be submitted on the portal",
+          draft: "something is missing: the file goes back to its author with your note", compliance: "the file goes back to the Compliance check",
+          published: "the approved change is integrated and published (manual, register): only the close-out remains", closed: "nothing more to do: the file is closed",
+        };
+        const stageLabel = (await import("@/lib/authority")).STAGE_LABEL[file.stage as never] ?? file.stage;
+        const help = [`Where the file stands: **${stageLabel}**. Compliance only.`, ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
+          ...(file.stage === "ready" ? ["- **Record the submission…**: asks for the portal reference, then records that the file was submitted."] : []),
+          "- **Open in S.A.M.**: opens the file, changes nothing.", "The note is optional, except for the buttons marked *."].join("\n");
+        if (actions.length) return taskCard(t, undefined, { hint: help, commentHint: "Note (required for the buttons marked *)", actions });
       }
       return taskCard(t);
     }
