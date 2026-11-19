@@ -74,11 +74,17 @@ export async function computeKpis(db: SupabaseClient, entity: string, asOf = tod
   // C3 · C4 · C5
   const internal = findings.filter((f) => f.source !== "authority"), authority = findings.filter((f) => f.source === "authority");
   const openInt = internal.filter((f) => OPEN_STATUSES.includes(f.status) && ["1", "2"].includes(f.level));
+  // FB-149 · audits were carried out and S.A.M. holds no finding at all: the history is not in S.A.M., so "0" proves nothing
+  const noHistory = findings.length === 0 && audits.some((a) => DONE.includes(a.status));
+  const NOH = "no finding recorded in S.A.M. for this entity: import the findings before reading this indicator";
+  if (noHistory) { push("C3", null, null, null, NOH); push("C4", null, null, null, NOH); push("C5", null, null, null, NOH); }
+  else {
   push("C3", openInt.length, openInt.length, null);
   const lateInt = internal.filter((f) => OPEN_STATUSES.includes(f.status) && f.due && f.due < asOf);
   push("C4", lateInt.length, lateInt.length, null);
   const lateAut = authority.filter((f) => OPEN_STATUSES.includes(f.status) && f.due && f.due < asOf);
   push("C5", lateAut.length, lateAut.length, null);
+  }
   // C6 · mean closure time over the last 12 months
   const closed = findings.filter((f) => f.status === "closed" && f.notified && (f.effective_closed_on ?? f.closed_at?.slice(0, 10)) && (f.effective_closed_on ?? f.closed_at!.slice(0, 10)) >= since);
   const days = closed.map((f) => daysBetween(f.notified!, f.effective_closed_on ?? f.closed_at!.slice(0, 10))).filter((d) => d >= 0);

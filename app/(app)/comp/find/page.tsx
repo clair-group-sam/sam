@@ -71,14 +71,14 @@ export default async function Findings({ searchParams }: { searchParams: Promise
     <>
       <PageHeader eyebrow="Compliance, Findings" title="Findings" sub="Authority and internal audit findings: the nominated person analyses and plans, S.A.M. pre-reads, Compliance decides, the plan is followed to closure." right={compliance ? <Link className="btn primary" href="/comp/find/new">+ Raise a finding</Link> : undefined} />
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Open" value={open.length} hint={`${open.filter((f) => f.level === "1").length} level 1`} />
+        <Metric label={src === "authority" ? "Open, authority" : "Open, internal"} value={open.length} hint={`${open.filter((f) => f.level === "1").length} level 1 · ${every.filter((f) => OPEN_STATUSES.includes(f.status)).length} open in all (${every.filter((f) => OPEN_STATUSES.includes(f.status) && f.source === "authority").length} authority, ${every.filter((f) => OPEN_STATUSES.includes(f.status) && f.source !== "authority").length} internal)`} />
         <Metric label="Waiting for an answer" value={open.filter((f) => NP_TURN.includes(f.status)).length} tone={open.some((f) => NP_TURN.includes(f.status) && f.due && f.due < t0) ? "red" : undefined} hint={`${open.filter((f) => NP_TURN.includes(f.status) && f.due && f.due < t0).length} past due`} />
         <Metric label="To review (Compliance)" value={open.filter((f) => CMM_TURN.includes(f.status)).length} />
         <Metric label="Plan in progress" value={open.filter((f) => f.status === "accepted").length} hint={`${open.filter((f) => f.status === "accepted" && prog(f).label.startsWith("Work done")).length} with the work done`} />
       </div>
       <div className="seg mb-3" style={{ display: "inline-flex" }}>
-        <Link href="/comp/find?src=internal" className={src === "internal" ? "on" : ""}>Internal findings <span className="mini">{nInt}</span></Link>
-        <Link href="/comp/find?src=authority" className={src === "authority" ? "on" : ""}>Authority findings <span className="mini">{nAuth}</span></Link>
+        <Link href="/comp/find?src=internal" className={src === "internal" ? "on" : ""}>Internal findings <span className="mini">{every.filter((f) => f.source !== "authority" && OPEN_STATUSES.includes(f.status)).length} open / {nInt}</span></Link>
+        <Link href="/comp/find?src=authority" className={src === "authority" ? "on" : ""}>Authority findings <span className="mini">{every.filter((f) => f.source === "authority" && OPEN_STATUSES.includes(f.status)).length} open / {nAuth}</span></Link>
       </div>
       <div className="flex items-center justify-between mb-3" style={{ flexWrap: "wrap", gap: 8 }}>
         <div className="tabs" style={{ marginBottom: 0 }}>{tabs.map(([k, l, n]) => <Link key={k} href={`/comp/find?src=${src}&tab=${k}&view=${view}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>

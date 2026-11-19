@@ -56,7 +56,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
         <Metric label="Our turn" value={ours} tone={ours ? "amber" : undefined} hint="an action is expected from us" />
-        <Metric label="At the authority" value={o.length - ours} hint={`${remarks} with remarks to answer, ${atAuth} submitted`} />
+        <Metric label="The authority's turn" value={o.length - ours} hint={`we wait for its answer; ${atAuth} file${atAuth === 1 ? "" : "s"} submitted in all, ${remarks} with remarks we must answer`} />
         <Metric label="Past target date" value={late} tone={late ? "red" : undefined} hint={late ? `${lateOurs} on our side, ${late - lateOurs} waiting on the authority` : "none"} />
         <Metric label="Due within 15 days" value={soon} tone={soon ? "amber" : undefined} hint="target date" />
       </div>

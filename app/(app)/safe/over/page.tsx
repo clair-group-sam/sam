@@ -123,7 +123,7 @@ function SpiLineRow({ r, labels }: { r: SpiRow; labels: string[] }) {
       <td><MonthCells values={vals} verdicts={r.monthVerdicts} labels={labels} />{BASIS[r.basis].den && <div className="mini">events per month, rate in Q / YTD</div>}</td>
       <td className="mono"><span className={"pill " + VERDICT[r.quarterVerdict][1]}>{fmt(r.quarter, r.basis)}</span></td>
       <td className="mono"><b>{fmt(r.ytd, r.basis)}</b>{r.ytdTarget?.target != null && r.ytdTarget.target !== r.t?.target && <div className="mini">expected {fmt(r.ytdTarget.target, r.basis)}</div>}</td>
-      <td><span className={"pill " + v[1]}>{v[0]}</span>{r.offTwice && <div className="mini red">off target 2 months in a row → <Link className="underline" href={`/safe/over/spi/${r.id}#action`}>action</Link></div>}</td>
+      <td><span className={"pill " + v[1]} title="Status of the year to date against the target; the coloured figure on the left is the current quarter or month alone.">{v[0]}</span><div className="mini">year to date</div>{r.offTwice && <div className="mini red">off target 2 months in a row → <Link className="underline" href={`/safe/over/spi/${r.id}#action`}>action</Link></div>}</td>
     </tr>
   );
 }
@@ -133,6 +133,10 @@ async function GroupView({ ents, year, yearLinks }: { ents: string[]; year: numb
   const months = Array.from({ length: Number(upTo.slice(5)) }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const data = await Promise.all(ents.map(async (e) => ({ e, b: await spiBoard(e, year), c: await computedMetrics(e, months) })));
   const sum = (c: Record<string, ({ num: number } | null)[]>, k: string) => c[k].reduce((t, x) => t + (x?.num ?? 0), 0);
+  // FB-143 · actions overdue today, counted as on the entity's own overview (the monthly SPI snapshot showed another figure)
+  const { data: openActs } = year === now.getUTCFullYear() ? await supabaseAdmin().from("safety_actions").select("entity,due,status").in("entity", ents).eq("module", "safety").in("status", ["open", "in_progress"]).limit(5000) : { data: null };
+  const t0 = now.toISOString().slice(0, 10);
+  const lateNow = (e: string): number | null => (openActs ? (openActs as { entity: string; due: string | null }[]).filter((a) => a.entity === e && a.due && a.due < t0).length : null);
   return (
     <>
       <PageHeader eyebrow="Safety, Safety assurance" title="Overview. Group view" sub={`Safety performance ${year} of every entity in your scope (to ${monthShort(upTo)}). Pick an entity in the top bar to work on its SPIs.`} right={yearLinks} />
@@ -147,7 +151,7 @@ async function GroupView({ ents, year, yearLinks }: { ents: string[]; year: numb
                 <td className="mono">{sum(c, "reports")}</td>
                 <td className="mono">{rr && rr.ytd != null ? <>{fmt(rr.ytd, rr.basis)} {BASIS[rr.basis].short} <span className={"pill " + VERDICT[rr.ytdVerdict][1]}>{targetText(rr, rr.t)}</span></> : <span className="mini">{rr ? "hours not entered" : "—"}</span>}</td>
                 <td className="mono">{sum(c, "mor")}</td><td className="mono">{sum(c, "significant")}</td><td className="mono">{sum(c, "acc_si")}</td>
-                <td className="mono">{c.open90[c.open90.length - 1]?.num ?? 0}</td><td className="mono">{c.actions_late[c.actions_late.length - 1]?.num ?? 0}</td>
+                <td className="mono">{c.open90[c.open90.length - 1]?.num ?? 0}</td><td className="mono">{lateNow(e) ?? c.actions_late[c.actions_late.length - 1]?.num ?? 0}</td>
                 <td>{act.length ? <span className="flex gap-1 flex-wrap"><span className="pill green">{act.filter((r) => r.ytdVerdict === "ok").length}</span><span className="pill amber">{act.filter((r) => r.ytdVerdict === "improve").length}</span><span className="pill red">{act.filter((r) => r.ytdVerdict === "far").length}</span></span> : <span className="mini">{b.rows.length ? `${b.rows.length} proposed` : "no SPI set"}</span>}</td>
               </tr>);
           })}</tbody>

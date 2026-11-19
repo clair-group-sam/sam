@@ -24,7 +24,9 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
   if (s.entity !== "ALL") q = q.eq("entity", s.entity);
   const { data } = await q;
   const posts = new Set(s.roles.map(basePost));
-  const tasks: InboxItem[] = ((data ?? []) as InboxItem[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : true).slice(0, 100);
+  const tasks: InboxItem[] = ((data ?? []) as InboxItem[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : true).slice(0, 100)
+    // FB-152 · an escalation written "overdue 6 days" at its creation is read with today's count
+    .map((t) => (t.kind === "escalation" && /: overdue \d+ days?$/.test(t.title) && /due (\d{4}-\d{2}-\d{2})/.test(t.detail ?? "") ? { ...t, title: t.title.replace(/: overdue \d+ days?$/, `: overdue ${Math.max(0, Math.round((Date.now() - Date.parse(/due (\d{4}-\d{2}-\d{2})/.exec(t.detail ?? "")![1])) / 864e5))} days`) } : t));
   // project tasks (PRJ-02): mine, open, with no open dependency — due = projected end
   const admin = supabaseAdmin();
   let pq = admin.from("projects").select("*").eq("status", "open");

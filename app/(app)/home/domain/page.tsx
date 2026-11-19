@@ -23,7 +23,7 @@ export default async function MyDomain() {
   const me = s.person?.id ?? "-"; const t0 = today(); const db = supabaseAdmin();
   const [{ data: fnd }, { data: act }, { data: fil }, { data: man }, dues, inbox, { data: asm }] = await Promise.all([
     db.from("findings").select("id,entity,number,title,status,due,level,owner_role,owner_person").in("entity", ents).in("status", OPEN_STATUSES).limit(2000),
-    db.from("safety_actions").select("id,entity,number,title,status,due,owner_role").in("entity", ents).in("status", ["open", "in_progress"]).limit(2000),
+    db.from("safety_actions").select("id,entity,number,title,status,due,owner_role,owner_person").in("entity", ents).in("status", ["open", "in_progress"]).limit(2000),
     db.from("authority_files").select("id,entity,title,stage,target_date,portal_ref,owner_role,next_task,ball_override").in("entity", ents).not("stage", "in", "(closed,standby)").limit(1000),
     db.from("manuals").select("id,entity,code,title,owner_role").in("entity", ents).limit(2000),
     loadDeadlines(db, ents, { to: new Date(Date.parse(t0) + 90 * 86_400_000).toISOString().slice(0, 10) }),
@@ -31,11 +31,11 @@ export default async function MyDomain() {
     ents.some((e) => ASSESS_ENTITIES.includes(e)) ? db.from("competency_assessments").select("id,entity,status,next_due,assessed_on").eq("person_id", me).order("created_at", { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
   ]);
   type F = { id: string; entity: string; number: string; title: string; status: string; due: string | null; level: string; owner_role: string | null; owner_person: string | null };
-  type A = { id: string; entity: string; number: string; title: string; status: string; due: string | null; owner_role: string | null };
+  type A = { id: string; entity: string; number: string; title: string; status: string; due: string | null; owner_role: string | null; owner_person: string | null };
   type C = { id: string; entity: string; title: string; stage: Stage; target_date: string | null; portal_ref: string | null; owner_role: string | null; next_task: string | null; ball_override: "us" | "authority" | null };
   type M = { id: string; entity: string; code: string; title: string; owner_role: string };
   const findings = ((fnd ?? []) as F[]).filter((f) => (f.owner_person ? f.owner_person === me : mine(f.owner_role))).sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
-  const actions = ((act ?? []) as A[]).filter((a) => mine(a.owner_role)).sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
+  const actions = ((act ?? []) as A[]).filter((a) => (a.owner_person ? a.owner_person === me : mine(a.owner_role))) /* FB-143 · an action given to me by name is mine too */.sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
   const files = ((fil ?? []) as C[]).filter((f) => mine(f.owner_role)).sort((a, b) => (a.target_date ?? "9").localeCompare(b.target_date ?? "9"));
   const manuals = ((man ?? []) as M[]).filter((m) => mine(m.owner_role));
   const { data: rv } = manuals.length ? await db.from("revisions").select("id,manual_id,rev,step").in("manual_id", manuals.map((m) => m.id)).not("step", "in", "(published,repository)") : { data: [] };
@@ -48,7 +48,7 @@ export default async function MyDomain() {
   return (
     <>
       <PageHeader eyebrow="Home, My domain" title="My domain" sub={posts.length ? `What belongs to ${posts.join(", ")}${multi ? "" : ", " + (ENT[ents[0]]?.name ?? ents[0])}: findings, safety actions, CAA applications, manuals, and their dates.` : "No post is attached to your account yet: ask Compliance to add it in Users."}
-        right={<><Link className="btn" href="/home/tasks">Inbox ({inbox.length})</Link><Link className="btn primary" href="/safe/new">+ Safety report</Link></>} />
+        right={<><Link className="btn" href="/home/tasks">Inbox ({inbox.length} task{inbox.length === 1 ? "" : "s"})</Link><Link className="btn primary" href="/safe/new">+ Safety report</Link></>} />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         <Metric label="Late" value={late.length} tone={late.length ? "red" : "green"} hint={late.length ? "dates of my domain already passed" : "nothing late"} />
         <Metric label="Findings" value={findings.length} tone={myTurn.length ? "amber" : findings.length ? "info" : "none"} hint={myTurn.length ? `${myTurn.length} waiting for my answer` : "none waiting for me"} />

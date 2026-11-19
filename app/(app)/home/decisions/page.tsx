@@ -39,7 +39,8 @@ export default async function Decisions() {
   return (
     <>
       <PageHeader eyebrow="Home, Decisions for me" title={`Decisions for you, ${first}`} sub="What waits for the Accountable Manager: to sign, to accept, to arbitrate. Each line opens the page where the decision is taken."
-        right={<><Link className="btn" href="/dash/codir">CODIR / SRB</Link><Link className="btn" href="/home/tasks">Inbox ({lines.length})</Link></>} />
+        right={<><Link className="btn" href="/dash/codir">CODIR / SRB</Link><Link className="btn" href="/home/tasks">Inbox ({lines.length} line{lines.length === 1 ? "" : "s"}, {inbox.length} task{inbox.length === 1 ? "" : "s"})</Link></>} />
+      {s.role !== "am" && <p className="mini mb-3">You are not the Accountable Manager of this entity: “To decide or sign” below is read from your own Inbox. What waits for the AM is counted on the CODIR / SRB page.</p>}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <Metric label="To decide or sign" value={decide.length} tone={late ? "red" : decide.length ? "amber" : "green"} hint={late ? `${late} past their date` : decide.length ? "waiting for you" : "nothing waiting"} />
         <Metric label="Escalated to you" value={escalated} tone={escalated ? "red" : "green"} hint={escalated ? "late items that reached the AM" : "no escalation"} />

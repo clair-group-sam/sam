@@ -23,7 +23,7 @@ export async function loadDeadlines(db: SupabaseClient, entities: string[], opts
   const [fil, fnd, act, rep, aud, chk, wat, cer, prg, brd] = await Promise.all([
     want("file") ? db.from("authority_files").select("id,entity,title,stage,target_date,portal_ref,authority,owner_role,next_task,next_owner,ball_override").in("entity", entities).in("stage", OPEN_STAGES).not("target_date", "is", null) : none,
     want("finding") ? db.from("findings").select("id,entity,number,title,status,due,level,authority,source,owner_role").in("entity", entities).in("status", FND_OPEN).not("due", "is", null) : none,
-    want("action") ? db.from("safety_actions").select("id,entity,number,title,status,due,owner_role").in("entity", entities).in("status", ["open", "in_progress"]).not("due", "is", null) : none,
+    want("action") ? db.from("safety_actions").select("id,entity,number,title,status,due,owner_role,owner_person").in("entity", entities).in("status", ["open", "in_progress"]).not("due", "is", null) : none,
     want("mor") ? db.from("reports").select("id,entity,headline,headline_en,mor_filed_at,mor_followup_at,mor_final_at,mor_ref,history,status").in("entity", entities).not("mor_filed_at", "is", null).gte("mor_filed_at", addMonths(t0, -5)).is("mor_final_at", null) : none,
     want("audit") ? db.from("audits").select("id,entity,number,title,status,planned_month,kind").in("entity", entities).in("status", ["planned", "report"]).not("planned_month", "is", null) : none,
     want("check") ? db.from("compliance_checks").select("id,entity,code,title,next_due,active").in("entity", entities).eq("active", true).not("next_due", "is", null) : none,
@@ -41,10 +41,14 @@ export async function loadDeadlines(db: SupabaseClient, entities: string[], opts
     out.push({ key: `${kind}:${id}:${d}`, kind, entity, date: d, days, state: days < 0 ? "late" : days < 15 ? "soon" : "later", ref, title, todo, who, ball, href });
   };
   for (const f of rows(fil)) { const b = ballOf({ stage: f.stage as Stage, ball_override: f.ball_override as "us" | "authority" | null });
-    push("file", f.entity!, f.target_date, f.id!, f.portal_ref ?? "CAA file", f.title ?? "", f.next_task ?? (b === "authority" ? `Waiting for ${f.authority ?? "the authority"}` : f.stage === "remarks" ? "Answer the authority's remarks" : "Prepare and submit"), f.next_owner ?? f.owner_role, b, `/proj/auth/${f.id}`); }
+    push("file", f.entity!, f.target_date, f.id!, f.portal_ref ?? "CAA file", f.title ?? "", f.next_task ?? (b === "authority" ? `Waiting for ${f.authority ?? "the authority"}` : f.stage === "remarks" ? "Answer the authority's remarks" : ["approved", "decision", "integration"].includes(String(f.stage)) ? "Integrate the return, publish, file the letter" : f.stage === "submitted" ? "Action expected from us on the portal" : "Prepare and submit") /* FB-144 · the task follows the stage, as in the Inbox */, f.next_owner ?? f.owner_role, b, `/proj/auth/${f.id}`); }
   for (const f of rows(fnd)) { const cmm = CMM_TURN.includes(f.status ?? ""); const auth = f.source === "authority";
     push("finding", f.entity!, f.due, f.id!, f.number ?? "", f.title ?? "", cmm ? "Compliance to review the answer" : f.status === "accepted" ? "Carry out the plan, then request closure" : `Answer due${auth && f.authority ? ` at ${f.authority}` : ""}`, cmm ? "CMM" : f.owner_role, "us", `/comp/find/${f.id}`); }
-  for (const a of rows(act)) push("action", a.entity!, a.due, a.id!, a.number ?? "", a.title ?? "", a.status === "in_progress" ? "In progress, to finish with its evidence" : "To do", a.owner_role, "us", `/safe/actions/${a.id}`);
+  // FB-153 · an action given to a person by name shows that name (it showed "—")
+  const pids = [...new Set(rows(act).map((a) => (a as { owner_person?: string | null }).owner_person).filter((x): x is string => !!x))];
+  const { data: pn } = pids.length ? await db.from("people").select("id,display_name").in("id", pids) : { data: [] };
+  const nameOf = new Map(((pn ?? []) as { id: string; display_name: string }[]).map((x) => [x.id, x.display_name]));
+  for (const a of rows(act)) push("action", a.entity!, a.due, a.id!, a.number ?? "", a.title ?? "", a.status === "in_progress" ? "In progress, to finish with its evidence" : "To do", a.owner_role ?? nameOf.get((a as { owner_person?: string | null }).owner_person ?? "") ?? null, "us", `/safe/actions/${a.id}`);
   for (const r of rows(rep)) { if (r.history) continue; const filed = r.mor_filed_at!.slice(0, 10); const t = r.headline_en || r.headline || "";
     if (!r.mor_followup_at) push("mor", r.entity!, addDays(filed, 30), r.id! + "f", r.mor_ref ?? r.id!, t, "Follow-up report to the authority, 30 days after filing (376/2014 art. 13(4))", "SM", "us", `/safe/reports/${r.id}`);
     push("mor", r.entity!, addMonths(filed, 3), r.id! + "z", r.mor_ref ?? r.id!, t, "Final report to the authority, 3 months after filing (376/2014 art. 13(4))", "SM", "us", `/safe/reports/${r.id}`); }

@@ -23,7 +23,7 @@ export async function managementReview(db: SupabaseClient, entity: string): Prom
     entityDash(db, entity),
     computeKpis(db, entity, t0),
     db.from("audits").select("status,kind,planned_month").eq("entity", entity).gte("planned_month", `${year}-01-01`).lte("planned_month", `${year}-12-31`).limit(2000),
-    db.from("reports").select("received_at,mor_filed_at,e2_status,report_analysis(mor_status,confirmed_at)").eq("entity", entity).gte("received_at", `${year}-01-01`).limit(5000),
+    db.from("reports").select("received_at,mor_filed_at,e2_status,source,report_analysis(mor_status,confirmed_at)").eq("entity", entity).gte("received_at", `${year}-01-01`).limit(5000),
     db.from("committees").select("id,number,title,planned_on,starts_at,status,agenda,kind").contains("entities", [entity]).eq("kind", boardKind).neq("status", "cancelled").order("planned_on", { ascending: false }).limit(12),
     db.from("tasks").select("kind,owner_role").eq("entity", entity).eq("status", "open").in("owner_role", ["AM", "CMM", "SM"]).limit(2000),
   ]);
@@ -34,9 +34,10 @@ export async function managementReview(db: SupabaseClient, entity: string): Prom
     late: live.filter((a) => a.status === "planned" && a.planned_month < month0).length, cancelled: A.length - live.length,
     authority: live.filter((a) => a.kind === "authority").length, subcontractor: live.filter((a) => a.kind === "subcontractor").length,
   };
-  type R = { received_at: string; mor_filed_at: string | null; e2_status: string | null; report_analysis: { mor_status: string | null; confirmed_at: string | null } | { mor_status: string | null; confirmed_at: string | null }[] | null };
+  type R = { received_at: string; mor_filed_at: string | null; e2_status: string | null; source?: string | null; report_analysis: { mor_status: string | null; confirmed_at: string | null } | { mor_status: string | null; confirmed_at: string | null }[] | null };
   const mandatory = ((rp ?? []) as R[]).filter((r) => { const a = Array.isArray(r.report_analysis) ? r.report_analysis[0] : r.report_analysis; return a?.confirmed_at && a.mor_status === "mandatory"; });
-  const lateFiled = (r: R) => !!r.mor_filed_at && new Date(r.mor_filed_at).getTime() > new Date(r.received_at).getTime() + 72 * 3600e3;
+  // FB-154 · the 72 h are only measurable on a report received in S.A.M.: an imported report carries the dates of its import, not of its filing
+  const lateFiled = (r: R) => (!r.source || r.source === "sam") && !!r.mor_filed_at && new Date(r.mor_filed_at).getTime() > new Date(r.received_at).getTime() + 72 * 3600e3;
   const mor = { year, filed: mandatory.filter((r) => r.mor_filed_at).length, late: mandatory.filter(lateFiled).length, pending: mandatory.filter((r) => !r.mor_filed_at).length };
   type C = { id: string; number: string; title: string; planned_on: string | null; starts_at: string | null; status: string; agenda: { decision?: string | null }[] | null };
   const boards = ((cm ?? []) as C[]).map((c) => ({ id: c.id, number: c.number, title: c.title, planned_on: c.planned_on, starts_at: c.starts_at, status: c.status, decided: (c.agenda ?? []).filter((i) => i.decision?.trim()).length }));

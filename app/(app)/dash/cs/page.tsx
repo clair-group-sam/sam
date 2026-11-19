@@ -117,7 +117,7 @@ function EntityColumn({ d, compact }: { d: EntityDash; compact: boolean }) {
         {p && <Area title={`Safety since the last SRB${p.since ? `, ${p.since.slice(0, 10)}` : ""}`} link={{ href: "/safe/over", label: "Open the overview" }} figs={[
           { label: "reports", value: p.reports.total, href: "/safe/reports", hint: `${p.reports.mor} MOR, ${p.reports.significant} ERC ≥ 100, ${p.reports.open} open` },
           { label: "SPI on target", value: `${p.spiCounts.ok ?? 0} / ${p.spi.length}`, tone: (p.spiCounts.far ?? 0) ? "red" : (p.spiCounts.improve ?? 0) ? "amber" : "green", href: "/safe/over", hint: `${p.spiCounts.improve ?? 0} to improve, ${p.spiCounts.far ?? 0} far off` },
-          { label: "hazards", value: p.hazards.log, href: "/safe/risk", hint: `${p.hazards.red.length} intolerable, ${p.hazards.reviewDue} reviews due`, tone: p.hazards.red.length ? "red" : p.hazards.reviewDue ? "amber" : undefined },
+          { label: "hazards", value: p.hazards.log, href: "/safe/risk", hint: `${p.hazards.red.length} intolerable in the log, ${p.hazards.reviewDue} reviews due`, tone: p.hazards.red.length ? "red" : p.hazards.reviewDue ? "amber" : undefined },
           { label: "safety actions", value: p.actions.open, href: "/safe/actions", hint: `${p.actions.late} overdue, ${p.actions.doneSince} done`, tone: p.actions.late ? "amber" : undefined },
           { label: "change files", value: p.changes.length, href: "/safe/moc" },
         ]} />}

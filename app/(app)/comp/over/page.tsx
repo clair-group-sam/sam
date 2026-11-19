@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { addMonths, coverage, current, type Audit, type AuditModule, type Programme } from "@/lib/audit-programme";
-import { auditorRoster, controlOf, daysTo, nextDueOf, type Auditor, type CCheck, type Subcontractor, withProgrammeHistory } from "@/lib/compliance-registers";
+import { auditorByPost, holdsReviewPost, auditorRoster, controlOf, daysTo, nextDueOf, type Auditor, type CCheck, type Subcontractor, withProgrammeHistory } from "@/lib/compliance-registers";
 import { CMM_TURN, NP_TURN, OPEN_STATUSES as FND_OPEN } from "@/lib/findings";
 import { Icon } from "@/lib/icons";
 import { OPEN_STATUSES as WATCH_OPEN } from "@/lib/watch";
@@ -48,6 +48,7 @@ export default async function ComplianceOverview() {
   const auditors = (aud ?? []) as Auditor[], subs = (sd ?? []) as Subcontractor[], mods = (md ?? []) as AuditModule[];
   const cur = current(progs, t0);
   const kpis = Object.fromEntries(await Promise.all(scope.map(async (e) => [e, (await computeKpis(db, e, t0)).values] as const)));
+  const byPost = await auditorByPost(supabaseAdmin(), scope); // FB-147 · same rule as the Auditors page: the holder of the review post needs no file
   const cards = scope.map((e) => {
     const alerts: Alert[] = [];
     // — Surveillance
@@ -66,7 +67,7 @@ export default async function ComplianceOverview() {
     const chPast = ch.filter((d) => d !== null && d < 0).length, chSoon = ch.filter((d) => d !== null && d >= 0 && d <= 30).length, chNone = ch.filter((d) => d === null).length, chOk = ch.length - chPast - chSoon - chNone;
     if (chPast) alerts.push({ tone: "red", text: `${chPast} compliance check${chPast > 1 ? "s" : ""} past due`, href: "/comp/checks" });
     const sc = subs.filter((x) => x.entity === e).map((x) => controlOf(x, audits, t0).status);
-    const scOk = sc.filter((x) => x === "under_control" || x === "control_planned").length, scDue = sc.filter((x) => x === "control_due").length, scBad = sc.filter((x) => x === "control_overdue" || x === "contract_expired").length, scNever = sc.filter((x) => x === "not_controlled").length;
+    const scOk = sc.filter((x) => x === "under_control").length, scPlanned = sc.filter((x) => x === "control_planned").length, /* FB-145 · a planned control is not a control done */ scDue = sc.filter((x) => x === "control_due").length, scBad = sc.filter((x) => x === "control_overdue" || x === "contract_expired").length, scNever = sc.filter((x) => x === "not_controlled").length;
     if (scBad) alerts.push({ tone: "red", text: `${scBad} subcontractor${scBad > 1 ? "s" : ""}: control overdue or contract expired`, href: "/comp/subs" });
     // — Findings
     const fo = findings.filter((f) => f.entity === e && FND_OPEN.includes(f.status));
@@ -82,11 +83,12 @@ export default async function ComplianceOverview() {
     if (kOff) alerts.push({ tone: "red", text: `${kOff} indicator${kOff > 1 ? "s" : ""} off target`, href: `/comp/kpi?ent=${e}` });
     if (p && p.next_review_on && p.next_review_on < t0) alerts.push({ tone: "red", text: "Annual review of the programme past due", href: `/comp/prog/${p.id}` });
     const roster = auditorRoster(auditors.filter((a) => a.entities.includes(e)), (ppl ?? []) as { id: string; display_name: string; roles: string[] | null; home_entity: string | null }[], audits.filter((a) => a.entity === e) as never, (its ?? []) as { auditor_id: string; done: boolean }[], (dcs ?? []) as { auditor_id: string }[], t0);
+    for (const r of roster) if (holdsReviewPost(byPost, e, r.auditor?.person_id ?? (r.key.startsWith("p:") ? r.key.slice(2) : null), r.name)) r.missing = [];
     const auOk = roster.filter((r) => !r.missing.length).length, auBad = roster.length - auOk;
     if (auBad) alerts.push({ tone: "amber", text: `${auBad} auditor file${auBad > 1 ? "s" : ""} incomplete`, href: "/comp/auditors" });
     const re = regs.filter((r) => r.entities.includes(e));
     alerts.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "red" ? -1 : 1));
-    return { e, p, cov, elapsed, ea, alerts, ch: { ok: chOk, soon: chSoon, past: chPast, none: chNone, n: ch.length }, sc: { ok: scOk, due: scDue, bad: scBad, never: scNever, n: sc.length }, fo, wo: { n: wo.length, an: wAn, late: wLate }, kv, roster: { ok: auOk, bad: auBad }, re };
+    return { e, p, cov, elapsed, ea, alerts, ch: { ok: chOk, soon: chSoon, past: chPast, none: chNone, n: ch.length }, sc: { ok: scOk, planned: scPlanned, due: scDue, bad: scBad, never: scNever, n: sc.length }, fo, wo: { n: wo.length, an: wAn, late: wLate }, kv, roster: { ok: auOk, bad: auBad }, re };
   });
   return (
     <>
@@ -108,9 +110,9 @@ export default async function ComplianceOverview() {
               <div className="ovcols">
                 <div className="ovcol"><div className="ovh"><Icon name="search" size={16} /> Surveillance <span className="mini">are we checking?</span></div>
                   <Link href={p ? `/comp/prog/${p.id}` : "/comp/prog"} className="ovrow"><div className="ovtop"><span className="ovl">Audit programme</span><span className="ovv">{p ? `${done} / ${tot}` : "—"}</span></div>
-                    {p ? <><div className="ovprog"><i style={{ width: `${tot ? Math.round((100 * done) / tot) : 0}%` }} /><b style={{ left: `${c.elapsed}%` }} title={`${c.elapsed} % of the cycle elapsed`} /></div><div className="ovs">{done} audit{done === 1 ? "" : "s"} done, {todo} to do · the mark = {c.elapsed} % of the cycle elapsed{cov && cov.outside ? ` · ${cov.outside} outside the cycle` : ""}</div></> : <div className="ovs">no programme in force</div>}</Link>
+                    {p ? <><div className="ovprog"><i style={{ width: `${tot ? Math.round((100 * done) / tot) : 0}%` }} /><b style={{ left: `${c.elapsed}%` }} title={`${c.elapsed} % of the cycle elapsed`} /></div><div className="ovs">{done} audit{done === 1 ? "" : "s"} done, {todo} to do, programme in force (the CODIR page counts every kind over the calendar year) · the mark = {c.elapsed} % of the cycle elapsed{cov && cov.outside ? ` · ${cov.outside} outside the cycle` : ""}</div></> : <div className="ovs">no programme in force</div>}</Link>
                   <Row href="/comp/checks" label="Compliance checks" value={c.ch.n} parts={[{ n: c.ch.ok, tone: "green", label: "up to date" }, { n: c.ch.soon, tone: "amber", label: "due ≤ 30 d" }, { n: c.ch.past, tone: "red", label: "past due" }, { n: c.ch.none, tone: "grey", label: "never done" }]} />
-                  <Row href="/comp/subs" label="Subcontractors" value={c.sc.n} parts={[{ n: c.sc.ok, tone: "green", label: "under control" }, { n: c.sc.due, tone: "amber", label: "control due" }, { n: c.sc.bad, tone: "red", label: "overdue / expired" }, { n: c.sc.never, tone: "grey", label: "never controlled" }]} />
+                  <Row href="/comp/subs" label="Subcontractors" value={c.sc.n} parts={[{ n: c.sc.ok, tone: "green", label: "under control" }, { n: c.sc.planned, tone: "blue", label: "control planned" }, { n: c.sc.due, tone: "amber", label: "control due" }, { n: c.sc.bad, tone: "red", label: "overdue / expired" }, { n: c.sc.never, tone: "grey", label: "never controlled" }]} />
                 </div>
                 <div className="ovcol"><div className="ovh"><Icon name="clip" size={16} /> Findings <span className="mini">what is open?</span></div>
                   <Row href="/comp/find?tab=open" label="Open findings" value={c.fo.length} sub={`${fAuth} from the authority, ${c.fo.length - fAuth} internal`} parts={[{ n: fNp, tone: "amber", label: "waiting for the analysis" }, { n: fCmm, tone: "blue", label: "with Compliance" }, { n: fPlan, tone: "green", label: "plan in progress" }]} />

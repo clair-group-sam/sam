@@ -45,10 +45,10 @@ const d10 = (x: string | null | undefined) => (x ? x.slice(0, 10) : "");
 function Headline({ r, compact }: { r: Review; compact?: boolean }) {
   const p = r.safety; const k = r.kpi;
   const figs = [
-    { label: "for the AM to decide", value: r.decisions.am + r.overdue.am, tone: tone(r.decisions.am + r.overdue.am ? 1 : 0), href: "/home/tasks" },
+    { label: "for the AM to decide", value: r.decisions.am + r.overdue.am, tone: tone(r.decisions.am + r.overdue.am ? 1 : 0), href: "/home/tasks", hint: `${r.decisions.am} to decide or sign, ${r.overdue.am} late item${r.overdue.am === 1 ? "" : "s"} escalated` }, // FB-141 · what the figure is made of
     { label: "compliance indicators on target", value: `${k.on} / ${k.on + k.alert + k.off}`, tone: tone(k.off, k.alert), href: "/comp/kpi", hint: `${k.alert} alert, ${k.off} off target` },
     { label: "SPI on target", value: p ? `${p.spiCounts.ok ?? 0} / ${p.spi.length}` : "—", tone: p ? tone(p.spiCounts.far ?? 0, p.spiCounts.improve ?? 0) : "none", href: "/safe/over" },
-    { label: `audits ${r.programme.year}`, value: `${r.programme.done} / ${r.programme.planned}`, tone: tone(r.programme.late, r.programme.running), href: "/comp/prog", hint: `${r.programme.running} running, ${r.programme.late} month passed` },
+    { label: `audits ${r.programme.year}`, value: `${r.programme.done} / ${r.programme.planned}`, tone: tone(r.programme.late, r.programme.running), href: "/comp/prog", hint: `every kind, calendar year (${r.programme.authority} by the authority); ${r.programme.running} running, ${r.programme.late} month passed` }, // FB-140 · the scope of the figure
     { label: "findings open", value: r.findings.open, tone: tone(r.findings.late || r.findings.level1, r.findings.cmmTurn), href: "/comp/find?tab=open", hint: `${r.findings.late} past due, ${r.findings.level1} level 1` },
     { label: `MOR ${r.mor.year}`, value: r.mor.filed, tone: tone(r.mor.pending, r.mor.late), href: "/safe/mor", hint: `${r.mor.late} filed late, ${r.mor.pending} pending` },
     { label: "overdue items", value: r.overdue.total, tone: tone(r.overdue.am, r.overdue.total), href: "/dash/cs/overdue", hint: `${r.overdue.escalated} escalated` },
@@ -108,7 +108,7 @@ function OneEntity({ r, band }: { r: Review; band?: React.ReactNode }) {
           <Fig label="open over 90 days" value={p.reports.openOld} tone={p.reports.openOld ? "amber" : undefined} href="/safe/reports" />
           <Fig label="MOR filed this year" value={r.mor.filed} hint={`${r.mor.late} after the 72 h, ${r.mor.pending} pending`} tone={r.mor.pending ? "red" : r.mor.late ? "amber" : undefined} href="/safe/mor" />
           <Fig label="SPI to improve / far off" value={`${p.spiCounts.improve ?? 0} / ${p.spiCounts.far ?? 0}`} tone={(p.spiCounts.far ?? 0) ? "red" : (p.spiCounts.improve ?? 0) ? "amber" : undefined} href="/safe/over" />
-          <Fig label="hazards intolerable" value={p.hazards.red.length} tone={p.hazards.red.length ? "red" : undefined} href="/safe/risk" hint={`${p.hazards.log} in the log, ${p.hazards.reviewDue} reviews due`} />
+          <Fig label="hazards intolerable, hazard log" value={p.hazards.red.length} tone={p.hazards.red.length ? "red" : undefined} href="/safe/risk" hint={`${p.hazards.log} in the log, ${p.hazards.reviewDue} reviews due; one-off assessments and MOC are counted in Risk assessments`} />
           <Fig label="safety actions overdue" value={p.actions.late} tone={p.actions.late ? "red" : undefined} href="/safe/actions" hint={`${p.actions.open} open, ${p.actions.doneSince} done since`} />
           <Fig label="change files" value={p.changes.length} href="/safe/moc" />
         </Area>}

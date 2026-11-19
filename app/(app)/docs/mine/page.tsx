@@ -20,7 +20,7 @@ export default async function MyManuals() {
     <>
       <PageHeader eyebrow="Documents, My manuals" title="My manuals" sub={s.role === "cmm" ? "As CMM you own the compliance side of every manual." : "Manuals of your post, and what you still have to read."} />
       <div className="grid grid-cols-2 gap-4">
-        <section className="card"><div className="ch"><span className="eyebrow">To read and acknowledge</span><span className="mini">{toRead.length}</span></div>
+        <section className="card"><div className="ch"><span className="eyebrow" title="Every published revision you have not ticked as read, with or without a reading task. The Library and the Inbox list only those a reading task asks of you.">Published, not acknowledged by you</span><span className="mini">{toRead.length}</span></div>
           <table className="tbl"><tbody>
             {toRead.map(({ manual, current }) => <tr key={manual.id}><td><Link href={`/docs/manual/${manual.id}`}><b>{manual.code}, {manual.title}</b></Link><div className="mini">Rev {current!.rev}, published {current!.published_at}</div></td><td className="text-right"><Link className="btn" href={`/docs/manual/${manual.id}`}>Read ›</Link></td></tr>)}
             {!toRead.length && <tr><td className="p-5 text-slate6">Nothing to read, you are up to date.</td></tr>}

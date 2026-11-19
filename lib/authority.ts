@@ -96,7 +96,7 @@ export function nextAction(f: AuthorityFile, items: Pick<FileItem, "required" | 
     case "compliance": return missing.length ? `Compliance check: ${missing.length} required item(s) still open` : "Compliance check: all items done, confirm";
     case "signing": return "Signatures to collect";
     case "ready": return "Submit on the portal (CMM)";
-    case "submitted": { const d = daysAtAuthority(f); const late = f.target_date && f.target_date < today(); return late ? `Waiting for the authority — target date passed (${d} days), follow up` : `Waiting for the authority (${d ?? 0} days)`; }
+    case "submitted": { if (f.ball_override === "us") return "The portal shows an action on our side: open the application and answer"; /* FB-144 */ const d = daysAtAuthority(f); const late = f.target_date && f.target_date < today(); return late ? `Waiting for the authority — target date passed (${d} days), follow up` : `Waiting for the authority (${d ?? 0} days)`; }
     case "remarks": return "Answer the authority's remarks in the same application";
     case "approved": return "Integrate the return, publish, file the letter";
     case "published": return "Close-out: repository, APP - Approvals, fee";

@@ -182,7 +182,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
       )}
       {!q && (toRead.length > 0 || favs.length > 0 || recent.length > 0) && (
         <div className="shortcuts">
-          <section className="card"><div className="ch"><span className="eyebrow">To acknowledge</span><span className="mini">{toRead.length}</span></div>
+          <section className="card"><div className="ch"><span className="eyebrow" title="The reading tasks addressed to you. My manuals lists every published revision you have not ticked as read.">Reading tasks for you</span><span className="mini">{toRead.length}</span></div>
             {toRead.map((t, i) => <div key={i} className="row"><span className={"ent " + t.entity}>{t.entity}</span><Link href={t.link} className="underline">{t.title}</Link></div>)}
             {!toRead.length && <div className="row mini">Nothing to read.</div>}</section>
           <section className="card"><div className="ch"><span className="eyebrow"><Icon name="star" size={13} /> Favourites</span><span className="mini">{favs.length}</span></div>
