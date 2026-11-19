@@ -3,16 +3,20 @@ import { isCmm } from "@/lib/revisions";
 
 /* NP-03 · Competency assessments: the two house forms, as written.
  * ENR-COMP-01 (OPS) and ENR-COMP-02 (CAMO, CAMO.A.305(g), CAME § 2.9). A point applies to a person when it is ticked
- * for at least one of the functions assessed. {org} is replaced by the name of the entity. */
+ * for at least one of the functions assessed. {org} is replaced by the name of the entity.
+ * 19/11 (Guillaume): Astonjet France and Astonjet Malta only (the Astonfly MSM names no competency assessment); the assessor is the
+ * Compliance Monitoring Manager (MSM 1.5.2), never the AM; the person pre-fills the sheet, Compliance validates and signs. */
+export const ASSESS_ENTITIES = ["ASJFR", "ASJMT"];
 export type FormKey = "OPS" | "CAMO";
 export type FormPoint = { k: string; section: string; text: string; mask: string; initialOnly?: boolean };
 export type FormDef = { key: FormKey; ref: string; edition: string; basis: string; functions: { code: string; label: string }[]; levels: [number, string][]; points: FormPoint[]; page3: boolean };
-export type Item = { k: string; section: string; text: string; level: number | null; remark: string | null };
+/** level / remark: the assessor (Compliance). self / self_remark: what the person wrote when pre-filling the sheet. */
+export type Item = { k: string; section: string; text: string; level: number | null; remark: string | null; self?: number | null; self_remark?: string | null };
 export type Assessment = {
   id: string; entity: string; form: FormKey; form_ref: string; form_edition: string | null; person_id: string | null; person_name: string; position: string | null;
   functions: string[]; kind: "initial" | "recurrent"; assessed_on: string | null; last_assessed_on: string | null; assessor_id: string | null; assessor_name: string | null;
   org_changes: string | null; items: Item[]; outcome: "fit" | "fit_training" | "not_fit" | null; training_required: string | null; diplomas: string | null; trainings: string | null;
-  next_due: string | null; status: "draft" | "signed"; signed_at: string | null; signed_by: string | null; created_by: string | null; created_at: string;
+  next_due: string | null; status: "draft" | "submitted" | "signed"; submitted_at: string | null; signed_at: string | null; signed_by: string | null; created_by: string | null; created_at: string;
 };
 
 const ops = (rows: [string, string][]): FormPoint[] => rows.map(([text, mask], i) => ({ k: String(i + 1), section: "Points to evaluate", text, mask }));
@@ -160,29 +164,31 @@ export function pointsFor(form: FormKey, functions: string[], kind: "initial" | 
     .map((p) => ({ k: p.k, section: p.section, text: p.text.replaceAll("{org}", orgName), level: null, remark: null }));
 }
 export function progress(a: Pick<Assessment, "items">) { const n = a.items.length; const done = a.items.filter((i) => i.level).length; return { n, done, low: a.items.filter((i) => i.level && i.level <= 2).length }; }
-/** What still prevents the signature. */
+/** What still prevents the signature by Compliance. */
 export function missingToSign(a: Assessment): string[] {
   const m: string[] = []; const p = progress(a);
   if (!a.assessed_on) m.push("date of assessment");
-  if (!a.assessor_id) m.push("assessor");
-  if (a.assessor_id && a.assessor_id === a.person_id) m.push("an assessor other than the person assessed");
   if (p.done < p.n) m.push(`${p.n - p.done} point${p.n - p.done === 1 ? "" : "s"} without a level`);
   if (!a.outcome) m.push("fit for position: yes / yes with training / no");
   if (a.outcome === "fit_training" && !a.training_required?.trim()) m.push("the training required");
   return m;
 }
+export const selfProgress = (a: Pick<Assessment, "items">) => ({ n: a.items.length, done: a.items.filter((i) => i.self).length });
 
-/** Compliance sees the assessments of its entities; anyone else sees the ones they carry out and their own. */
+/** Compliance (CMM and deputy) of the entity: the assessor. */
 export const isDesk = (s: Session) => isCmm(s) || s.role === "cmm";
-export function maySee(s: Session, a: Pick<Assessment, "entity" | "assessor_id" | "person_id" | "created_by">): boolean {
-  const me = s.person?.id ?? "-";
-  if (a.assessor_id === me || a.person_id === me || a.created_by === me) return true;
-  return isDesk(s) && (s.group || s.entities.includes(a.entity));
+const deskOf = (s: Session, entity: string) => isDesk(s) && (s.group || s.entities.includes(entity));
+/** A sheet is seen by Compliance and by the person assessed. */
+export function maySee(s: Session, a: Pick<Assessment, "entity" | "person_id">): boolean {
+  return a.person_id === (s.person?.id ?? "-") || deskOf(s, a.entity);
 }
-/** Who may carry out an assessment: Compliance and the nominated persons (and their deputies). */
-export const mayAssess = (s: Session) => isDesk(s) || s.role === "np" || s.role === "am";
-export function mayEdit(s: Session, a: Pick<Assessment, "entity" | "assessor_id" | "person_id" | "created_by" | "status">): boolean {
-  if (a.status !== "draft") return false; const me = s.person?.id ?? "-";
-  if (a.person_id === me && a.assessor_id !== me) return false; // nobody fills their own assessment
-  return a.assessor_id === me || a.created_by === me || (isDesk(s) && (s.group || s.entities.includes(a.entity)));
+/** The person pre-fills their own sheet while it is a draft. */
+export function mayPrefill(s: Session, a: Pick<Assessment, "person_id" | "status">): boolean {
+  return a.status === "draft" && !!s.person && a.person_id === s.person.id;
 }
+/** Compliance grades, decides and signs — never its own sheet. */
+export function mayValidate(s: Session, a: Pick<Assessment, "entity" | "person_id" | "status">): boolean {
+  return a.status !== "signed" && deskOf(s, a.entity) && a.person_id !== (s.person?.id ?? "-");
+}
+/** A nominated person (or deputy) may open their own sheet to pre-fill it. */
+export const mayStartOwn = (s: Session) => !!s.person && (s.role === "np" || s.role === "cmm");
