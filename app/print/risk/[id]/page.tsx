@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -44,7 +45,7 @@ export default async function PrintRisk({ params }: { params: Promise<{ id: stri
       <table className="kv"><tbody>
         <tr><td>Domain</td><td>{a.domain ?? "—"}</td></tr>
         <tr><td>Owner</td><td>{a.owner_role ?? "—"}</td></tr>
-        {a.kind !== "moc" && <tr><td>Conducted on · next due</td><td>{a.conducted_on ?? "—"} · {a.next_due ?? "—"}</td></tr>}
+        {a.kind !== "moc" && <tr><td>Conducted on · next due</td><td>{a.conducted_on ?? "—"} · {fr(a.next_due)}</td></tr>}
         <tr><td>Description</td><td style={{ whiteSpace: "pre-wrap" }}>{a.description ?? "—"}</td></tr>
         <tr><td>Participants</td><td>{(a.participants ?? []).length ? (a.participants ?? []).map((p) => `${p.name}${p.role ? " (" + p.role + ")" : ""}`).join(" · ") : "—"}</td></tr>
         <tr><td>Method</td><td>Hazard – consequence; severity A–E × likelihood 1–5 ({sch === "centrik" ? "scores: green 1–10 acceptable, yellow 20–100 tolerable, red 300–2500 intolerable" : "ICAO tolerability table"}); reasonably worst case.</td></tr>

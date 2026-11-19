@@ -53,7 +53,7 @@ export default async function SafetyPromotion({ searchParams }: { searchParams: 
             </tr>))}
             {!rows.length && <tr><td colSpan={5} className="p-5 mini">Nothing yet.</td></tr>}</tbody></table>
       </section>
-      {isSafetyDesk(s) && s.entity !== "ALL" && <details className="card mb-5"><summary className="ch cursor-pointer"><span className="eyebrow">Import from Web Manuals</span><span className="mini">bulletins already published (history). PDF kept, nothing sent</span></summary><div className="cb"><PromoImport entity={s.entity} /></div></details>}
+      {/* FB-136 · import by script: super admin only */ s.superadmin && isSafetyDesk(s) && s.entity !== "ALL" && <details className="card mb-5"><summary className="ch cursor-pointer"><span className="eyebrow">Import from Web Manuals (admin)</span><span className="mini">bulletins already published (history). PDF kept, nothing sent</span></summary><div className="cb"><PromoImport entity={s.entity} /></div></details>}
       {writer && s.entity !== "ALL" && <details className="card" open={!!(sp.report || sp.inv)}><summary className="ch cursor-pointer"><span className="eyebrow">+ New</span><span className="mini">{ENT[s.entity]?.name ?? s.entity}</span></summary>
         <form action={createPromotion} className="cb grid grid-cols-6 gap-2">
           <input type="hidden" name="entity" value={s.entity} />{sp.report && <input type="hidden" name="report_id" value={sp.report} />}{sp.inv && <input type="hidden" name="investigation_id" value={sp.inv} />}

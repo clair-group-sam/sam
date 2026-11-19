@@ -46,3 +46,12 @@ export function describeTokens(tokens: string[], entityName: string, names: Map<
   if (people.length) parts.push(people.join(", "));
   return parts.join(", ") || "nobody";
 }
+
+/** FB-138 · the posts offered in a form of one entity: AM, CMM, SM and the posts NP management holds for that entity
+ *  (not the posts of the other entities). Falls back to the whole list while the entity has no post recorded. */
+export async function postsOf(db: import("@supabase/supabase-js").SupabaseClient, entity: string | null | undefined): Promise<string[]> {
+  if (!entity || entity === "ALL") return POSTS;
+  const { data } = await db.from("np_posts").select("code,ord").eq("entity", entity).order("ord");
+  const own = ((data ?? []) as { code: string }[]).map((x) => x.code.toUpperCase());
+  return own.length ? [...new Set(["AM", "CMM", "SM", ...own])] : POSTS;
+}

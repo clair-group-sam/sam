@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -101,7 +102,7 @@ export default async function NpOverview({ searchParams }: { searchParams: Promi
               </tr>
             ) : (
               <tr key={p.id}><td className="mono">{p.code}</td><td>{p.title}</td><td className="mono">{p.parent_code ?? "—"}</td><td><b>{p.holder_name ?? "vacant"}</b></td><td>{p.deputy_name ?? <span className="mini">—</span>}</td>
-                <td><span className={"pill " + (STATUS[p.status]?.[0] ?? "")}>{STATUS[p.status]?.[1] ?? p.status}</span></td><td className="mono">{p.since ?? ""}</td></tr>
+                <td><span className={"pill " + (STATUS[p.status]?.[0] ?? "")}>{STATUS[p.status]?.[1] ?? p.status}</span></td><td className="mono">{p.since ? fr(p.since) : ""}</td></tr>
             ))}
             {!posts.length && <tr><td colSpan={8} className="p-5 text-slate6">No post yet.</td></tr>}
           </tbody>

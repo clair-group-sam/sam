@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -51,7 +52,7 @@ export default async function PrintAudit({ params, searchParams }: { params: Pro
       </tbody></table>
       {a.report_summary && <><h2>Conclusion</h2><div className="pre">{a.report_summary}</div></>}
       <h2>Findings · {F.length}</h2>
-      {F.length ? <table><thead><tr><th style={{ width: 130 }}>Finding</th><th>Title</th><th style={{ width: 90 }}>Level</th><th style={{ width: 110 }}>Requirement</th><th style={{ width: 70 }}>Answers</th><th style={{ width: 80 }}>Due</th></tr></thead><tbody>{F.map((f) => <tr key={f.number}><td>{f.number}</td><td>{f.title}</td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td>{f.requirement ?? "—"}</td><td>{f.owner_role ?? "—"}</td><td>{f.due ?? "—"}</td></tr>)}</tbody></table> : <div className="mini">No finding raised in this audit.</div>}
+      {F.length ? <table><thead><tr><th style={{ width: 130 }}>Finding</th><th>Title</th><th style={{ width: 90 }}>Level</th><th style={{ width: 110 }}>Requirement</th><th style={{ width: 70 }}>Answers</th><th style={{ width: 80 }}>Due</th></tr></thead><tbody>{F.map((f) => <tr key={f.number}><td>{f.number}</td><td>{f.title}</td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td>{f.requirement ?? "—"}</td><td>{f.owner_role ?? "—"}</td><td>{fr(f.due)}</td></tr>)}</tbody></table> : <div className="mini">No finding raised in this audit.</div>}
       <h2>Checks{sp.all === "1" ? "" : " (N/A omitted)"}</h2>
       <table><thead><tr><th style={{ width: 120 }}>Rule</th><th>Observation</th><th style={{ width: 110 }}>Result</th></tr></thead><tbody>
         {sections.map((sec) => [<tr key={sec}><td colSpan={3} className="sec">{sec}</td></tr>, ...shown.filter((c) => (c.section ?? "Checks") === sec).map((c) => <tr key={c.id}><td>{c.code}{c.ref ? ` ${c.ref}` : ""}</td><td>{c.question && <div><i>{c.question}</i></div>}{c.comment ?? ""}{c.evidence.length ? <div className="mini">Evidence: {c.evidence.map((e) => e.name).join(", ")}</div> : null}</td><td className={`r-${c.result ?? ""}`}>{c.result ? RESULT_LABEL[c.result] : "—"}</td></tr>)])}

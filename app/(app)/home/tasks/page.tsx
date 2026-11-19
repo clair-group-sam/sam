@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -54,7 +55,7 @@ export default async function Inbox() {
               <tr key={t.id}>
                 <td className="entcol"><span className={"ent " + t.entity}>{t.entity}</span></td>
                 <td><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span>{isTest(t) && <span className="pill ml-1" title={TEST_PILL_TITLE}>test</span>}</td>
-                <td className={"due" + (t.due && t.due < today ? " red" : "")}>{t.due ?? ""}{t.due && t.due < today && <small> late</small>}</td>
+                <td className={"due" + (t.due && t.due < today ? " red" : "")}>{t.due ? fr(t.due) : ""}{t.due && t.due < today && <small> late</small>}</td>
                 <td>
                   {t.ctx && <div className="ctx">{t.kind === "project" ? "Project: " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
                   {t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}

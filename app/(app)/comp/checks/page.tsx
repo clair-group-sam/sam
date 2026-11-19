@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -55,7 +56,7 @@ export default async function ComplianceChecks({ searchParams }: { searchParams:
         <table className="tbl"><thead><tr><th>Check</th><th>Reference</th><th>Every</th><th>Owner</th><th>Last</th><th>Next due</th><th></th></tr></thead><tbody>{checks.map((c) => (
           <tr key={c.id} className={open?.id === c.id ? "on" : ""}><td><Link href={`/comp/checks?c=${c.id}#check`}><b className="mono">{c.code}</b> {c.title}</Link><div className="mini"><span className="entdot" style={{ background: ENT_COLOR[c.entity] ?? "var(--field)" }} />{c.entity}{c.domain ? `, ${c.domain}` : ""}</div></td>
             <td className="mono mini">{c.reference ?? "—"}</td><td>{c.every_months} mo</td><td>{c.owner_person ? name(c.owner_person) : c.owner_role ?? "—"}</td><td className="mono mini">{c.last_done_on ?? "never"}{c.history_from && <div title="No passage recorded in S.A.M. yet: date of the last audit done under the linked programme module">from audit {c.history_from}</div>}</td>
-            <td className={c.days !== null && c.days < 0 ? "late" : ""}>{c.due ?? "—"}{c.days !== null && <div className="mini">{c.days < 0 ? `${-c.days} d late` : c.days === 0 ? "today" : `in ${c.days} d`}</div>}</td>
+            <td className={c.days !== null && c.days < 0 ? "late" : ""}>{fr(c.due)}{c.days !== null && <div className="mini">{c.days < 0 ? `${-c.days} d late` : c.days === 0 ? "today" : `in ${c.days} d`}</div>}</td>
             <td>{owns(c) && <Link className="btn sm" href={`/comp/checks?c=${c.id}#check`}>Record</Link>}</td></tr>))}</tbody></table>)}</div></section>
 
       {open && <div id="check" className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -82,7 +83,7 @@ export default async function ComplianceChecks({ searchParams }: { searchParams:
               <form action={archiveCheck} className="mt-2"><input type="hidden" name="id" value={open.id} /><button className="btn sm">Remove the check</button></form></details>}
           </div></section>
         <section className="card"><div className="ch"><span className="eyebrow">Runs, {(runs ?? []).length}</span></div><div className="cb" style={{ padding: 0 }}>
-          <table className="tbl"><tbody>{((runs ?? []) as CRun[]).map((r) => <tr key={r.id}><td className="mono mini">{r.done_on}</td><td><span className={"pill " + CHECK_RESULT_TONE[r.result]}>{CHECK_RESULT_LABEL[r.result]}</span></td><td>{r.sample && <div className="mini">Sample: {r.sample}</div>}{r.comment && <div className="mini">{r.comment}</div>}{r.evidence.map((e, i) => <a key={i} className="mini" href={`/api/files/${e.path}`} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>{e.name}</a>)}{r.finding_id && <Link className="mini" href={`/comp/find/${r.finding_id}`}> finding ›</Link>}</td><td className="mini">{name(r.done_by)}</td></tr>)}{!(runs ?? []).length && <tr><td className="mini">No run recorded yet.</td></tr>}</tbody></table></div></section>
+          <table className="tbl"><tbody>{((runs ?? []) as CRun[]).map((r) => <tr key={r.id}><td className="mono mini">{fr(r.done_on)}</td><td><span className={"pill " + CHECK_RESULT_TONE[r.result]}>{CHECK_RESULT_LABEL[r.result]}</span></td><td>{r.sample && <div className="mini">Sample: {r.sample}</div>}{r.comment && <div className="mini">{r.comment}</div>}{r.evidence.map((e, i) => <a key={i} className="mini" href={`/api/files/${e.path}`} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>{e.name}</a>)}{r.finding_id && <Link className="mini" href={`/comp/find/${r.finding_id}`}> finding ›</Link>}</td><td className="mini">{name(r.done_by)}</td></tr>)}{!(runs ?? []).length && <tr><td className="mini">No run recorded yet.</td></tr>}</tbody></table></div></section>
       </div>}
       <p className="mini mt-3">{Object.keys(LEVEL_LABEL).length ? "A not-conforming run can raise a finding (level 2) or an observation; it then follows the usual finding workflow." : ""}</p>
     </>

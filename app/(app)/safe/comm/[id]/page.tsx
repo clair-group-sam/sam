@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -60,7 +61,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
 
           <section className="card mb-5" id="actions">
             <div className="ch"><span className="eyebrow">Actions decided</span><span className="mini">{A.length}, followed in Safety › Actions (owner, due date, evidence, verification)</span></div>
-            <table className="tbl"><tbody>{A.map((a) => <tr key={a.id}><td className="mono" style={{ width: 150 }}><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link></td><td>{a.title}</td><td className="mono" style={{ width: 80 }}>{a.owner_role ?? ""}</td><td className="mono" style={{ width: 100 }}>{a.due ?? ""}</td><td style={{ width: 150 }}><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span></td></tr>)}
+            <table className="tbl"><tbody>{A.map((a) => <tr key={a.id}><td className="mono" style={{ width: 150 }}><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link></td><td>{a.title}</td><td className="mono" style={{ width: 80 }}>{a.owner_role ?? ""}</td><td className="mono" style={{ width: 100 }}>{a.due ? fr(a.due) : ""}</td><td style={{ width: 150 }}><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span></td></tr>)}
               {!A.length && <tr><td className="p-4 mini">No action yet.</td></tr>}</tbody></table>
             {edit && <div className="cb"><NewActionForm entity={c.entity} source="committee" committee_id={c.id} stay compact /></div>}
           </section>

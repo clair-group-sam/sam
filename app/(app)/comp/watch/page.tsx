@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { DueChip } from "@/components/DueChip";
 import { redirect } from "next/navigation";
@@ -106,7 +107,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
                 <td className="mono">{e.reference ?? "—"}</td>
                 <td><span className={"pill " + (APPL_TONE[e.applicability] ?? "")}>{APPL_LABEL[e.applicability] ?? e.applicability}</span>{e.task && <div className="mini">{TASK_LABEL[e.task]}</div>}</td>
                 <td>{e.owner_person ? name(e.owner_person) : e.owner_role ?? "—"}</td>
-                <td className={e.due && e.due < t0 && OPEN_STATUSES.includes(e.status) ? "late" : ""}>{e.due ?? "—"}</td>
+                <td className={e.due && e.due < t0 && OPEN_STATUSES.includes(e.status) ? "late" : ""}>{fr(e.due)}</td>
                 <td><span className={"pill " + (e.status === "closed" ? "green" : e.status === "done" ? "amber" : "")}>{STATUS_LABEL[e.status] ?? e.status}</span></td>
               </tr>))}</tbody></table>)}
       </div></section>}

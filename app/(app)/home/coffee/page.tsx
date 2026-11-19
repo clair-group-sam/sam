@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -25,7 +26,7 @@ function Block({ title, hint, lines, empty, dueCol = true }: { title: string; hi
           <tr key={i}>
             <td style={{ width: 70 }}><span className={"ent " + l.entity}>{l.entity}</span></td>
             <td style={{ width: 160 }}><span className={"kind " + l.cls}>{l.label}</span></td>
-            {dueCol && <td style={{ width: 110 }} className="mono">{l.due ?? "—"}</td>}
+            {dueCol && <td style={{ width: 110 }} className="mono">{fr(l.due)}</td>}
             <td>
               {l.ctx && <div className="ctx">{l.ctx}</div>}
               {l.link ? <Link href={l.link} className="underline"><b>{l.title}</b></Link> : <b>{l.title}</b>}

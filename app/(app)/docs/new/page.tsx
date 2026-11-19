@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
 import { mayCreateManual } from "@/lib/create";
-import { POSTS } from "@/lib/audience";
+import { POSTS, postsOf } from "@/lib/audience";
 import { createManual, setCreators } from "./actions";
 
 /** Library › New manual. The author becomes the owner (his post, or himself by name); internal documents are published by him after the review. */
@@ -18,6 +18,7 @@ export default async function NewManual({ searchParams }: { searchParams: Promis
   const ents = s.group ? ENTS4 : s.entities;
   const entity = q && ents.includes(q) ? q : s.entity !== "ALL" && ents.includes(s.entity) ? s.entity : ents[0];
   const db = supabaseAdmin();
+  const entPosts = await postsOf(db, entity); // FB-138 · owners offered: the posts of this entity
   const { data: ms } = await db.from("manuals").select("path").eq("entity", entity);
   const folders = [...new Set(((ms ?? []) as { path: string | null }[]).map((m) => m.path).filter(Boolean) as string[])].sort();
   const myPosts = [...new Set(s.roles.map(basePost).filter((p) => POSTS.includes(p) || p.startsWith("NP")))];
@@ -36,7 +37,7 @@ export default async function NewManual({ searchParams }: { searchParams: Promis
           <label><span className="eyebrow">Owner</span>
             <select name="owner" defaultValue={myPosts[0] ?? `PERSON:${s.person?.id}`} className="inp">
               {myPosts.map((p) => <option key={p} value={p}>{p} (my post, deputies included)</option>)}
-              {cmm && POSTS.filter((p) => !myPosts.includes(p)).map((p) => <option key={p} value={p}>{p}</option>)}
+              {cmm && entPosts.filter((p) => !myPosts.includes(p)).map((p) => <option key={p} value={p}>{p}</option>)}
               {s.person && <option value={`PERSON:${s.person.id}`}>Myself, by name ({s.name})</option>}
             </select></label>
           <label><span className="eyebrow">Code</span><input name="code" required className="inp" placeholder="e.g. PRO-TRAINING" /></label>

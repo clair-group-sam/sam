@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -84,7 +85,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <div className="ch"><span className="eyebrow">The report, as sent</span><span className="mini">{r.source && r.source !== "sam" ? (seesReporter(s) ? (r.reporter_name ?? (r.anonymous ? "anonymous" : "—")) + ", " : "") + `imported from ${r.source === "flightlogger" ? "FlightLogger" : "Centrik"}, ${r.external_no ?? ""}` : r.anonymous ? "anonymous" : who ? `${who.display_name}${who.job_title ? ", " + who.job_title : ""}` : seesReporter(s) ? "reporter not found" : "reporter identity: SM / FSO only"}</span></div>
             <div className="cb">
               <table className="tbl mb-3"><tbody>
-                <tr><td className="mini" style={{ width: 130 }}>When</td><td>{r.event_date ?? "—"} {r.event_time_utc ? r.event_time_utc.slice(0, 5) + " UTC" : ""}</td></tr>
+                <tr><td className="mini" style={{ width: 130 }}>When</td><td>{fr(r.event_date)} {r.event_time_utc ? r.event_time_utc.slice(0, 5) + " UTC" : ""}</td></tr>
                 <tr><td className="mini">Aircraft, flight</td><td>{r.aircraft ?? "—"} {r.flight_ref ? "· " + r.flight_ref : ""}{r.aircraft && !inRegistry && <div className="mini" style={{ color: "var(--amber-ink)" }}>{r.aircraft} is not in the aircraft registry of {r.entity}: <Link className="underline" href="/users/fleet?new=1">add it</Link>, or correct the registration.</div>}</td></tr>
                 <tr><td className="mini">Phase, where</td><td>{r.phase ?? "—"} {r.location ? "· " + r.location : ""}</td></tr>
               </tbody></table>

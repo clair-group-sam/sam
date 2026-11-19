@@ -902,6 +902,8 @@ summary{min-height:24px}summary.mini,details>summary.mini{padding-block:3px}
 
 /* FB-117 · very large screens: the content stops growing; the editor keeps a readable line */
 main.px-8>*{max-width:1720px}
+/* FB-137 · very wide screens: the working column sits in the middle of the free space instead of leaving the right half empty */
+@media (min-width:2200px){main.px-8{max-width:1784px;width:100%;margin-left:auto;margin-right:auto}}
 .edbody .ProseMirror{max-width:92ch}
 .reader{max-width:92ch}
 

@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -34,7 +35,7 @@ export default async function PrintCommittee({ params, searchParams }: { params:
       <PrintAuto fileName={`${c.entity} ${c.number} minutes`} auto={sp.auto === "1"} />
       <div className="top"><div><div className="ent">{(c.entities?.length ? c.entities : [c.entity]).map((e) => ENT[e]?.name ?? e).join(" · ")}</div><h1>{c.number} — {c.title}</h1><div className="mini">{isJoint(c) ? "Joint meeting · " : ""}{kindName(c.entity, c.kind)} · Minutes{c.status !== "closed" ? " — DRAFT, not issued" : ` issued ${c.closed_at?.slice(0, 10)}`}</div></div><div className="mini" style={{ textAlign: "right" }}>MSM §{c.kind === "sag" ? "4.6" : c.entity === "ASFFR" ? "4.2" : "4.5"}<br />Record kept 5 years (MSM §1.6.5)</div></div>
       <table className="kv"><tbody>
-        <tr><td>Date</td><td>{c.planned_on}{c.starts_at ? ` · ${c.starts_at.slice(11, 16)}${c.ends_at ? `–${c.ends_at.slice(11, 16)}` : ""} UTC` : ""}</td></tr>
+        <tr><td>Date</td><td>{fr(c.planned_on)}{c.starts_at ? ` · ${c.starts_at.slice(11, 16)}${c.ends_at ? `–${c.ends_at.slice(11, 16)}` : ""} UTC` : ""}</td></tr>
         <tr><td>Location</td><td>{c.location ?? "—"}</td></tr>
         {c.topic && <tr><td>Topic</td><td>{c.topic}</td></tr>}
         <tr><td>{c.kind === "sag" ? "Facilitator" : "Chair"}</td><td>{c.kind === "sag" ? c.attendees.find((a) => /SM/.test(a.role ?? ""))?.name ?? "—" : chair?.name ?? "Accountable Manager"}</td></tr>
@@ -51,7 +52,7 @@ export default async function PrintCommittee({ params, searchParams }: { params:
           {!x.notes && !x.decision && !f.length && <div className="mini">No discussion recorded.</div>}
         </div>); })}
       <h2>Actions assigned</h2>
-      <table><thead><tr><th style={{ width: 120 }}>Number</th><th>Action</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 80 }}>Due</th></tr></thead><tbody>{A.map((a) => <tr key={a.number}><td>{a.number}</td><td>{a.title}</td><td>{a.owner_role ?? ""}</td><td>{a.due ?? ""}</td></tr>)}{!A.length && <tr><td colSpan={4} className="mini">No action.</td></tr>}</tbody></table>
+      <table><thead><tr><th style={{ width: 120 }}>Number</th><th>Action</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 80 }}>Due</th></tr></thead><tbody>{A.map((a) => <tr key={a.number}><td>{a.number}</td><td>{a.title}</td><td>{a.owner_role ?? ""}</td><td>{a.due ? fr(a.due) : ""}</td></tr>)}{!A.length && <tr><td colSpan={4} className="mini">No action.</td></tr>}</tbody></table>
       <h2>Sign-off</h2>
       <table className="sig"><tbody><tr><td style={{ width: "50%" }}><span className="mini">{c.kind === "sag" ? "Safety Manager" : "Accountable Manager (chair)"}</span></td><td><span className="mini">Safety Manager (organiser)</span></td></tr></tbody></table>
     </div>

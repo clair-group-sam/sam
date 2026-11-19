@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -34,7 +35,7 @@ export default async function PrintInvestigation({ params, searchParams }: { par
       <table className="kv"><tbody>
         <tr><td>Report</td><td>{i.report_id ?? "—"}</td></tr><tr><td>Lead</td><td>{i.lead_name ?? "—"}</td></tr>
         <tr><td>Team</td><td>{i.team.map((t) => `${t.name}${t.role ? ` (${t.role})` : ""}`).join(", ") || "—"}</td></tr>
-        <tr><td>Opened · due</td><td>{i.created_at.slice(0, 10)} · {i.due ?? "—"}</td></tr>
+        <tr><td>Opened · due</td><td>{i.created_at.slice(0, 10)} · {fr(i.due)}</td></tr>
       </tbody></table>
       {i.report_text ? <><h2>Investigation report</h2><div className="pre">{i.report_text}</div></> : <>
         <h2>Terms of reference</h2><div className="pre">{i.terms ?? "—"}</div>
@@ -42,7 +43,7 @@ export default async function PrintInvestigation({ params, searchParams }: { par
         <h2>Analysis</h2><ul>{i.factors.map((f, k) => <li key={k}><b>{FACTOR_CAT[f.cat]?.split(" (")[0] ?? f.cat}:</b> {f.text}</li>)}</ul>
         <h2>Causes</h2><div className="pre">{i.causes ?? "—"}</div><h2>Conclusions</h2><div className="pre">{i.conclusions ?? "—"}</div></>}
       <h2>Safety recommendations</h2>
-      <table><thead><tr><th style={{ width: 130 }}>Action</th><th>Recommendation</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 80 }}>Due</th></tr></thead><tbody>{A.map((a) => <tr key={a.number}><td>{a.number}</td><td>{a.title}</td><td>{a.owner_role ?? ""}</td><td>{a.due ?? ""}</td></tr>)}{!A.length && <tr><td colSpan={4} className="mini">None.</td></tr>}</tbody></table>
+      <table><thead><tr><th style={{ width: 130 }}>Action</th><th>Recommendation</th><th style={{ width: 70 }}>Owner</th><th style={{ width: 80 }}>Due</th></tr></thead><tbody>{A.map((a) => <tr key={a.number}><td>{a.number}</td><td>{a.title}</td><td>{a.owner_role ?? ""}</td><td>{a.due ? fr(a.due) : ""}</td></tr>)}{!A.length && <tr><td colSpan={4} className="mini">None.</td></tr>}</tbody></table>
       <h2>Sign-off</h2>
       <table className="sig"><tbody><tr><td style={{ width: "50%" }}><span className="mini">Investigation lead</span></td><td><span className="mini">Safety Manager</span></td></tr></tbody></table>
     </div>

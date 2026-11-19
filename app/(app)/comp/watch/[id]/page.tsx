@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -93,7 +94,7 @@ export default async function WatchEntry({ params }: { params: Promise<{ id: str
                 {may && isOpen && manuals.length > 0 && <form action={draftFor} className="flex gap-2 items-end mt-2"><input type="hidden" name="id" value={e.id} /><label style={{ flex: 1 }}><span className="mini">Open a draft to address it</span><select name="manual" className="inp" defaultValue={manuals.find((m) => e.manual_ids.includes(m.id))?.id ?? ""}><option value="">— manual —</option>{manuals.map((m) => <option key={m.id} value={m.id}>{m.code}, {m.title}</option>)}</select></label><button className="btn" type="submit">Open the draft</button></form>}
               </div>
               <div><div className="eyebrow mb-1">Actions</div>
-                {actions.length ? <table className="tbl"><tbody>{actions.map((x) => <tr key={x.id}><td><Link href={`/safe/actions/${x.id}`}><b className="mono">{x.number}</b> {x.title}</Link><div className="mini">{x.owner_role ?? name(x.owner_person)}, due {x.due ?? "—"}</div></td><td style={{ textAlign: "right" }}><span className={"pill " + (ACTION_STATUS[x.status]?.[1] ?? "")}>{ACTION_STATUS[x.status]?.[0] ?? x.status}</span></td></tr>)}</tbody></table> : <p className="mini">None.</p>}
+                {actions.length ? <table className="tbl"><tbody>{actions.map((x) => <tr key={x.id}><td><Link href={`/safe/actions/${x.id}`}><b className="mono">{x.number}</b> {x.title}</Link><div className="mini">{x.owner_role ?? name(x.owner_person)}, due {fr(x.due)}</div></td><td style={{ textAlign: "right" }}><span className={"pill " + (ACTION_STATUS[x.status]?.[1] ?? "")}>{ACTION_STATUS[x.status]?.[0] ?? x.status}</span></td></tr>)}</tbody></table> : <p className="mini">None.</p>}
                 {may && isOpen && <details className="mt-2"><summary className="mini">+ Action (training, information, contract, check…)</summary><div className="mt-2"><NewActionForm entity={e.entity} source="other" watch_entry_id={e.id} owner_role={e.owner_role} compact stay /></div></details>}
               </div>
               {e.conclusion && <div><div className="eyebrow mb-1">Conclusion</div><p style={{ whiteSpace: "pre-wrap" }}>{e.conclusion}</p></div>}

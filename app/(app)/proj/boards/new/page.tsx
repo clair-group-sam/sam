@@ -38,7 +38,7 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
             <Link href={`/proj/boards/new?entity=${entity}`} className={"tplrow" + (!chosen ? " on" : "")}><b>Blank project</b><span className="mini">Add your own tasks and applications.</span></Link>
             {others.length > 0 && <><div className="eyebrow mt-1">All templates</div>
               {others.map((t) => <Link key={t.code} href={`/proj/boards/new?entity=${entity}&template=${t.code}`} className={"tplrow" + (chosen?.code === t.code ? " on" : "")}><b>{t.name}</b><span className="mini">{t.code}, {t.phases.length} phases, {t.tasks.length} tasks</span></Link>)}</>}
-            <p className="mini">Templates are maintained in the database (project_templates); a change applies to projects opened afterwards.</p>
+            <p className="mini">Templates are kept in References › Project templates; a change applies to projects opened afterwards.</p>
           </div>
         </section>
         <section className="card col-span-2">

@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { DueChip } from "@/components/DueChip";
 import { notFound, redirect } from "next/navigation";
@@ -100,7 +101,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
       </div>
       <div>
         <div className="eyebrow mb-1">Other actions <span className="mini">(contracts, training, audits, tools, owner, date, evidence, verified by Compliance)</span></div>
-        {actions.length ? <table className="tbl"><tbody>{actions.map((a) => <tr key={a.id}><td><Link href={`/safe/actions/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini">{a.owner_role ?? name(a.owner_person)}, due {a.due ?? "—"}</div></td><td style={{ textAlign: "right" }}>{step >= 4 && <span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0] ?? a.status}</span>}</td></tr>)}</tbody></table> : <p className="mini">None yet.</p>}
+        {actions.length ? <table className="tbl"><tbody>{actions.map((a) => <tr key={a.id}><td><Link href={`/safe/actions/${a.id}`}><b className="mono">{a.number}</b> {a.title}</Link><div className="mini">{a.owner_role ?? name(a.owner_person)}, due {fr(a.due)}</div></td><td style={{ textAlign: "right" }}>{step >= 4 && <span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0] ?? a.status}</span>}</td></tr>)}</tbody></table> : <p className="mini">None yet.</p>}
         {mayEditPlan && <details className="mt-2"><summary className="mini">+ Action</summary><div className="mt-2"><NewActionForm entity={f.entity} source="finding" finding_id={f.id} owner_role={f.owner_role} compact stay /></div></details>}
       </div>
     </>

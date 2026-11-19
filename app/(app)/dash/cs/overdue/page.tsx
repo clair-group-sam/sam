@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
@@ -40,7 +41,7 @@ export default async function ComplianceSafetyDash() {
                 <tbody>
                   {g.items.map((t) => (
                     <tr key={t.id}>
-                      <td>{t.link ? <Link href={t.link}>{t.title}</Link> : t.title}<div className="mini">{t.kind.replace(/_/g, " ")} · due {t.due}</div></td>
+                      <td>{t.link ? <Link href={t.link}>{t.title}</Link> : t.title}<div className="mini">{t.kind.replace(/_/g, " ")} · due {fr(t.due)}</div></td>
                       <td style={{ whiteSpace: "nowrap", textAlign: "right" }}><span className={"pill " + (t.overdue > 15 ? "red" : t.overdue > 7 ? "amber" : "")}>{t.overdue} d</span>{t.level && <div className="mini">{STEP_LABEL[t.level]}</div>}</td>
                     </tr>
                   ))}

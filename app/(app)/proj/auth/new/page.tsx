@@ -25,7 +25,8 @@ export default async function NewAuthorityFile({ searchParams }: { searchParams:
   type R = { id: string; rev: string; issue: number; step: string; manuals: { id: string; code: string; title: string; entity: string } };
   const revisions = (revs ?? []) as unknown as R[];
   const pre = revisions.find((r) => r.id === sp.revision);
-  const roles = ["CMM", "SM", "AM", ...NP_ROLES.filter((r) => !["NP", "SMD", "QM"].includes(r)), "CAMO"];
+  const own = ((posts ?? []) as { code: string }[]).map((x) => x.code.toUpperCase()); // FB-138 · the posts of this entity when NP management holds them
+  const roles = own.length ? [...new Set(["CMM", "SM", "AM", ...own, "CAMO"])] : ["CMM", "SM", "AM", ...NP_ROLES.filter((r) => !["NP", "SMD", "QM"].includes(r)), "CAMO"];
   const defType = sp.type && list.some((t) => t.code === sp.type) ? sp.type : pre ? "OM-APP" : list[0]?.code;
 
   return (

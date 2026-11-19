@@ -101,11 +101,14 @@ export type ViewOption = { value: string; code: string; entity: string | null; l
 /** FB-122 · may this profile open this menu screen? The menus already hide what a profile does not use; this closes the
  *  same screens when their address is typed. Only menu screens (/<module>/<screen>) are checked: a record's own page
  *  (three segments) is reached from a task or a card and checks its own rights. Returns false when the screen is closed. */
+/** Screens a profile reaches from a link of its own pages although they are not in its menus (My domain › every deadline). */
+const OPEN_EXTRA: Partial<Record<RoleKey, string[]>> = { np: ["dash/due"] };
 export function mayOpen(role: RoleKey, path: string): boolean {
   const seg = path.split("?")[0].split("/").filter(Boolean);
   if (!seg.length || seg.length > 2) return true;
   const [mod, sub] = seg;
   if (!MODULES.some((m) => m.id === mod)) return true; // not a module of the menu (print, login…)
+  if ((OPEN_EXTRA[role] ?? []).includes(`${mod}/${sub ?? ""}`)) return true;
   const R = ROLES[role];
   if (!R.mods.includes(mod)) return false;
   if (!sub) return true;

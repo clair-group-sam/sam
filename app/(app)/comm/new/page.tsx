@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
-import { POSTS, peopleFor } from "@/lib/audience";
+import { postsOf, peopleFor } from "@/lib/audience";
 import { mayWriteComm, saveComm } from "../actions";
 
 /* COM · compose a communication: entity, audience (all staff, posts, people), kind, acknowledgement, e-mail. Save as draft or send. */
@@ -19,6 +19,7 @@ export default async function NewCommunication({ searchParams }: { searchParams:
   const ents = (s.entity === "ALL" ? ENTS4 : [s.entity]).filter((e) => s.group || s.entities.includes(e));
   const entity = draft?.entity ?? ents[0];
   const people = await peopleFor(db, entity);
+  const POSTS = [...new Set([...(await postsOf(db, entity)), ...((draft?.audience ?? []).filter((a) => a.startsWith("ROLE:")).map((a) => a.slice(5)))])]; // FB-138 · the posts of this entity
   const { data: p } = await db.from("app_params").select("value").eq("key", "comm_ack_days").maybeSingle();
   const days = Number((p as { value: string } | null)?.value ?? 14) || 14;
   const due = draft?.due ?? new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);

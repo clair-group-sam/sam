@@ -34,9 +34,17 @@ export default async function AuditLog({ searchParams }: { searchParams: Promise
         <div style={{ overflowX: "auto" }}><table className="tbl"><thead><tr><th>When</th><th className="entcol">Entity</th><th>Who</th><th>Object</th><th>Action</th><th>Detail</th></tr></thead><tbody>
           {rows.map((r) => <tr key={r.id}><td className="due">{fr(r.at)} <span className="mini">{hm(r.at)}</span></td><td className="entcol">{r.entity ? <span className={"ent " + r.entity}>{r.entity}</span> : <span className="mini">group</span>}</td>
             <td>{P.get(r.actor ?? "") ?? <span className="mini">S.A.M.</span>}</td><td className="mini">{r.object_type.replace(/_/g, " ")}</td><td><b>{r.action.replace(/_/g, " ")}</b></td>
-            <td className="mini mono" style={{ maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.after ? JSON.stringify(r.after) : ""}>{r.after ? JSON.stringify(r.after).slice(0, 140) : ""}</td></tr>)}
+            <td className="mini" style={{ maxWidth: 520 }}>{r.after ? <details><summary style={{ cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plain(r.after)}</summary><pre className="mono" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(r.after, null, 1)}</pre></details> : ""}</td></tr>)}
         </tbody></table></div>)}</div></section>
       <div className="flex gap-2 justify-end mt-3">{page > 0 && <Link className="btn" href={`/admin/log${qs({ p: page - 1 })}`}>Newer</Link>}{rows.length === 200 && <Link className="btn" href={`/admin/log${qs({ p: page + 1 })}`}>Older</Link>}</div>
     </>
   );
+}
+
+/* FB-135 · the detail of an entry in words: "base: OMDW · status: in service" instead of raw JSON (kept under the line, on click). */
+function plain(after: unknown): string {
+  if (after === null || typeof after !== "object") return String(after ?? "");
+  const skip = new Set(["id", "updated_at", "created_at", "entity"]);
+  return Object.entries(after as Record<string, unknown>).filter(([k, v]) => !skip.has(k) && v !== null && v !== "" && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "object" ? (Array.isArray(v) ? v.join(", ") : "…") : String(v).replace(/_/g, " ")}`).join(" · ").slice(0, 260);
 }

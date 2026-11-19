@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
@@ -67,7 +68,7 @@ export default async function Actions({ searchParams }: { searchParams: Promise<
                 <td className="mono"><Link className="underline" href={`/safe/actions/${a.id}`}>{a.number}</Link>{/^SMS-\d+/.test(a.number) && <SourceMark source="centrik" />}{(scope.length > 1 || !scope.includes(a.entity)) && <div><span className={"ent " + a.entity}>{a.entity}</span>{!scope.includes(a.entity) && <span className="mini"> joint meeting</span>}</div>}</td>
                 <td><Link href={`/safe/actions/${a.id}`}><b>{a.title}</b></Link><div className="mini">{ACTION_KINDS[a.kind]}, {ACTION_SOURCES[a.source_kind]}{a.report_id ? ` ${a.report_id}` : ""}</div></td>
                 <td className="mini">{a.owner_person ? nameOf.get(a.owner_person) ?? "—" : <span className="mono">{a.owner_role ?? "—"}</span>}</td>
-                <td className={"mono" + (isLate(a, today) ? " red" : "")}>{a.due ?? "—"}</td>
+                <td className={"mono" + (isLate(a, today) ? " red" : "")}>{fr(a.due)}</td>
                 <td><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span>{effDue(a) && <div className="mini">effectiveness to check</div>}{a.effectiveness && <div className="mini">{a.effectiveness === "effective" ? "effective" : "not effective"}</div>}</td>
               </tr>))}
             {!rows.length && <tr><td colSpan={5} className="p-6 text-slate6">No action{sp.st || sp.src || sp.q || sp.mine ? " matching the filters" : " yet, raise one from a safety report (SAM suggests some), a hazard or below"}.</td></tr>}

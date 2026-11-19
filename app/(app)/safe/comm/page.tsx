@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
@@ -33,7 +34,7 @@ export default async function Committees({ searchParams }: { searchParams: Promi
     <tr>
       <td className="mono"><Link className="underline" href={`/safe/comm/${c.id}`}>{c.number}</Link><SourceMark source={c.source} />{(scope.length > 1 || isJoint(c)) && <div className="flex gap-1">{c.entities.map((e) => <span key={e} className={"ent " + e}>{e}</span>)}</div>}</td>
       <td><Link href={`/safe/comm/${c.id}`}><b>{c.title}</b></Link><div className="mini">{isJoint(c) ? `Joint meeting ${entitiesLabel(c)}, ` : ""}{kindName(c.entity, c.kind)}{c.location ? `, ${c.location}` : ""}</div></td>
-      <td className="mono">{c.planned_on ?? "—"}</td>
+      <td className="mono">{fr(c.planned_on)}</td>
       <td className="mini">{c.attendees.filter((a) => a.present).length ? `${c.attendees.filter((a) => a.present).length} present` : `${c.attendees.length} invited`}</td>
       <td><span className={"pill " + (c.status === "planned" && (c.planned_on ?? "") < today ? "amber" : STATUS[c.status]?.[1] ?? "")}>{c.status === "planned" && (c.planned_on ?? "") < today ? "Date passed, record it" : STATUS[c.status]?.[0]}</span></td>
     </tr>);

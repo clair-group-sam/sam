@@ -1,3 +1,4 @@
+import { fr } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -21,7 +22,7 @@ export default async function NpBasis() {
           <div className="ch"><b>{ENT[e]?.name ?? e}</b><span className="mini">{ENT[e]?.qual}, {ENT[e]?.auth} · {posts.length} post{posts.length === 1 ? "" : "s"}</span></div>
           <div className="cb" style={{ padding: 0 }}>
             {posts.length ? <table className="tbl"><thead><tr><th>Post</th><th>Regulatory basis</th><th>Holder</th><th>Deputy</th><th>Since</th><th>Status</th></tr></thead><tbody>
-              {posts.map((p) => <tr key={p.id}><td><b>{p.code}</b><div className="mini">{p.title}</div></td><td className="mini" style={{ maxWidth: 360 }}>{p.regulatory || <span className="late">not recorded</span>}</td><td>{p.holder_name || <span className="mini">no holder recorded</span>}</td><td className="mini">{p.deputy_name || ""}</td><td className="mini">{p.since ?? ""}</td><td><span className={"pill " + (p.status === "approved" || p.status === "active" ? "green" : p.status === "pending" ? "amber" : "")}>{p.status}</span></td></tr>)}
+              {posts.map((p) => <tr key={p.id}><td><b>{p.code}</b><div className="mini">{p.title}</div></td><td className="mini" style={{ maxWidth: 360 }}>{p.regulatory || <span className="late">not recorded</span>}</td><td>{p.holder_name || <span className="mini">no holder recorded</span>}</td><td className="mini">{p.deputy_name || ""}</td><td className="mini">{p.since ? fr(p.since) : ""}</td><td><span className={"pill " + (p.status === "approved" || p.status === "active" ? "green" : p.status === "pending" ? "amber" : "")}>{p.status}</span></td></tr>)}
             </tbody></table> : <p className="p-4 mini">No post recorded yet for this entity: NP management › Posts & org chart creates them (« Create these posts from the Crisis directory »).</p>}
           </div>
         </section>))}
