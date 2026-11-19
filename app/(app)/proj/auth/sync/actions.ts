@@ -19,6 +19,29 @@ export async function recordReading(fd: FormData) {
   if (error || !data) redirect(`/proj/auth/sync?err=${encodeURIComponent(`Reading not saved: ${error?.message ?? "unknown"}`)}`);
   redirect(`/proj/auth/sync/${(data as unknown as { id: string }).id}`);
 }
+/** A finding of the authority that S.A.M. does not hold: opened as the portal reads it (title, text, level, reference, dates), to analyse.
+ *  One click by Compliance; the owner post is Compliance until it names the nominated person who answers. */
+export async function openFindingFromReading(fd: FormData) {
+  const s = await desk(); const id = String(fd.get("id")); const key = String(fd.get("open") ?? "");
+  const db = supabaseAdmin();
+  const { data: rd } = await db.from("portal_readings").select("read_on,source,lines").eq("id", id).maybeSingle();
+  const reading = rd as { read_on: string; source: string | null; lines: unknown } | null; if (!reading) throw new Error("Reading not found");
+  const l = parseLines(reading.lines).find((x) => x.key === key && x.kind === "finding"); if (!l) throw new Error("Line not found");
+  if (!s.group && !s.entities.includes(l.entity)) throw new Error("Out of scope");
+  const { data: dup } = await db.from("findings").select("id").eq("entity", l.entity).eq("authority_ref", l.number).limit(1);
+  if (dup?.length) redirect(`/comp/find/${(dup[0] as { id: string }).id}`);
+  const { nextFindingNumber, syncFindingTasks } = await import("@/lib/findings");
+  const lv = /obs/i.test(l.level ?? "") ? "obs" : (/([123])/.exec(l.level ?? "") ?? [])[1] ?? "2";
+  const authority = /meteor|dsac/i.test(`${reading.source} ${l.url ?? ""}`) ? "DSAC" : /tmcad|centrik/i.test(`${reading.source} ${l.url ?? ""}`) ? "TM-CAD" : null;
+  const row = { entity: l.entity, number: await nextFindingNumber(db, l.entity), source: "authority", authority, authority_ref: l.number, audit_ref: l.origin, level: lv, requirement: l.requirement, title: l.title.slice(0, 300), description: l.description,
+    owner_role: "CMM", notified: l.notified ?? reading.read_on, due: l.due, status: "open", portal_status: l.status, portal_read_on: reading.read_on, imported_from: `portal reading ${reading.read_on}`, created_by: s.person?.id ?? null };
+  const { data, error } = await db.from("findings").insert(row).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Finding not created");
+  await syncFindingTasks(db, data as never);
+  await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: l.entity, object_type: "finding", object_id: (data as { id: string }).id, action: "finding_created", after: { ...row, via: "portal_reading", reading: id } });
+  revalidatePath("/comp/find"); revalidatePath(`/proj/auth/sync/${id}`); revalidatePath("/home/tasks");
+  redirect(`/comp/find/${(data as { id: string }).id}`);
+}
 export async function applyReading(fd: FormData) {
   const s = await desk(); const id = String(fd.get("id"));
   const picks = fd.getAll("pick").map(String).map((key) => ({ key, type: String(fd.get(`type_${key}`) ?? "") || null, title: String(fd.get(`title_${key}`) ?? "").trim() || null }));

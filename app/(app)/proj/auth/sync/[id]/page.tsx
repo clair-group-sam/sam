@@ -6,7 +6,7 @@ import { Metric, PageHeader } from "@/components/Page";
 import { isCmm } from "@/lib/revisions";
 import { fr } from "@/lib/authority";
 import { parseLines, planSync, type Proposal } from "@/lib/portal-sync";
-import { applyReading } from "../actions";
+import { applyReading, openFindingFromReading } from "../actions";
 
 /* PRJ-05 · one reading against S.A.M.: per line, what S.A.M. holds and what would change. Ticked lines are applied; the rest stays. */
 const TONE: Record<Proposal["action"], [string, string]> = { create: ["To open in S.A.M.", "amber"], update: ["Changed", "amber"], same: ["Same as S.A.M.", "green"], missing: ["Not in S.A.M.", "red"], info: ["Information", ""] };
@@ -40,7 +40,7 @@ export default async function Reading({ params, searchParams }: { params: Promis
                 <td style={{ maxWidth: 340 }}>{p.action === "create" && !done ? <input name={`title_${l.key}`} className="inp" defaultValue={l.title} aria-label="Title in S.A.M." style={{ marginTop: 0 }} /> : <b>{l.title}</b>}
                   <div className="mini">{l.status}{l.due ? `, due ${fr(l.due)}` : ""}{l.turn ? `, ${l.turn === "us" ? "our turn" : "the authority's turn"}` : ""}{l.assessor ? `, ${l.assessor}` : ""}</div>
                   {l.last && <div className="mini">Last exchange: {l.last.slice(0, 220)}</div>}{l.next && <div className="mini">To do: {l.next}{l.who ? `, ${l.who}` : ""}</div>}</td>
-                <td className="mini" style={{ maxWidth: 240 }}>{p.href && p.id ? <Link className="underline" href={p.href}>{p.holds}</Link> : p.action === "create" && !done ? <label>Type<select name={`type_${l.key}`} className="inp" defaultValue={p.typeGuess ?? ""}>{types.filter((t) => t.entities.includes(l.entity)).map((t) => <option key={t.code} value={t.code}>{t.code}, {t.name.slice(0, 40)}</option>)}</select></label> : p.action === "missing" ? <Link className="underline" href="/comp/find">Compliance, Findings</Link> : "—"}</td>
+                <td className="mini" style={{ maxWidth: 240 }}>{p.href && p.id ? <Link className="underline" href={p.href}>{p.holds}</Link> : p.action === "create" && !done ? <label>Type<select name={`type_${l.key}`} className="inp" defaultValue={p.typeGuess ?? ""}>{types.filter((t) => t.entities.includes(l.entity)).map((t) => <option key={t.code} value={t.code}>{t.code}, {t.name.slice(0, 40)}</option>)}</select></label> : p.action === "missing" ? <button className="btn" type="submit" formAction={openFindingFromReading} name="open" value={l.key}>Open this finding in S.A.M.</button> : "—"}</td>
                 <td className="mini" style={{ maxWidth: 360 }}>{p.changes.map((c) => <div key={c.field}><b>{c.label}</b>: {c.from ? <><s>{c.from.slice(0, 80)}</s> → </> : ""}{(c.to ?? "").slice(0, 160)}</div>)}{p.note && <div className={p.action === "missing" ? "late" : ""}>{p.note}</div>}{!p.changes.length && !p.note && p.action === "same" ? "Nothing: the date of the reading is recorded" : ""}</td>
               </tr>; })}
           </tbody></table></div></section>)}

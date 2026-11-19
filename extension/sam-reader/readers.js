@@ -130,6 +130,22 @@ async function readMeteor() {
       if (/^(sans suite|cl[oô]tur|clos|ferm)/i.test(state)) continue;
       lines.push({ entity, kind: "finding", number: `#${num}`, title, level, due: iso(limit), status: state, origin: act, url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#constatation/${num}`, turn: /attente de correction|à traiter|réponse attendue|refus/i.test(state) ? "us" : "authority" });
     }
+    // 3. each constatation followed: the page loads its description, its corrective actions and the exchanges; the reader keeps the text
+    for (const l of lines.filter((x) => x.kind === "finding")) {
+      const num = l.number.slice(1); const at = (p) => new RegExp(`/constatations/${num}/${p}`);
+      if (!(await go(`#constatation/${num}`, at("description")))) { skipped.push(`${l.number}: detail not read`); continue; }
+      await sleep(900);
+      const d = got(at("description")) || {}; const ac = got(at("actionsCorrectives")) || {}; const ex = got(at("echangeAnalyse"));
+      l.description = plain(d.constatation).slice(0, 4000) || null;
+      l.requirement = [(Array.isArray(d.referenceListDto) ? d.referenceListDto.map((r) => r.label).join(", ") : ""), plain(d.detailRefReglementaire)].filter(Boolean).join(" ").slice(0, 300) || null;
+      l.notified = iso(d.dateNotification); if (d.acteLibelle) l.origin = String(d.acteLibelle).trim();
+      if (Array.isArray(ac.actionList)) l.actions = ac.actionList.length;
+      if (Array.isArray(ex) && ex.length) { // the last exchange, whatever the field names: the longest text and the latest date of the last item
+        const flat = (o, out = []) => { for (const v of Object.values(o || {})) { if (v && typeof v === "object") flat(v, out); else if (typeof v === "string") out.push(v); } return out; };
+        const items = ex.map((e) => { const ss = flat(e); return { on: ss.map(iso).filter(Boolean).sort().pop() || null, text: ss.map(plain).filter((t) => !/^\d{4}-\d{2}-\d{2}/.test(t)).sort((a, b) => b.length - a.length)[0] || "" }; }).sort((a, b) => String(a.on).localeCompare(String(b.on)));
+        const last = items[items.length - 1]; if (last && last.text) { l.last_exchange = last.text.slice(0, 400); l.last_exchange_on = last.on; }
+      }
+    }
   } else skipped.push("Constatations: the list did not load");
   location.hash = "#";
   return { account: head, entity, lines, observations, skipped, closed: typeof closedCount === "number" ? closedCount : 0 };
