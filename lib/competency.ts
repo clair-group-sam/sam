@@ -7,6 +7,9 @@ import { isCmm } from "@/lib/revisions";
  * 19/11 (Guillaume): Astonjet France and Astonjet Malta only (the Astonfly MSM names no competency assessment); the assessor is the
  * Compliance Monitoring Manager (MSM 1.5.2), never the AM; the person pre-fills the sheet, Compliance validates and signs. */
 export const ASSESS_ENTITIES = ["ASJFR", "ASJMT"];
+/** MSM 4-5 (Astonjet Ltd Iss 01 Rev 09, Astonjet Iss 10 Rev 07): "Those files have a validity period of 12 months." */
+export const VALIDITY_MONTHS = 12;
+export const validUntil = (assessedOn: string | null) => { if (!assessedOn) return null; const d = new Date(assessedOn + "T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + VALIDITY_MONTHS); return d.toISOString().slice(0, 10); };
 export type FormKey = "OPS" | "CAMO";
 export type FormPoint = { k: string; section: string; text: string; mask: string; initialOnly?: boolean };
 export type FormDef = { key: FormKey; ref: string; edition: string; basis: string; functions: { code: string; label: string }[]; levels: [number, string][]; points: FormPoint[]; page3: boolean };

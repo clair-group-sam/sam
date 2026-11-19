@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { ENT } from "@/lib/nav";
-import { FORMS, OUTCOME, isDesk, mayPrefill, maySee, mayValidate, missingToSign, progress, selfProgress, type Assessment } from "@/lib/competency";
+import { FORMS, OUTCOME, isDesk, mayPrefill, maySee, mayValidate, missingToSign, progress, selfProgress, validUntil, VALIDITY_MONTHS, type Assessment } from "@/lib/competency";
 import { deleteDraft, reopenAssessment, saveAssessment, savePrefill } from "../actions";
 
 const fr = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : "—");
@@ -110,7 +110,7 @@ export default async function Sheet({ params, searchParams }: { params: Promise<
               {val ? <div className="flex flex-wrap gap-5">{Object.entries(OUTCOME).map(([k, [l]]) => <label key={k} className="flex items-center gap-2"><input type="radio" name="outcome" value={k} defaultChecked={a.outcome === k} />{l}</label>)}</div>
                 : <span className={"pill " + (o?.[1] ?? "")}>{o?.[0] ?? "not decided"}</span>}
               <label className="block mt-3"><span className="mini">Training required (if any)</span><textarea name="training_required" className="inp" rows={2} defaultValue={a.training_required ?? ""} readOnly={!val} /></label>
-              <label className="block mt-3" style={{ width: 220 }}><span className="mini">Next assessment due</span><input name="next_due" type="date" className="inp" defaultValue={a.next_due ?? ""} readOnly={!val} /></label>
+              <p className="mini mt-3">Valid {VALIDITY_MONTHS} months (MSM 4-5): next assessment due by <b>{fr(signed ? a.next_due : validUntil(a.assessed_on))}</b>{!a.assessed_on && ", once the date of assessment is set"}.</p>
               {signed && <p className="mt-3"><b>Assessor signature:</b> {a.assessor_name}, Compliance, signed in S.A.M. on {fr(a.signed_at)}.</p>}
               {val && (
                 <div className="mt-4 flex flex-wrap gap-2 items-center">

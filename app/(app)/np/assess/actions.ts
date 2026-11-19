@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENT } from "@/lib/nav";
-import { ASSESS_ENTITIES, FORMS, isDesk, isForm, mayPrefill, mayStartOwn, mayValidate, missingToSign, pointsFor, type Assessment, type Item } from "@/lib/competency";
+import { ASSESS_ENTITIES, FORMS, isDesk, isForm, mayPrefill, mayStartOwn, mayValidate, missingToSign, pointsFor, validUntil, type Assessment, type Item } from "@/lib/competency";
 
 const v = (fd: FormData, k: string) => { const x = String(fd.get(k) ?? "").trim(); return x || null; };
 const log = (db: ReturnType<typeof supabaseAdmin>, actor: string | null, entity: string, id: string, action: string, after?: unknown) =>
@@ -69,7 +69,7 @@ export async function saveAssessment(fd: FormData) {
   const row: Record<string, unknown> = {
     position: v(fd, "position"), assessed_on: v(fd, "assessed_on"), last_assessed_on: v(fd, "last_assessed_on"), org_changes: v(fd, "org_changes"), items,
     outcome: outcome && ["fit", "fit_training", "not_fit"].includes(outcome) ? outcome : null, training_required: v(fd, "training_required"),
-    diplomas: v(fd, "diplomas"), trainings: v(fd, "trainings"), next_due: v(fd, "next_due"), updated_at: new Date().toISOString(),
+    diplomas: v(fd, "diplomas"), trainings: v(fd, "trainings"), next_due: validUntil(v(fd, "assessed_on")), updated_at: new Date().toISOString(),
   };
   if (intent === "return" && a.person_id) { row.status = "draft"; row.submitted_at = null; }
   await db.from("competency_assessments").update(row).eq("id", id);
