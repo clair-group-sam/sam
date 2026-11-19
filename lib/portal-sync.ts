@@ -164,7 +164,7 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
       const w = want.get(f.id)!; let to: Stage | null = null;
       if (f.stage === "submitted" && w.to === "remarks") to = "remarks";
       // a favourable decision only: a refusal, a withdrawal or a replaced dossier is left to the desk, with the portal's wording
-      else if ((f.stage === "submitted" || f.stage === "remarks") && w.to === "approved" && /approuv|approved|signed off|accept|accus[ée] de r[ée]ception|acknowledg|completed|publish/i.test(w.status) && !/refus|reject|withdraw|cancel|annul|remplac/i.test(w.status)) to = "approved";
+      else if ((f.stage === "submitted" || f.stage === "remarks") && w.to === "approved" && /approuv|approved|signed off|accept|accus[ée]\W*(de\W*)?r[ée]ception|acknowledg|completed|publish/i.test(w.status) && !/refus|reject|withdraw|cancel|annul|remplac/i.test(w.status)) to = "approved";
       else if (f.stage === "remarks" && w.to === "submitted" && turnOf.get(f.id) === "authority") to = "submitted";
       const ref = f.portal_ref ?? f.title;
       // the portal is normally right, but S.A.M. is not rewound without a yes: a dossier held as submitted that the portal shows as not sent is a question
