@@ -229,8 +229,8 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
   try {
     if (t.kind === "authority" && t.ref_id) {
       const { movesFrom } = await import("@/lib/authority");
-      const { data: f } = await db.from("authority_files").select("id,stage,type_code,owner_role,owner_person").eq("id", t.ref_id).maybeSingle();
-      const file = f as { id: string; stage: string; type_code: string } | null;
+      const { data: f } = await db.from("authority_files").select("id,stage,type_code,owner_role,owner_person,authority,portal_status,portal_read_on,last_exchange,last_exchange_on").eq("id", t.ref_id).maybeSingle();
+      const file = f as { id: string; stage: string; type_code: string; authority: string | null; portal_status: string | null; portal_read_on: string | null; last_exchange: string | null; last_exchange_on: string | null } | null;
       if (file && file.stage !== "draft") {
         const { data: ty } = await db.from("authority_file_types").select("needs_signature").eq("code", file.type_code).maybeSingle();
         // Compliance moves from the card — except the submission itself (COM-03: Submit stays a deliberate act with its reference) and standby
@@ -248,7 +248,16 @@ export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState)
           published: "the approved change is integrated and published (manual, register): only the close-out remains", closed: "nothing more to do: the file is closed",
         };
         const stageLabel = (await import("@/lib/authority")).STAGE_LABEL[file.stage as never] ?? file.stage;
-        const help = [`Where the file stands: **${stageLabel}**. Compliance only.`, ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
+        // the card asks one question; when nothing happened there is nothing to click
+        const who = file.authority ?? "the authority"; const d = (x: string | null) => (x ? `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}` : "");
+        const ASK: Record<string, string> = {
+          submitted: `This is a reminder, not something to tick: the file is with ${who}. **Has ${who} answered?** If not, there is nothing to do: leave this card.`,
+          remarks: `${who} made remarks and waits for our reply. **Has the reply been sent on the portal?** If not, there is nothing to click yet.`,
+          approved: "The decision is in. **Is the change integrated and published?** If not yet, leave this card.",
+          published: "The change is published. **Is the close-out done** (decision filed, registers up to date)?",
+        };
+        const portal = file.portal_status ? `What the portal showed when S.A.M. last read it (${d(file.portal_read_on)}): “${file.portal_status}”${file.last_exchange ? `. Last exchange${file.last_exchange_on ? ` (${d(file.last_exchange_on)})` : ""}: ${file.last_exchange.slice(0, 220)}` : ""}` : null;
+        const help = [ASK[file.stage] ?? `Where the file stands: **${stageLabel}**.`, ...(portal ? [portal] : []), "If something did happen, say which (Compliance only):", ...moves.map((m) => `- **${m.label}**: ${WHAT[m.to] ?? "moves the file to the next stage"}.`),
           ...(file.stage === "ready" ? ["- **Record the submission…**: asks for the portal reference, then records that the file was submitted."] : []),
           "- **Open in S.A.M.**: opens the file, changes nothing.", "The note is optional, except for the buttons marked *."].join("\n");
         if (actions.length) return taskCard(t, undefined, { hint: help, commentHint: "Note (required for the buttons marked *)", actions });
