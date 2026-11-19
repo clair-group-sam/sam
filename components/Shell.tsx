@@ -6,7 +6,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ENT, ENT_COLOR, entMode, singleEntity, type EntMode, RAIL_BOTTOM, RAIL_DAILY, modLabel, roleModules, subLabel, subsFor, isBuilt, type Module, type RoleKey } from "@/lib/nav";
 import type { Session } from "@/lib/session";
-import { VIEWS } from "@/lib/nav";
 import { A11y } from "@/components/A11y";
 import { applyPrefs, readPrefs } from "@/lib/prefs";
 
@@ -176,7 +175,7 @@ export default function Shell({ session, children }: Props) {
             before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
         <script dangerouslySetInnerHTML={{ __html: ENT_ARRIVE }} />
         {subs.length > 0 && <nav className="mobsub" aria-label={curMod ? modLabel(role, curMod) : mod}>{subs.filter((x) => isBuilt(mod, x.id) || sub === x.id).map((x) => <Link key={x.id} href={`/${mod}/${x.id}`} className={sub === x.id ? "on" : ""} aria-current={sub === x.id ? "page" : undefined}>{subLabel(role, mod, x)}</Link>)}</nav>}
-        {session.viewAs && <div className="groupband"><b>Viewing as {VIEWS[session.viewAs]?.label ?? session.viewAs}, {ENT[session.entity]?.name ?? session.entity}</b>: the menus and the rights are those of this profile; what is personal (Inbox, own reports, own sheets) stays yours. <button type="button" className="underline" onClick={() => viewAs(null)}>Back to my own view</button></div>}
+        {session.viewAs && <div className="groupband"><b>Viewing as {session.viewOptions.find((o) => o.code === session.viewAs && (!o.entity || o.entity === session.entity))?.label ?? session.viewAs}, {ENT[session.entity]?.name ?? session.entity}</b>: the menus and the rights are those of this profile; what is personal (Inbox, own reports, own sheets) stays yours. <button type="button" className="underline" onClick={() => viewAs(null)}>Back to my own view</button></div>}
         <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto px-8 py-7">{children}</main>
       </div>
     </div>
@@ -320,7 +319,10 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
               <div className="prefs" role="group" aria-label="View as">
                 <div className="mi muted" style={{ padding: "4px 10px" }}>View S.A.M. as (super admin){session.viewAs ? `: now ${session.viewAs}, ${session.entity}` : ""}</div>
                 {session.viewAs && <button type="button" className="mi" onClick={() => viewAs(null)}><b>Back to my own view</b></button>}
-                {Object.entries(VIEWS).filter(([k]) => k !== session.viewAs).map(([k, v]) => <button key={k} type="button" className="mi" onClick={() => viewAs(k)}>{v.label}</button>)}
+                <div style={{ padding: "2px 10px 8px" }}><select className="inp" style={{ marginTop: 0 }} aria-label="Profile to look at" value="" onChange={(e) => { if (e.target.value) viewAs(e.target.value); }}>
+                  <option value="">Choose a profile…</option>
+                  {[...new Set(session.viewOptions.map((o) => o.entity))].map((e) => <optgroup key={e ?? "any"} label={e ? `${ENT[e]?.name ?? e} (${e})` : "Any entity (the one selected)"}>{session.viewOptions.filter((o) => o.entity === e).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</optgroup>)}
+                </select></div>
               </div>
             )}
             <Link href="/api/me" className="mi" target="_blank">My access rights</Link>

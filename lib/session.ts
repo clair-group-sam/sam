@@ -3,7 +3,7 @@ import { normEntity } from "@/lib/entity-codes";
 import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { ENTS4, VIEWS, entMode, homeFor, singleEntity, type RoleKey } from "@/lib/nav";
+import { ENTS4, VIEW_BASE, VIEW_RE, type ViewOption, entMode, homeFor, singleEntity, type RoleKey } from "@/lib/nav";
 
 export type Person = {
   id: string; email: string; display_name: string; home_entity: string | null; entities: string[]; roles: string[];
@@ -21,6 +21,8 @@ export type Session = {
   viewAs: string | null;
   /** The signed-in person is a super admin, whatever the view. */
   superadmin: boolean;
+  /** Super admin only: every profile that can be looked at (posts of each entity, roles given in Users, AM, user). */
+  viewOptions: ViewOption[];
 };
 
 export const NP_ROLES = ["NPFO", "NPCA", "NPGO", "NPCT", "NPMT", "CFI", "HT", "CTKI", "FSO", "MAM", "NP", "SMD", "QM"];
@@ -49,6 +51,19 @@ export function initialsOf(name: string): string {
   return name.split(/[\s.@_-]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
+/** Every profile a super admin can look at: the posts of each entity (NP management), then the roles given to people in Users that are not posts. */
+async function viewOptionsFor(): Promise<ViewOption[]> {
+  const db = supabaseAdmin();
+  const [{ data: posts }, { data: ppl }] = await Promise.all([db.from("np_posts").select("entity,code,title,ord").order("entity").order("ord"), db.from("people").select("roles").limit(3000)]);
+  const out: ViewOption[] = []; const seen = new Set<string>();
+  for (const p of (posts ?? []) as { entity: string; code: string; title: string }[]) { const code = p.code.toUpperCase(); if (!VIEW_RE.test(code) || code === "SUPERADMIN") continue; seen.add(basePost(code)); out.push({ value: `${code}@${p.entity}`, code, entity: p.entity, label: `${code}, ${p.title}` }); }
+  for (const b of VIEW_BASE) if (!seen.has(b.code)) { seen.add(b.code); out.push({ value: b.code, code: b.code, entity: null, label: b.label }); }
+  const others = new Set<string>();
+  for (const r of ((ppl ?? []) as { roles: string[] | null }[]).flatMap((x) => x.roles ?? [])) { const c = basePost(r); if (c !== "SUPERADMIN" && VIEW_RE.test(c) && !seen.has(c)) others.add(c); }
+  for (const c of [...others].sort()) out.push({ value: c, code: c, entity: null, label: c });
+  return out;
+}
+
 /** One auth round-trip per request (layout + page share it). */
 export const getSession = cache(async (): Promise<Session | null> => {
   const sb = await supabaseServer();
@@ -64,11 +79,12 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const store = await cookies();
   // "View as": a super admin sees S.A.M. as another profile does — its roles (so its menus and its rights), one entity, no group view.
   const view = superadmin ? store.get("sam_view")?.value : undefined;
-  const viewAs = view && VIEWS[view] ? view : null;
-  const roles = viewAs ? VIEWS[viewAs].roles : realRoles;
+  const [viewCode, viewEntRaw] = view && VIEW_RE.test(view) ? view.split("@") : [null, null];
+  const viewAs = viewCode && viewCode !== "SUPERADMIN" ? viewCode : null;
+  const roles = viewAs ? [viewAs] : realRoles;
   const role = roleKeyFrom(roles);
   const group = viewAs ? false : !!person?.is_group_function;
-  const viewEnt = (() => { const v = store.get("sam_ent")?.value; const e = v && v !== "ALL" ? normEntity(v) : null; return e && ENTS4.includes(e) ? e : person?.home_entity ?? ENTS4[0]; })();
+  const viewEnt = viewEntRaw && ENTS4.includes(viewEntRaw) ? viewEntRaw : (() => { const v = store.get("sam_ent")?.value; const e = v && v !== "ALL" ? normEntity(v) : null; return e && ENTS4.includes(e) ? e : person?.home_entity ?? ENTS4[0]; })();
   const entities = viewAs ? [viewEnt] : group ? ENTS4 : (person?.entities ?? []);
   const name = person?.display_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "";
   const wanted = (() => { const v = store.get("sam_ent")?.value; return v && v !== "ALL" ? normEntity(v) : v; })(); // old cookies (AJD…) still work
@@ -79,5 +95,5 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const path = (await headers()).get("x-sam-path") ?? "";
   const entityPref = entity;
   if (entity === "ALL" && path && entMode(path) === "single") entity = singleEntity(person?.home_entity, entities);
-  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role), viewAs, superadmin };
+  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role), viewAs, superadmin, viewOptions: superadmin ? await viewOptionsFor() : [] };
 });
