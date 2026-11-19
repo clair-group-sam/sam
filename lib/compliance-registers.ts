@@ -150,7 +150,7 @@ export function auditorRoster(register: Auditor[], people: { id: string; display
       if (!r) { r = { key: `p:${pid}`, auditor: null, name: pname(pid) ?? "—", company: null, audits: [], missing: [], items: { total: 0, done: 0 } }; rows.push(r); }
       hits.add(r);
     }
-    if (x.external_auditor) for (const part of x.external_auditor.split(/\s*[/,&+]\s*|\s+et\s+|\s+and\s+/i).filter(Boolean)) {
+    if (x.external_auditor) for (const part of auditorNames(x.external_auditor)) {
       const { name, company } = splitAuditor(part);
       // a post written instead of a name (« CMM ») = the person who holds it for that entity
       if (/^[A-Z]{2,6}$/.test(name)) {
@@ -175,4 +175,15 @@ export function auditorRoster(register: Auditor[], people: { id: string; display
     if (!a.entities.length) r.missing.push("no entity");
   }
   return rows;
+}
+
+/** FB-128 · the people behind an auditor field typed by hand or imported. Centrik writes one person as
+ *  "Last, First (Department and Team)": the brackets are dropped and a single "Last, First" stays one person;
+ *  several auditors are separated by / & + "et" "and". A dash alone is nobody. */
+export function auditorNames(raw: string): string[] {
+  const t = raw.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+  if (!t || /^[-—–.?]+$/.test(t)) return [];
+  const one = t.match(/^([^,/&+]+),\s*([^,/&+]+)$/);
+  if (one && !/\s(et|and)\s/i.test(t)) return [`${one[2].trim()} ${one[1].trim()}`];
+  return t.split(/\s*[/,&+]\s*|\s+et\s+|\s+and\s+/i).map((x) => x.trim()).filter((x) => x && !/^[-—–.?]+$/.test(x));
 }

@@ -52,7 +52,8 @@ export async function proposeMaps(fd: FormData) {
 }
 export async function saveMap(fd: FormData) {
   const entity = String(fd.get("entity")); await me(entity);
-  const field = str(fd, "field"), our = str(fd, "our_value"); const attribute = Number(fd.get("attribute_code")); const vid = str(fd, "value_id");
+  const field = str(fd, "field"), our = str(fd, "our_value"); const attribute = Number(fd.get("attribute_code")); const pick = str(fd, "value_pick"); const vid = str(fd, "value_id") ?? (pick ? (pick.match(/\[(\d+)\]\s*$/)?.[1] ?? (/^\d+$/.test(pick) ? pick : null)) : null);
+  if (pick && !vid) fail("Pick the E2 value in the list (type a few letters, then choose a line).");
   if (!field || !our || !attribute) fail("Field, our value and attribute are required.");
   if (fd.get("what") === "remove") await db().from("eccairs_value_maps").delete().eq("entity", entity).eq("field", field).eq("our_value", our);
   else await db().from("eccairs_value_maps").upsert({ entity, field, our_value: our, attribute_code: attribute, value_id: vid ? Number(vid) : null, note: str(fd, "note"), updated_at: new Date().toISOString() }, { onConflict: "entity,field,our_value" });

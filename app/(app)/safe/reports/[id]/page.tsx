@@ -62,7 +62,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const invOpen = invs.find((x) => !["closed", "cancelled"].includes(x.status));
   const invDone = r.status === "investigation" && invs.length > 0 && !invOpen;
   const fedBack = events.some((e) => /feedback/i.test(e.kind) || /^feedback/i.test(e.note ?? ""));
-  const nextStep = !a?.confirmed_at ? "decide whether it is a mandatory occurrence (MOR card on the right); the 72 h clock runs until then."
+  const morDecided = !!a?.confirmed_at || !!r.mor_filed_at || !!r.mor_ref; // FB-125 · a MOR already filed is a decision taken
+  const nextStep = !morDecided ? "decide whether it is a mandatory occurrence (MOR card on the right); the 72 h clock runs until then."
     : invOpen ? `investigation ${invOpen.number} is in progress${invOpen.due ? `, due ${invOpen.due}` : ""}.`
     : !fedBack ? "send the feedback to the reporter (Reporter card), then close the report."
     : "everything is done: close the report (bottom of the right column).";
@@ -89,7 +90,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               </tbody></table>
               <div className="narr">{translated ? r.narrative_en : r.narrative}</div>
               {Object.keys(r.complements ?? {}).length > 0 && <><div className="eyebrow mt-4 mb-1">Precisions given before sending</div><ul className="mini">{Object.entries(r.complements).filter(([k]) => k !== "teams_thread" && k !== "teams_messages").map(([k, v]) => <li key={k}><b>{k.replace(/_/g, " ")}:</b> {v}</li>)}</ul>
-                {(r.complements.teams_messages || r.complements.teams_thread) && <details className="mini mt-1"><summary style={{ cursor: "pointer" }}>Teams messages the report was drafted from</summary><pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{r.complements.teams_messages ?? r.complements.teams_thread}</pre></details>}</>}
+                {/* FB-160 · the Teams conversation a report was drafted from is no longer stored nor shown */}</>}
               {r.contributing && <><div className="eyebrow mt-4 mb-1">Contributing factors in the reporter&apos;s view</div><p>{r.contributing}</p></>}
               {translated && <details className="mt-4"><summary className="mini underline cursor-pointer">Original text ({r.language})</summary><div className="narr mt-2">{r.narrative}</div></details>}
             </div>

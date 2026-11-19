@@ -114,7 +114,7 @@ export function discardedCard(by: string): unknown {
   return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body: [{ type: "TextBlock", text: "S.A.M.", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" }, { type: "TextBlock", text: `Draft discarded by ${by}. Nothing was stored.`, wrap: true }] };
 }
 
-/** Creates the report from the card's inputs; the thread is re-read and kept with the report as context (complements.teams_thread). */
+/** Creates the report from the card's inputs; the thread is re-read to draft it and is not stored with the report (FB-160). */
 export async function createFromCard(db: SupabaseClient, person: { id: string; display_name: string; entities: string[] }, data: Record<string, unknown>): Promise<{ ok: true; id: string; headline: string } | { ok: false; error: string }> {
   const g = (k: string, n = 2000) => (typeof data[k] === "string" ? (data[k] as string).slice(0, n) : "");
   const entity = g("entity", 3);
@@ -124,7 +124,7 @@ export async function createFromCard(db: SupabaseClient, person: { id: string; d
   // FB-039 · only the messages that tell the event are kept with the report (the rest of the chat is nobody's business)
   try { if (ref) transcript = eventBurst(await readThread(ref)).map((m) => `[${m.at.slice(0, 16).replace("T", " ")}] ${m.from}: ${m.text}`).join("\n").slice(0, 6000); } catch { /* context only */ }
   const r: NewReport = { entity, headline: g("headline", 200), narrative: g("narrative", 6000), event_date: g("event_date", 10), event_time_utc: g("event_time_utc", 5), aircraft: g("aircraft", 12), flight_ref: g("flight_ref", 40), phase: g("phase", 40), location: g("location", 120), contributing: "", anonymous: false, language: g("language", 5),
-    precisions: { source: "Teams conversation", ...(transcript ? { teams_messages: transcript } : {}) } };
+    precisions: { source: "Teams conversation" } }; // FB-160 · the conversation is read to draft the report and not kept: it holds messages that have nothing to do with the event
   const res = await createReport(db, r, person.id, { source: "teams", note: `Received — created from a Teams conversation by ${person.display_name}` });
   return res.ok ? { ok: true, id: res.id, headline: r.headline } : res;
 }
