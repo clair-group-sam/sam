@@ -196,8 +196,11 @@ export type CardOpts = { actions?: unknown[]; hint?: string; doneTitle?: string;
   /** the coloured band on top: amber = we have something to do, green = we wait, red = something contradicts */ lead?: { text: string; tone: "work" | "wait" }; alert?: string };
 /** Coloured bands: whose turn it is (amber: ours, green: we wait), then a red one when something contradicts. */
 function bands(body: unknown[], opts: CardOpts) {
-  if (opts.lead) body.push({ type: "Container", style: opts.lead.tone === "work" ? "warning" : "good", spacing: "Medium", items: [{ type: "TextBlock", text: opts.lead.text, wrap: true, weight: "Bolder" }] });
-  if (opts.alert) body.push({ type: "Container", style: "attention", spacing: "Small", items: [{ type: "TextBlock", text: opts.alert, wrap: true }] });
+  // Teams keeps the container tints pale: the band also carries a coloured mark, larger bold text in the same colour, and a thick separator
+  if (opts.lead) { const work = opts.lead.tone === "work";
+    body.push({ type: "Container", style: work ? "warning" : "good", bleed: true, spacing: "Medium", separator: true, items: [
+      { type: "TextBlock", text: `${work ? "🟠" : "🟢"} ${opts.lead.text}`, wrap: true, weight: "Bolder", size: "Medium", color: work ? "Warning" : "Good" }] }); }
+  if (opts.alert) body.push({ type: "Container", style: "attention", bleed: true, spacing: "Small", items: [{ type: "TextBlock", text: `🔴 ${opts.alert}`, wrap: true, weight: "Bolder", color: "Attention" }] });
 }
 export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): unknown {
   const kind = KIND_LABEL[t.kind] ?? t.kind.replace(/_/g, " ");
