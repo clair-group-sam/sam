@@ -11,7 +11,7 @@ import { eccairsConfig, eccairsEnv } from "@/lib/eccairs";
 import { recordFollowup } from "./actions";
 
 type R = { id: string; entity: string; headline: string; headline_en: string | null; received_at: string; event_date: string | null; source: string | null; external_no: string | null; mor_ref: string | null; mor_filed_at: string | null; mor_authority: string | null; mor_followup_at: string | null; mor_followup_ref: string | null; mor_final_at: string | null; mor_final_ref: string | null; status: string; report_analysis: { mor_status: string | null; confirmed_at: string | null } | { mor_status: string | null; confirmed_at: string | null }[] | null };
-const d = (x: Date | string | null) => (x ? (typeof x === "string" ? x : x.toISOString()).slice(0, 10) : "—");
+const d = (x: Date | string | null) => (x ? (typeof x === "string" ? x : x.toISOString()).slice(0, 10).split("-").reverse().join("/") : "—");
 const TABS: [string, string][] = [["", "To do"], ["sam", "Filed from S.A.M."], ["imported", "Imported (mirror)"], ["all", "All"]];
 
 /** Safety › MOR / ECCAIRS: mandatory occurrence reports — 72 h to file from receipt in S.A.M., 30-day and final (3-month) reports to the authority; imported reports mirrored as sent / not sent to ECCAIRS. */

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ballOf, routeFor, syncTasks, type AuthorityFile, type FileType, type Stage } from "@/lib/authority";
 import { applyMove } from "@/lib/authority-moves";
+const frd = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 
 /* PRJ-05 · Reconciling a portal reading with S.A.M. A line = one application or one finding as the portal shows it. Accepted keys are
  * the ones of the CAA point (French) or their English names: ref, entite/entity, nature/kind, numero/number, objet/title, statut/status,
@@ -102,7 +103,7 @@ export async function applySync(db: SupabaseClient, actor: { personId: string | 
       const type = types.find((t) => t.code === (pk.type || p.typeGuess)); if (!type || !type.entities.includes(l.entity)) throw new Error(`${l.key}: choose a type offered for ${l.entity}`);
       const route = routeFor(type, l.entity); const stage = stageFromPortal(l.status); const authority = route.authority;
       const row = { entity: l.entity, type_code: type.code, title: (pk.title || l.title).slice(0, 200), stage, category: route.category, authority, portal: route.portal || null, portal_ref: l.number, owner_role: type.default_owner_role,
-        trigger_kind: "other", trigger_note: `Read on the portal on ${reading.read_on}`, triggered_at: l.submitted ?? reading.read_on, target_date: l.due, submitted_at: stage === "draft" ? null : l.submitted ?? reading.read_on, portal_url: l.url, decision_at: stage === "approved" ? reading.read_on : null, outcome: stage === "approved" ? "approved" : null,
+        trigger_kind: "other", trigger_note: `Read on the portal on ${frd(reading.read_on)}`, triggered_at: l.submitted ?? reading.read_on, target_date: l.due, submitted_at: stage === "draft" ? null : l.submitted ?? reading.read_on, portal_url: l.url, decision_at: stage === "approved" ? reading.read_on : null, outcome: stage === "approved" ? "approved" : null,
         ball_override: l.turn && l.turn !== (stage === "submitted" ? "authority" : "us") ? l.turn : null, next_task: l.next, next_owner: l.who, assessor: l.assessor, portal_status: l.status, portal_read_on: reading.read_on, last_exchange: l.last, last_exchange_on: l.lastOn, imported_from: `portal reading ${reading.read_on}`, created_by: actor.personId };
       const { data: cf, error } = await db.from("authority_files").insert(row).select("*").single(); if (error || !cf) throw new Error(`${l.key}: ${error?.message ?? "not created"}`);
       const f = cf as AuthorityFile;
@@ -172,7 +173,7 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
       if (f.stage === "submitted" && /not sent|non envoy|\bdraft\b|brouillon/i.test(w.status)) { ex.push({ kind: "Portal contradicts S.A.M.", ref, text: `${f.title}: submitted in S.A.M., “${w.status}” on the portal, so the turn is ours. Open the file to update S.A.M. or keep it.`, href: `/proj/auth/${f.id}` }); continue; }
       if (!to) continue;
       try {
-        await applyMove(db, { personId: actor.personId, name: `${actor.name} (portal reading)`, cmm: true, owner: false }, f, to, { note: `Read on the portal on ${reading.read_on}: “${w.status}”.${f.last_exchange ? ` Last exchange: ${f.last_exchange.slice(0, 300)}` : ""}`, decision_at: to === "approved" ? reading.read_on : null });
+        await applyMove(db, { personId: actor.personId, name: `${actor.name} (portal reading)`, cmm: true, owner: false }, f, to, { note: `Read on the portal on ${frd(reading.read_on)}: “${w.status}”.${f.last_exchange ? ` Last exchange: ${f.last_exchange.slice(0, 300)}` : ""}`, decision_at: to === "approved" ? reading.read_on : null });
         for (let i = ex.length - 1; i >= 0; i--) if (ex[i].href === `/proj/auth/${f.id}`) ex.splice(i, 1);
         ex.push({ kind: "Stage moved", ref, text: `${f.title}: the portal reads “${w.status}”. ${to === "remarks" ? "Passed to “Remarks to answer”: the reply is ours." : to === "approved" ? "Passed to “Decision received”: publication and close-out remain." : "Reply seen on the portal: back with the authority."}`, href: `/proj/auth/${f.id}` });
       } catch (e) { ex.push({ kind: "To check", ref, text: `${f.title}: the portal reads “${w.status}” but the file could not be moved (${e instanceof Error ? e.message : "error"})`, href: `/proj/auth/${f.id}` }); }
