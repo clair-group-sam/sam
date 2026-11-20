@@ -6,7 +6,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { today } from "@/lib/authority";
-import { entityDash } from "@/lib/dashboard";
+import { groupTiles } from "@/components/GroupTiles";
+import { overdueByOwner } from "@/lib/escalation";
 import { KIND, myInbox, groupProjects } from "@/lib/inbox";
 import DueBand, { dueWindow } from "@/components/DueBand";
 
@@ -22,15 +23,16 @@ export default async function Decisions() {
   const ents = s.entity === "ALL" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
   const db = supabaseAdmin(); const t0 = today();
   const [inbox, dash, due, { data: ch }] = await Promise.all([
-    myInbox(s), Promise.all(ents.map((e) => entityDash(db, e).catch(() => null))), dueWindow(db, ents),
+    myInbox(s), Promise.all([groupTiles(db, ents), overdueByOwner(db, ents)]), dueWindow(db, ents), // FB-170: counted straight, not the full state of each entity
     db.from("np_changes").select("id,entity,post_code,seat,from_name,to_name,effective_on,acceptance").in("entity", ents).eq("status", "open").order("effective_on"),
   ]);
   const lines = groupProjects(inbox, t0);
   const decide = lines.filter((t) => DECISION.includes(t.kind)); const other = lines.filter((t) => !DECISION.includes(t.kind));
   const late = decide.filter((t) => t.due && t.due < t0).length;
   const changes = (ch ?? []) as { id: string; entity: string; post_code: string; seat: string; from_name: string | null; to_name: string | null; effective_on: string | null; acceptance: string }[];
-  const D = dash.filter((d): d is NonNullable<typeof d> => !!d);
-  const escalated = D.reduce((n, d) => n + d.overdue.am, 0); const level1 = D.reduce((n, d) => n + d.findings.level1, 0);
+  const [tiles, groups] = dash;
+  const D = tiles.map((t) => { const g = groups.filter((x) => x.entity === t.entity); return { ...t, overdue: g.reduce((n, x) => n + x.count, 0), am: g.reduce((n, x) => n + x.am, 0) }; });
+  const escalated = D.reduce((n, d) => n + d.am, 0); const level1 = D.reduce((n, d) => n + d.level1, 0);
   const first = s.name.split(" ")[0];
   const row = (t: (typeof lines)[number]) => (
     <tr key={t.id}><td style={{ width: 70 }}><span className={"ent " + t.entity}>{t.entity}</span></td><td style={{ width: 170 }}><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span></td>
@@ -67,9 +69,9 @@ export default async function Decisions() {
           <thead><tr><th>Entity</th><th>Findings open</th><th>Findings late</th><th>CAA applications</th><th>Late with us</th><th>Overdue items</th><th>Reached the AM</th></tr></thead>
           <tbody>{D.map((d) => (
             <tr key={d.entity}><td><span className={"ent " + d.entity}>{d.entity}</span> {ENT[d.entity]?.name}</td>
-              <td><Link className="underline" href={`/comp/find?entity=${d.entity}`}>{d.findings.open}</Link>{d.findings.level1 > 0 && <span className="pill red ml-1">{d.findings.level1} level 1</span>}</td>
-              <td className={d.findings.late ? "red" : ""}>{d.findings.late}</td><td><Link className="underline" href="/proj/auth">{d.files.open}</Link></td><td className={d.files.lateOurs ? "red" : ""}>{d.files.lateOurs}</td>
-              <td><Link className="underline" href="/dash/cs/overdue">{d.overdue.total}</Link></td><td className={d.overdue.am ? "red" : ""}>{d.overdue.am}</td></tr>))}</tbody>
+              <td><Link className="underline" href={`/comp/find?entity=${d.entity}`}>{d.findings}</Link>{d.level1 > 0 && <span className="pill red ml-1">{d.level1} level 1</span>}</td>
+              <td className={d.findingsLate ? "red" : ""}>{d.findingsLate}</td><td><Link className="underline" href="/proj/auth">{d.ours + d.theirs}</Link></td><td className={d.filesLate ? "red" : ""}>{d.filesLate}</td>
+              <td><Link className="underline" href="/dash/cs/overdue">{d.overdue}</Link></td><td className={d.am ? "red" : ""}>{d.am}</td></tr>))}</tbody>
         </table>
       </section>
 

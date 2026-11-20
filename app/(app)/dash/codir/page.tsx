@@ -1,4 +1,5 @@
 import Link from "next/link";
+import GroupTiles from "@/components/GroupTiles";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -18,6 +19,7 @@ export default async function CodirDash({ searchParams }: { searchParams: Promis
   const db = supabaseAdmin();
   const ents = s.entity === "ALL" || view === "group" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
   const group = ents.length > 1;
+  if (group) return <GroupTiles db={db} ents={ents} title="CODIR / SRB" group={s.group} />; // FB-170: tiles, the full board is per entity
   // FB-168: the deadlines are read while the reviews are computed, not after them
   const [rs, { win, dues }] = await Promise.all([Promise.all(ents.map((e) => managementReview(db, e))), dueWindow(db, ents)]);
   return (

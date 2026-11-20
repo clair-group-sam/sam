@@ -1,4 +1,5 @@
 import Link from "next/link";
+import GroupTiles from "@/components/GroupTiles";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -18,6 +19,7 @@ export default async function Deadlines({ searchParams }: { searchParams: Promis
   if (!["cmm", "am", "np"].includes(s.role)) redirect("/home/tasks");
   const sp = await searchParams; const t0 = today();
   const ents = s.entity === "ALL" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
+  if (ents.length > 1) return <GroupTiles db={supabaseAdmin()} ents={ents} title="Deadlines" group={s.group} />; // FB-170
   const win = WIN[sp.win ?? "90"] ?? WIN["90"]; const from = addDays(t0, win[0]), to = addDays(t0, win[1]);
   const kinds = (sp.kind ?? "").split(",").filter((k): k is DueKind => k in DUE_KIND);
   const all = await loadDeadlines(supabaseAdmin(), ents, { from: addDays(t0, -400), to });

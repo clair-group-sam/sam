@@ -1,4 +1,5 @@
 import Link from "next/link";
+import GroupTiles from "@/components/GroupTiles";
 import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -17,6 +18,7 @@ export default async function ComplianceSafetyDash() {
   if (!["cmm", "am"].includes(s.role)) redirect("/home/tasks");
   const db = supabaseAdmin();
   const ents = s.entity === "ALL" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
+  if (ents.length > 1) return <GroupTiles db={db} ents={ents} title="Compliance & Safety" group={s.group} />; // FB-170
   const dashes = await Promise.all(ents.map((e) => entityDash(db, e)));
   const multi = dashes.length > 1;
   return (
