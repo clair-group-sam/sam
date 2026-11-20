@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { EntityTiles } from "@/components/GroupTiles";
 import { frText } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -37,6 +38,8 @@ export default async function Inbox() {
   return (
     <>
       <PageHeader eyebrow="S.A.M., Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
+      {/* Group view: where each entity stands, before the list; a click opens the Inbox of that entity */}
+      {s.entity === "ALL" && dueEnts.length > 1 && ["cmm", "am"].includes(s.role) && <EntityTiles db={supabaseAdmin()} ents={dueEnts} />}
       {due && <DueBand dues={due.dues} win={due.win} lanes={dueEnts} />}
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? `, + ${testCount} test` : "") + (tasks.length !== all.length ? `, ${tasks.length} lines (a project = one line)` : "")} />

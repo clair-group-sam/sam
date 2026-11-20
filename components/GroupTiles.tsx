@@ -35,13 +35,21 @@ export async function groupTiles(db: SupabaseClient, ents: string[]): Promise<Ti
 }
 
 export default async function GroupTiles({ db, ents, title, group }: { db: SupabaseClient; ents: string[]; title: string; group: boolean }) {
-  const tiles = await groupTiles(db, ents);
-  const n = (v: number, late = false) => <b style={{ fontSize: 22, color: late && v ? "var(--terra)" : undefined }}>{v}</b>;
   return (
     <>
       <PageHeader eyebrow={`Dashboards, ${title}`} title={`${title}, ${group ? "Group view" : "all your entities"}`}
         sub="Where each entity stands, in a few figures. Click an entity to open its full dashboard; come back with Group at the top." />
-      <div className="grid md:grid-cols-2 gap-4">
+      <EntityTiles db={db} ents={ents} />
+    </>
+  );
+}
+
+/** The tiles alone: used by the dashboards in Group view and on top of the Inbox in Group view. */
+export async function EntityTiles({ db, ents }: { db: SupabaseClient; ents: string[] }) {
+  const tiles = await groupTiles(db, ents);
+  const n = (v: number, late = false) => <b style={{ fontSize: 22, color: late && v ? "var(--terra)" : undefined }}>{v}</b>;
+  return (
+      <div className="grid md:grid-cols-2 gap-4 mb-5">
         {tiles.map((t) => { const late = t.findingsLate + t.filesLate + t.actionsLate; const tone = late || t.level1 ? "var(--terra)" : t.ours || t.findings ? "var(--amber-ink)" : "var(--green-ink, #2e7d32)";
           return (
             <EntityTile key={t.entity} entity={t.entity} className="card" style={{ borderTop: `4px solid ${tone}`, padding: 0, width: "100%" }}>
@@ -55,6 +63,5 @@ export default async function GroupTiles({ db, ents, title, group }: { db: Supab
               </div>
             </EntityTile>); })}
       </div>
-    </>
   );
 }
