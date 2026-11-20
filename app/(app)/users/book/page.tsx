@@ -16,6 +16,7 @@ export default async function People({ searchParams }: { searchParams: Promise<{
   const { data } = await db.from("people").select("id,display_name,email,job_title,home_entity,entities,roles,is_group_function,last_seen_at,can_create_manuals").order("display_name");
   let all = (data ?? []) as P[];
   if (s.entity !== "ALL") all = all.filter((p) => p.is_group_function || p.home_entity === s.entity || (p.entities ?? []).includes(s.entity));
+  else if (!s.group) all = all.filter((p) => p.is_group_function || s.entities.includes(p.home_entity ?? "") || (p.entities ?? []).some((e) => s.entities.includes(e))); // "ALL" of someone in several entities: the people of those entities
   else if (!s.group) all = all.filter((p) => p.is_group_function || (p.entities ?? []).some((e) => s.entities.includes(e)));
   const q = (sp.q ?? "").toLowerCase().trim();
   const list = q ? all.filter((p) => [p.display_name, p.email, p.job_title, ...(p.roles ?? [])].join(" ").toLowerCase().includes(q)) : all;

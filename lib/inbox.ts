@@ -21,7 +21,7 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
   const sb = await supabaseServer();
   // my items: addressed to me by name, or to one of my posts (holders and deputies), or to nobody in particular
   let q = sb.from("tasks").select("id,title,detail,due,entity,kind,status,link,owner_person,owner_role").eq("status", "open").order("due", { ascending: true, nullsFirst: false }).limit(200);
-  if (s.entity !== "ALL") q = q.eq("entity", s.entity);
+  if (s.entity !== "ALL") q = q.eq("entity", s.entity); else if (!s.group) q = q.in("entity", s.entities);
   const { data } = await q;
   const posts = new Set(s.roles.map(basePost));
   const tasks: InboxItem[] = ((data ?? []) as InboxItem[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : true).slice(0, 100)

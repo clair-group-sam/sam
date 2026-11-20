@@ -11,6 +11,8 @@ import { applyPrefs, readPrefs } from "@/lib/prefs";
 
 type Props = { session: Session; children: React.ReactNode };
 /** Super admin: look at S.A.M. as another profile (or come back). A full reload on Home: the page in front may not exist for that profile. */
+/** The entity the person lands on: saved on their profile, and shown at once. */
+async function setDefaultEntity(def: string) { const r = await fetch("/api/ent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ def }) }); if (r.ok) window.location.reload(); }
 async function viewAs(view: string | null) { await fetch("/api/view", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ view }) }); window.location.assign("/"); }
 
 // Entity switch animation (09/11): ~0.4 s, all three moves in the direction of travel. The switch still reloads the page (FB-048);
@@ -169,7 +171,7 @@ export default function Shell({ session, children }: Props) {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar session={session} ent={ent} mode={eMode} crumb={[curMod ? modLabel(role, curMod) : mod, curSub ? subLabel(role, mod, curSub) : sub]} />
-        {ent === "ALL" && eMode === "group" && <div className="groupband"><b>Group view</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
+        {ent === "ALL" && eMode === "group" && <div className="groupband"><b>{session.group ? "Group view" : "All your entities"}</b>: lists show every entity in your scope ({session.entities.join(", ")}). Pick an entity at the top to work on its documents, projects and files.</div>}
         {entAuto && <div className="groupband"><b>{ENT[ent]?.name ?? ent} ({ent})</b>: this page works one entity at a time, so the group view gives way to your home entity here. Pick another entity at the top if needed; the overviews and lists stay in group view.</div>}
         {/* entity switch, after the reload: the new page slides in from the side the click went to. Runs while the HTML is parsed,
             before <main> paints, so the page never shows, vanishes and comes back. A <style> in <head>, not an attribute, so hydration sees nothing. */}
@@ -226,9 +228,12 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
   const choices = session.entities;
   const cur = ent;
   // the buttons: Group only where the page can show every entity; none of them on a page that does not depend on the entity
-  const list = [...choices, ...(session.group && mode !== "single" ? ["ALL"] : [])];
+  // "ALL" for anyone who works in several entities: named Group for a group function (the whole group), ALL otherwise (their own entities)
+  const mayAll = session.group || (!session.viewAs && choices.length > 1);
+  const allLabel = session.group ? "Group" : "ALL"; const allName = session.group ? "Group view" : "All your entities";
+  const list = [...choices, ...(mayAll && mode !== "single" ? ["ALL"] : [])];
   const idle = mode === "none";
-  const curName = cur === "ALL" ? "Group view" : ENT[cur]?.name ?? cur;
+  const curName = cur === "ALL" ? allName : ENT[cur]?.name ?? cur;
   const curSub = cur === "ALL" ? `lists across every entity, ${choices.join(", ")}` : `${ENT[cur]?.qual ?? ""}, ${ENT[cur]?.auth ?? ""}`;
   // the switch in motion: the white pill slides (frosted on the way), the new colour sweeps the bar, the page leaves sideways
   const switchRef = useRef<HTMLElement | null>(null);
@@ -258,7 +263,7 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
       <div className="entid" title={curSub}>
         {!(choices.length > 1 || session.group) && <span className="entcode">{cur}</span>}
         {going ? (
-          <span key="to" className={"enttext entin-" + going.dir}><b>{going.ent === "ALL" ? "Group view" : ENT[going.ent]?.name ?? going.ent}</b>
+          <span key="to" className={"enttext entin-" + going.dir}><b>{going.ent === "ALL" ? allName : ENT[going.ent]?.name ?? going.ent}</b>
             <small>{going.ent === "ALL" ? `lists across every entity, ${choices.join(", ")}` : `${ENT[going.ent]?.qual ?? ""}, ${ENT[going.ent]?.auth ?? ""}`}</small></span>
         ) : (
           <span key="cur" className="enttext"><b>{curName}</b><small>{curSub}</small></span>
@@ -272,8 +277,8 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
             const on = going ? going.ent === e : cur === e;
             return <button key={e} type="button" className={on ? "on" : ""} aria-pressed={on}
               style={going && on ? { ["--entc" as string]: ENT_COLOR[e] ?? "var(--navy-ink)" } as React.CSSProperties : undefined}
-              disabled={idle} title={idle ? "This page does not depend on the entity" : e === "ALL" ? "Group view: overviews and lists across every entity" : `${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`}
-              onClick={() => cur !== e && pick(e)}>{e === "ALL" ? "Group" : e}</button>;
+              disabled={idle} title={idle ? "This page does not depend on the entity" : e === "ALL" ? `${allName}: overviews and lists across ${session.group ? "every entity" : choices.join(", ")}` : `${ENT[e]?.name ?? e}, ${ENT[e]?.qual ?? ""}, ${ENT[e]?.auth ?? ""}`}
+              onClick={() => cur !== e && pick(e)}>{e === "ALL" ? allLabel : e}</button>;
           })}
         </nav>
       )}
@@ -315,6 +320,16 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
               <div className="row"><span className="lab">Theme</span><span className="seg3">{(["light", "dark", "auto"] as const).map((t) => <button key={t} type="button" className={prefs.theme === t ? "on" : ""} aria-pressed={prefs.theme === t} onClick={() => { applyPrefs(t); setPrefs(readPrefs()); }}>{t === "auto" ? "System" : t === "dark" ? "Dark" : "Light"}</button>)}</span></div>
               <div className="row"><span className="lab">Text size</span><span className="seg3">{([["standard", "A"], ["large", "A+"], ["xlarge", "A++"]] as const).map(([z, l]) => <button key={z} type="button" className={prefs.size === z ? "on" : ""} aria-pressed={prefs.size === z} title={z === "standard" ? "Standard" : z === "large" ? "Large (110 %)" : "Extra large (122 %)"} onClick={() => { applyPrefs(undefined, z); setPrefs(readPrefs()); }}>{l}</button>)}</span></div>
             </div>
+            {!session.viewAs && session.entities.length > 1 && (
+              <div className="prefs" role="group" aria-label="Default entity">
+                <div className="mi muted" style={{ padding: "4px 10px" }}>Entity shown when I open S.A.M.</div>
+                <div style={{ padding: "2px 10px 8px" }}><select className="inp" style={{ marginTop: 0 }} aria-label="Default entity" defaultValue={session.defaultEntity ?? ""} onChange={(e) => setDefaultEntity(e.target.value)}>
+                  <option value="">{session.group ? "Group (as today)" : `My home entity${session.person?.home_entity ? ` (${session.person.home_entity})` : ""}`}</option>
+                  {session.entities.map((e) => <option key={e} value={e}>{ENT[e]?.name ?? e} ({e})</option>)}
+                  <option value="ALL">{session.group ? "Group, every entity" : `ALL, ${session.entities.join(" + ")}`}</option>
+                </select></div>
+              </div>
+            )}
             {session.superadmin && (
               <div className="prefs" role="group" aria-label="View as">
                 <div className="mi muted" style={{ padding: "4px 10px" }}>View S.A.M. as (super admin){session.viewAs ? `: now ${session.viewAs}, ${session.entity}` : ""}</div>

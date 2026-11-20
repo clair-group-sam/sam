@@ -50,7 +50,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
   const entOfFolder = (f: string) => (several ? /\(([A-Z]{3})\)$/.exec(f.split(" › ")[0])?.[1] ?? null : null);
   const sbc = await supabaseServer();
   let cq = sbc.from("certificates").select("id", { count: "exact", head: true });
-  if (s.entity !== "ALL") cq = cq.eq("entity", s.entity);
+  if (s.entity !== "ALL") cq = cq.eq("entity", s.entity); else if (!s.group) cq = cq.in("entity", s.entities);
   const { count: certCount } = await cq;
   const pathOf = (r: Row) => [...(several ? [`${ENT[r.manual.entity]?.name ?? r.manual.entity} (${r.manual.entity})`] : []), ...(r.manual.path ?? "Unfiled").split(" › ")].join(" › ");
   const inFolder = folder ? rows.filter((r) => pathOf(r) === folder || pathOf(r).startsWith(folder + " › ")) : rows;

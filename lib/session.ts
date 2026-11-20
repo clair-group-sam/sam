@@ -19,6 +19,8 @@ export type Session = {
   entityPref: string;
   /** "View as" (super admin): the profile being looked at, e.g. "NPFO"; null in one's own view. */
   viewAs: string | null;
+  /** The entity the person chose to land on (user menu), when it is still in their scope; null: none chosen. */
+  defaultEntity: string | null;
   /** The signed-in person is a super admin, whatever the view. */
   superadmin: boolean;
   /** Super admin only: every profile that can be looked at (posts of each entity, roles given in Users, AM, user). */
@@ -89,12 +91,18 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const entities = viewAs ? [viewEnt] : group ? ENTS4 : (person?.entities ?? []);
   const name = person?.display_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "";
   const wanted = (() => { const v = store.get("sam_ent")?.value; return v && v !== "ALL" ? normEntity(v) : v; })(); // old cookies (AJD…) still work
-  let entity = viewAs ? viewEnt : group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL"); // a view works on its one entity
-  if (wanted && (wanted === "ALL" ? group : entities.includes(wanted))) entity = wanted;
+  // "ALL" = every entity of the person's scope: the whole group for a group function, their own entities for someone who works in several
+  const mayAll = !viewAs && (group || entities.length > 1);
+  const inScope = (e: string | null | undefined) => !!e && (e === "ALL" ? mayAll : entities.includes(e));
+  // the entity chosen as default in the user menu (read apart: a missing column must never block a sign-in)
+  let defaultEntity: string | null = null;
+  if (person && !viewAs && (group || entities.length > 1)) { try { const { data: de } = await supabaseAdmin().from("people").select("default_entity").eq("id", person.id).maybeSingle(); const d = (de as { default_entity?: string | null } | null)?.default_entity ?? null; if (inScope(d)) defaultEntity = d; } catch { /* no default */ } }
+  let entity = viewAs ? viewEnt : defaultEntity ?? (group ? "ALL" : (person?.home_entity ?? entities[0] ?? "ALL")); // a view works on its one entity
+  if (wanted && inScope(wanted)) entity = wanted;
   // 09/11 · the Group view only on overviews and lists: a page that works on one entity gets the home entity instead
   // (the cookie keeps "ALL", so the overviews show the group again). x-sam-path is set by the middleware.
   const path = (await headers()).get("x-sam-path") ?? "";
   const entityPref = entity;
   if (entity === "ALL" && path && entMode(path) === "single") entity = singleEntity(person?.home_entity, entities);
-  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role), viewAs, superadmin, viewOptions: superadmin ? await viewOptionsFor() : [] };
+  return { userId: user.id, email: user.email ?? "", name, initials: initialsOf(name), person, role, roles, entities, group, entity, entityPref, home: homeFor(role), viewAs, defaultEntity, superadmin, viewOptions: superadmin ? await viewOptionsFor() : [] };
 });

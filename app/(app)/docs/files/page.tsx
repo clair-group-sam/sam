@@ -15,7 +15,7 @@ export default async function Certificates({ searchParams }: { searchParams: Pro
   const canDrop = await mayCreateManual(s);
   const sb = await supabaseServer();
   let q = sb.from("certificates").select("*").order("valid_until", { ascending: true, nullsFirst: false });
-  if (s.entity !== "ALL") q = q.eq("entity", s.entity); else if (qe) q = q.eq("entity", qe);
+  if (s.entity !== "ALL") q = q.eq("entity", s.entity); else if (qe && (s.group || s.entities.includes(qe))) q = q.eq("entity", qe); else if (!s.group) q = q.in("entity", s.entities);
   if (qf) q = qf === "Unfiled" ? q.is("folder", null) : q.eq("folder", qf);
   const { data } = await q;
   const everything = (data ?? []) as (Certificate & { archived_at?: string | null; reference?: string | null; summary?: string | null; folder?: string | null })[];

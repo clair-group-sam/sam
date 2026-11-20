@@ -12,15 +12,15 @@ export const STEP_LABEL: Record<string, string> = {
 };
 export const STEPS = ["draft", "approved_np", "approved_compliance", "signed", "with_civil_aviation", "published", "repository"];
 
-export function entityFilter<T extends { eq: (c: string, v: string) => T }>(q: T, s: Session, col = "entity"): T {
-  return s.entity === "ALL" ? q : q.eq(col, s.entity);
+export function entityFilter<T extends { eq: (c: string, v: string) => T; in: (c: string, v: string[]) => T }>(q: T, s: Session, col = "entity"): T {
+  return s.entity === "ALL" ? (s.group ? q : q.in(col, s.entities)) : q.eq(col, s.entity); // "ALL" is the person's own entities unless they hold a group function
 }
 
 /** Manuals in scope with their current (latest published) and working (unpublished) revisions. */
 export async function listManuals(s: Session): Promise<{ manual: Manual; current: Revision | null; working: Revision | null; workings: Revision[] }[]> {
   const sb = await supabaseServer();
   let mq = sb.from("manuals").select("*").order("path").order("code");
-  if (s.entity !== "ALL") mq = mq.eq("entity", s.entity);
+  if (s.entity !== "ALL") mq = mq.eq("entity", s.entity); else if (!s.group) mq = mq.in("entity", s.entities);
   const { data: manuals } = await mq;
   const ids = (manuals ?? []).map((m: Manual) => m.id);
   if (!ids.length) return [];
