@@ -1,5 +1,5 @@
 // The Inbox list of one person (tasks addressed to them, their posts, deputies included, and their project tasks ready to start).
-// Shared by Home › Inbox and Home › Morning coffee.
+// Shared by Home › Inbox and the three landing screens.
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { morClock } from "@/lib/safety";
@@ -100,4 +100,11 @@ export function groupProjects(items: InboxItem[], today: string): InboxItem[] {
     rest.push({ ...ts[0], id: "acts:" + entity, title: "Safety actions", ctx: undefined, ctxLink: undefined, link: `/safe/actions?mine=1`, detail: `${parts.join(", ")}. Next: ${next}` });
   }
   return rest.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
+}
+
+/** The day and the hour in Paris, where the group works (a server in UTC would say "Good morning" at 01:00). */
+export function parisParts(d = new Date()) {
+  const f = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short", hour12: false });
+  const p = Object.fromEntries(f.formatToParts(d).map((x) => [x.type, x.value]));
+  return { day: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) % 24, minute: Number(p.minute), weekday: p.weekday as string };
 }

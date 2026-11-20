@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { saveTokens, userToken } from "@/lib/msgraph-user";
 
 /** OAuth return from Supabase (Entra ID). Exchanges the code, then refreshes the person row (scope from Entra groups when present). */
 export async function GET(req: NextRequest) {
@@ -19,20 +18,6 @@ export async function GET(req: NextRequest) {
       try {
         await supabaseAdmin().rpc("touch_person", { p_auth_uid: user.id, p_email: user.email, p_name: name, p_groups: Array.isArray(groups) ? groups : [] });
       } catch { /* identity refresh is best effort; RLS still protects the data */ }
-      // Morning coffee: keep the Microsoft refresh token (delegated read-only rights), encrypted, for this person
-      const refresh = data?.session?.provider_refresh_token;
-      const access = data?.session?.provider_token;
-      console.log("[graph] sign-in tokens:", { refresh: refresh ? `${refresh.length} ${refresh.slice(0, 4)}` : null, access: access ? `${access.length} ${access.slice(0, 4)}` : null });
-      if (refresh || access) {
-        try {
-          const { data: p } = await supabaseAdmin().from("people").select("id").eq("auth_uid", user.id).maybeSingle();
-          if (p) {
-            await saveTokens((p as { id: string }).id, { refresh, access, expiresIn: 3000 });
-            // diagnosis: renew once right away, so a refusal shows in the logs at sign-in rather than an hour later
-            if (refresh) await userToken((p as { id: string }).id, { force: true }).then(() => console.log("[graph] refresh test ok")).catch((e) => console.error("[graph] refresh test failed", e instanceof Error ? e.message : e));
-          }
-        } catch { /* the recap will ask to sign in again */ }
-      }
     }
   }
   return NextResponse.redirect(new URL("/home", req.url));

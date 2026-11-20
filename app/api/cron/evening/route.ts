@@ -7,11 +7,10 @@ import { checkAll } from "@/lib/regulation";
 import { eccairsConfig } from "@/lib/eccairs";
 import { syncE2 } from "@/lib/eccairs-map";
 import { ENTS4 } from "@/lib/nav";
-// Evening (19:00 UTC = 20:00 / 21:00 Paris): Morning coffee recaps are deleted — they hold mail and Teams summaries (UX-02).
+// Evening (19:00 UTC = 20:00 / 21:00 Paris): Leon hours, FlightLogger reports, Easy Access Rules, ECCAIRS statuses.
 export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) return new Response("forbidden", { status: 403 });
-  const { count } = await supabaseAdmin().from("coffee_recaps").delete({ count: "exact" }).gte("day", "1900-01-01");
   // SPI activity from Leon (ASJMT + ASJFR): this month and the previous one, every evening (journey logs closed late are picked up)
   let leon: unknown = "not configured";
   if (leonConfigured()) { const d = new Date(); const cur = d.toISOString().slice(0, 7); const prev = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
@@ -25,5 +24,5 @@ export async function GET(req: NextRequest) {
   // ECC-02 · the status of the reports S.A.M. holds in ECCAIRS 2, mirrored (a few proxy calls per entity, only where configured and reports exist)
   const eccairs: Record<string, unknown> = {};
   for (const e of ENTS4) if (eccairsConfig(e)) { try { eccairs[e] = await syncE2(supabaseAdmin(), e); } catch (err) { eccairs[e] = (err as Error).message; } }
-  return Response.json({ ran: new Date().toISOString(), coffee_recaps_deleted: count ?? 0, leon, flightlogger, regulations, eccairs });
+  return Response.json({ ran: new Date().toISOString(), leon, flightlogger, regulations, eccairs });
 }

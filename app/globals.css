@@ -534,24 +534,6 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 .kind.k-docs{background:var(--gray1);color:var(--navy)}
 .ctx{font-size:13px;font-weight:600;color:var(--indigo-ink);margin-bottom:2px}
 .ctx a{color:inherit}
-/* Morning coffee (UX-02) */
-.coffee-box{border-color:var(--amber-line);background:linear-gradient(90deg,var(--orange-s),var(--white) 60%)}
-.cf-head{display:flex;align-items:center;gap:14px}
-.cf-cup{line-height:0;color:var(--amber-ink);flex:0 0 auto}
-.cf-form{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:12px;flex-wrap:wrap}
-.cf-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;font-size:14px}
-.cf-src{display:flex;align-items:center;gap:6px}
-.cf-src.off{color:var(--field)}
-.coffee-syn .cb{display:flex;align-items:flex-start;gap:14px;font-size:16px;font-weight:600;line-height:1.5}
-.coffee-syn.hot{border-color:var(--amber-line);background:var(--orange-s)}
-.card.cf-hot{border-color:var(--amber-line)}
-.card.cf-hot .ch{background:var(--orange-s)}
-.coffee-syn ol li{margin:2px 0}
-.coffee-soon{border-style:dashed;background:var(--gray05)}
-@media (max-width:760px){.cf-sources{grid-template-columns:1fr}.cf-head{flex-wrap:wrap}}
-.cf-grp{padding:10px 18px 4px;font-size:13px;font-weight:600;color:var(--slate7)}
-.cf-mailgrp+.cf-mailgrp{border-top:1px solid var(--line)}
-tr.cf-free td{color:var(--field)}
 .mini.red{color:var(--terra)}
 /* Safety reports (SAF-01) */
 .rep-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}

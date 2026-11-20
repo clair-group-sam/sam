@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/Page";
 
 const STEP: Record<string, [number, string]> = {
   docs: [3, "Documents, library, manual page, reading & acknowledgement, certificates & validities"],
-  home: [4, "Home, real Inbox, My to-do list, Morning coffee"],
+  home: [4, "Home, real Inbox, My to-do list"],
   safe: [5, "Safety, report (SAF-01) then analysis on the SM side"],
   comp: [6, "Compliance, findings, actions, change requests"],
 };

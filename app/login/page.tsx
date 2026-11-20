@@ -3,7 +3,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 // keep in step with SIGNIN_SCOPES in lib/msgraph-user.ts (server file, not imported here)
-const SIGNIN_SCOPES = "openid profile email offline_access User.Read Calendars.Read Mail.Read Chat.Read ChannelMessage.Read.All";
+const SIGNIN_SCOPES = "openid profile email User.Read"; // identity only: S.A.M. reads no mailbox, calendar or chat
 function LoginCard() {
   const setup = useSearchParams().get("setup") === "1";
   const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);

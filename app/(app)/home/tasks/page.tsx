@@ -6,10 +6,7 @@ import { PageHeader, Metric } from "@/components/Page";
 import { ENT, ENTS4 } from "@/lib/nav";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DueBand, { dueWindow } from "@/components/DueBand";
-import { KIND, myInbox, groupProjects } from "@/lib/inbox";
-import { CoffeeBox } from "@/components/CoffeeBox";
-import { todaysRecap, parisParts } from "@/lib/coffee";
-import { hasGraph } from "@/lib/msgraph-user";
+import { KIND, myInbox, groupProjects, parisParts } from "@/lib/inbox";
 import { isTestData, TEST_PILL_TITLE } from "@/lib/testdata";
 
 export const maxDuration = 60;
@@ -23,7 +20,6 @@ export default async function Inbox() {
   if (s.entity !== "ALL" && (s.group || s.entities.length > 1)) for (const t of groupProjects(await myInbox({ ...s, entity: "ALL" }), parisParts().day)) if (t.entity && t.entity !== s.entity && !isTestData(t.title, (t as { ctx?: string }).ctx)) elsewhere.set(t.entity, (elsewhere.get(t.entity) ?? 0) + 1);
   const elseTotal = [...elsewhere.values()].reduce((a, b) => a + b, 0);
   const elseText = [...elsewhere.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${ENT[e]?.name ?? e} ${n}`).join(", ");
-  const [recap, connected] = s.person ? await Promise.all([todaysRecap(s.person.id), hasGraph(s.person.id)]) : [null, false];
   const { day: today, hour } = parisParts();
   // FB-024 · test objects are labelled and left out of the counters
   const isTest = (t: { title: string; ctx?: string }) => isTestData(t.title, t.ctx);
@@ -41,7 +37,6 @@ export default async function Inbox() {
     <>
       <PageHeader eyebrow="S.A.M., Inbox" title={`${greet} ${first}`} sub="Everything that needs you, in one list." />
       {due && <DueBand dues={due.dues} win={due.win} lanes={dueEnts} />}
-      <CoffeeBox recap={recap} connected={connected} />
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Metric label="Open tasks" value={real.length} hint={(s.entity === "ALL" ? "all entities" : ENT[s.entity]?.name) + (testCount ? `, + ${testCount} test` : "") + (tasks.length !== all.length ? `, ${tasks.length} lines (a project = one line)` : "")} />
         <Metric label="Overdue tasks" value={late} tone={late ? "red" : "green"} hint={late ? "past due date" : "nothing late"} />
