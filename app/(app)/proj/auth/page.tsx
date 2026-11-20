@@ -82,7 +82,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
                   <td className="mono">{f.portal_url ? <a className="underline" href={f.portal_url} target="_blank" rel="noreferrer">{f.portal_ref ?? "portal"}</a> : f.portal_ref ?? "—"}</td>
                   <td>{b ? <span className={"pill " + (b === "us" ? "amber" : "")}>{b === "us" ? "Ours" : f.authority ?? "Authority"}</span> : "—"}{f.portal_status && <div className="mini">{f.portal_status}</div>}{d !== null && AT_AUTHORITY.includes(f.stage) && <div className="mini">{d} d there</div>}</td>
                   <td className="mono">{fr(f.target_date)}{due.days !== null && b && <div className={"mini" + (due.state === "late" ? " red" : "")}>{due.days < 0 ? `${-due.days} d past` : `in ${due.days} d`}</div>}</td>
-                  <td className="mini" style={{ maxWidth: 260 }}>{f.last_exchange ? <>{f.last_exchange_on ? <b>{fr(f.last_exchange_on)} </b> : null}{f.last_exchange}</> : lr ? <><b>{fr(lr.at)} </b>{lr.direction === "sent" ? "Sent: " : "Received: "}{lr.note.slice(0, 110)}</> : "—"}{f.assessor && <div>{f.assessor}</div>}</td>
+                  <td className="mini" style={{ maxWidth: 260 }}>{f.last_exchange ? <>{f.last_exchange_on ? <b>{fr(f.last_exchange_on)} </b> : null}{frText(f.last_exchange)}</> : lr ? <><b>{fr(lr.at)} </b>{lr.direction === "sent" ? "Sent: " : "Received: "}{frText(lr.note).slice(0, 110)}</> : "—"}{f.assessor && <div>{f.assessor}</div>}</td>
                   <td className="mini" style={{ maxWidth: 240 }}>{nextAction(f, itemsBy.get(f.id) ?? [])}{!f.next_owner && f.owner_role ? <div className="mono">{f.owner_role}</div> : null}</td>
                 </tr>);
             })}
