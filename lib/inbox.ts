@@ -102,6 +102,48 @@ export function groupProjects(items: InboxItem[], today: string): InboxItem[] {
   return rest.sort((a, b) => (a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
 }
 
+export type InboxLine = InboxItem & { children?: InboxItem[] };
+const PLURAL: Record<string, string> = { authority: "CAA applications", finding: "Findings", escalation: "Escalations", reading: "Manuals to read and acknowledge", communication: "Communications", signature: "Signatures", safety_report: "Safety reports", mitigation: "Mitigations", watch: "Regulatory watch items", check: "Compliance checks", certificate_validity: "Validities" };
+/**
+ * The Inbox in a few lines instead of a wall: (1) everything that belongs to one project under the project — its own tasks and
+ * the CAA applications it opened; (2) several tasks on the same object under that object; (3) from 3 lines of the same kind in
+ * an entity, one line for the kind. Nothing is hidden: each grouped line carries its lines, shown on a click.
+ */
+export function regroup(lines: InboxItem[], today: string, fileProject: Map<string, { id: string; title: string }>): InboxLine[] {
+  const byDue = (a: InboxItem, b: InboxItem) => ((a.due ?? "9999") < (b.due ?? "9999") ? -1 : 1);
+  const head = (ts: InboxItem[], over: Partial<InboxLine>, what: string): InboxLine => {
+    ts.sort(byDue); const late = ts.filter((t) => t.due && t.due < today).length;
+    return { ...ts[0], ctx: undefined, ctxLink: undefined, ...over, detail: [`${ts.length} ${what}`, late && `${late} late`].filter(Boolean).join(", ") + `. Next: ${ts[0].title}`, children: ts };
+  };
+  const out: InboxLine[] = []; let rest: InboxItem[] = [];
+  // 1 · by project
+  const proj = new Map<string, { title: string; items: InboxItem[] }>();
+  for (const t of lines) {
+    const board = /^\/proj\/boards\/([^/?#]+)/.exec(t.link ?? "")?.[1]; const file = /^\/proj\/auth\/([^/?#]+)/.exec(t.link ?? "")?.[1];
+    const p = board ? { id: board, title: t.title } : file ? fileProject.get(file) : undefined;
+    if (!p) { rest.push(t); continue; }
+    if (!proj.has(p.id)) proj.set(p.id, { title: p.title, items: [] });
+    const g = proj.get(p.id)!; if (board) g.title = t.title; g.items.push(t);
+  }
+  for (const [id, g] of proj) {
+    if (g.items.length === 1) { rest.push(g.items[0]); continue; }
+    out.push(head(g.items, { id: "pg:" + id, kind: "project", title: g.title, link: `/proj/boards/${id}` }, "lines for you in this project"));
+  }
+  // 2 · several tasks on the same object
+  const same = new Map<string, InboxItem[]>(); const r2: InboxItem[] = [];
+  for (const t of rest) { if (!t.link || t.id.startsWith("acts:")) { r2.push(t); continue; } const k = t.entity + "|" + t.link; if (!same.has(k)) same.set(k, []); same.get(k)!.push(t); }
+  rest = r2;
+  for (const [k, ts] of same) { if (ts.length === 1) rest.push(ts[0]); else out.push(head(ts, { id: "same:" + k }, "tasks for you on this item")); }
+  // 3 · from 3 lines of the same kind in an entity
+  const kinds = new Map<string, InboxItem[]>();
+  for (const t of rest) { const k = t.entity + "|" + (KIND[t.kind]?.[0] ?? t.kind); if (!kinds.has(k)) kinds.set(k, []); kinds.get(k)!.push(t); }
+  for (const [k, ts] of kinds) {
+    if (ts.length < 3 || ts[0].id.startsWith("acts:") || ts[0].id.startsWith("proj:")) { out.push(...ts); continue; }
+    out.push(head(ts, { id: "kind:" + k, title: PLURAL[ts[0].kind] ?? `${KIND[ts[0].kind]?.[0] ?? ts[0].kind.replace(/_/g, " ")}: ${ts.length} lines`, link: null }, "for you"));
+  }
+  return out.sort(byDue);
+}
+
 /** The day and the hour in Paris, where the group works (a server in UTC would say "Good morning" at 01:00). */
 export function parisParts(d = new Date()) {
   const f = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short", hour12: false });
