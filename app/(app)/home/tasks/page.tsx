@@ -30,6 +30,18 @@ export default async function Inbox() {
   const testCount = all.length - real.length;
   // projects: one line each (title, tasks waiting for me, late, next) — the detail is on the project page
   const tasks = groupProjects(all, today).sort((a, b) => Number(isTest(a)) - Number(isTest(b)));
+  // the list in groups, the most pressing first: late, the next 7 days, later, without a date; test objects apart
+  const in7 = new Date(Date.parse(today) + 7 * 86_400_000).toISOString().slice(0, 10);
+  const realT = tasks.filter((t) => !isTest(t));
+  const byEnt = (ts: typeof tasks) => { const m = new Map<string, number>(); for (const t of ts) m.set(t.entity, (m.get(t.entity) ?? 0) + 1); return s.entity === "ALL" && m.size > 1 ? [...m.entries()].map(([e, n]) => `${e} ${n}`).join(", ") : ""; };
+  const mk = (key: string, label: string, tone: string, open: boolean, items: typeof tasks) => ({ key, label, tone, open, items, hint: byEnt(items) });
+  const buckets = [
+    mk("late", "Late", "red", true, realT.filter((t) => t.due && t.due < today)),
+    mk("week", "Today and the next 7 days", "amber", true, realT.filter((t) => t.due && t.due >= today && t.due <= in7)),
+    mk("later", "Later", "", realT.length <= 25, realT.filter((t) => t.due && t.due > in7)),
+    mk("nodate", "Without a date", "", realT.length <= 25, realT.filter((t) => !t.due)),
+    mk("test", "Test objects", "", false, tasks.filter((t) => isTest(t))),
+  ].filter((b) => b.items.length);
   const first = s.name.split(" ")[0];
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   // deadlines of the selected entity (all the entities of the scope in Group), same band as CODIR / SRB
@@ -46,29 +58,32 @@ export default async function Inbox() {
         <Metric label="Overdue tasks" value={late} tone={late ? "red" : "green"} hint={late ? "past due date" : "nothing late"} />
         {s.entity !== "ALL" && (s.group || s.entities.length > 1) ? <Metric label="In your other entities" value={elseTotal} tone={elseTotal ? "amber" : "green"} hint={elseTotal ? `${elseText}; switch entity at the top, or Group to see all` : "nothing waiting elsewhere"} /> : <Metric label="Your posts" value={s.roles.map(basePost).filter((r, i, a) => a.indexOf(r) === i).slice(0, 3).join(", ") || "—"} hint={s.group ? "group function, every entity" : s.entities.join(", ") || "no entity yet"} />}
       </div>
-      <section className="card">
-        <table className="tbl">
-          <thead><tr><th className="entcol" style={{ width: 70 }}>Entity</th><th style={{ width: 160 }}>What</th><th style={{ width: 110 }}>Due</th><th>Item</th></tr></thead>
-          <tbody>
-            {tasks.map((t) => (
-              <tr key={t.id}>
-                <td className="entcol"><span className={"ent " + t.entity}>{t.entity}</span></td>
-                <td><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span>{isTest(t) && <span className="pill ml-1" title={TEST_PILL_TITLE}>test</span>}</td>
-                <td className={"due" + (t.due && t.due < today ? " red" : "")}>{t.due ? fr(t.due) : ""}{t.due && t.due < today && <small> late</small>}</td>
-                <td>
-                  {t.ctx && <div className="ctx">{t.kind === "project" ? "Project: " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
-                  {t.link ? <Link href={t.link} className="underline"><b>{frText(t.title)}</b></Link> : <b>{frText(t.title)}</b>}{t.detail && <div className="mini">{frText(t.detail)}</div>}
-                </td>
-              </tr>
-            ))}
-            {!tasks.length && (
-              <tr><td colSpan={4} className="p-6 text-slate6">
-                {s.person ? (elseTotal ? `Nothing to do in ${ENT[s.entity]?.name ?? s.entity}. ${elseTotal} line${elseTotal === 1 ? "" : "s"} wait${elseTotal === 1 ? "s" : ""} in ${elseText}.` : "Nothing to do.") : "Your account is not yet attached to a person in S.A.M. Ask the CMM to add you."}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      {buckets.map((b) => (
+        <details key={b.key} className="card mb-3" open={b.open}>
+          <summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">{b.label}</span><span className={"pill " + b.tone}>{b.items.length}</span>{b.hint && <span className="mini">{b.hint}</span>}</summary>
+          <table className="tbl">
+            <thead><tr><th className="entcol" style={{ width: 70 }}>Entity</th><th style={{ width: 160 }}>What</th><th style={{ width: 110 }}>Due</th><th>Item</th></tr></thead>
+            <tbody>
+              {b.items.map((t) => (
+                <tr key={t.id}>
+                  <td className="entcol"><span className={"ent " + t.entity}>{t.entity}</span></td>
+                  <td><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span>{isTest(t) && <span className="pill ml-1" title={TEST_PILL_TITLE}>test</span>}</td>
+                  <td className={"due" + (t.due && t.due < today ? " red" : "")}>{t.due ? fr(t.due) : ""}{t.due && t.due < today && <small> late</small>}</td>
+                  <td>
+                    {t.ctx && <div className="ctx">{t.kind === "project" ? "Project: " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
+                    {t.link ? <Link href={t.link} className="underline"><b>{frText(t.title)}</b></Link> : <b>{frText(t.title)}</b>}{t.detail && <div className="mini">{frText(t.detail)}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      ))}
+      {!tasks.length && (
+        <section className="card"><div className="p-6 text-slate6">
+          {s.person ? (elseTotal ? `Nothing to do in ${ENT[s.entity]?.name ?? s.entity}. ${elseTotal} line${elseTotal === 1 ? "" : "s"} wait${elseTotal === 1 ? "s" : ""} in ${elseText}.` : "Nothing to do.") : "Your account is not yet attached to a person in S.A.M. Ask the CMM to add you."}
+        </div></section>
+      )}
     </>
   );
 }
