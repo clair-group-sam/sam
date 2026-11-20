@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
 import { STEPS, STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
 import { allowedTransitions, expectedReturn, isCmm, ownsManual, RETURN_LABEL, type ReturnKind } from "@/lib/revisions";
-import { moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review, setManualClass } from "./actions";
+import { abandonRevision, moveStep, saveSummary, resolveConflict, clearReturn, setReturnKind, type RouteProposal as Proposal, type Review, setManualClass } from "./actions";
 import ReviewPanel from "@/components/ReviewPanel";
 import SummaryAssist from "@/components/SummaryAssist";
 import ChapterTools from "@/components/ChapterTools";
@@ -164,7 +164,15 @@ export default async function Editor({ params, searchParams }: { params: Promise
       </div>
       {editable ? (
         <div className="draftbar mb-4"><div><b>Draft. Rev {rev.rev}</b> is the working copy, {!baseRow && /^0+$/.test(String(rev.rev)) ? "first issue: nothing is published yet" : `based on ${baseLabel}`}. Nothing here is visible to readers until it is published{frozen.refs.size ? `; ${frozen.refs.size} chapter(s) are frozen while Rev ${frozen.baseRev} is under review` : ""}.</div><Link href={`/docs/manual/${manual.id}?rev=${rev.id}${active ? `&sec=${encodeURIComponent(active.ref)}` : ""}`} className="btn">Preview as reader</Link></div>
-      ) : (
+      ) : null}
+      {editable && (cmm || ownsManual(s, manual.owner_role)) && (baseRow || !/^0+$/.test(String(rev.rev))) && (
+        <details className="mb-4"><summary className="mini underline" style={{ cursor: "pointer" }}>Abandon this draft</summary>
+          <form action={abandonRevision} className="card cb mt-2 flex flex-wrap gap-3 items-center"><input type="hidden" name="revision_id" value={rev.id} />
+            <span>Rev {rev.rev} and everything written in it are removed; the published revision stays as it is. This cannot be undone.</span>
+            <label className="flex items-center gap-2"><input type="checkbox" name="confirm" required />I abandon this draft</label>
+            <button className="btn" type="submit">Abandon the draft</button></form></details>
+      )}
+      {editable ? null : (
         <div className="draftbar mb-4"><div><b>Rev {rev.rev}, {STEP_LABEL[rev.step]}</b>. The text is read-only at this step{rev.step === "published" || rev.step === "repository" ? "" : "; it goes back to Draft if Compliance or the authority ask for changes"}.</div></div>
       )}
 

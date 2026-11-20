@@ -383,6 +383,19 @@ export function submitConfirmCard(t: TaskRow, f: { id: string; title: string; au
   ], msteams: { width: "Full" } };
 }
 /** One card listing several tasks (new batch, or the morning digest): title, due, entity — and the Inbox. */
+/** FB-158 · one card for a whole portal reading: the figures, what moved, what needs a decision — instead of one card per file. */
+export function readingCard(r: { created: number; updated: number; same: number; exceptions: { kind: string; ref: string; text: string }[] }, link: string): unknown {
+  const moved = r.exceptions.filter((e) => e.kind === "Stage moved"); const look = r.exceptions.filter((e) => e.kind !== "Stage moved");
+  const line = (e: { kind: string; ref: string; text: string }) => ({ type: "TextBlock", text: `**${e.ref}** ${e.text}`.slice(0, 260), wrap: true, spacing: "Small" });
+  const body: unknown[] = [
+    { type: "TextBlock", text: "S.A.M. · Portal reading", size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: `${r.created} file${r.created === 1 ? "" : "s"} opened, ${r.updated} updated, ${moved.length} moved, ${r.same} unchanged`, size: "Medium", weight: "Bolder", wrap: true },
+  ];
+  if (look.length) { body.push({ type: "Container", style: "warning", bleed: true, spacing: "Medium", items: [{ type: "TextBlock", text: `🟠 ${look.length} to look at`, weight: "Bolder", color: "Warning", wrap: true }] }); body.push(...look.slice(0, 6).map(line)); if (look.length > 6) body.push({ type: "TextBlock", text: `… and ${look.length - 6} more in S.A.M.`, isSubtle: true }); }
+  else body.push({ type: "Container", style: "good", bleed: true, spacing: "Medium", items: [{ type: "TextBlock", text: "🟢 Nothing needs you.", weight: "Bolder", color: "Good", wrap: true }] });
+  if (moved.length) { body.push({ type: "TextBlock", text: "Moved to the stage the portal shows", weight: "Bolder", spacing: "Medium" }); body.push(...moved.slice(0, 6).map(line)); if (moved.length > 6) body.push({ type: "TextBlock", text: `… and ${moved.length - 6} more.`, isSubtle: true }); }
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions: [{ type: "Action.OpenUrl", title: "Open the reading", url: `${origin()}${link}` }, { type: "Action.OpenUrl", title: "CAA applications", url: `${origin()}/proj/auth` }], msteams: { width: "Full" } };
+}
 export function listCard(title: string, intro: string, tasks: TaskRow[], link = "/home/tasks"): unknown {
   const t0 = todayISO();
   const rows = tasks.slice(0, 10).map((t) => ({ type: "ColumnSet", spacing: "Small", columns: [

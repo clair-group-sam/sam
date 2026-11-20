@@ -71,7 +71,12 @@ export async function receivePortalReading(payload: { portal: string; label?: st
   const { data, error } = await db.from("portal_readings").insert({ read_on, source: payload.map((p) => p.label ?? p.portal).join(", ") + " (S.A.M. Reader)", entities: [...new Set(lines.map((l) => l.entity))], lines: raw, created_by: s.person?.id ?? null }).select("id").single();
   if (error || !data) return { ok: false, error: `Reading not saved: ${error?.message ?? "unknown"}` };
   const id = (data as unknown as { id: string }).id;
-  try { const r = await autoApply(db, { personId: s.person?.id ?? null, name: s.name }, id);
+  try {
+    // FB-158: the tasks the reading creates stay in the Inbox without a card each; the reader gets one card of synthesis
+    const { quietTeams } = await import("@/lib/quiet");
+    const { result: r } = await quietTeams(() => autoApply(db, { personId: s.person?.id ?? null, name: s.name }, id));
+    if (s.person && (r.created || r.updated || r.exceptions.length)) { try { const { ensureConversation, sendCard, readingCard, teamsConfigured } = await import("@/lib/teams");
+      if (teamsConfigured()) { const conv = await ensureConversation(db, { id: s.person.id, email: s.email }); if (conv) await sendCard(conv, readingCard(r, `/proj/auth/sync/${id}`), "Portal reading"); } } catch { /* the card is a courtesy: the reading is saved */ } }
     revalidatePath("/proj/auth"); revalidatePath("/comp/find"); revalidatePath("/dash/due"); revalidatePath("/home/tasks");
     return { ok: true, id, ...r }; }
   catch (e) { return { ok: false, id, error: (e as Error).message }; }

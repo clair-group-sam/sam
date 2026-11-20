@@ -159,7 +159,10 @@ export async function syncTasks(db: SupabaseClient, f: AuthorityFile): Promise<v
   if (rows.length) {
     const { data: inserted } = await db.from("tasks").insert(rows).select("*");
     // TMS-01: the card goes to Teams right away (best effort)
-    if (inserted?.length) { const { notifyTasks } = await import("@/lib/teams"); await notifyTasks(db, inserted as Parameters<typeof notifyTasks>[1]); }
+    // FB-158: inside a batch (a portal reading) the cards are held back; the batch sends one card of synthesis
+    const quiet = inserted?.length ? (await import("@/lib/quiet")).quietStore() : undefined;
+    if (quiet && inserted?.length) { quiet.tasks.push(...(inserted as { id: string; title: string; entity: string }[])); await db.from("tasks").update({ teams_notified_at: new Date().toISOString() }).in("id", (inserted as { id: string }[]).map((x) => x.id)); }
+    else if (inserted?.length) { const { notifyTasks } = await import("@/lib/teams"); await notifyTasks(db, inserted as Parameters<typeof notifyTasks>[1]); }
   }
 }
 

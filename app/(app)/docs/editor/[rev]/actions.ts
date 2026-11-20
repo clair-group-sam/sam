@@ -48,6 +48,29 @@ export async function startRevision(formData: FormData) {
   redirect(`/docs/editor/${d.id}`);
 }
 
+/** FB-167 · a draft started by mistake, or no longer wanted, is abandoned from the editor: the working copy and its chapters are
+ *  removed, the published revision stays as it is. Only a draft, never the first issue of a manual, never a revision a CAA
+ *  application or another draft rests on. Written in the audit log. */
+export async function abandonRevision(formData: FormData) {
+  const { s, db, rev, manual, may } = await guard(String(formData.get("revision_id") ?? ""));
+  if (!may) fail("Only the owner NP or Compliance can abandon a draft");
+  if (rev.step !== "draft") fail("Only a draft can be abandoned: this revision is already in its approval circuit");
+  if (formData.get("confirm") !== "on") fail("Tick the confirmation to abandon the draft");
+  const [{ count: others }, { count: files }, { count: based }] = await Promise.all([
+    db.from("revisions").select("id", { count: "exact", head: true }).eq("manual_id", manual.id).neq("id", rev.id),
+    db.from("authority_files").select("id", { count: "exact", head: true }).eq("revision_id", rev.id),
+    db.from("revisions").select("id", { count: "exact", head: true }).eq("based_on", rev.id),
+  ]);
+  if (!others) fail("This is the first issue of the manual: there is no published revision to go back to");
+  if (files) fail("A CAA application is attached to this revision: detach or close it first");
+  if (based) fail("Another draft is based on this revision: it cannot be abandoned");
+  const { error } = await db.from("revisions").delete().eq("id", rev.id);
+  if (error) fail(`The draft could not be removed: something still refers to it (${error.message.slice(0, 160)})`);
+  await audit(db, s.person?.id ?? null, manual.entity, rev.id, "revision_abandoned", { manual: manual.code, rev: rev.rev, by: s.name });
+  revalidatePath(`/docs/manual/${manual.id}`); revalidatePath("/docs/drafts"); revalidatePath("/docs/lib"); revalidatePath("/docs/mine");
+  redirect(`/docs/manual/${manual.id}`);
+}
+
 /** Takes the approved text for a conflicting chapter (base wins), or keeps own text (conflict cleared). */
 export async function resolveConflict(formData: FormData) {
   const revisionId = String(formData.get("revision_id") ?? ""); const sectionId = String(formData.get("section_id") ?? ""); const choice = String(formData.get("choice") ?? "");

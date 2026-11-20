@@ -18,8 +18,8 @@ export default async function CodirDash({ searchParams }: { searchParams: Promis
   const db = supabaseAdmin();
   const ents = s.entity === "ALL" || view === "group" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
   const group = ents.length > 1;
-  const rs = await Promise.all(ents.map((e) => managementReview(db, e)));
-  const { win, dues } = await dueWindow(db, ents);
+  // FB-168: the deadlines are read while the reviews are computed, not after them
+  const [rs, { win, dues }] = await Promise.all([Promise.all(ents.map((e) => managementReview(db, e))), dueWindow(db, ents)]);
   return (
     <>
       <PageHeader eyebrow="Dashboards, CODIR / SRB" title={group ? "Management review, group view" : `Management review, ${ENT[ents[0]]?.name ?? ents[0]}`}
