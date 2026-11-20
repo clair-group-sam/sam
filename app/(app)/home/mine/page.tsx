@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { frText } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -27,7 +29,7 @@ export default async function MySpace() {
   const row = (t: (typeof inbox)[number]) => (
     <tr key={t.id}><td style={{ width: 170 }}><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span></td>
       <td className={"due" + (t.due && t.due < t0 ? " red" : "")} style={{ width: 110 }}>{fr(t.due)}{t.due && t.due < t0 && <small> late</small>}</td>
-      <td>{t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}</td></tr>);
+      <td>{t.link ? <Link href={t.link} className="underline"><b>{frText(t.title)}</b></Link> : <b>{frText(t.title)}</b>}{t.detail && <div className="mini">{frText(t.detail)}</div>}</td></tr>);
 
   return (
     <>
@@ -61,7 +63,7 @@ export default async function MySpace() {
       <section className="card">
         <div className="ch"><span className="eyebrow">My safety reports</span><Link className="mini underline" href="/safe/mine">all my reports</Link></div>
         <table className="tbl"><tbody>
-          {reports.slice(0, 8).map((r) => <tr key={r.id}><td className="mono" style={{ width: 110 }}>{fr(r.received_at?.slice(0, 10) ?? null)}</td><td><Link className="underline" href="/safe/mine"><b>{r.headline ?? "Report"}</b></Link>{r.feedback_sent_at && r.feedback && <div className="mini">Feedback: {r.feedback.slice(0, 220)}{r.feedback.length > 220 ? "…" : ""}</div>}</td>
+          {reports.slice(0, 8).map((r) => <tr key={r.id}><td className="mono" style={{ width: 110 }}>{frd(r.received_at)}</td><td><Link className="underline" href="/safe/mine"><b>{r.headline ?? "Report"}</b></Link>{r.feedback_sent_at && r.feedback && <div className="mini">Feedback: {r.feedback.slice(0, 220)}{r.feedback.length > 220 ? "…" : ""}</div>}</td>
             <td style={{ width: 200 }}><span className={"pill " + (r.feedback_sent_at ? "green" : "")}>{r.feedback_sent_at ? "feedback received" : r.status.replace(/_/g, " ")}</span></td></tr>)}
           {!reports.length && <tr><td className="p-5 text-slate6">You have not sent a report yet.</td></tr>}
         </tbody></table>

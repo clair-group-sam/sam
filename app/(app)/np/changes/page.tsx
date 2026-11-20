@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -106,7 +107,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
         <table className="tbl">
           <thead><tr><th>Post</th><th>Change</th><th>Takes effect</th><th>CAA application</th>{cmm && <th />}</tr></thead>
           <tbody>
-            {open.map((c) => { const f = fileOf(c); const d = c.effective_on ? days(c.effective_on, t0) : null; const submitted = f?.submitted_at?.slice(0, 10) ?? null;
+            {open.map((c) => { const f = fileOf(c); const d = c.effective_on ? days(c.effective_on, t0) : null; const submitted = frd(f?.submitted_at) ?? null;
               const nt = noticeFor(entity, c.post_code); const lead = (from: string) => (nt?.working ? workingDays(from, c.effective_on!) : days(c.effective_on!, from));
               const short = !!nt && c.acceptance === "required" && !!c.effective_on && (nt.days ? lead(submitted ?? t0) < nt.days : !submitted && d !== null && d <= 0);
               return (

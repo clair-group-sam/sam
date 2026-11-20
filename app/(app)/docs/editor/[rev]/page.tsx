@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -86,7 +88,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
     <section className="card mb-4 samcard">
       <div className="ch"><span className="eyebrow">Regulatory changes to consider in this revision</span><span className="mini">{wentries.length} open watch entr{wentries.length === 1 ? "y" : "ies"} name this manual, information, your call</span></div>
       <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{wentries.map((w) => (
-        <tr key={w.id}><td><Link href={`/comp/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${w.due}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
+        <tr key={w.id}><td><Link href={`/comp/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${frd(w.due)}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
           <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) && <Link className="btn" href={`/docs/editor/${rev.id}?tab=write${(w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)?.ref ? `&sec=${encodeURIComponent((w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)!.ref)}` : sec ? `&sec=${encodeURIComponent(sec)}` : ""}&ai=${encodeURIComponent(`Regulatory change ${w.number}${w.reference ? ` (${w.reference})` : ""}: ${w.title}. Integrate what this change requires in this chapter.`)}`} style={{ marginRight: 4 }}>Draft it with SAM</Link>}{w.revision_ids.includes(rev.id) ? <span className="pill green">Addressed in this draft</span> : editable && (owner || cmm) ? <form action={addressedInDraft} style={{ display: "inline" }}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="rev" value={rev.id} /><button className="btn" type="submit">Addressed in this draft</button></form> : null}</td></tr>))}</tbody></table></div>
     </section>
   ) : null;
@@ -243,7 +245,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
                   <div className="flex items-center gap-3"><button className="btn primary" type="submit" disabled={t.to === "published" && !rev.review}>{t.label}</button><span className="mini">No authority approval or notification. The update notice goes to every reader of the document.</span></div>
                 </form>
               ))}
-              {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
+              {notices.map((n, i) => <p key={i} className="mini">Update notice · {frdt(n.sent_at)} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
             </div>
           </section>
           <section className="card col-span-2">
@@ -271,7 +273,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
               <Workflow revisionId={rev.id} current={rev.step} rows={wfRows} transitions={transitions} routeHint={routeHint} blocked={blocked}
                 blockedNote={rev.step === "with_civil_aviation" && returnMissing ? `Waiting for the authority's return (${RETURN_LABEL[returnKind].toLowerCase()}), integrate it in the card below first.` : null} />
               {ownerMissing && <p className="mini mt-2" style={{ color: "var(--amber-ink)" }}>The manual is owned by the <b>{ownerPost}</b> post, which has no holder in NP management for {manual.entity} (posts there: {posts.map((p) => p.code).join(", ") || "none"}). <Link className="underline" href={`/np/over?entity=${manual.entity}`}>Name the holder</Link>, or change the owner post on the manual page.</p>}
-              {notices.map((n, i) => <p key={i} className="mini">Update notice · {n.sent_at.slice(0, 16).replace("T", " ")} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
+              {notices.map((n, i) => <p key={i} className="mini">Update notice · {frdt(n.sent_at)} · {n.recipients} reader{n.recipients === 1 ? "" : "s"} (task in S.A.M.) · e-mail: {n.email_status === "sent" ? `${n.emailed} sent` : n.email_status}</p>)}
               {(rev.authority_route === "approval" || rev.authority_route === "notification") && (
                 <p className="mini mt-3">CAA application: {authFile ? <Link className="underline" href={`/proj/auth/${authFile.id}`}>{authFile.type_code}, {authFile.portal_ref ?? "no reference yet"}, {STAGE_LABEL[authFile.stage]}</Link> : <>none yet, opened automatically when the revision is sent to the authority, or <Link className="underline" href={`/proj/auth/new?entity=${manual.entity}&revision=${rev.id}`}>open it now</Link> to prepare the dossier checklist first.</>}</p>
               )}

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { frdt } from "@/lib/dates";
 import { proposeRoute, decideRoute, type RouteProposal as Proposal } from "@/app/(app)/docs/editor/[rev]/actions";
 import { Icon } from "@/lib/icons";
 
@@ -21,7 +22,7 @@ export default function RouteProposal({ revisionId, initial, route, authority }:
       {err && <p className="mini red mb-2">{err}</p>}
       {p && (
         <div className="rprop">
-          <div className="flex items-center gap-2 mb-1"><span className={"pill " + (p.route === "approval" ? "amber" : p.route === "notification" ? "" : "green")}>{LABEL[p.route]}</span><span className="mini">proposed by SAM · confidence {p.confidence}{p.at ? ` · ${p.at.slice(0, 16).replace("T", " ")}` : ""}</span></div>
+          <div className="flex items-center gap-2 mb-1"><span className={"pill " + (p.route === "approval" ? "amber" : p.route === "notification" ? "" : "green")}>{LABEL[p.route]}</span><span className="mini">proposed by SAM · confidence {p.confidence}{p.at ? ` · ${frdt(p.at)}` : ""}</span></div>
           <p className="text-[13px] mb-2">{p.summary}</p>
           {p.reasons?.length > 0 && <table className="tbl"><tbody>{p.reasons.map((r, i) => <tr key={i}><td className="mono" style={{ width: 70 }}>{r.chapter}</td><td>{r.change}<div className="mini">{r.rule}</div></td></tr>)}</tbody></table>}
         </div>

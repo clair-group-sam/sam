@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -42,9 +43,9 @@ export default async function PrintAudit({ params, searchParams }: { params: Pro
       <PrintAuto fileName={`${a.number} audit report`} auto={sp.auto === "1"} />
       <div><b>{ENT[a.entity]?.name ?? a.entity}</b> · <span className="mini">Compliance monitoring — audit report (PRO-CM-02){a.imported_from ? ` · ${a.imported_from}` : ""}</span></div>
       <h1>{a.number} — {a.title}</h1>
-      <div className="mini">{KIND_LABEL[a.kind]}{a.domain ? ` · ${a.domain}` : ""} · {STATUS_LABEL[a.status]}{a.closed_at ? ` ${a.closed_at.slice(0, 10)}` : a.status !== "closed" ? " — NOT CLOSED" : ""}</div>
+      <div className="mini">{KIND_LABEL[a.kind]}{a.domain ? ` · ${a.domain}` : ""} · {STATUS_LABEL[a.status]}{a.closed_at ? ` ${frd(a.closed_at)}` : a.status !== "closed" ? " — NOT CLOSED" : ""}</div>
       <table className="kv"><tbody>
-        <tr><td>Planned · performed</td><td>{monthLong(a.planned_month)} · {a.planned_on ?? a.started_on ?? "—"}{a.planned_end ? ` → ${a.planned_end}` : ""}{a.done_on ? ` · completed ${a.done_on}` : ""}</td></tr>
+        <tr><td>Planned · performed</td><td>{monthLong(a.planned_month)} · {a.planned_on ?? a.started_on ?? "—"}{a.planned_end ? ` → ${a.planned_end}` : ""}{a.done_on ? ` · completed ${frd(a.done_on)}` : ""}</td></tr>
         <tr><td>Lead auditor · team</td><td>{a.lead_auditor ? name(a.lead_auditor) : a.external_auditor ?? "—"}{a.auditors.length ? ` · ${a.auditors.map(name).join(", ")}` : ""}{a.lead_auditor && a.external_auditor ? ` · ${a.external_auditor}` : ""}</td></tr>
         {a.subcontractor && <tr><td>Subcontractor</td><td>{a.subcontractor}</td></tr>}{a.authority && <tr><td>Authority</td><td>{a.authority}</td></tr>}
         <tr><td>Scope</td><td>{a.scope ?? "—"}</td></tr>

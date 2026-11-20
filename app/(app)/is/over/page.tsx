@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { Metric, PageHeader } from "@/components/Page";
@@ -57,7 +58,7 @@ export default async function IsOverview() {
           {awaiting.map((x) => <tr key={x.id}><td><span className="pill amber">reply</span></td><td><Link href={`/is/systems?open=${x.id}#edit`}><b>{x.name}</b></Link><div className="mini">No reply to the inventory, follow up</div></td></tr>)}
           {red.map((r) => <tr key={r.id}><td><span className="pill red">high</span></td><td><Link href={`/is/risks?open=${r.id}#edit`}><b>{r.threat}</b></Link><div className="mini">{r.system ?? ""}</div></td></tr>)}
           {noClause.slice(0, 6).map((f) => <tr key={f.id}><td><span className="pill amber">clause</span></td><td><Link href={`/is/flows?open=${f.id}#edit`}><b>{f.from_system} to {f.to_system}</b></Link><div className="mini">No Part-IS clause recorded{f.contract_ref ? ` in ${f.contract_ref}` : ""}</div></td></tr>)}
-          {unrep.map((i) => <tr key={i.id}><td><span className="pill amber">event</span></td><td><Link href={`/is/inc?open=${i.id}#edit`}><b>{i.title}</b></Link><div className="mini">{i.occurred_on}, not reported</div></td></tr>)}
+          {unrep.map((i) => <tr key={i.id}><td><span className="pill amber">event</span></td><td><Link href={`/is/inc?open=${i.id}#edit`}><b>{i.title}</b></Link><div className="mini">{frd(i.occurred_on)}, not reported</div></td></tr>)}
           {review.length > 0 && <tr><td><span className="pill">review</span></td><td><Link href="/is/risks"><b>{review.length} risk(s) not reviewed in 12 months</b></Link></td></tr>}
           {tbc.filter((x) => x.attention === "critical").slice(0, 6).map((x) => <tr key={"c" + x.id}><td><span className="pill amber">contract</span></td><td><Link href={`/is/systems?open=${x.id}#edit`}><b>{x.name}</b></Link><div className="mini">Critical: confirm the contract holder and its Part-IS clauses</div></td></tr>)}
           {unsure.length > 0 && <tr><td><span className="pill">confirm</span></td><td><Link href="/is/systems"><b>{unsure.length} system(s) with status or operational impact to confirm</b></Link></td></tr>}

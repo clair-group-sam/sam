@@ -4,6 +4,7 @@
 // (the Azure Bot uses the S.A.M. app registration), optional TEAMS_SERVICE_URL (default EMEA).
 import { createPublicKey, verify as cryptoVerify } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { frText } from "@/lib/dates";
 import { CLIENT_ID, TENANT_ID } from "@/lib/msgraph-user";
 import { basePost } from "@/lib/session";
 
@@ -209,7 +210,7 @@ export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): un
     { type: "TextBlock", text: `${t.entity} · ${kind}`, size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
     { type: "TextBlock", text: t.title, size: "Medium", weight: "Bolder", wrap: true },
   ];
-  if (t.detail) body.push({ type: "TextBlock", text: t.detail, wrap: true, spacing: "Small" });
+  if (t.detail) body.push({ type: "TextBlock", text: frText(t.detail), wrap: true, spacing: "Small" });
   const facts: { title: string; value: string }[] = [];
   if (t.due) facts.push({ title: "Due", value: fr(t.due) + (t.due < todayISO() ? ", overdue" : "") });
   if (t.owner_role && !t.owner_person) facts.push({ title: "For", value: t.owner_role });

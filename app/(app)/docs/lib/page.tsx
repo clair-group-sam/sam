@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -216,7 +217,7 @@ export default async function Library({ searchParams }: { searchParams: Promise<
                   <td className="mono">{manual.code}{fromWm.has(manual.id) && <SourceMark source="webmanuals" />}</td>
                   <td><Link href={`/docs/manual/${manual.id}`}><b>{manual.title}</b></Link>{(manual as typeof manual & { internal?: boolean }).internal && <span className="nature ml-2">internal</span>}{isTestData(manual.code, manual.title) && <span className="pill ml-2" title={TEST_PILL_TITLE}>test</span>}{!folder && <div className="mini">{manual.path}</div>}</td>
                   <td className="mini">{manual.owner_role}</td>
-                  <td className="mono">{current ? `Iss ${current.issue} Rev ${current.rev}` : "—"}{current?.published_at && <div className="mini">{current.published_at}</div>}</td>
+                  <td className="mono">{current ? `Iss ${current.issue} Rev ${current.rev}` : "—"}{current?.published_at && <div className="mini">{frd(current.published_at)}</div>}</td>
                   <td>{current ? <span className="pill green">Published</span> : <span className="pill red">Never published</span>}{workings.map((w) => <span key={w.id} className="pill amber ml-1">Rev {w.rev}, {STEP_LABEL[w.step]}</span>)}</td>
                 </tr>
               ))}

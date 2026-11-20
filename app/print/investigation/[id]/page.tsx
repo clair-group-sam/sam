@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -31,11 +32,11 @@ export default async function PrintInvestigation({ params, searchParams }: { par
       <PrintAuto fileName={`${i.number} investigation report`} auto={sp.auto === "1"} />
       <div><b>{ENT[i.entity]?.name ?? i.entity}</b> · <span className="mini">CONFIDENTIAL — internal safety investigation (just culture: not to apportion blame or liability)</span></div>
       <h1>{i.number} — {i.title}</h1>
-      <div className="mini">{INV_LEVEL[i.level]?.[0]} · {INV_STATUS[i.status]?.[0]}{i.closed_at ? ` ${i.closed_at.slice(0, 10)}` : " — DRAFT"}</div>
+      <div className="mini">{INV_LEVEL[i.level]?.[0]} · {INV_STATUS[i.status]?.[0]}{i.closed_at ? ` ${frd(i.closed_at)}` : " — DRAFT"}</div>
       <table className="kv"><tbody>
         <tr><td>Report</td><td>{i.report_id ?? "—"}</td></tr><tr><td>Lead</td><td>{i.lead_name ?? "—"}</td></tr>
         <tr><td>Team</td><td>{i.team.map((t) => `${t.name}${t.role ? ` (${t.role})` : ""}`).join(", ") || "—"}</td></tr>
-        <tr><td>Opened · due</td><td>{i.created_at.slice(0, 10)} · {fr(i.due)}</td></tr>
+        <tr><td>Opened · due</td><td>{frd(i.created_at)} · {fr(i.due)}</td></tr>
       </tbody></table>
       {i.report_text ? <><h2>Investigation report</h2><div className="pre">{i.report_text}</div></> : <>
         <h2>Terms of reference</h2><div className="pre">{i.terms ?? "—"}</div>

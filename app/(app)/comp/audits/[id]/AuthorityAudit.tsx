@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { DueChip } from "@/components/DueChip";
 import { PageHeader, Metric } from "@/components/Page";
 import { SurvTabs } from "@/components/SurvTabs";
@@ -25,7 +26,7 @@ export function AuthorityAudit({ a, findings, desk, name }: { a: AA; findings: A
   return (
     <>
       <PageHeader eyebrow={`Compliance, Surveillance plan, authority audit, ${a.entity}`} title={`${a.number}, ${a.title}`}
-        sub={`${ENT[a.entity]?.name ?? a.entity}, ${a.authority ?? "authority"}${a.external_auditor && !(a.authority && a.external_auditor.startsWith(a.authority)) ? ` (${a.external_auditor})` : a.external_auditor && a.external_auditor !== a.authority ? a.external_auditor.slice((a.authority ?? "").length) : ""}, ${a.planned_on ? `on ${a.planned_on}${a.planned_end && a.planned_end !== a.planned_on ? ` → ${a.planned_end}` : ""}` : monthLong(a.planned_month)}`}
+        sub={`${ENT[a.entity]?.name ?? a.entity}, ${a.authority ?? "authority"}${a.external_auditor && !(a.authority && a.external_auditor.startsWith(a.authority)) ? ` (${a.external_auditor})` : a.external_auditor && a.external_auditor !== a.authority ? a.external_auditor.slice((a.authority ?? "").length) : ""}, ${a.planned_on ? `on ${frd(a.planned_on)}${a.planned_end && a.planned_end !== a.planned_on ? ` → ${a.planned_end}` : ""}` : monthLong(a.planned_month)}`}
         tag={<span className={"pill " + stage[1]}>{stage[0]}</span>}
         right={<Link className="btn" href="/comp/audits?src=authority">All authority audits</Link>} />
       <SurvTabs on="audits" />
@@ -47,13 +48,13 @@ export function AuthorityAudit({ a, findings, desk, name }: { a: AA; findings: A
               <td className="mini">{f.owner_person ? name(f.owner_person) : f.owner_role ?? "—"}</td>
               <td><DueChip due={d} done={["closed", "cancelled"].includes(f.status)} t0={t0} />{f.extension && <div className="mini">{EXT_LABEL[f.extension]}</div>}</td>
               <td><Dec v={f.authority_rca} /></td><td><Dec v={f.authority_pac} /></td><td><Dec v={f.authority_proof} /></td>
-              <td><span className={"pill " + st.tone}>{st.label}</span>{f.closed_at && f.status === "closed" && <div className="mini">{f.closed_at.slice(0, 10)}</div>}</td></tr>; })}</tbody></table>)}
+              <td><span className={"pill " + st.tone}>{st.label}</span>{f.closed_at && f.status === "closed" && <div className="mini">{frd(f.closed_at)}</div>}</td></tr>; })}</tbody></table>)}
         </div></section>
 
       <div className="grid grid-cols-2 gap-4">
         <section className="card"><div className="ch"><span className="eyebrow">Report of the authority</span></div><div className="cb grid gap-2">
           {a.report_files.length ? a.report_files.map((u) => <a key={u} href={u} target="_blank" rel="noreferrer">{fileName(u)} ↗</a>) : <p className="mini">No report attached yet.</p>}
-          <p className="mini">{a.report_received_on ? `Received ${a.report_received_on}.` : ""}{a.closed_at ? ` Closed ${a.closed_at.slice(0, 10)}.` : ""}</p>
+          <p className="mini">{a.report_received_on ? `Received ${frd(a.report_received_on)}.` : ""}{a.closed_at ? ` Closed ${frd(a.closed_at)}.` : ""}</p>
           {desk && <details><summary className="mini">Record the report</summary><form action={saveAuthorityAudit} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
             <label><span className="mini">Report received on (findings notified)</span><input type="date" name="report_received_on" className="inp" defaultValue={a.report_received_on ?? ""} /></label>
             <label><span className="mini">Link to the report (METEOR, SharePoint…), one per line</span><textarea name="report_files" className="inp mono" rows={2} defaultValue={a.report_files.join("\n")} /></label>

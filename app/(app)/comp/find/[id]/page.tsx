@@ -1,4 +1,6 @@
 import { fr } from "@/lib/dates";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import Link from "next/link";
 import { DueChip } from "@/components/DueChip";
 import { notFound, redirect } from "next/navigation";
@@ -74,7 +76,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
         <div className="eyebrow mb-1">Expected manual changes <span className="mini">(shown to the author when a draft of the manual opens; effective at the authority's approval / acknowledgement or at publication, then verified — MSM §2.3)</span></div>
         {changes.length ? <table className="tbl"><tbody>{changes.map((c) => (
           <tr key={c.id}><td><b className="mono">{c.manual_code ?? "manual"}</b> {c.section_ref}<div className="mini">{c.expected}</div>
-              {(c.route || c.authority_ref || c.effective_on) && <div className="mini">{c.route ? `Effective by ${ROUTE_LABEL[c.route] ?? c.route}` : ""}{c.authority_ref ? ` · ${c.authority_ref}` : ""}{c.effective_on ? ` · ${c.effective_on}` : ""}{c.authority_file_id ? <> · <Link href={`/proj/auth/${c.authority_file_id}`}>application</Link></> : null}</div>}
+              {(c.route || c.authority_ref || c.effective_on) && <div className="mini">{c.route ? `Effective by ${ROUTE_LABEL[c.route] ?? c.route}` : ""}{c.authority_ref ? ` · ${c.authority_ref}` : ""}{c.effective_on ? ` · ${frd(c.effective_on)}` : ""}{c.authority_file_id ? <> · <Link href={`/proj/auth/${c.authority_file_id}`}>application</Link></> : null}</div>}
               {c.verified_note && <div className="mini">Compliance: {c.verified_note}</div>}</td>
             <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{step >= 4 && <span className={"pill " + (c.status === "verified" ? "green" : c.status === "published" || c.status === "awaiting_authority" ? "amber" : "")}>{CHANGE_LABEL[c.status] ?? c.status}</span>}
               {c.revision_id && <div className="mini"><Link href={`/docs/editor/${c.revision_id}`}>open revision</Link></div>}
@@ -110,7 +112,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
   return (
     <>
       <EntityBand entity={f.entity} current={s.entity} multi={s.entities.length > 1} what="finding" />
-      <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${f.notified ?? "—"}, answer due ${f.due ?? "—"}, answered by ${who}, ${progress(f, changes, actions).label}`}
+      <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${frd(f.notified)}, answer due ${frd(f.due)}, answered by ${who}, ${progress(f, changes, actions).label}`}
         right={<span className="flex gap-2 items-center"><BackButton fallback={f.audit_id ? `/comp/audits/${f.audit_id}` : "/comp/find"} />{f.source === "authority" && !closedOrCancelled && (f.authority_rca || f.authority_pac) ? <span className={"pill " + authorityStep(f).tone}>{authorityStep(f).label}</span> : <span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>}</span>} />
 
       <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? <Icon name="check" size={12} /> : i + 1}</i><span>{l}</span></div>)}</div>
@@ -124,7 +126,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
 
       {sentBack && (
         <section className="card mb-4 sentback">
-          <div className="ch"><span className="eyebrow">Analysis sent back, {sentBack.points?.length ?? 0} point{(sentBack.points?.length ?? 0) === 1 ? "" : "s"} to address</span><span className="mini">by {name(sentBack.decided_by)}, {sentBack.decided_at?.slice(0, 10)}</span></div>
+          <div className="ch"><span className="eyebrow">Analysis sent back, {sentBack.points?.length ?? 0} point{(sentBack.points?.length ?? 0) === 1 ? "" : "s"} to address</span><span className="mini">by {name(sentBack.decided_by)}, {frd(sentBack.decided_at)}</span></div>
           <div className="cb grid grid-cols-2 gap-4">
             <div><div className="eyebrow">Root cause</div>{sentBack.points?.some((q) => (q.part ?? "rca") === "rca") ? <Pts pts={sentBack.points} part="rca" /> : <p className="mini">Nothing to change.</p>}</div>
             <div><div className="eyebrow">Action plan</div>{sentBack.points?.some((q) => q.part === "plan") ? <Pts pts={sentBack.points} part="plan" /> : <p className="mini">Nothing to change.</p>}</div>
@@ -149,7 +151,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <label className="col-span-2"><span className="mini">Text</span><textarea name="description" className="inp" rows={4} defaultValue={f.description ?? ""} /></label>
                 <div className="col-span-2 flex justify-end"><button className="btn" type="submit">Save</button></div></form></details>}</div>
             <div className="cb"><p style={{ whiteSpace: "pre-wrap" }}>{f.description ?? <span className="mini">No text pasted.</span>}</p>
-              {audit && <p className="mini mt-2">From the audit <Link href={`/comp/audits/${audit.id}`}><b className="mono">{audit.number}</b> {audit.title}</Link>{audit.done_on ? `, ${audit.done_on}` : ""}</p>}</div>
+              {audit && <p className="mini mt-2">From the audit <Link href={`/comp/audits/${audit.id}`}><b className="mono">{audit.number}</b> {audit.title}</Link>{audit.done_on ? `, ${frd(audit.done_on)}` : ""}</p>}</div>
           </section>
 
           {f.source === "authority" && (() => { const st = authorityStep(f); const d = effectiveDue({ due: f.due, extension: f.extension ?? null }); const D = ({ v }: { v: string | null | undefined }) => v ? <span className={"pill " + (DECISION_TONE[v] ?? "")}>{DECISION_LABEL[v] ?? v}</span> : <span className="mini">—</span>; return (
@@ -157,7 +159,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
             <div className="ch"><span className="eyebrow">With the authority{f.authority ? `, ${f.authority}` : ""}</span><span className={"pill " + st.tone}>{st.label}</span></div>
             <div className="cb grid gap-2">
               <div className="grid grid-cols-4 gap-2 mini"><div>Reference<div className="mono" style={{ fontSize: 14 }}>{f.authority_ref ?? "—"}</div></div><div>Root cause<div><D v={f.authority_rca} /></div></div><div>Plan<div><D v={f.authority_pac} /></div></div><div>Proof<div><D v={f.authority_proof} /></div></div></div>
-              <p className="mini">Deadline <DueChip due={d} done={["closed", "cancelled"].includes(f.status)} t0={t0} />{f.extension ? ` (${EXT_LABEL[f.extension]}, initially ${f.due})` : ""}{f.notified ? `, notified ${f.notified}` : ""}{f.finding_file ? <> · <a href={f.finding_file} target="_blank" rel="noreferrer">finding sheet ↗</a></> : null}</p>
+              <p className="mini">Deadline <DueChip due={d} done={["closed", "cancelled"].includes(f.status)} t0={t0} />{f.extension ? ` (${EXT_LABEL[f.extension]}, initially ${frd(f.due)})` : ""}{f.notified ? `, notified ${frd(f.notified)}` : ""}{f.finding_file ? <> · <a href={f.finding_file} target="_blank" rel="noreferrer">finding sheet ↗</a></> : null}</p>
               {f.proof && <div><div className="eyebrow">Proof of implementation sent</div><p className="mini" style={{ whiteSpace: "pre-wrap" }}>{f.proof}</p></div>}
               {f.extension_reason && <p className="mini" style={{ whiteSpace: "pre-wrap" }}><b>Note:</b> {f.extension_reason}</p>}
               {compliance && <details><summary className="mini">Record the authority's answer</summary><form action={setAuthorityDecision} className="grid gap-2 grid-cols-2 mt-2"><input type="hidden" name="id" value={f.id} />
@@ -231,19 +233,19 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
             </>
           ) : current ? (
             <section className="card">
-              <div className="ch"><span className="eyebrow">{current.via === "import" ? "Analysis (imported from Monday)" : `Analysis, round ${current.n}`}</span><span className="mini">{current.decision === "accepted" ? `accepted by ${name(current.decided_by)}, ${current.decided_at?.slice(0, 10)}` : `by ${name(current.answered_by)}, ${current.answered_at.slice(0, 10)}`}</span></div>
+              <div className="ch"><span className="eyebrow">{current.via === "import" ? "Analysis (imported from Monday)" : `Analysis, round ${current.n}`}</span><span className="mini">{current.decision === "accepted" ? `accepted by ${name(current.decided_by)}, ${frd(current.decided_at)}` : `by ${name(current.answered_by)}, ${frd(current.answered_at)}`}</span></div>
               <div className="cb grid gap-3"><RcaText r={current} />{current.comment && <div><div className="eyebrow">How the plan answers the cause</div><p className="mini">{current.comment}</p></div>}</div>
             </section>
           ) : <section className="card"><div className="ch"><span className="eyebrow">Analysis</span></div><div className="cb mini">Waiting for {who}.</div></section>}
 
           {rounds.filter((r) => r.decision === "sent_back").length > 0 && (
             <section className="card"><div className="ch"><span className="eyebrow">Previous rounds</span></div>
-              <div className="cb grid gap-2">{rounds.filter((r) => r.decision).reverse().map((r) => <details key={r.id}><summary><b>Round {r.n}</b>, {name(r.answered_by)}, {r.answered_at.slice(0, 10)}, {r.decision === "accepted" ? "accepted" : `sent back, ${r.points?.length ?? 0} point${(r.points?.length ?? 0) === 1 ? "" : "s"}`}</summary><div className="mini mt-2"><RcaText r={r} /></div>{r.decision === "sent_back" && <div className="mini mt-2"><Pts pts={r.points} /></div>}</details>)}</div></section>
+              <div className="cb grid gap-2">{rounds.filter((r) => r.decision).reverse().map((r) => <details key={r.id}><summary><b>Round {r.n}</b>, {name(r.answered_by)}, {frd(r.answered_at)}, {r.decision === "accepted" ? "accepted" : `sent back, ${r.points?.length ?? 0} point${(r.points?.length ?? 0) === 1 ? "" : "s"}`}</summary><div className="mini mt-2"><RcaText r={r} /></div>{r.decision === "sent_back" && <div className="mini mt-2"><Pts pts={r.points} /></div>}</details>)}</div></section>
           )}
 
           <section className="card">
             <div className="ch"><span className="eyebrow">History</span></div>
-            <div className="cb mini">{events.length ? events.map((e, i) => <div key={i}>{e.at.slice(0, 16).replace("T", " ")} · {e.action.replace(/^finding_/, "").replace(/_/g, " ")} · {name(e.actor)}</div>) : "—"}</div>
+            <div className="cb mini">{events.length ? events.map((e, i) => <div key={i}>{frdt(e.at)} · {e.action.replace(/^finding_/, "").replace(/_/g, " ")} · {name(e.actor)}</div>) : "—"}</div>
           </section>
         </div>
 
@@ -299,7 +301,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
                 <label><span className="mini">Note</span><input name="note" className="inp" placeholder="Why, accepted by the authority on …, raised by mistake…" /></label>
                 <div className="flex gap-2 justify-end"><button className="btn" name="what" value="cancel">Cancel the finding</button><button className="btn" name="what" value="close">Close directly</button></div></form></div></details>
           )}
-          {f.closed_at && <section className="card"><div className="ch"><span className="eyebrow">{f.status === "cancelled" ? "Cancelled" : "Closed"}</span><span className="mini">{f.status === "closed" && f.effective_closed_on ? <>effective {f.effective_closed_on}, decided {f.closed_at.slice(0, 10)}</> : f.closed_at.slice(0, 10)}, {name(f.closed_by)}</span></div>{(f.closed_note || (f.status === "closed" && f.effective_closed_on)) && <div className="cb">{f.status === "closed" && f.effective_closed_on && <p className="mini">Closure date = date of the last approval / acknowledgement / publication of the plan (MSM §2.3), not the day the text was written.</p>}{f.closed_note}</div>}</section>}
+          {f.closed_at && <section className="card"><div className="ch"><span className="eyebrow">{f.status === "cancelled" ? "Cancelled" : "Closed"}</span><span className="mini">{f.status === "closed" && f.effective_closed_on ? <>effective {frd(f.effective_closed_on)}, decided {frd(f.closed_at)}</> : frd(f.closed_at)}, {name(f.closed_by)}</span></div>{(f.closed_note || (f.status === "closed" && f.effective_closed_on)) && <div className="cb">{f.status === "closed" && f.effective_closed_on && <p className="mini">Closure date = date of the last approval / acknowledgement / publication of the plan (MSM §2.3), not the day the text was written.</p>}{f.closed_note}</div>}</section>}
         </div>
       </div>
     </>

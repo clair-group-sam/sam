@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { fr as frd } from "@/lib/dates";
 import { canDownloadPdf, getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -155,7 +156,7 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
         <h1>Record of revisions</h1>
         <table className="pm-tab"><thead><tr><th>Issue / Rev</th><th>Effective</th><th>Summary</th></tr></thead><tbody>
           {!isPublished && <tr className="cur"><td>Iss {current.issue} Rev {current.rev}</td><td>{STEP_LABEL[current.step]}</td><td>{current.summary ?? "—"}</td></tr>}
-          {published.map((r) => <tr key={r.id} className={r.id === current.id ? "cur" : ""}><td>Iss {r.issue} Rev {r.rev}</td><td>{r.published_at ?? "—"}</td><td>{r.summary ?? "—"}</td></tr>)}
+          {published.map((r) => <tr key={r.id} className={r.id === current.id ? "cur" : ""}><td>Iss {r.issue} Rev {r.rev}</td><td>{frd(r.published_at)}</td><td>{r.summary ?? "—"}</td></tr>)}
         </tbody></table>
 
         {lepPages.length > 0 ? (<>

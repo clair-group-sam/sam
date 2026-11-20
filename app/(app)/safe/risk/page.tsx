@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -98,7 +99,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
                   <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}</td>
                   <td>{pre ? <span className={"pill " + tolTone(pre)}>{riskLabel(h.lik_before, h.sev_before, sc)}</span> : <span className="mini">—</span>} → {cur ? <span className={"pill " + tolTone(cur)}>{riskLabel(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, sc)}</span> : <span className="mini">—</span>}</td>
                   <td className="mono">{h.owner_role ?? a.owner_role ?? "—"}</td>
-                  <td className={"mono" + (dd && dd < today ? " red" : "")}>{dd ?? "—"}</td>
+                  <td className={"mono" + (dd && dd < today ? " red" : "")}>{frd(dd)}</td>
                   <td className="mini">{n ? `${n} stud${n > 1 ? "ies" : "y"}` : ""}{n && r ? ", " : ""}{r ? `${r} report${r > 1 ? "s" : ""}` : ""}{!n && !r ? "—" : ""}</td>
                   <td><Link className="mono underline mini" href={`/safe/risk/a/${a.id}`}>{a.number}</Link><SourceMark source={(a as { source?: string }).source} /><div><span className={"pill " + (RA_STATUS[a.status]?.[1] ?? "")}>{RA_STATUS[a.status]?.[0] ?? a.status}</span></div></td>
                 </tr>);

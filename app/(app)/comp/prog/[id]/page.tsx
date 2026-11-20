@@ -1,4 +1,6 @@
 import { fr } from "@/lib/dates";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -52,8 +54,8 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
   const MonthSelect = ({ name: n, def }: { name: string; def?: string }) => <select name={n} className="inp" defaultValue={def ?? ms[0]}>{ms.map((m) => <option key={m} value={m}>{monthLong(m)}</option>)}</select>;
   return (
     <>
-      <PageHeader eyebrow={`Compliance, Audit programme, ${p.entity}`} title={p.title} sub={`${ENT[p.entity]?.name ?? p.entity}, ${p.reference ?? PROG_REF[p.entity]?.reference ?? ""}, ${PROG_REF[p.entity]?.msm ?? ""}, ${p.cycle_months}-month cycle ${p.starts_on} → ${p.ends_on}`}
-        tag={<span className={"pill " + (p.status === "approved" ? "green" : p.status === "draft" ? "amber" : "")}>{PROG_STATUS[p.status]}{p.approved_at ? `, ${p.approved_at.slice(0, 10)}, ${name(p.approved_by)}` : ""}</span>}
+      <PageHeader eyebrow={`Compliance, Audit programme, ${p.entity}`} title={p.title} sub={`${ENT[p.entity]?.name ?? p.entity}, ${p.reference ?? PROG_REF[p.entity]?.reference ?? ""}, ${PROG_REF[p.entity]?.msm ?? ""}, ${p.cycle_months}-month cycle ${frd(p.starts_on)} → ${frd(p.ends_on)}`}
+        tag={<span className={"pill " + (p.status === "approved" ? "green" : p.status === "draft" ? "amber" : "")}>{PROG_STATUS[p.status]}{p.approved_at ? `, ${frd(p.approved_at)}, ${name(p.approved_by)}` : ""}</span>}
         right={<div className="flex gap-2"><Link className="btn" href="/comp/prog">All programmes</Link>{desk && p.status === "draft" && <form action={approveProgramme}><input type="hidden" name="id" value={p.id} /><button className="btn primary">Approve the programme</button></form>}
           {desk && p.status !== "closed" && !next && <form action={planNextCycle}><input type="hidden" name="id" value={p.id} /><button className="btn">Plan next cycle</button></form>}
           {next && <Link className="btn" href={`/comp/prog/${next.id}`}>Next cycle ›</Link>}
@@ -66,7 +68,7 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
       </div>
 
       {p.status === "approved" && (() => { const late = !!p.next_review_on && p.next_review_on < t0; const soon = !!p.next_review_on && !late && daysTo(p.next_review_on, t0)! <= 30; return (
-        <section className={"card mb-4" + (late ? " late" : "")}><div className="ch"><span className="eyebrow">Annual review of the programme</span><span className={"mini " + (late ? "late" : "")}>{p.reviewed_on ? `last review ${p.reviewed_on}` : "never reviewed"}{p.next_review_on ? ` · next ${p.next_review_on}${late ? " — past due" : soon ? " — within 30 days" : ""}` : ""}</span></div>
+        <section className={"card mb-4" + (late ? " late" : "")}><div className="ch"><span className="eyebrow">Annual review of the programme</span><span className={"mini " + (late ? "late" : "")}>{p.reviewed_on ? `last review ${frd(p.reviewed_on)}` : "never reviewed"}{p.next_review_on ? ` · next ${frd(p.next_review_on)}${late ? " — past due" : soon ? " — within 30 days" : ""}` : ""}</span></div>
           <div className="cb">
             {p.review_note && <p className="mini mb-2" style={{ whiteSpace: "pre-wrap" }}>{p.review_note}</p>}
             {desk ? <details open={late || soon}><summary className="mini">Record the annual review (MSM §2.2.3 · DSAC #1416100)</summary>
@@ -171,7 +173,7 @@ export default async function ProgrammePage({ params }: { params: Promise<{ id: 
       {events.length > 0 && <section className="card"><div className="ch"><span className="eyebrow">History</span></div><div className="cb" style={{ padding: 0 }}>
         <table className="tbl"><thead><tr><th>When (UTC)</th><th>Audit</th><th>What</th><th>Who</th></tr></thead><tbody>{events.map((e) => {
           const a = audits.find((y) => y.id === e.audit_id);
-          return <tr key={e.id}><td className="mono mini">{e.at.slice(0, 16).replace("T", " ")}</td><td className="mono">{a?.number}</td>
+          return <tr key={e.id}><td className="mono mini">{frdt(e.at)}</td><td className="mono">{a?.number}</td>
             <td>{e.kind === "replanned" ? `Moved ${e.from_month ? monthLong(e.from_month) : ""} → ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind === "planned" ? `Planned ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind === "cancelled" ? "Cancelled" : e.kind === "status" ? `Status → ${STATUS_LABEL[e.status ?? ""] ?? e.status}` : e.kind}{e.reason && <div className="mini">{e.reason}</div>}</td><td>{name(e.by)}</td></tr>;
         })}</tbody></table></div></section>}
       <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[p.entity] ?? "var(--field)" }} />{p.entity}, the audits are conducted in Compliance › Audits (PRO-CM-02); a finding raised in an audit points to it.</p>

@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { DeleteTest } from "@/components/DeleteTest";
 import { isTestData as isTestObj } from "@/lib/testdata";
 import Link from "next/link";
@@ -67,7 +68,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const fedBack = events.some((e) => /feedback/i.test(e.kind) || /^feedback/i.test(e.note ?? ""));
   const morDecided = !!a?.confirmed_at || !!r.mor_filed_at || !!r.mor_ref; // FB-125 · a MOR already filed is a decision taken
   const nextStep = !morDecided ? "decide whether it is a mandatory occurrence (MOR card on the right); the 72 h clock runs until then."
-    : invOpen ? `investigation ${invOpen.number} is in progress${invOpen.due ? `, due ${invOpen.due}` : ""}.`
+    : invOpen ? `investigation ${invOpen.number} is in progress${invOpen.due ? `, due ${frd(invOpen.due)}` : ""}.`
     : !fedBack ? "send the feedback to the reporter (Reporter card), then close the report."
     : "everything is done: close the report (bottom of the right column).";
 
@@ -225,7 +226,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <section className="card mb-4">
             <div className="ch"><span className="eyebrow">Investigation</span><span className="mini">{invs.length}</span></div>
             <div className="cb grid gap-1">
-              {invs.map((x) => <div key={x.id} className="flex gap-2 items-center"><Link className="underline mono" href={`/safe/inv/${x.id}`}>{x.number}</Link><span className="flex-1">{x.lead_name ?? ""}{x.due && !["closed", "cancelled"].includes(x.status) ? `, due ${x.due}` : ""}</span><span className={"pill " + (INV_STATUS[x.status]?.[1] ?? "")}>{INV_STATUS[x.status]?.[0] ?? x.status}</span></div>)}
+              {invs.map((x) => <div key={x.id} className="flex gap-2 items-center"><Link className="underline mono" href={`/safe/inv/${x.id}`}>{x.number}</Link><span className="flex-1">{x.lead_name ?? ""}{x.due && !["closed", "cancelled"].includes(x.status) ? `, due ${frd(x.due)}` : ""}</span><span className={"pill " + (INV_STATUS[x.status]?.[1] ?? "")}>{INV_STATUS[x.status]?.[0] ?? x.status}</span></div>)}
               {!invs.length && <p className="mini">{(r as { investigation?: string | null }).investigation ? "Investigation recorded in the source tool (above)." : "No internal investigation."}</p>}
               {!closed && !invs.some((x) => !["closed", "cancelled"].includes(x.status)) && <form action={openInvestigation} className="flex gap-2 mt-1"><input type="hidden" name="entity" value={r.entity} /><input type="hidden" name="report_id" value={r.id} />
                 <select name="level" className="inp" defaultValue="standard" style={{ marginTop: 0, width: 230 }}>{Object.entries(INV_LEVEL).map(([k, [l, d]]) => <option key={k} value={k}>{l}, {d} d</option>)}</select><button className="btn">Open an investigation</button></form>}

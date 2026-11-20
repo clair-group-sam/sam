@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { frdt } from "@/lib/dates";
 import { getSession } from "@/lib/session";
 import { PageHeader } from "@/components/Page";
 import { listManuals } from "@/lib/docs";
@@ -29,7 +30,7 @@ export default async function Integrations() {
         <section className="card"><div className="ch"><span className="eyebrow">Outlook, compliance@clair-group.com</span><span className={"pill " + (process.env.GRAPH_CLIENT_SECRET && process.env.MAIL_FROM ? "green" : "amber")}>{process.env.GRAPH_CLIENT_SECRET && process.env.MAIL_FROM ? "Configured" : "Not set (MAIL_FROM)"}</span></div><div className="cb mini">Microsoft Graph, application permission Mail.Send limited to the Compliance mailbox (Exchange RBAC).</div></section>
         <section className="card"><div className="ch"><span className="eyebrow">Teams bot « S.A.M. »</span><span className={"pill " + teamsState[0]}>{teamsState[1]}</span></div>
           <div className="cb mini">Cards in your personal chat for what needs you (tasks, dossiers, readings), with Done / Not yet buttons written back in S.A.M. {conv ? `Your chat with the bot is open (${(conv as { installed_by: string }).installed_by === "graph" ? "installed by S.A.M." : "you opened it"}).` : teamsInstallConfigured() ? "S.A.M. will open the chat for you at the first card." : "Open the S.A.M. app once in Teams, or ask IT for TEAMS_APP_ID so S.A.M. installs it for everyone."}
-            <form action={teamsTestCard} className="mt-2 flex items-center gap-2"><button className="btn" type="submit" disabled={!teamsConfigured()}>Send me a test card</button>{test && <span>last: {test.after?.status} · {test.at.slice(0, 16).replace("T", " ")}</span>}</form></div></section>
+            <form action={teamsTestCard} className="mt-2 flex items-center gap-2"><button className="btn" type="submit" disabled={!teamsConfigured()}>Send me a test card</button>{test && <span>last: {test.after?.status} · {frdt(test.at)}</span>}</form></div></section>
         <section className="card"><div className="ch"><span className="eyebrow">FlightLogger, Leon, Claude</span><span className="flex gap-1">{/* FB-156 · read from this deployment, not written by hand */ ([["FlightLogger", !!process.env.FLIGHTLOGGER_USER], ["Leon", !!process.env.LEON_REFRESH_TOKEN], ["Claude", !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY)]] as [string, boolean][]).map(([n, ok]) => <span key={n} className={"pill " + (ok ? "green" : "")}>{n}: {ok ? "key set" : "not set"}</span>)}</span></div><div className="cb mini">Leon: block hours, flight hours and flights for the SPI rates. FlightLogger: Astonfly safety reports. Claude: the AI agents (AI-01, usage in Registers › AI agents & usage). Keys live in Vercel only.</div></section>
       </div>
       <section className="card">

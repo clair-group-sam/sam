@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { fr as frd } from "@/lib/dates";
 import { useRouter } from "next/navigation";
 import { analyseDrop, certFolders, discardDrop, fileDrop, type DropProposal, type Existing } from "@/app/(app)/docs/drop/actions";
 
@@ -70,11 +71,11 @@ export default function DropDocument({ entities, kinds }: { entities: { code: st
                   <label><span className="eyebrow">Issued on</span><input type="date" className="inp" value={it.p.issued_on ?? ""} onChange={(e) => setP(i, { issued_on: e.target.value || null })} /></label>
                   <label><span className="eyebrow">Valid until</span><input type="date" className="inp" value={it.p.valid_until ?? ""} onChange={(e) => setP(i, { valid_until: e.target.value || null })} /></label>
                 </div>
-                <p className="mini mt-3">Goes to <b>Certificates & Validities › {it.p.entity} › {it.p.folder || "(choose a folder)"}</b>, {kinds.find((k) => k.id === it.p!.kind)?.label}{it.p.scope === "aircraft" ? `, ${it.p.registration || "registration?"}` : ""}{it.p.valid_until ? `, alerts at 90 / 30 / 7 days before ${it.p.valid_until}` : ", no expiry date, no alert"}.</p>
+                <p className="mini mt-3">Goes to <b>Certificates & Validities › {it.p.entity} › {it.p.folder || "(choose a folder)"}</b>, {kinds.find((k) => k.id === it.p!.kind)?.label}{it.p.scope === "aircraft" ? `, ${it.p.registration || "registration?"}` : ""}{it.p.valid_until ? `, alerts at 90 / 30 / 7 days before ${frd(it.p.valid_until)}` : ", no expiry date, no alert"}.</p>
                 {!!it.existing?.length && (
                   <div className="mt-2 p-2 border border-line rounded-lg">
                     <div className="eyebrow mb-1">It replaces</div>
-                    {it.existing.map((x) => <label key={x.id} className="audchk"><input type="checkbox" checked={it.replaces?.includes(x.id) ?? false} onChange={(e) => set(i, { replaces: e.target.checked ? [...(it.replaces ?? []), x.id] : (it.replaces ?? []).filter((y) => y !== x.id) })} /> {x.title}{x.registration ? `, ${x.registration}` : ""}, valid until {x.valid_until ?? "no expiry"} <span className="mini">(kept as superseded)</span></label>)}
+                    {it.existing.map((x) => <label key={x.id} className="audchk"><input type="checkbox" checked={it.replaces?.includes(x.id) ?? false} onChange={(e) => set(i, { replaces: e.target.checked ? [...(it.replaces ?? []), x.id] : (it.replaces ?? []).filter((y) => y !== x.id) })} /> {x.title}{x.registration ? `, ${x.registration}` : ""}, valid until {x.valid_until ? frd(x.valid_until) : "no expiry"} <span className="mini">(kept as superseded)</span></label>)}
                   </div>
                 )}
                 <div className="flex gap-2 mt-3">
@@ -84,7 +85,7 @@ export default function DropDocument({ entities, kinds }: { entities: { code: st
               </div>
             </div>
           )}
-          {it.status === "filed" && <div className="cb mini">Filed in Certificates & Validities{it.p?.valid_until ? `, valid until ${it.p.valid_until}` : ""}.</div>}
+          {it.status === "filed" && <div className="cb mini">Filed in Certificates & Validities{it.p?.valid_until ? `, valid until ${frd(it.p.valid_until)}` : ""}.</div>}
         </section>
       ))}
     </div>

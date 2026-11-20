@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { frText } from "@/lib/dates";
+import { frdt } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -143,7 +145,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
                 <tr key={r.id}>
                   <td className="mono" style={{ width: 100 }}>{fr(r.at)}</td>
                   <td style={{ width: 120 }}><span className={"pill " + (r.direction === "sent" ? "" : "amber")}>{r.direction === "sent" ? "⇧ sent" : "⇩ received"}</span></td>
-                  <td>{r.note}<div className="mini">{r.who}{r.revision_id && !r.file_id ? ", from the revision editor" : ""}</div></td>
+                  <td>{frText(r.note)}<div className="mini">{r.who}{r.revision_id && !r.file_id ? ", from the revision editor" : ""}</div></td>
                 </tr>))}
               {!rounds.length && <tr><td className="p-5 text-slate6">No exchange yet. The submission, the remarks and the decision are recorded here automatically; mails and calls can be added below.</td></tr>}
             </tbody></table>
@@ -186,7 +188,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
               <select name="kind" className="inp" style={{ maxWidth: 140 }} defaultValue="note"><option value="note">note</option><option value="mail">mail exchanged</option><option value="remarks">authority remark</option><option value="reply">our reply</option></select>
               <input name="note" className="inp" placeholder="What happened (who, what, where)" required /><button className="btn" type="submit">Add</button></form>
             <table className="tbl"><tbody>
-              {events.map((e) => <tr key={e.id}><td className="mono" style={{ width: 130 }}>{e.at.slice(0, 16).replace("T", " ")}</td><td style={{ width: 30 }}><Icon name={KIND_ICON[e.kind] ?? "dot"} size={14} /></td><td>{e.note}<div className="mini">{e.kind} · {e.who ?? ""}</div></td></tr>)}
+              {events.map((e) => <tr key={e.id}><td className="mono" style={{ width: 130 }}>{frdt(e.at)}</td><td style={{ width: 30 }}><Icon name={KIND_ICON[e.kind] ?? "dot"} size={14} /></td><td>{frText(e.note)}<div className="mini">{e.kind} · {e.who ?? ""}</div></td></tr>)}
             </tbody></table>
           </section>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { DueChip } from "@/components/DueChip";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -88,7 +89,7 @@ export default async function Findings({ searchParams }: { searchParams: Promise
         <section key={g.key} className="card mb-3">
           <div className="ch" style={{ flexWrap: "wrap", gap: 8 }}>
             <span>{g.audit ? <Link href={`/comp/audits/${g.audit.id}`}><b className="mono">{g.audit.number}</b> <b>{g.audit.title}</b></Link> : <b>Not linked to an audit</b>}
-              {g.audit && <span className="mini"> · {g.audit.authority ?? g.audit.external_auditor ?? ""}{g.audit.done_on ? `, ${g.audit.done_on}` : g.audit.planned_on ? `, ${g.audit.planned_on}` : ""}</span>}</span>
+              {g.audit && <span className="mini"> · {g.audit.authority ?? g.audit.external_auditor ?? ""}{g.audit.done_on ? `, ${frd(g.audit.done_on)}` : g.audit.planned_on ? `, ${frd(g.audit.planned_on)}` : ""}</span>}</span>
             <span className="flex items-center gap-2"><span className="fstack" title={`${g.open} open, ${g.closed} closed`}><i className="o" style={{ flex: g.open }} /><i className="c" style={{ flex: g.closed }} /></span><span className="mini"><b>{g.open}</b> open, {g.closed} closed{g.late ? <>, <span className="late">{g.late} past due</span></> : null}</span></span>
           </div>
           <div className="cb" style={{ padding: 0 }}>{Table(g.list)}</div>

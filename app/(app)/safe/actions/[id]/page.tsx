@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -43,7 +44,7 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
     <>
       <PageHeader eyebrow={`Safety, Actions, ${ENT[a.entity]?.name ?? a.entity}`} title={`${a.number}, ${a.title}`}
         tag={<span className="flex gap-2 items-center"><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span>{isLate(a, today) && <span className="pill red">overdue</span>}<span className="pill">{ACTION_KINDS[a.kind]}</span>{a.effectiveness && <span className={"pill " + (a.effectiveness === "effective" ? "green" : "red")}>{a.effectiveness === "effective" ? "effective" : "not effective"}</span>}</span>}
-        sub={`Owner ${a.owner_person ? nameOf.get(a.owner_person) ?? "—" : a.owner_role ?? "—"}, due ${a.due ?? "—"}, from ${ACTION_SOURCES[a.source_kind]}`}
+        sub={`Owner ${a.owner_person ? nameOf.get(a.owner_person) ?? "—" : a.owner_role ?? "—"}, due ${frd(a.due)}, from ${ACTION_SOURCES[a.source_kind]}`}
         right={<Link className="btn" href="/safe/actions">All actions</Link>} />
       <div className="repgrid2">
         <div>
@@ -85,13 +86,13 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
               {live && !owner && !manage && <p className="mini">Waiting for the owner.</p>}
               {a.status === "done" && (verify ? (
                 <form action={verifyAction} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
-                  <p className="mini">Done by {a.done_by ? nameOf.get(a.done_by) ?? "" : ""}, {a.done_at?.slice(0, 10)}, {a.done_note}</p>
+                  <p className="mini">Done by {a.done_by ? nameOf.get(a.done_by) ?? "" : ""}, {frd(a.done_at)}, {a.done_note}</p>
                   <textarea name="verified_note" className="inp" rows={2} placeholder="Verification (what you checked), or what is missing" />
                   <label><span className="mini">Check effectiveness on</span><input type="date" name="effectiveness_due" className="inp" defaultValue={in3m} /></label>
                   <select name="verdict" className="inp" defaultValue="accept"><option value="accept">Verified, close the action</option><option value="back">Not complete, send back to the owner</option></select>
                   <button className="btn primary">Confirm</button></form>
               ) : <p className="mini">Done, waiting for the safety desk&apos;s verification.</p>)}
-              {a.status === "verified" && <p className="mini">Verified by {a.verified_by ? nameOf.get(a.verified_by) ?? "" : ""}, {a.verified_at?.slice(0, 10)}{a.verified_note ? `, ${a.verified_note}` : ""}</p>}
+              {a.status === "verified" && <p className="mini">Verified by {a.verified_by ? nameOf.get(a.verified_by) ?? "" : ""}, {frd(a.verified_at)}{a.verified_note ? `, ${a.verified_note}` : ""}</p>}
               {effDue && (verify ? (
                 <form action={checkEffectiveness} className="grid gap-2"><input type="hidden" name="id" value={a.id} />
                   <span className="mini"><b>Effectiveness</b>{a.effectiveness_due ? `, planned on ${a.effectiveness_due}` : ""}: did the action remove or reduce the problem (new reports, audits, SPI)?</span>
@@ -99,7 +100,7 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
                   <textarea name="effectiveness_note" className="inp" rows={2} placeholder="What shows it (required if not effective)" />
                   <button className="btn">Record</button></form>
               ) : <p className="mini">Effectiveness to check{a.effectiveness_due ? ` on ${a.effectiveness_due}` : ""}.</p>)}
-              {a.effectiveness && <p className="mini">{a.effectiveness === "effective" ? "Effective" : "Not effective"}, {a.effectiveness_at?.slice(0, 10)}{a.effectiveness_note ? `, ${a.effectiveness_note}` : ""}</p>}
+              {a.effectiveness && <p className="mini">{a.effectiveness === "effective" ? "Effective" : "Not effective"}, {frd(a.effectiveness_at)}{a.effectiveness_note ? `, ${a.effectiveness_note}` : ""}</p>}
               {a.status === "cancelled" && <p className="mini">Cancelled.</p>}
             </div>
           </section>

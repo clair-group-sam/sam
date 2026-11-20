@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -45,7 +46,7 @@ export default async function PrintRisk({ params }: { params: Promise<{ id: stri
       <table className="kv"><tbody>
         <tr><td>Domain</td><td>{a.domain ?? "—"}</td></tr>
         <tr><td>Owner</td><td>{a.owner_role ?? "—"}</td></tr>
-        {a.kind !== "moc" && <tr><td>Conducted on · next due</td><td>{a.conducted_on ?? "—"} · {fr(a.next_due)}</td></tr>}
+        {a.kind !== "moc" && <tr><td>Conducted on · next due</td><td>{frd(a.conducted_on)} · {fr(a.next_due)}</td></tr>}
         <tr><td>Description</td><td style={{ whiteSpace: "pre-wrap" }}>{a.description ?? "—"}</td></tr>
         <tr><td>Participants</td><td>{(a.participants ?? []).length ? (a.participants ?? []).map((p) => `${p.name}${p.role ? " (" + p.role + ")" : ""}`).join(" · ") : "—"}</td></tr>
         <tr><td>Method</td><td>Hazard – consequence; severity A–E × likelihood 1–5 ({sch === "centrik" ? "scores: green 1–10 acceptable, yellow 20–100 tolerable, red 300–2500 intolerable" : "ICAO tolerability table"}); reasonably worst case.</td></tr>
@@ -71,7 +72,7 @@ export default async function PrintRisk({ params }: { params: Promise<{ id: stri
             <td><b>{h.title}</b><div className="mini">{h.ref}</div>{h.description && <div className="mini">{h.description}</div>}</td>
             <td>{h.consequence ?? "—"}</td>
             <td><ul>{(h.hazard_mitigations ?? []).filter((m) => m.existing).map((m, i) => <li key={i}>{m.text}</li>)}</ul></td>
-            <td><ul>{(h.hazard_mitigations ?? []).filter((m) => !m.existing).map((m, i) => <li key={i}>{m.text}{m.owner_role ? ` (${m.owner_role}${m.due ? `, ${m.due}` : ""})` : ""}{m.done_at ? " — done" : ""}</li>)}</ul></td>
+            <td><ul>{(h.hazard_mitigations ?? []).filter((m) => !m.existing).map((m, i) => <li key={i}>{m.text}{m.owner_role ? ` (${m.owner_role}${m.due ? `, ${frd(m.due)}` : ""})` : ""}{m.done_at ? " — done" : ""}</li>)}</ul></td>
             <td>{lab(h.lik_before, h.sev_before)}</td><td>{lab(h.lik_after, h.sev_after)}</td>
           </tr>))}</tbody></table>
       <p className="mini">Severity: {SEVERITIES.map((x) => `${x.id} ${x.label}`).join(" · ")} — Likelihood: {LIKELIHOODS.map((x) => `${x.id} ${x.label}`).join(" · ")}</p>
@@ -79,8 +80,8 @@ export default async function PrintRisk({ params }: { params: Promise<{ id: stri
       <h2>Decision and sign-off</h2>
       <table className="kv sig"><tbody>
         <tr><td>Decision</td><td>{a.decision ? DECISIONS[a.decision] : "—"}{a.decision_comment ? ` — ${a.decision_comment}` : ""}</td></tr>
-        <tr><td>Validated by (nominated person / SM)</td><td>{a.validated_at ? `${a.validated_name ?? ""}${a.validated_role ? " (" + a.validated_role + ")" : ""} — ${a.validated_at.slice(0, 10)} (electronic sign-off in S.A.M.)` : ""}</td></tr>
-        <tr><td>Residual risk accepted</td><td>{a.accepted_at ? `Accountable Manager ${a.accepted_name ?? ""} — ${a.accepted_at.slice(0, 10)} (electronic sign-off in S.A.M.)` : a.status === "accepted" ? `By the sign-off above (residual risk not red) — the Accountable Manager keeps the final say (MSM)` : ""}</td></tr>
+        <tr><td>Validated by (nominated person / SM)</td><td>{a.validated_at ? `${a.validated_name ?? ""}${a.validated_role ? " (" + a.validated_role + ")" : ""} — ${frd(a.validated_at)} (electronic sign-off in S.A.M.)` : ""}</td></tr>
+        <tr><td>Residual risk accepted</td><td>{a.accepted_at ? `Accountable Manager ${a.accepted_name ?? ""} — ${frd(a.accepted_at)} (electronic sign-off in S.A.M.)` : a.status === "accepted" ? `By the sign-off above (residual risk not red) — the Accountable Manager keeps the final say (MSM)` : ""}</td></tr>
       </tbody></table>
 
       <h2>Conformity with the MSM</h2>

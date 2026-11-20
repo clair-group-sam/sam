@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { frdt } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -57,7 +58,7 @@ export default async function E2Admin({ searchParams }: { searchParams: Promise<
             <form action={loadTax}><input type="hidden" name="entity" value={entity} /><button className="btn primary" disabled={!cfg}>{ctx.taxonomy ? "Reload the taxonomy" : "Load the taxonomy"}</button></form>
             <form action={loadLong}><input type="hidden" name="entity" value={entity} /><button className="btn" disabled={!cfg || !ctx.taxonomy} title="Aircraft make/model (~20 000) and operators (~17 000): cached once, searched by name">{longCount ? "Reload the long lists" : "Load the long lists (aircraft types, operators)"}</button></form>
           </div>
-          {ctx.taxonomy && <p className="mini mt-2">Taxonomy <b>{ctx.taxonomy.name} {ctx.taxonomy.version}</b> loaded {ctx.taxonomy.loaded_at.slice(0, 16).replace("T", " ")} ({ctx.taxonomy.env}) · {ctx.attrs.length} attributes · {ctx.values.length} values in {new Set(ctx.values.map((v) => v.value_list_id)).size} lists{longCount ? ` · long lists: ${longCount} aircraft types and operators` : " · long lists not cached yet"}.</p>}
+          {ctx.taxonomy && <p className="mini mt-2">Taxonomy <b>{ctx.taxonomy.name} {ctx.taxonomy.version}</b> loaded {frdt(ctx.taxonomy.loaded_at)} ({ctx.taxonomy.env}) · {ctx.attrs.length} attributes · {ctx.values.length} values in {new Set(ctx.values.map((v) => v.value_list_id)).size} lists{longCount ? ` · long lists: ${longCount} aircraft types and operators` : " · long lists not cached yet"}.</p>}
         </div></section>
       <section className="card mb-4"><div className="ch"><span className="eyebrow">Correspondences, S.A.M. value → E2 value</span><span className="flex gap-2 items-center"><form action={proposeMaps}><input type="hidden" name="entity" value={entity} /><button className="btn sm" disabled={!ctx.taxonomy} title="Occurrence classes, phases and event types that S.A.M. can read from the names — where nothing is set yet; the desk confirms">Propose by name</button></form><form method="get" className="flex gap-1 items-center"><input type="hidden" name="ent" value={entity} /><input name="q" className="inp" defaultValue={sp.q ?? ""} placeholder="search the long lists (e.g. Mustang, Astonjet)" style={{ marginTop: 0, width: 280 }} /><button className="btn sm">Search</button></form><span className="mini">{ctx.maps.length} set</span></span></div>
         <div className="cb" style={{ padding: 0 }}>
@@ -73,7 +74,7 @@ export default async function E2Admin({ searchParams }: { searchParams: Promise<
                 <td className="mini">{m ? (m.note?.startsWith("proposed") ? <span title={m.note}>proposed, to confirm</span> : "set") : <span className="late">missing</span>}</td></tr>); }); })}
           </tbody></table>}
         </div></section>
-      {(subs ?? []).length > 0 && <section className="card"><div className="ch"><span className="eyebrow">Last exchanges with E2</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((subs ?? []) as { at: string; kind: string; requested_status: string | null; ok: boolean; e2_id: string | null; e2_status: string | null; error: string | null; report_id: string }[]).map((h, i) => <tr key={i}><td className="mini">{h.at.slice(0, 16).replace("T", " ")}</td><td><Link href={`/safe/reports/${h.report_id}`} className="mono">{h.report_id}</Link></td><td>{h.kind}{h.requested_status ? ` → ${h.requested_status}` : ""}</td><td>{h.ok ? <span className="pill green">{h.e2_id} {h.e2_status}</span> : <span className="pill red">refused</span>}{h.error && <div className="mini">{h.error}</div>}</td></tr>)}</tbody></table></div></section>}
+      {(subs ?? []).length > 0 && <section className="card"><div className="ch"><span className="eyebrow">Last exchanges with E2</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((subs ?? []) as { at: string; kind: string; requested_status: string | null; ok: boolean; e2_id: string | null; e2_status: string | null; error: string | null; report_id: string }[]).map((h, i) => <tr key={i}><td className="mini">{frdt(h.at)}</td><td><Link href={`/safe/reports/${h.report_id}`} className="mono">{h.report_id}</Link></td><td>{h.kind}{h.requested_status ? ` → ${h.requested_status}` : ""}</td><td>{h.ok ? <span className="pill green">{h.e2_id} {h.e2_status}</span> : <span className="pill red">refused</span>}{h.error && <div className="mini">{h.error}</div>}</td></tr>)}</tbody></table></div></section>}
     </>
   );
 }

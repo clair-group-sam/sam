@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { DeleteTest } from "@/components/DeleteTest";
 import { isTestData as isTestObj } from "@/lib/testdata";
 import type { ReactNode } from "react";
@@ -159,7 +161,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             <form action={acknowledge}><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
               <button className="btn primary" type="submit">I have read Rev {current.rev}</button></form>
           )}
-          {mine?.acknowledged_at && <span className="pill green">Read on {mine.acknowledged_at.slice(0, 10)}</span>}
+          {mine?.acknowledged_at && <span className="pill green">Read on {frd(mine.acknowledged_at)}</span>}
           {isCmm(s) ? (
             <form action={setNature} className="flex items-center" title="Nature of the document (Compliance): a regulated manual follows the DOC-09 cycle with an authority route; an internal document is reviewed and published by its author">
               <input type="hidden" name="manual_id" value={manual.id} />
@@ -191,7 +193,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       )}
       {current && (current.step === "published" || current.step === "repository") && tab !== "history" && (
         <div className="statusline mb-4">
-          <span className="pill green">Published, Iss {current.issue} Rev {current.rev}{current.published_at ? `, ${current.published_at}` : ""}</span>
+          <span className="pill green">Published, Iss {current.issue} Rev {current.rev}{current.published_at ? `, ${frd(current.published_at)}` : ""}</span>
           {current.authority_route === "approval" && <span className="mini">approved by the civil aviation authority before publication</span>}
           {current.authority_route === "notification" && <span className="mini">notified to the civil aviation authority</span>}
           {workings.map((w) => <Link key={w.id} href={`/docs/manual/${manual.id}?rev=${w.id}`} className="pill amber">Rev {w.rev}, {STEP_LABEL[w.step]}</Link>)}
@@ -258,7 +260,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
         <section className="card"><table className="tbl">
           <thead><tr><th>Issue / Rev</th><th>Step</th><th>Authority route</th><th>Published</th><th>Summary</th></tr></thead>
           <tbody>{revs.map((r) => (
-            <tr key={r.id}><td className="mono"><Link className="underline" href={`/docs/manual/${manual.id}?rev=${r.id}`}>Iss {r.issue} Rev {r.rev}</Link></td><td>{STEP_LABEL[r.step]}</td><td className="mini">{r.authority_route ?? "—"}{r.authority_ref ? `, ${r.authority_ref}` : ""}</td><td className="mono">{r.published_at ?? "—"}</td><td className="mini">{r.summary}</td></tr>
+            <tr key={r.id}><td className="mono"><Link className="underline" href={`/docs/manual/${manual.id}?rev=${r.id}`}>Iss {r.issue} Rev {r.rev}</Link></td><td>{STEP_LABEL[r.step]}</td><td className="mini">{r.authority_route ?? "—"}{r.authority_ref ? `, ${r.authority_ref}` : ""}</td><td className="mono">{frd(r.published_at)}</td><td className="mini">{r.summary}</td></tr>
           ))}</tbody>
         </table></section>
       )}
@@ -270,9 +272,9 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             <tbody>
               {expected.map((p) => { const r = readings.find((x) => x.person_id === p.id); return (
                 <tr key={p.id}><td><b>{p.display_name}</b><div className="mini">{p.job_title}</div></td><td className="mini">{p.roles.join(", ")}</td>
-                  <td className="mono">{r?.acknowledged_at ? r.acknowledged_at.slice(0, 16).replace("T", " ") : <span className="pill amber">to read</span>}</td><td className="mini">{r?.via ?? ""}</td></tr>); })}
+                  <td className="mono">{r?.acknowledged_at ? frdt(r.acknowledged_at) : <span className="pill amber">to read</span>}</td><td className="mini">{r?.via ?? ""}</td></tr>); })}
               {readings.filter((r) => r.acknowledged_at && !expected.some((p) => p.id === r.person_id)).map((r) => (
-                <tr key={r.person_id}><td><b>{r.people?.display_name}</b><div className="mini">{r.people?.job_title} · not in the readers list</div></td><td /><td className="mono">{r.acknowledged_at?.slice(0, 16).replace("T", " ")}</td><td className="mini">{r.via ?? ""}</td></tr>))}
+                <tr key={r.person_id}><td><b>{r.people?.display_name}</b><div className="mini">{r.people?.job_title} · not in the readers list</div></td><td /><td className="mono">{frdt(r.acknowledged_at)}</td><td className="mini">{r.via ?? ""}</td></tr>))}
               {!expected.length && <tr><td colSpan={4} className="p-5 text-slate6">Nobody must read this manual with the current list (below).</td></tr>}
             </tbody></table>
         </section>

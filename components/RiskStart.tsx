@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { similarStudies, templatesFor, type Base, type Question } from "@/lib/risk-start";
 import { applyBase, chooseBase, resetBase } from "@/app/(app)/safe/risk/start-actions";
 import { Icon } from "@/lib/icons";
@@ -29,7 +30,7 @@ export default async function RiskStart({ a }: { a: A }) {
     <section className="card mb-4 hz-proposed">
       <div className="ch"><span className="eyebrow">Start from…</span><span className="mini">a similar past study or a template. SAM asks what differs, you keep each hazard</span></div>
       <div className="cb grid gap-3">
-        {similar.length > 0 && <div><div className="mini mb-1"><b>Similar past studies</b> (closest first)</div>{similar.map((x) => opt("study", x.id, <><Link className="underline mono" href={`/safe/risk/a/${x.id}`}>{x.number}</Link> {x.name}</>, `${x.hazards} hazards, ${x.conducted_on ?? "—"}${x.uses ? `, used ${x.uses}× as a base` : ""}`))}</div>}
+        {similar.length > 0 && <div><div className="mini mb-1"><b>Similar past studies</b> (closest first)</div>{similar.map((x) => opt("study", x.id, <><Link className="underline mono" href={`/safe/risk/a/${x.id}`}>{x.number}</Link> {x.name}</>, `${x.hazards} hazards, ${frd(x.conducted_on)}${x.uses ? `, used ${x.uses}× as a base` : ""}`))}</div>}
         {tpls.length > 0 && <div><div className="mini mb-1"><b>Templates</b> (most used first)</div>{tpls.map((t) => opt("template", t.id, <b>{t.name}</b>, `${t.hazards.length} hazards, ${t.questions.length} questions${t.uses ? `, used ${t.uses}×` : ""}${t.entity ? "" : ", group"}`))}</div>}
         {!similar.length && !tpls.length && <p className="mini">No similar study and no template for this kind yet, <Link className="underline" href="/safe/risk/templates">templates</Link>.</p>}
         <form action={chooseBase}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="base_kind" value="blank" /><button className="btn">Start blank</button> <span className="mini">add hazards yourself, or ask SAM to propose some</span></form>

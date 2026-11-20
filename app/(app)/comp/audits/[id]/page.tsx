@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { DueChip } from "@/components/DueChip";
 import { today } from "@/lib/authority";
 import { notFound, redirect } from "next/navigation";
@@ -65,7 +67,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   return (
     <>
       <PageHeader eyebrow={`Compliance, Audits, ${a.entity}`} title={`${a.number}, ${a.title}`}
-        sub={`${ENT[a.entity]?.name ?? a.entity}, ${KIND_LABEL[a.kind]}, planned ${monthLong(a.planned_month)}${a.planned_on ? `, ${a.planned_on}${a.planned_end ? ` → ${a.planned_end}` : ""}` : ""}, ${a.lead_auditor ? `lead auditor ${name(a.lead_auditor)}` : a.external_auditor ?? "no auditor named"}${a.auditors.length ? `, with ${a.auditors.map(name).join(", ")}` : ""}${a.scope ? `, ${a.scope}` : ""}`}
+        sub={`${ENT[a.entity]?.name ?? a.entity}, ${KIND_LABEL[a.kind]}, planned ${monthLong(a.planned_month)}${a.planned_on ? `, ${frd(a.planned_on)}${a.planned_end ? ` → ${a.planned_end}` : ""}` : ""}, ${a.lead_auditor ? `lead auditor ${name(a.lead_auditor)}` : a.external_auditor ?? "no auditor named"}${a.auditors.length ? `, with ${a.auditors.map(name).join(", ")}` : ""}${a.scope ? `, ${a.scope}` : ""}`}
         tag={<span className={"pill " + (a.status === "closed" ? "green" : a.status === "planned" ? "" : "amber")}>{STATUS_LABEL[a.status]}</span>}
         right={<div className="flex gap-2"><Link className="btn" href="/comp/audits">All audits</Link>{a.status !== "planned" && <a className="btn" href={`/print/audit/${a.id}?auto=1`} target="_blank" rel="noreferrer">PDF report</a>}{a.programme_id && <Link className="btn" href={`/comp/prog/${a.programme_id}`}>Programme</Link>}
           {a.status === "planned" && team && <form action={startAudit} className="flex gap-2"><input type="hidden" name="id" value={a.id} />
@@ -85,7 +87,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
       </div>
       {!elig.ok && <section className="card mb-4" style={{ borderColor: "var(--amber)" }}><div className="cb mini" style={{ color: "var(--amber-ink)" }}>Lead auditor {name(a.lead_auditor)}: {elig.why.join(", ")}, <Link href="/comp/auditors">Internal auditors</Link>.</div></section>}
       {a.status === "planned" && <section className="card mb-4"><div className="cb mini">{team ? "Pick the checklist and start: its items become the checks of this audit, with the official text of the rules in the version loaded today." : "Not started yet."}{!checklists.length && desk ? <> No checklist for {a.entity} yet, create one from the programme (module › checklist).</> : null}</div></section>}
-      {a.report_summary && <section className="card mb-4"><div className="ch"><span className="eyebrow">Report</span><span className="mini">{a.report_at ? `issued ${a.report_at.slice(0, 10)}` : ""}{a.closed_at ? `, closed ${a.closed_at.slice(0, 10)} by ${name(a.closed_by)}` : ""}</span></div><div className="cb" style={{ whiteSpace: "pre-wrap" }}>{a.report_summary}</div></section>}
+      {a.report_summary && <section className="card mb-4"><div className="ch"><span className="eyebrow">Report</span><span className="mini">{a.report_at ? `issued ${frd(a.report_at)}` : ""}{a.closed_at ? `, closed ${frd(a.closed_at)} by ${name(a.closed_by)}` : ""}</span></div><div className="cb" style={{ whiteSpace: "pre-wrap" }}>{a.report_summary}</div></section>}
 
       {checks.length > 0 && <div className="grid gap-4" style={{ gridTemplateColumns: "340px 1fr" }}>
         <div>{sections.map((sec) => <section key={sec} className="card mb-3"><div className="ch"><span className="eyebrow">{sec}</span><span className="mini">{checks.filter((c) => (c.section ?? "Checks") === sec && c.result).length}/{checks.filter((c) => (c.section ?? "Checks") === sec).length}</span></div>
@@ -104,7 +106,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
                 <div className="flex items-center gap-3"><input type="file" name="file" className="mini" /><button className="btn primary sm" style={{ marginLeft: "auto" }}>Save</button></div>
               </form> : <div><span className={"pill " + (RESULT_TONE[open.result ?? ""] ?? "")}>{open.result ? RESULT_LABEL[open.result] : "no result"}</span>{open.comment && <p className="mt-2" style={{ whiteSpace: "pre-wrap" }}>{open.comment}</p>}</div>}
               {open.evidence.length > 0 && <div className="mini mt-2">Evidence: {open.evidence.map((e, i) => <a key={i} href={`/api/files/${e.path}`} target="_blank" rel="noreferrer" style={{ marginRight: 10 }}>{e.name}</a>)}</div>}
-              {open.checked_at && <div className="mini mt-1">Result by {name(open.checked_by)} · {open.checked_at.slice(0, 16).replace("T", " ")} UTC</div>}
+              {open.checked_at && <div className="mini mt-1">Result by {name(open.checked_by)} · {frdt(open.checked_at)} UTC</div>}
               {open.imported && <div className="mini mt-1">Imported from {(open.imported as { source?: string }).source ?? "Centrik"} as read: {String((open.imported as { result?: string }).result ?? "")}{(open.imported as { comment?: string }).comment ? `, ${(open.imported as { comment: string }).comment}` : ""}</div>}
               <div className="flex items-center gap-2 mt-3" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
                 {open.finding_id ? <Link className="btn sm" href={`/comp/find/${open.finding_id}`}>Finding {findings.find((f) => f.id === open.finding_id)?.number ?? ""} ›</Link>
@@ -128,7 +130,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
                 {help.hints.chapters.length > 0 && <div><div className="mini" style={{ fontWeight: 700 }}>Chapters to open</div>{help.hints.chapters.map((c, i) => <div key={i} className="mini"><b>{c.manual}</b> {c.ref}, {c.why}</div>)}</div>}
                 {help.hints.evidence.length > 0 && <div><div className="mini" style={{ fontWeight: 700 }}>Typical evidence</div><ul className="mini" style={{ margin: 0, paddingLeft: 18 }}>{help.hints.evidence.map((e, i) => <li key={i}>{e}</li>)}</ul></div>}
                 {help.hints.ask.length > 0 && <div><div className="mini" style={{ fontWeight: 700 }}>To ask or sample</div><ul className="mini" style={{ margin: 0, paddingLeft: 18 }}>{help.hints.ask.map((e, i) => <li key={i}>{e}</li>)}</ul></div>}
-                <div className="mini" style={{ color: "var(--slate5)" }}>Suggestions by S.A.M. ({help.hints.at.slice(0, 10)}), a help to look, not an assessment.</div></>}
+                <div className="mini" style={{ color: "var(--slate5)" }}>Suggestions by S.A.M. ({frd(help.hints.at)}), a help to look, not an assessment.</div></>}
               {!help.hints && !help.citations.length && <div className="mini">{a.status === "planned" ? "Hints appear once the audit is started." : "No chapter of our manuals cites this rule and no suggestion is available yet."}</div>}
               {(hist.previous.length > 0 || hist.findings.length > 0) && <div><div className="mini" style={{ fontWeight: 700 }}>Last time on this rule</div>{hist.previous.map((p, i) => <div key={i} className="mini"><span className={"pill " + (RESULT_TONE[p.result] ?? "")}>{RESULT_LABEL[p.result] ?? p.result}</span> {p.audit?.number} {p.audit?.title}{p.comment ? `, ${p.comment.slice(0, 160)}` : ""}</div>)}{hist.findings.map((f) => <div key={f.id} className="mini"><Link href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link>, {f.status}</div>)}</div>}
             </div></section>
@@ -138,7 +140,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
       </div>}
 
       {findings.length > 0 && <section className="card mt-4"><div className="ch"><span className="eyebrow">Findings of this audit, {findings.length}</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th>Finding</th><th>Level</th><th>Answer due</th><th>Status</th></tr></thead><tbody>{findings.map((f) => { const lateF = !!f.due && f.due < today() && OPEN_STATUSES.includes(f.status); return <tr key={f.id} className="rowlink"><td><Link className="stretch" href={`/comp/find/${f.id}`}><b className="mono">{f.number}</b> {f.title}</Link></td><td>{LEVEL_LABEL[f.level] ?? f.level}</td><td><DueChip due={f.due} done={!OPEN_STATUSES.includes(f.status)} /></td><td><span className={"pill " + (FND_TONE[f.status] ?? "")}>{FND_STATUS[f.status] ?? f.status}</span></td></tr>; })}</tbody></table></div></section>}
-      {(ev ?? []).length > 0 && <details className="card mt-4"><summary className="ch"><span className="eyebrow">History</span></summary><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((ev ?? []) as AuditEvent[]).map((e) => <tr key={e.id}><td className="mono mini">{e.at.slice(0, 16).replace("T", " ")}</td><td>{e.kind === "status" ? `Status → ${STATUS_LABEL[e.status ?? ""] ?? e.status}` : e.kind === "replanned" ? `Moved ${e.from_month ? monthLong(e.from_month) : ""} → ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind}{e.reason ? <div className="mini">{e.reason}</div> : null}</td><td className="mini">{name(e.by)}</td></tr>)}</tbody></table></div></details>}
+      {(ev ?? []).length > 0 && <details className="card mt-4"><summary className="ch"><span className="eyebrow">History</span></summary><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{((ev ?? []) as AuditEvent[]).map((e) => <tr key={e.id}><td className="mono mini">{frdt(e.at)}</td><td>{e.kind === "status" ? `Status → ${STATUS_LABEL[e.status ?? ""] ?? e.status}` : e.kind === "replanned" ? `Moved ${e.from_month ? monthLong(e.from_month) : ""} → ${e.to_month ? monthLong(e.to_month) : ""}` : e.kind}{e.reason ? <div className="mini">{e.reason}</div> : null}</td><td className="mini">{name(e.by)}</td></tr>)}</tbody></table></div></details>}
       <p className="mini mt-3"><span className="entdot" style={{ background: ENT_COLOR[a.entity] ?? "var(--field)" }} />{a.entity}, PRO-CM-02</p>
     </>
   );

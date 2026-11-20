@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import Link from "next/link";
 import SourceMark from "@/components/SourceMark";
 import { redirect } from "next/navigation";
@@ -45,7 +46,7 @@ export default async function Committees({ searchParams }: { searchParams: Promi
     <>
       <PageHeader eyebrow="Safety, Safety assurance" title="Committees" sub="Safety Review Board, strategic, chaired by the AM, organised by the SM, with the nominated persons; Safety Action Groups, implementation on a topic, reporting to the SRB. Minutes record attendees, decisions and assigned actions." right={<>{tab("", "All")}{tab("srb", "Review boards")}{tab("sag", "Action groups")}</>} />
       <div className="grid gap-4 mb-5" style={{ gridTemplateColumns: `repeat(${Math.min(5, scope.length + 1)}, minmax(0, 1fr))` }}>
-        {scope.filter((e) => e !== "ASTFR" || all.some((c) => c.entities.includes("ASTFR"))).map((e) => { const k = cad(e); return <Metric key={e} label={`${kindShort(e, "srb")} ${y}, ${e}`} value={`${k.held} / ${k.need}`} tone={k.short && k.monthsLeft < 3 ? "red" : k.short ? "amber" : "green"} hint={k.next ? `next ${k.next.planned_on}` : `${CADENCE[e]?.label ?? ""} (${CADENCE[e]?.ref ?? ""})`} />; })}
+        {scope.filter((e) => e !== "ASTFR" || all.some((c) => c.entities.includes("ASTFR"))).map((e) => { const k = cad(e); return <Metric key={e} label={`${kindShort(e, "srb")} ${y}, ${e}`} value={`${k.held} / ${k.need}`} tone={k.short && k.monthsLeft < 3 ? "red" : k.short ? "amber" : "green"} hint={k.next ? `next ${frd(k.next.planned_on)}` : `${CADENCE[e]?.label ?? ""} (${CADENCE[e]?.ref ?? ""})`} />; })}
         <Metric label="Minutes to issue" value={toClose.length} tone={toClose.length ? "amber" : undefined} hint="held, or date passed" />
       </div>
       {toClose.length > 0 && <section className="card mb-5"><div className="ch"><span className="eyebrow">To record</span><span className="mini">attendance, notes, decisions, actions, then issue the minutes</span></div><Table list={toClose} empty="" /></section>}

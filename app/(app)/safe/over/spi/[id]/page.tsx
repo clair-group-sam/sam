@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -72,7 +73,7 @@ export default async function SpiPage({ params, searchParams }: { params: Promis
         <section className="card" id="action">
           <div className="ch"><span className="eyebrow">Actions from this SPI</span>{r.offTwice && <span className="pill red">off target two months in a row</span>}</div>
           <div className="cb">
-            {((acts ?? []) as { id: string; number: string; title: string; status: string; due: string | null }[]).map((a) => <div key={a.id}><Link className="underline mono" href={`/safe/actions/${a.id}`}>{a.number}</Link> {a.title} <span className="mini">· {a.status}{a.due ? `, due ${a.due}` : ""}</span></div>)}
+            {((acts ?? []) as { id: string; number: string; title: string; status: string; due: string | null }[]).map((a) => <div key={a.id}><Link className="underline mono" href={`/safe/actions/${a.id}`}>{a.number}</Link> {a.title} <span className="mini">· {a.status}{a.due ? `, due ${frd(a.due)}` : ""}</span></div>)}
             {edit && <details className="mt-2" open={r.offTwice}><summary className="cursor-pointer mini">+ Raise an action (ENR-CM-06: off target two months in a row → action with owner and due date)</summary>
               <div className="mt-2"><NewActionForm entity={entity} source="spi" spi_id={r.id} title={`${r.code} off target, analyse and act`} description={`${r.label}: ${fmt(r.ytd, r.basis)} YTD against ${targetText(r, r.t)}.`} owner_role={r.owner_role} compact /></div></details>}
           </div>

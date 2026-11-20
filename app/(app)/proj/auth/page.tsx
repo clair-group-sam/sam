@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { frText } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -76,7 +77,7 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
                 <tr key={f.id}>
                   <td className="entcol"><span className={"ent " + f.entity}>{f.entity}</span></td>
                   <td className="mono"><Link className="underline" href={link({ type: f.type_code })} title={typeMap.get(f.type_code)?.name}>{f.type_code}</Link></td>
-                  <td><Link href={`/proj/auth/${f.id}`} className="underline"><b>{f.title}</b></Link><div className="mini">{f.portal ?? f.authority}{f.trigger_note ? `, ${f.trigger_note}` : ""}</div></td>
+                  <td><Link href={`/proj/auth/${f.id}`} className="underline"><b>{f.title}</b></Link><div className="mini">{f.portal ?? f.authority}{f.trigger_note ? `, ${frText(f.trigger_note)}` : ""}</div></td>
                   <td><span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{f.rounds > 0 && <div className="mini">{f.rounds} round{f.rounds > 1 ? "s" : ""}</div>}</td>
                   <td className="mono">{f.portal_url ? <a className="underline" href={f.portal_url} target="_blank" rel="noreferrer">{f.portal_ref ?? "portal"}</a> : f.portal_ref ?? "—"}</td>
                   <td>{b ? <span className={"pill " + (b === "us" ? "amber" : "")}>{b === "us" ? "Ours" : f.authority ?? "Authority"}</span> : "—"}{f.portal_status && <div className="mini">{f.portal_status}</div>}{d !== null && AT_AUTHORITY.includes(f.stage) && <div className="mini">{d} d there</div>}</td>

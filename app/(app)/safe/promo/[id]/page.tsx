@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -37,7 +38,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
   const paras = (t: string | null) => (t ?? "").split(/\n\s*\n/).filter(Boolean);
   return (
     <>
-      <PageHeader eyebrow={`Safety, ${PROMO_KIND[p.kind]?.label}, ${p.entity}`} title={`${p.number}, ${p.title}`} sub={`${AUDIENCE[p.audience]}${p.published_at ? `, published ${p.published_at.slice(0, 10)}` : ""}${p.due ? `, by ${p.due}` : ""}`}
+      <PageHeader eyebrow={`Safety, ${PROMO_KIND[p.kind]?.label}, ${p.entity}`} title={`${p.number}, ${p.title}`} sub={`${AUDIENCE[p.audience]}${p.published_at ? `, published ${frd(p.published_at)}` : ""}${p.due ? `, by ${frd(p.due)}` : ""}`}
         tag={<span className={"pill " + (PROMO_STATUS[p.status]?.[1] ?? "")}>{PROMO_STATUS[p.status]?.[0]}</span>} right={<>{p.pdf_path && <a className="btn primary" href={`/api/promotions/${p.id}/pdf`} target="_blank" rel="noreferrer">PDF</a>}<Link href="/safe/promo" className="btn">← Safety promotion</Link></>} />
       <div className="grid gap-5" style={{ gridTemplateColumns: edit || desk ? "minmax(0,2fr) minmax(0,1fr)" : "minmax(0,1fr)" }}>
         <div>
@@ -68,7 +69,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
           </section>}
 
           {mine && p.status === "published" && p.kind !== "survey" && p.ack_required && <section className="card mb-5"><div className="cb flex items-center gap-3">
-            {mine.acknowledged_at ? <span className="mini">Acknowledged on {mine.acknowledged_at.slice(0, 10)}.</span> : <><span>Please confirm you have read and understood this {PROMO_KIND[p.kind].label.toLowerCase()}.</span><form action={ackPromotion} className="ml-auto"><Hid /><button className="btn primary">I have read and understood</button></form></>}</div></section>}
+            {mine.acknowledged_at ? <span className="mini">Acknowledged on {frd(mine.acknowledged_at)}.</span> : <><span>Please confirm you have read and understood this {PROMO_KIND[p.kind].label.toLowerCase()}.</span><form action={ackPromotion} className="ml-auto"><Hid /><button className="btn primary">I have read and understood</button></form></>}</div></section>}
 
           {desk && p.kind === "survey" && <section className="card mb-5"><div className="ch"><span className="eyebrow">Results</span><span className="mini">{A.length} answer(s)</span></div>
             <div className="cb grid gap-3">{p.questions.map((q, k) => { const v = A.map((a) => a[q.key]).filter(Boolean); const opts = q.type === "scale" ? SCALE : q.options ?? [];
@@ -84,7 +85,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
               {mayPublish(s) ? <form action={publishPromotion}><Hid /><button className="btn primary">Publish</button></form> : <span className="mini">Published by the safety desk (SM / CMM / FSO).</span>}</div></section>}
           {desk && <section className="card mb-5"><div className="ch"><span className="eyebrow">Reading</span><span className="mini">{R.filter(done).length} / {R.length}</span>
               {p.status === "published" && mayPublish(s) && <form action={closePromotion} className="ml-auto"><Hid /><button className="btn">Close</button></form>}</div>
-            <table className="tbl"><tbody>{R.sort((a, b) => Number(!!done(a)) - Number(!!done(b)) || (a.people?.display_name ?? "").localeCompare(b.people?.display_name ?? "")).map((r) => <tr key={r.person_id}><td>{r.people?.display_name ?? "—"}</td><td className="mini" style={{ width: 120 }}>{done(r) ? `${p.kind === "survey" ? "answered" : p.ack_required ? "acknowledged" : "read"} ${done(r)!.slice(0, 10)}` : r.read_at ? `opened ${r.read_at.slice(0, 10)}` : "not opened"}</td></tr>)}</tbody></table></section>}
+            <table className="tbl"><tbody>{R.sort((a, b) => Number(!!done(a)) - Number(!!done(b)) || (a.people?.display_name ?? "").localeCompare(b.people?.display_name ?? "")).map((r) => <tr key={r.person_id}><td>{r.people?.display_name ?? "—"}</td><td className="mini" style={{ width: 120 }}>{done(r) ? `${p.kind === "survey" ? "answered" : p.ack_required ? "acknowledged" : "read"} ${done(r)!.slice(0, 10)}` : r.read_at ? `opened ${frd(r.read_at)}` : "not opened"}</td></tr>)}</tbody></table></section>}
         </div>}
       </div>
     </>

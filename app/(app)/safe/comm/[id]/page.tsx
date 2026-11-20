@@ -1,4 +1,6 @@
 import { fr } from "@/lib/dates";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -32,7 +34,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
   const step = c.status === "planned" ? 1 : c.status === "held" ? 2 : 3;
   return (
     <>
-      <PageHeader eyebrow={`Safety, Committees, ${entitiesLabel(c)}`} title={`${c.number}, ${c.title}`} sub={`${isJoint(c) ? `Joint meeting ${entitiesLabel(c)}, ` : ""}${kindName(c.entity, c.kind)}, ${c.planned_on ?? "date to set"}${c.starts_at ? ` ${hm(c.starts_at)}${c.ends_at ? `–${hm(c.ends_at)}` : ""} UTC` : ""}${c.location ? `, ${c.location}` : ""}`}
+      <PageHeader eyebrow={`Safety, Committees, ${entitiesLabel(c)}`} title={`${c.number}, ${c.title}`} sub={`${isJoint(c) ? `Joint meeting ${entitiesLabel(c)}, ` : ""}${kindName(c.entity, c.kind)}, ${c.planned_on ? frd(c.planned_on) : "date to set"}${c.starts_at ? ` ${hm(c.starts_at)}${c.ends_at ? `–${hm(c.ends_at)}` : ""} UTC` : ""}${c.location ? `, ${c.location}` : ""}`}
         tag={<span className="flex gap-2 flex-wrap"><span className={"pill " + (STATUS[c.status]?.[1] ?? "")}>{STATUS[c.status]?.[0]}</span>{c.source !== "sam" && <span className="pill">from {c.source === "centrik" ? "Centrik" : "SharePoint"}{c.source_ref ? ` ${c.source_ref}` : ""}</span>}{(parent as { id: string; number: string } | null) && <Link className="pill" href={`/safe/comm/${(parent as { id: string }).id}`}>reports to {(parent as { number: string }).number}</Link>}</span>}
         right={<><Link href="/safe/comm" className="btn">← Committees</Link>{["held", "closed"].includes(c.status) && <a className="btn" href={`/print/committee/${c.id}`} target="_blank" rel="noreferrer">Minutes PDF</a>}</>} />
 
@@ -45,7 +47,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
       <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)" }}>
         <div>
           <section className="card mb-5">
-            <div className="ch"><span className="eyebrow">Agenda</span>{c.pack_at && <span className="mini">figures as at {c.pack_at.slice(0, 16).replace("T", " ")} UTC{c.pack?.since ? ` — since ${c.pack.since.slice(0, 10)}` : ""}</span>}
+            <div className="ch"><span className="eyebrow">Agenda</span>{c.pack_at && <span className="mini">figures as at {frdt(c.pack_at)} UTC{c.pack?.since ? ` — since ${frd(c.pack.since)}` : ""}</span>}
               {edit && <form action={preparePack} className="ml-auto"><input type="hidden" name="id" value={c.id} /><button className="btn">{c.pack ? "Refresh the figures" : "Prepare the figures"}</button></form>}</div>
             {c.agenda.map((x, i) => { const f = packFor(x.key, c.pack); return (
               <div key={x.key} className="cb agitem">
@@ -106,7 +108,7 @@ export default async function CommitteePage({ params }: { params: Promise<{ id: 
 
           {c.kind === "srb" && ((sags ?? []) as { id: string; number: string; title: string; status: string }[]).length > 0 && <section className="card mb-5"><div className="ch"><span className="eyebrow">Action groups reporting here</span></div><div className="cb">{((sags ?? []) as { id: string; number: string; title: string }[]).map((g) => <div key={g.id}><Link className="underline mono" href={`/safe/comm/${g.id}`}>{g.number}</Link> {g.title}</div>)}</div></section>}
 
-          <section className="card"><div className="ch"><span className="eyebrow">Journal</span></div><div className="cb">{((ev ?? []) as { at: string; kind: string; note: string | null }[]).map((e, i) => <div key={i} className="mini"><span className="mono">{e.at.slice(0, 16).replace("T", " ")}</span> {e.note}</div>)}</div></section>
+          <section className="card"><div className="ch"><span className="eyebrow">Journal</span></div><div className="cb">{((ev ?? []) as { at: string; kind: string; note: string | null }[]).map((e, i) => <div key={i} className="mini"><span className="mono">{frdt(e.at)}</span> {e.note}</div>)}</div></section>
         </div>
       </div>
     </>

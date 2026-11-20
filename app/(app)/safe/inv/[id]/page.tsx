@@ -1,4 +1,6 @@
 import { fr } from "@/lib/dates";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -35,7 +37,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
   const T = ({ v }: { v: string | null }) => (v ? <p style={{ whiteSpace: "pre-wrap" }}>{v}</p> : <p className="mini">Not written.</p>);
   return (
     <>
-      <PageHeader eyebrow={`Safety, Investigations, ${i.entity}`} title={`${i.number}, ${i.title}`} sub={`${INV_LEVEL[i.level]?.[0] ?? i.level}, lead ${i.lead_name ?? "—"}, due ${i.due ?? "—"}`}
+      <PageHeader eyebrow={`Safety, Investigations, ${i.entity}`} title={`${i.number}, ${i.title}`} sub={`${INV_LEVEL[i.level]?.[0] ?? i.level}, lead ${i.lead_name ?? "—"}, due ${frd(i.due)}`}
         tag={<span className="flex gap-2"><span className={"pill " + (invLate(i) ? "red" : INV_STATUS[i.status]?.[1] ?? "")}>{invLate(i) ? "Overdue" : INV_STATUS[i.status]?.[0]}</span><span className="pill">Confidential, just culture</span></span>}
         right={<><Link href="/safe/inv" className="btn">← Investigations</Link>{i.report_text && <a className="btn" href={`/print/investigation/${i.id}`} target="_blank" rel="noreferrer">Report PDF</a>}</>} />
 
@@ -112,7 +114,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
             <div className="cb"><p className="mini mb-2">A de-identified safety bulletin drafted from this investigation, sent to the people concerned.</p><Link className="btn" href={`/safe/promo?inv=${i.id}${i.report_id ? `&report=${i.report_id}` : ""}`}>+ Safety bulletin</Link></div></section>}
 
           <section className="card"><div className="ch"><span className="eyebrow">History</span></div>
-            <ul className="cb mini" style={{ display: "grid", gap: 4 }}>{((ev ?? []) as { at: string; kind: string; note: string | null }[]).map((e, k) => <li key={k}><span className="mono">{e.at.slice(0, 16).replace("T", " ")} UTC</span> · {e.note ?? e.kind}</li>)}</ul></section>
+            <ul className="cb mini" style={{ display: "grid", gap: 4 }}>{((ev ?? []) as { at: string; kind: string; note: string | null }[]).map((e, k) => <li key={k}><span className="mono">{frdt(e.at)} UTC</span> · {e.note ?? e.kind}</li>)}</ul></section>
         </div>
       </div>
     </>

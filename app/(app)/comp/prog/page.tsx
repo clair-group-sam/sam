@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -58,7 +59,7 @@ export default async function AuditProgramme() {
           <section key={p.id} className="card mb-4">
             <div className="ch" style={{ flexWrap: "wrap", gap: 12 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}><span className="entdot" style={{ background: ENT_COLOR[p.entity] ?? "var(--field)" }} /><Link href={`/comp/prog/${p.id}`}><b>{ENT[p.entity]?.name ?? p.entity}, {p.title}</b></Link><span className="mini mono">{p.reference ?? PROG_REF[p.entity]?.reference}, {PROG_REF[p.entity]?.msm}</span></span>
-              <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span className={"pill " + (p.status === "approved" ? "green" : p.status === "draft" ? "amber" : "")}>{PROG_STATUS[p.status]}</span><span className="pill">{p.cycle_months}-month cycle</span><span className="mono mini">{p.starts_on} → {p.ends_on}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span className={"pill " + (p.status === "approved" ? "green" : p.status === "draft" ? "amber" : "")}>{PROG_STATUS[p.status]}</span><span className="pill">{p.cycle_months}-month cycle</span><span className="mono mini">{frd(p.starts_on)} → {frd(p.ends_on)}</span>
                 <span className="mini">{pct} % elapsed, {c.done} done / {c.done + c.planned} audits</span><Link className="btn sm" href={`/comp/prog/${p.id}`}>Open</Link></span>
             </div>
             <div className="cb"><AuditGrid p={p} mods={m} audits={a} t0={t0} />
@@ -69,7 +70,7 @@ export default async function AuditProgramme() {
       })}
       {others.length > 0 && <section className="card"><div className="ch"><span className="eyebrow">Other cycles</span></div><div className="cb" style={{ padding: 0 }}>
         <table className="tbl"><thead><tr><th>Entity</th><th>Programme</th><th>Cycle</th><th>Status</th></tr></thead><tbody>{others.map((p) => (
-          <tr key={p.id}><td><span className="entdot" style={{ background: ENT_COLOR[p.entity] ?? "var(--field)" }} />{p.entity}</td><td><Link href={`/comp/prog/${p.id}`}><b>{p.title}</b></Link></td><td className="mono">{p.starts_on} → {p.ends_on}</td><td><span className="pill">{PROG_STATUS[p.status]}</span></td></tr>))}</tbody></table></div></section>}
+          <tr key={p.id}><td><span className="entdot" style={{ background: ENT_COLOR[p.entity] ?? "var(--field)" }} />{p.entity}</td><td><Link href={`/comp/prog/${p.id}`}><b>{p.title}</b></Link></td><td className="mono">{frd(p.starts_on)} → {frd(p.ends_on)}</td><td><span className="pill">{PROG_STATUS[p.status]}</span></td></tr>))}</tbody></table></div></section>}
     </>
   );
 }

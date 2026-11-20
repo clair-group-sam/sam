@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { frText } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -34,7 +35,7 @@ export default async function Decisions() {
   const row = (t: (typeof lines)[number]) => (
     <tr key={t.id}><td style={{ width: 70 }}><span className={"ent " + t.entity}>{t.entity}</span></td><td style={{ width: 170 }}><span className={"kind " + (KIND[t.kind]?.[1] ?? "")}>{KIND[t.kind]?.[0] ?? t.kind.replace(/_/g, " ")}</span></td>
       <td className={"due" + (t.due && t.due < t0 ? " red" : "")} style={{ width: 110 }}>{fr(t.due)}{t.due && t.due < t0 && <small> late</small>}</td>
-      <td>{t.ctx && <div className="ctx">{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}{t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}</td></tr>);
+      <td>{t.ctx && <div className="ctx">{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}{t.link ? <Link href={t.link} className="underline"><b>{frText(t.title)}</b></Link> : <b>{frText(t.title)}</b>}{t.detail && <div className="mini">{frText(t.detail)}</div>}</td></tr>);
 
   return (
     <>

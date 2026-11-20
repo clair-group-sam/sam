@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { fr as frd } from "@/lib/dates";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
@@ -19,7 +20,7 @@ export default async function Parameters() {
         <table className="tbl"><thead><tr><th>Parameter</th><th>Value</th><th>Last change</th></tr></thead><tbody>
           {rows.map((r) => <tr key={r.key}><td><b>{r.label}</b><div className="mini">{r.hint}</div></td>
             <td style={{ width: 260 }}>{admin ? <form action={saveParam} className="flex gap-2"><input type="hidden" name="key" value={r.key} /><input name="value" className="inp mono" defaultValue={r.value} aria-label={r.label} /><button className="btn" type="submit">Save</button></form> : <span className="mono">{r.value}</span>}</td>
-            <td className="mini">{r.updated_at.slice(0, 10).split("-").reverse().join("/")}{r.updated_by ? `, ${P.get(r.updated_by) ?? ""}` : ""}</td></tr>)}
+            <td className="mini">{frd(r.updated_at).split("-").reverse().join("/")}{r.updated_by ? `, ${P.get(r.updated_by) ?? ""}` : ""}</td></tr>)}
         </tbody></table>)}</div></section>
     </>
   );

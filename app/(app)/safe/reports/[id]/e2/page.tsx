@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -35,7 +37,7 @@ export default async function E2Review({ params, searchParams }: { params: Promi
   return (
     <>
       <PageHeader eyebrow={`Safety, Report ${r.id}, ${ENT[r.entity]?.name ?? r.entity}, ECCAIRS 2`} title={r.e2_id ? `${r.e2_id}, ${r.e2_status ?? "—"} v${r.e2_version ?? "—"}` : "Report to ECCAIRS 2"}
-        sub={`${env ?? "not connected"} · ${ctx.taxonomy ? `${ctx.taxonomy.name} ${ctx.taxonomy.version}, loaded ${ctx.taxonomy.loaded_at.slice(0, 10)}` : "taxonomy not loaded"} · S.A.M. proposes, you decide; nothing leaves without the button below.`}
+        sub={`${env ?? "not connected"} · ${ctx.taxonomy ? `${ctx.taxonomy.name} ${ctx.taxonomy.version}, loaded ${frd(ctx.taxonomy.loaded_at)}` : "taxonomy not loaded"} · S.A.M. proposes, you decide; nothing leaves without the button below.`}
         right={<Link className="btn" href={`/safe/reports/${r.id}`}>Back to the report</Link>} />
       {!cfg && <section className="card mb-4"><div className="cb">ECCAIRS is not connected for {r.entity} (environment variables). The report is filed in the <a className="underline" href="https://e2.aviationreporting.eu/home" target="_blank" rel="noreferrer">E2 portal</a> and its reference recorded on the report.</div></section>}
       {err && <section className="card mb-4"><div className="cb"><span className="pill red">refused</span> <span className="mini" style={{ whiteSpace: "pre-wrap" }}>{err}</span></div></section>}
@@ -70,7 +72,7 @@ export default async function E2Review({ params, searchParams }: { params: Promi
             </div></section>
           <details className="card mb-4"><summary className="ch" style={{ cursor: "pointer" }}><span className="eyebrow">JSON that leaves (taxonomyCodes)</span></summary><pre className="cb mini" style={{ whiteSpace: "pre-wrap", maxHeight: 360, overflow: "auto" }}>{JSON.stringify(codes, null, 2)}</pre></details>
         </form>)}
-      {history.length > 0 && <section className="card"><div className="ch"><span className="eyebrow">Exchanges with E2</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{history.map((h, i) => <tr key={i}><td className="mini">{h.at.slice(0, 16).replace("T", " ")}</td><td>{h.kind}{h.requested_status ? ` → ${h.requested_status}` : ""}</td><td>{h.ok ? <span className="pill green">{h.e2_id} v{h.e2_version} {h.e2_status}</span> : <span className="pill red">refused</span>}{h.error && <div className="mini">{h.error}</div>}</td></tr>)}</tbody></table></div></section>}
+      {history.length > 0 && <section className="card"><div className="ch"><span className="eyebrow">Exchanges with E2</span></div><div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{history.map((h, i) => <tr key={i}><td className="mini">{frdt(h.at)}</td><td>{h.kind}{h.requested_status ? ` → ${h.requested_status}` : ""}</td><td>{h.ok ? <span className="pill green">{h.e2_id} v{h.e2_version} {h.e2_status}</span> : <span className="pill red">refused</span>}{h.error && <div className="mini">{h.error}</div>}</td></tr>)}</tbody></table></div></section>}
     </>
   );
 }

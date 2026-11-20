@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -23,7 +24,7 @@ export default async function Requirements() {
           <div className="ch"><b>{ENT[e]?.name ?? e}</b><span className="mini">{ENT[e]?.qual}, {ENT[e]?.auth} · {mine.length} regulation{mine.length === 1 ? "" : "s"}</span></div>
           <div className="cb" style={{ padding: 0 }}>
             {mine.length ? <table className="tbl"><thead><tr><th>Regulation</th><th>Domains</th><th>Version read</th><th>Last check</th><th></th></tr></thead><tbody>
-              {mine.map((r) => <tr key={r.key}><td><b>{r.short}</b><div className="mini">{r.number ? `${r.number}, ` : ""}{r.title}</div></td><td className="mini">{r.domains.join(", ")}</td><td className="mini">{r.current_version ?? "—"}{r.version_since ? `, since ${r.version_since}` : ""}</td><td className="mini">{r.checked_at ? r.checked_at.slice(0, 10) : "never"}{r.check_result ? `, ${r.check_result}` : ""}</td><td><Link className="mini underline" href={`/reg/ear/${r.key}`}>Open the rules</Link></td></tr>)}
+              {mine.map((r) => <tr key={r.key}><td><b>{r.short}</b><div className="mini">{r.number ? `${r.number}, ` : ""}{r.title}</div></td><td className="mini">{r.domains.join(", ")}</td><td className="mini">{r.current_version ?? "—"}{r.version_since ? `, since ${frd(r.version_since)}` : ""}</td><td className="mini">{r.checked_at ? frd(r.checked_at) : "never"}{r.check_result ? `, ${r.check_result}` : ""}</td><td><Link className="mini underline" href={`/reg/ear/${r.key}`}>Open the rules</Link></td></tr>)}
             </tbody></table> : <p className="p-4 mini">No regulation attached to this entity yet: Regulation › Easy Access Rules sets which entities each regulation applies to.</p>}
           </div>
         </section>); })}

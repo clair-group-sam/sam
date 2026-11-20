@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -126,7 +127,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                   <button className="btn primary">Sign off, {s.name.split(" ")[0]}</button>
                   <span className="mini">Validation by the most relevant nominated person, his/her deputy or the SM.</span>
                 </form>)) : <p className="mini">Waiting for the sign-off of the most relevant nominated person (or deputy / SM).</p>)}
-              {a.validated_at && <p className="mb-2">Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""}, {a.validated_at.slice(0, 10)}{a.decision ? `, ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
+              {a.validated_at && <p className="mb-2">Signed off by <b>{a.validated_name}</b>{a.validated_role ? ` (${a.validated_role})` : ""}, {frd(a.validated_at)}{a.decision ? `, ${DECISIONS[a.decision]}` : ""}{a.decision_comment ? <><br /><span className="mini">{a.decision_comment}</span></> : null}</p>}
               {a.status === "validated" && (mayAccept(s) ? (
                 <form action={acceptAssessment} className="grid gap-2 mt-2"><input type="hidden" name="id" value={a.id} />
                   <p className="mini">The residual risk stays red. Approve the activity anyway (justification required) or stop it.</p>
@@ -151,7 +152,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                     <button className="btn">Record the AM&apos;s decision</button></form></details>
                 </div>)}
               {a.status === "accepted" && !a.accepted_at && <p className="mini mb-2">Accepted by the sign-off (green / yellow residual risk), the AM may overrule it by opening a new version.</p>}
-              {a.accepted_at && <p className="mb-2">Decided by the AM <b>{a.accepted_name}</b>, {a.accepted_at.slice(0, 10)}</p>}
+              {a.accepted_at && <p className="mb-2">Decided by the AM <b>{a.accepted_name}</b>, {frd(a.accepted_at)}</p>}
               {moc && a.status === "accepted" && a.moc_status === "approved" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="implemented" /><button className="btn primary">Mark the change as implemented</button></form>}
               {moc && a.moc_status === "implemented" && <form action={mocStep} className="mt-2"><input type="hidden" name="id" value={a.id} /><input type="hidden" name="to" value="closed" /><button className="btn primary">Close the MOC</button></form>}
               {a.kind !== "hazard_log" && ["accepted", "archived"].includes(a.status) && mayEditRisk(s) && <form action={saveAsTemplate} className="mt-3 flex gap-2"><input type="hidden" name="id" value={a.id} /><input name="name" className="inp flex-1" style={{ marginTop: 0 }} placeholder="Template name (e.g. Ferry flight)" /><button className="btn">Save as a template</button></form>}

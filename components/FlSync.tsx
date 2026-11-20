@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { frdt } from "@/lib/dates";
 import { useRouter } from "next/navigation";
 
 type St = { configured: boolean; last: string | null; count: number } | null;
@@ -20,7 +21,7 @@ export default function FlSync({ url }: { url: string }) {
       setTxt(""); load(); router.refresh();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
   }
-  const last = st?.last ? `last read ${st.last.slice(0, 16).replace("T", " ")} UTC` : "not read yet";
+  const last = st?.last ? `last read ${frdt(st.last)} UTC` : "not read yet";
   return (
     <section className="card mb-5">
       <div className="ch"><span className="eyebrow">FlightLogger</span><span className="mini">Astonfly reports are sent in FlightLogger, {st ? `${st.count} in S.A.M., ${last}` : "…"}, read again every evening</span>

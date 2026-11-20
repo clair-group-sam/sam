@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -114,7 +115,7 @@ function EntityColumn({ d, compact }: { d: EntityDash; compact: boolean }) {
           { label: "open entries", value: d.watch.entries, href: "/comp/watch?tab=open", tone: d.watch.entriesLate ? "amber" : undefined, hint: d.watch.entriesLate ? `${d.watch.entriesLate} past return date` : undefined },
           { label: "to analyse", value: d.watch.toAnalyse, href: "/comp/watch?tab=analyse" },
         ]} />
-        {p && <Area title={`Safety since the last SRB${p.since ? `, ${p.since.slice(0, 10)}` : ""}`} link={{ href: "/safe/over", label: "Open the overview" }} figs={[
+        {p && <Area title={`Safety since the last SRB${p.since ? `, ${frd(p.since)}` : ""}`} link={{ href: "/safe/over", label: "Open the overview" }} figs={[
           { label: "reports", value: p.reports.total, href: "/safe/reports", hint: `${p.reports.mor} MOR, ${p.reports.significant} ERC ≥ 100, ${p.reports.open} open` },
           { label: "SPI on target", value: `${p.spiCounts.ok ?? 0} / ${p.spi.length}`, tone: (p.spiCounts.far ?? 0) ? "red" : (p.spiCounts.improve ?? 0) ? "amber" : "green", href: "/safe/over", hint: `${p.spiCounts.improve ?? 0} to improve, ${p.spiCounts.far ?? 0} far off` },
           { label: "hazards", value: p.hazards.log, href: "/safe/risk", hint: `${p.hazards.red.length} intolerable in the log, ${p.hazards.reviewDue} reviews due`, tone: p.hazards.red.length ? "red" : p.hazards.reviewDue ? "amber" : undefined },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { morClock } from "@/lib/safety";
@@ -100,7 +101,7 @@ export default async function SafetyOverview({ searchParams }: { searchParams: P
       </section>
 
       {(edit || note) && <section className="card mb-5">
-        <div className="ch"><span className="eyebrow">Safety performance, commentary for the SRB</span>{note && <span className="mini">Q{note.quarter}, {note.created_at.slice(0, 10)}{note.model ? ", draft prepared by SAM" : ""}</span>}
+        <div className="ch"><span className="eyebrow">Safety performance, commentary for the SRB</span>{note && <span className="mini">Q{note.quarter}, {frd(note.created_at)}{note.model ? ", draft prepared by SAM" : ""}</span>}
           {edit && <form action={draftCommentary} className="ml-auto"><input type="hidden" name="entity" value={e} /><input type="hidden" name="year" value={year} /><button className="btn">{note ? "Draft again" : "Draft the commentary"}</button></form>}</div>
         <div className="cb">
           {edit ? <form action={saveCommentary} className="grid gap-2"><input type="hidden" name="entity" value={e} /><input type="hidden" name="year" value={year} /><input type="hidden" name="quarter" value={board.quarter} />

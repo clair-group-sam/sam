@@ -1,4 +1,5 @@
 import { fr } from "@/lib/dates";
+import { frText } from "@/lib/dates";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -53,7 +54,7 @@ export default async function Inbox() {
                 <td className={"due" + (t.due && t.due < today ? " red" : "")}>{t.due ? fr(t.due) : ""}{t.due && t.due < today && <small> late</small>}</td>
                 <td>
                   {t.ctx && <div className="ctx">{t.kind === "project" ? "Project: " : ""}{t.ctxLink ? <Link href={t.ctxLink}>{t.ctx}</Link> : t.ctx}</div>}
-                  {t.link ? <Link href={t.link} className="underline"><b>{t.title}</b></Link> : <b>{t.title}</b>}{t.detail && <div className="mini">{t.detail}</div>}
+                  {t.link ? <Link href={t.link} className="underline"><b>{frText(t.title)}</b></Link> : <b>{frText(t.title)}</b>}{t.detail && <div className="mini">{frText(t.detail)}</div>}
                 </td>
               </tr>
             ))}

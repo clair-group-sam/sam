@@ -1,4 +1,6 @@
 import { fr } from "@/lib/dates";
+import { frdt } from "@/lib/dates";
+import { fr as frd } from "@/lib/dates";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession, basePost } from "@/lib/session";
@@ -42,18 +44,18 @@ export default async function WatchEntry({ params }: { params: Promise<{ id: str
   return (
     <>
       <EntityBand entity={e.entity} current={s.entity} multi={s.entities.length > 1} what="entry" />
-      <PageHeader eyebrow={`Compliance, Regulatory watch${tp ? `, ${tp.title}` : ""}`} title={`${e.number}, ${e.title}`} sub={`${e.source_kind ? KIND_LABEL[e.source_kind] ?? e.source_kind : "—"}${e.domain ? `, ${e.domain}` : ""}${e.reference ? `, ${e.reference}` : ""}${e.published_on ? `, published ${e.published_on}` : ""}${e.applicable_on ? `, applicable from ${e.applicable_on}` : ""}${e.imported_from ? `, imported from ${e.imported_from}` : ""}`}
+      <PageHeader eyebrow={`Compliance, Regulatory watch${tp ? `, ${tp.title}` : ""}`} title={`${e.number}, ${e.title}`} sub={`${e.source_kind ? KIND_LABEL[e.source_kind] ?? e.source_kind : "—"}${e.domain ? `, ${e.domain}` : ""}${e.reference ? `, ${e.reference}` : ""}${e.published_on ? `, published ${frd(e.published_on)}` : ""}${e.applicable_on ? `, applicable from ${frd(e.applicable_on)}` : ""}${e.imported_from ? `, imported from ${e.imported_from}` : ""}`}
         right={<span className="flex gap-2 items-center">{e.url && <a className="btn" href={e.url} target="_blank" rel="noreferrer">Open the text ↗</a>}{tp && <Link className="btn" href={`/comp/watch/topic/${tp.id}`}>Stream</Link>}<span className={"pill " + (e.status === "closed" ? "green" : isOpen ? "amber" : "")}>{STATUS_LABEL[e.status] ?? e.status}</span></span>} />
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Applicability" value={APPL_LABEL[e.applicability] ?? e.applicability} tone={e.applicability === "applicable" ? "amber" : undefined} hint={e.task ? TASK_LABEL[e.task] : ""} />
         <Metric label="Tasked to" value={e.owner_person ? name(e.owner_person) : e.owner_role ?? "—"} />
         <Metric label="Return before" value={e.due ?? "—"} tone={e.due && e.due < t0 && isOpen ? "red" : undefined} />
-        <Metric label="Done" value={`${revisions.length} draft${revisions.length === 1 ? "" : "s"}, ${actions.length} action${actions.length === 1 ? "" : "s"}`} hint={e.closed_at ? `closed ${e.closed_at.slice(0, 10)}, ${name(e.closed_by)}` : ""} />
+        <Metric label="Done" value={`${revisions.length} draft${revisions.length === 1 ? "" : "s"}, ${actions.length} action${actions.length === 1 ? "" : "s"}`} hint={e.closed_at ? `closed ${frd(e.closed_at)}, ${name(e.closed_by)}` : ""} />
       </div>
       <div className="grid grid-cols-2 gap-4 items-start">
         <div className="grid gap-4">
           <section className="card samcard">
-            <div className="ch"><span className="eyebrow">S.A.M. reading</span><span className="mini">{a ? `${a.at.slice(0, 16).replace("T", " ")}${a.model === "rules" ? " · citations only" : ""}` : "not run yet"}{may && isOpen && <form action={analyse} style={{ display: "inline", marginLeft: 8 }}><input type="hidden" name="id" value={e.id} /><button className="btn mini" type="submit">{a ? "Read again" : "Read with S.A.M."}</button></form>}</span></div>
+            <div className="ch"><span className="eyebrow">S.A.M. reading</span><span className="mini">{a ? `${frdt(a.at)}${a.model === "rules" ? " · citations only" : ""}` : "not run yet"}{may && isOpen && <form action={analyse} style={{ display: "inline", marginLeft: 8 }}><input type="hidden" name="id" value={e.id} /><button className="btn mini" type="submit">{a ? "Read again" : "Read with S.A.M."}</button></form>}</span></div>
             <div className="cb grid gap-3">
               {a ? <>
                 <p>{a.summary}</p>
@@ -82,7 +84,7 @@ export default async function WatchEntry({ params }: { params: Promise<{ id: str
               </form>) : <div className="grid gap-2"><p style={{ whiteSpace: "pre-wrap" }}>{e.impact ?? <span className="mini">No impact recorded.</span>}</p>{e.manual_ids.length > 0 && <div className="mini">Manuals: {manuals.filter((m) => e.manual_ids.includes(m.id)).map((m) => m.code).join(", ")}</div>}</div>}</div>
           </section>
 
-          <section className="card"><div className="ch"><span className="eyebrow">History</span></div><div className="cb mini">{events.map((x, i) => <div key={i}>{x.at.slice(0, 16).replace("T", " ")} · {x.action.replace(/^watch_/, "").replace(/_/g, " ")} · {name(x.actor)}</div>)}</div></section>
+          <section className="card"><div className="ch"><span className="eyebrow">History</span></div><div className="cb mini">{events.map((x, i) => <div key={i}>{frdt(x.at)} · {x.action.replace(/^watch_/, "").replace(/_/g, " ")} · {name(x.actor)}</div>)}</div></section>
         </div>
 
         <div className="grid gap-4">

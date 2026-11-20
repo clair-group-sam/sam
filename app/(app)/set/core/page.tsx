@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { frdt } from "@/lib/dates";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
@@ -41,7 +42,7 @@ export default async function Core() {
       <section className="card">
         <div className="ch"><span className="eyebrow">Last runs</span></div>
         <table className="tbl"><tbody>
-          {((log ?? []) as { at: string; action: string; after: { applied?: string[]; error?: string | null } | null }[]).map((l, i) => <tr key={i}><td className="mono" style={{ width: 170 }}>{l.at.slice(0, 16).replace("T", " ")}</td><td><span className={"pill " + (l.action === "migrations_applied" ? "green" : "red")}>{l.action.replace("migrations_", "")}</span></td><td className="mini">{(l.after?.applied ?? []).join(", ") || "—"}{l.after?.error ? ` · ${l.after.error}` : ""}</td></tr>)}
+          {((log ?? []) as { at: string; action: string; after: { applied?: string[]; error?: string | null } | null }[]).map((l, i) => <tr key={i}><td className="mono" style={{ width: 170 }}>{frdt(l.at)}</td><td><span className={"pill " + (l.action === "migrations_applied" ? "green" : "red")}>{l.action.replace("migrations_", "")}</span></td><td className="mini">{(l.after?.applied ?? []).join(", ") || "—"}{l.after?.error ? ` · ${l.after.error}` : ""}</td></tr>)}
           {!log?.length && <tr><td className="p-5 text-slate6">No run yet.</td></tr>}
         </tbody></table>
       </section>

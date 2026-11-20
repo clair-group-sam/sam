@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { mayCreateManual } from "@/lib/create";
 import { kindLabel } from "@/lib/cert";
@@ -47,7 +48,7 @@ export default async function Certificates({ searchParams }: { searchParams: Pro
                 <tr key={c.id}><td className="mini">{kindLabel(c.kind)}{c.registration ? <div className="mono">{c.registration}</div> : null}</td>
                   <td style={{ opacity: c.archived_at ? 0.55 : 1 }}><b>{c.title}</b>{c.archived_at && <span className="pill ml-2">superseded</span>}{c.reference && <div className="mini">ref. {c.reference}</div>}{c.file_path && <div className="mini">{c.file_path.startsWith("wm:") ? "file in Web Manuals (to migrate)" : <a className="underline" href={`/api/files/${c.file_path}`} target="_blank" rel="noreferrer">Open file</a>}</div>}</td>
                   <td className="mini">{c.issuer}</td>
-                  <td className="mono">{c.valid_until ?? "no expiry"}{d !== null && <div><span className={"pill " + (d < 0 ? "red" : d <= 30 ? "red" : d <= 90 ? "amber" : "green")}>{d < 0 ? `expired ${-d} d ago` : `${d} d left`}</span></div>}</td>
+                  <td className="mono">{c.valid_until ? frd(c.valid_until) : "no expiry"}{d !== null && <div><span className={"pill " + (d < 0 ? "red" : d <= 30 ? "red" : d <= 90 ? "amber" : "green")}>{d < 0 ? `expired ${-d} d ago` : `${d} d left`}</span></div>}</td>
                   {canDrop && <td style={{ width: 300 }}>
                     <form action={moveCertificate} className="flex gap-1">
                       <input type="hidden" name="id" value={c.id} />
