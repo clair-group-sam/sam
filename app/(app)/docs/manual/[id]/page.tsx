@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { DeleteTest } from "@/components/DeleteTest";
+import { isTestData as isTestObj } from "@/lib/testdata";
 import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { canDownloadPdf, getSession } from "@/lib/session";
@@ -290,6 +292,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
           ) : <div className="cb mini">Set by Compliance or the manual's owner ({manual.owner_role}).</div>}
         </section>
       </>)}
+      {s.superadmin && !s.viewAs && isTestObj(manual.code, manual.title) && <DeleteTest kind="manual" id={manual.id} what={`${manual.code}, ${manual.title}, every revision`} />}
     </>
   );
 }

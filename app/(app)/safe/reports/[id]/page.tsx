@@ -1,4 +1,6 @@
 import { fr } from "@/lib/dates";
+import { DeleteTest } from "@/components/DeleteTest";
+import { isTestData as isTestObj } from "@/lib/testdata";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -240,6 +242,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           </section>
         </div>
       </div>
+      {s.superadmin && !s.viewAs && isTestObj(r.headline, r.headline_en) && <DeleteTest kind="report" id={r.id} what={`Report ${r.id}, ${r.headline}`} />}
     </>
   );
 }
