@@ -41,7 +41,10 @@ export default async function Inbox() {
     const titles = new Map(((pj ?? []) as { id: string; title: string }[]).map((p) => [p.id, p.title]));
     for (const l of links) if (titles.has(l.project_id)) fileProject.set(l.link_id, { id: l.project_id, title: titles.get(l.project_id)! });
   }
-  const tasks: InboxLine[] = [...regroup(flat.filter((t) => !isTest(t)), today, fileProject), ...flat.filter((t) => isTest(t))];
+  // what is late stays one line each, so that "Late" holds only what is really late (its project named above it); the rest is grouped
+  const isLate = (t: { due: string | null }) => !!t.due && t.due < today;
+  const lateLines: InboxLine[] = flat.filter((t) => !isTest(t) && isLate(t)).map((t) => { const p = fileProject.get(/^\/proj\/auth\/([^/?#]+)/.exec(t.link ?? "")?.[1] ?? ""); return p && !t.ctx ? { ...t, ctx: "Project: " + p.title, ctxLink: `/proj/boards/${p.id}` } : t; });
+  const tasks: InboxLine[] = [...lateLines, ...regroup(flat.filter((t) => !isTest(t) && !isLate(t)), today, fileProject), ...flat.filter((t) => isTest(t))];
   // the list in groups, the most pressing first: late, the next 7 days, later, without a date; test objects apart
   const in7 = new Date(Date.parse(today) + 7 * 86_400_000).toISOString().slice(0, 10);
   const realT = tasks.filter((t) => !isTest(t));
