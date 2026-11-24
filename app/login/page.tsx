@@ -5,11 +5,12 @@ import { supabaseBrowser } from "@/lib/supabase-browser";
 // keep in step with SIGNIN_SCOPES in lib/msgraph-user.ts (server file, not imported here)
 const SIGNIN_SCOPES = "openid profile email User.Read"; // identity only: S.A.M. reads no mailbox, calendar or chat
 function LoginCard() {
-  const setup = useSearchParams().get("setup") === "1";
+  const sp = useSearchParams(); const setup = sp.get("setup") === "1"; const suspended = sp.get("suspended") === "1";
   const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const signIn = () => supabaseBrowser().auth.signInWithOAuth({ provider: "azure", options: { scopes: SIGNIN_SCOPES, redirectTo: `${location.origin}/auth/callback` } });
   return (<div className="bg-white border border-line rounded-xl p-10 w-[420px] text-center shadow-sm">
     <div className="text-3xl font-extrabold tracking-tight">S.A.M.</div><div className="text-slate6 text-sm mt-1">Safety · Assurance · Management</div>
+    {suspended && <div className="mt-6 rounded-md text-sm p-4 text-left" role="alert" style={{ border: "1px solid var(--amber-line)", background: "var(--amber-s)", color: "var(--amber-ink)" }}><b>Your access to S.A.M. is suspended.</b><br />Contact the Compliance department if this is not expected.</div>}
     {configured
       ? <button onClick={signIn} className="mt-8 w-full rounded-md bg-navy text-white py-3 font-semibold">Sign in with Microsoft</button>
       : <div className="mt-8 rounded-md text-sm p-4 text-left" style={{ border: "1px solid var(--amber-line)", background: "var(--amber-s)", color: "var(--amber-ink)" }}>

@@ -67,6 +67,12 @@ async function viewOptionsFor(): Promise<ViewOption[]> {
   return out;
 }
 
+/** True when the signed-in Microsoft account is a person whose access to S.A.M. is suspended (the sign-in page says so). */
+export const isSuspended = cache(async (): Promise<boolean> => {
+  try { const sb = await supabaseServer(); const { data: { user } } = await sb.auth.getUser(); if (!user) return false;
+    const { data } = await supabaseAdmin().from("people").select("suspended_at").eq("auth_uid", user.id).maybeSingle();
+    return !!(data as { suspended_at?: string | null } | null)?.suspended_at; } catch { return false; }
+});
 /** One auth round-trip per request (layout + page share it). */
 export const getSession = cache(async (): Promise<Session | null> => {
   const sb = await supabaseServer();
@@ -74,6 +80,8 @@ export const getSession = cache(async (): Promise<Session | null> => {
   if (!user) return null;
   const { data: p } = await sb.from("people").select("id,email,display_name,home_entity,entities,roles,is_group_function,job_title,last_seen_at").eq("auth_uid", user.id).maybeSingle();
   const person = (p as Person | null) ?? null;
+  // RIGHTS-03 · access suspended in S.A.M.: no session, at once, whatever Microsoft says (asked apart so that a missing column never locks anyone out)
+  if (person) { try { const { data: su } = await supabaseAdmin().from("people").select("suspended_at").eq("id", person.id).maybeSingle(); if ((su as { suspended_at?: string | null } | null)?.suspended_at) return null; } catch { /* never blocks a page */ } }
   // FB-094 · "last seen" followed the sign-in only; a session lasts for days. One write a day at most.
   const seen = (p as { last_seen_at?: string | null } | null)?.last_seen_at ?? null;
   if (person && (!seen || seen.slice(0, 10) < new Date().toISOString().slice(0, 10))) { try { await supabaseAdmin().from("people").update({ last_seen_at: new Date().toISOString() }).eq("id", person.id); } catch { /* never blocks a page */ } }

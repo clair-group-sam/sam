@@ -61,6 +61,32 @@ export async function saveRights(fd: FormData) {
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "person", object_id: id, action: "rights_changed", before, after: row });
   revalidatePath("/users/book"); redirect(`/users/book?p=${id}`);
 }
+/** RIGHTS-03 · access suspended / restored in S.A.M. by Compliance or the super admin: at once, open sessions included. Never oneself,
+ *  never a super admin (the way back in must stay open). */
+export async function suspendPerson(fd: FormData) {
+  const s = await admin(); const id = String(fd.get("id")); const note = String(fd.get("note") ?? "").trim() || null;
+  if (id === s.person?.id) fail("You cannot suspend your own access.");
+  const { data: p } = await db().from("people").select("roles").eq("id", id).maybeSingle();
+  if (!p) fail("Person not found"); if (((p as { roles: string[] | null }).roles ?? []).includes("SUPERADMIN")) fail("The access of a super admin is not suspended from here.");
+  const row = { suspended_at: new Date().toISOString(), suspended_by: s.person?.id ?? null, suspended_note: note };
+  const { error } = await db().from("people").update(row).eq("id", id); if (error) fail(error.message);
+  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "person", object_id: id, action: "access_suspended", after: row });
+  revalidatePath("/users/book"); redirect(`/users/book?p=${id}`);
+}
+export async function restorePerson(fd: FormData) {
+  const s = await admin(); const id = String(fd.get("id"));
+  const { error } = await db().from("people").update({ suspended_at: null, suspended_by: null, suspended_note: null, rights_reviewed_at: new Date().toISOString(), rights_reviewed_by: s.person?.id ?? null }).eq("id", id); if (error) fail(error.message);
+  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "person", object_id: id, action: "access_restored" });
+  revalidatePath("/users/book"); redirect(`/users/book?p=${id}`);
+}
+/** "It is normal": the rights of this person have been looked at; the line leaves the list until something changes again. */
+export async function reviewRights(fd: FormData) {
+  const s = await admin(); const id = String(fd.get("id"));
+  const row = { rights_reviewed_at: new Date().toISOString(), rights_reviewed_by: s.person?.id ?? null };
+  const { error } = await db().from("people").update(row).eq("id", id); if (error) fail(error.message);
+  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "person", object_id: id, action: "rights_reviewed", after: { reason: String(fd.get("why") ?? "") } });
+  revalidatePath("/users/book");
+}
 export async function savePerson(fd: FormData) {
   const s = await admin(); const id = String(fd.get("id"));
   const row = { job_title: String(fd.get("job_title") ?? "").trim() || null, can_create_manuals: fd.get("can_create_manuals") === "on" };

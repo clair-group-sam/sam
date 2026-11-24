@@ -4,12 +4,12 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sweepTeams } from "@/lib/teams";
 import Shell from "@/components/Shell";
 import { headers } from "next/headers";
-import { getSession } from "@/lib/session";
+import { getSession, isSuspended } from "@/lib/session";
 import { mayOpen } from "@/lib/nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect((await isSuspended()) ? "/login?suspended=1" : "/login");
   // FB-122 · a screen that is not in the menus of the profile is not opened by its address either
   const path = (await headers()).get("x-sam-path") ?? "";
   // a super admin who is not viewing as someone keeps every screen (they test the pages of the other profiles)
