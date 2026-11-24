@@ -1,3 +1,4 @@
+import NoOwner from "@/components/NoOwner";
 import Link from "next/link";
 import { frText } from "@/lib/dates";
 import { frdt } from "@/lib/dates";
@@ -51,6 +52,7 @@ export default async function AuthorityFilePage({ params }: { params: Promise<{ 
       <PageHeader eyebrow={`Projects, CAA applications, ${f.type_code}`} title={f.title}
         sub={`${ENT[f.entity]?.name ?? f.entity}, ${type?.name ?? f.type_code}, ${f.portal ?? f.authority ?? ""}${f.category ? `, ${CATEGORY_LABEL[f.category] ?? f.category}` : ""}`}
         right={<><span className={"pill " + STAGE_TONE[f.stage]} style={{ alignSelf: "center" }}>{STAGE_LABEL[f.stage]}</span><Link href="/proj/auth" className="btn">All files</Link></>} />
+      <NoOwner show={!f.owner_role && !f.owner_person && !["closed", "standby"].includes(f.stage)} what="CAA application" where="in “Owner post” below" />
       {disagrees && (
         <section className="card mb-4" style={{ borderLeft: "4px solid var(--red, #c0392b)" }}>
           <div className="cb">

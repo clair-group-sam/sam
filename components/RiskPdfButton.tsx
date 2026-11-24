@@ -2,12 +2,12 @@
 import { useState } from "react";
 
 /** Download the risk assessment as a PDF (for the CAA application or the archive). */
-export function PdfButton({ id }: { id: string }) {
+export function PdfButton({ id, base = "/api/risk/pdf" }: { id: string; base?: string }) {
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const go = async () => {
     if (busy) return; setBusy(true); setErr("");
     try {
-      const r = await fetch(`/api/risk/pdf/${id}`); const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+      const r = await fetch(`${base}/${id}`); const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!j.url) throw new Error(j.error ?? `HTTP ${r.status}`);
       const a = document.createElement("a"); a.href = j.url; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }

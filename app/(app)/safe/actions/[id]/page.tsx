@@ -1,3 +1,4 @@
+import NoOwner from "@/components/NoOwner";
 import Link from "next/link";
 import { fr as frd } from "@/lib/dates";
 import { notFound, redirect } from "next/navigation";
@@ -46,6 +47,7 @@ export default async function ActionPage({ params }: { params: Promise<{ id: str
         tag={<span className="flex gap-2 items-center"><span className={"pill " + (ACTION_STATUS[a.status]?.[1] ?? "")}>{ACTION_STATUS[a.status]?.[0]}</span>{isLate(a, today) && <span className="pill red">overdue</span>}<span className="pill">{ACTION_KINDS[a.kind]}</span>{a.effectiveness && <span className={"pill " + (a.effectiveness === "effective" ? "green" : "red")}>{a.effectiveness === "effective" ? "effective" : "not effective"}</span>}</span>}
         sub={`Owner ${a.owner_person ? nameOf.get(a.owner_person) ?? "—" : a.owner_role ?? "—"}, due ${frd(a.due)}, from ${ACTION_SOURCES[a.source_kind]}`}
         right={<Link className="btn" href="/safe/actions">All actions</Link>} />
+      <NoOwner show={!a.owner_role && !a.owner_person && ["open", "in_progress"].includes(a.status)} what="safety action" where="in “Owner, post” below" />
       <div className="repgrid2">
         <div>
           <section className="card mb-4">

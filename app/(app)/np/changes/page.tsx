@@ -12,7 +12,7 @@ import { applyChange, cancelChange, createChange, linkApplication, markAccepted,
 
 type Sp = { entity?: string; err?: string; new?: string; post?: string };
 type Change = { id: string; entity: string; post_code: string; post_title: string | null; seat: "holder" | "deputy"; from_name: string | null; to_name: string | null; effective_on: string | null; reason: string | null;
-  acceptance: "required" | "not_required"; authority_file_id: string | null; status: "open" | "applied" | "cancelled"; applied_as: string | null; applied_at: string | null; cancel_note: string | null; created_at: string };
+  acceptance: "required" | "not_required"; authority_file_id: string | null; authority_notice_days: number | null; status: "open" | "applied" | "cancelled"; applied_as: string | null; applied_at: string | null; cancel_note: string | null; created_at: string };
 type FileRow = { id: string; title: string; stage: Stage; portal_ref: string | null; submitted_at: string | null; np_post_code: string | null; type_code: string };
 const fr = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : "—");
 const days = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
@@ -23,16 +23,21 @@ const AS: Record<string, [string, string]> = { accepted: ["accepted by the autho
  *  CAO.A.105(a)(2) before the change takes place, no number of days. Unforeseen changes: at the earliest opportunity. */
 type Notice = { days: number; working: boolean; ref: string; text: string };
 const AIRWORTHINESS = /^(D?NPCA|CAM|CAMO|ARS)/;
-function noticeFor(entity: string, post: string): Notice | null {
-  if (entity === "ASJMT" && AIRWORTHINESS.test(post.toUpperCase())) return { days: 20, working: true, ref: "AMC1 CAMO.A.130(b)", text: "20 working days" };
-  if (entity === "ASJMT" || entity === "ASJFR") return { days: 20, working: false, ref: "AMC1 ORO.GEN.130(b)", text: "20 days" };
-  if (entity === "ASFFR") return { days: 10, working: false, ref: "AMC1 ORA.GEN.130(b)", text: "10 days" };
-  if (entity === "ASTFR") return { days: 0, working: false, ref: "CAO.A.105(a)(2)", text: "before the change takes place" };
-  return null;
+/** 24/11 (Guillaume) · the longest notice applies: every rule that applies to the post, and the notice the authority set itself
+ *  for this change when there is one; a working day counts for 7/5 of a day to compare them. */
+function noticeFor(entity: string, post: string, authorityDays?: number | null): Notice | null {
+  const all: Notice[] = [];
+  if (entity === "ASJMT" && AIRWORTHINESS.test(post.toUpperCase())) all.push({ days: 20, working: true, ref: "AMC1 CAMO.A.130(b)", text: "20 working days" });
+  if (entity === "ASJMT" || entity === "ASJFR") all.push({ days: 20, working: false, ref: "AMC1 ORO.GEN.130(b)", text: "20 days" });
+  if (entity === "ASFFR") all.push({ days: 10, working: false, ref: "AMC1 ORA.GEN.130(b)", text: "10 days" });
+  if (entity === "ASTFR") all.push({ days: 0, working: false, ref: "CAO.A.105(a)(2)", text: "before the change takes place" });
+  if (authorityDays && authorityDays > 0) all.push({ days: authorityDays, working: false, ref: "the notice set by the authority", text: `${authorityDays} days` });
+  const len = (n: Notice) => (n.working ? n.days * 1.4 : n.days);
+  return all.sort((a, b) => len(b) - len(a))[0] ?? null;
 }
 const RULES: Record<string, string> = {
-  ASJMT: "AMC1 ORO.GEN.130(b): at least 20 days before; airworthiness posts, AMC1 CAMO.A.130(b): at least 20 working days before",
-  ASJFR: "AMC1 ORO.GEN.130(b): at least 20 days before", ASFFR: "AMC1 ORA.GEN.130(b): at least 10 days before", ASTFR: "CAO.A.105(a)(2): notified before the change takes place",
+  ASJMT: "AMC1 ORO.GEN.130(b): at least 20 days before; airworthiness posts, AMC1 CAMO.A.130(b): at least 20 working days before. The longest notice applies, a notice set by the authority included",
+  ASJFR: "AMC1 ORO.GEN.130(b): at least 20 days before. A longer notice set by the authority applies", ASFFR: "AMC1 ORA.GEN.130(b): at least 10 days before. A longer notice set by the authority applies", ASTFR: "CAO.A.105(a)(2): notified before the change takes place; a notice set by the authority applies",
 };
 /** Monday to Friday between two dates (public holidays are not counted out). */
 function workingDays(from: string, to: string): number { let n = 0; const d = new Date(from + "T00:00:00Z"); const end = Date.parse(to + "T00:00:00Z"); const step = d.getTime() <= end ? 1 : -1;
@@ -93,6 +98,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
                 <label style={{ width: 240 }}><span className="mini">New person (S.A.M. account)</span><select name="to_person" className="inp" defaultValue=""><option value="">— not in the list —</option>{people.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select></label>
                 <label style={{ width: 220 }}><span className="mini">or name (empty: the seat becomes vacant)</span><input name="to_name" className="inp" placeholder="First LAST" /></label>
                 <label style={{ width: 160 }}><span className="mini">Takes effect on</span><input name="effective_on" type="date" className="inp" required /></label>
+                <label style={{ width: 200 }}><span className="mini">Notice set by the authority, days (if any)</span><input name="authority_notice_days" type="number" min={0} max={365} className="inp" /></label>
                 <label style={{ width: 220 }}><span className="mini">Acceptance by the authority</span><select name="acceptance" className="inp" defaultValue="required"><option value="required">required (Form 4 / Form 2)</option><option value="not_required">not required</option></select></label>
               </div>
               <label className="block mt-3"><span className="mini">Reason</span><input name="reason" className="inp" placeholder="departure, reorganisation, new deputy…" /></label>
@@ -102,13 +108,14 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
         </section>
       )}
 
+      <p className="mini mb-3">Applying a change also moves the rights in S.A.M.: the person who takes the seat receives the post and the entity, the person who leaves it loses the post. Where the rights of a person come from a Microsoft Entra group, the IT must move the person in that group too, otherwise the next sign-in puts the former rights back.</p>
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">In progress</span><span className="mini">{open.length}</span></div>
         <table className="tbl">
           <thead><tr><th>Post</th><th>Change</th><th>Takes effect</th><th>CAA application</th>{cmm && <th />}</tr></thead>
           <tbody>
             {open.map((c) => { const f = fileOf(c); const d = c.effective_on ? days(c.effective_on, t0) : null; const submitted = frd(f?.submitted_at) ?? null;
-              const nt = noticeFor(entity, c.post_code); const lead = (from: string) => (nt?.working ? workingDays(from, c.effective_on!) : days(c.effective_on!, from));
+              const nt = noticeFor(entity, c.post_code, c.authority_notice_days); const lead = (from: string) => (nt?.working ? workingDays(from, c.effective_on!) : days(c.effective_on!, from));
               const short = !!nt && c.acceptance === "required" && !!c.effective_on && (nt.days ? lead(submitted ?? t0) < nt.days : !submitted && d !== null && d <= 0);
               return (
                 <tr key={c.id}>

@@ -32,7 +32,7 @@ export async function createChange(fd: FormData) {
   const { data: pp } = personId ? await db.from("people").select("id,display_name").eq("id", personId).maybeSingle() : { data: null };
   const person = pp as { id: string; display_name: string } | null;
   const row = { entity, post_code: post.code, post_title: post.title, seat, from_name: seat === "holder" ? post.holder_name : post.deputy_name, to_name: person?.display_name ?? v(fd, "to_name"), to_person: person?.id ?? null,
-    effective_on: v(fd, "effective_on"), reason: v(fd, "reason"), acceptance: fd.get("acceptance") === "not_required" ? "not_required" : "required", created_by: s.person?.id ?? null };
+    effective_on: v(fd, "effective_on"), authority_notice_days: Number(v(fd, "authority_notice_days") ?? 0) > 0 ? Math.min(365, Math.round(Number(v(fd, "authority_notice_days")))) : null, reason: v(fd, "reason"), acceptance: fd.get("acceptance") === "not_required" ? "not_required" : "required", created_by: s.person?.id ?? null };
   if ((row.from_name ?? "") === (row.to_name ?? "")) redirect(`/np/changes?entity=${entity}&err=same`);
   const { data: ins } = await db.from("np_changes").insert(row).select("id").single();
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "np_change", object_id: (ins as { id: string } | null)?.id ?? code, action: "np_change_prepared", after: row });
@@ -77,7 +77,28 @@ export async function applyChange(fd: FormData) {
     : { deputy_name: c.to_name, deputy_person: c.to_person, updated_at: now, updated_by: s.person?.id ?? null };
   await db.from("np_posts").update(upd).eq("entity", c.entity).eq("code", c.post_code);
   await db.from("np_changes").update({ status: "applied", applied_as: as, applied_at: now, applied_by: s.person?.id ?? null }).eq("id", c.id);
-  await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "np_post", object_id: (before as { id: string }).id, action: "np_change_applied", before, after: { ...upd, change: c.id, seat: c.seat, acceptance: as } });
+  // 24/11 (Guillaume) · the rights in S.A.M. follow the post: the person who takes the seat receives the post (and the entity), the
+  // person who leaves it loses the post unless another seat of the same post is still theirs. Written in the audit log.
+  const role = c.seat === "deputy" ? `${c.post_code}_DEP` : c.post_code;
+  const b = before as { id: string; holder_person: string | null; deputy_person: string | null };
+  const outId = c.seat === "holder" ? b.holder_person : b.deputy_person;
+  const rights: Record<string, unknown> = { role };
+  type Pp = { id: string; display_name: string; roles: string[] | null; entities: string[] | null };
+  if (c.to_person) {
+    const { data: inP } = await db.from("people").select("id,display_name,roles,entities").eq("id", c.to_person).maybeSingle(); const p = inP as Pp | null;
+    if (p) { const roles = [...new Set([...(p.roles ?? []), role])]; const entities = [...new Set([...(p.entities ?? []), c.entity])];
+      await db.from("people").update({ roles, entities }).eq("id", p.id); rights.given_to = p.display_name;
+      await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { roles: p.roles, entities: p.entities }, after: { roles, entities, change: c.id } }); }
+  } else if (c.to_name) rights.not_given = `${c.to_name} has no account in S.A.M. yet`;
+  if (outId && outId !== c.to_person) {
+    const col = c.seat === "holder" ? "holder_person" : "deputy_person";
+    const { data: still } = await db.from("np_posts").select("id").eq("code", c.post_code).eq(col, outId).limit(1);
+    const { data: outP } = await db.from("people").select("id,display_name,roles,entities").eq("id", outId).maybeSingle(); const p = outP as Pp | null;
+    if (p && !(still ?? []).length && (p.roles ?? []).includes(role)) { const roles = (p.roles ?? []).filter((r) => r !== role);
+      await db.from("people").update({ roles: roles.length ? roles : ["USER"] }).eq("id", p.id); rights.removed_from = p.display_name;
+      await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { roles: p.roles }, after: { roles: roles.length ? roles : ["USER"], change: c.id } }); }
+  }
+  await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "np_post", object_id: b.id, action: "np_change_applied", before, after: { ...upd, change: c.id, seat: c.seat, acceptance: as, rights } });
   paths();
 }
 

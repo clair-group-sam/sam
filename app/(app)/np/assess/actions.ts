@@ -52,7 +52,11 @@ export async function savePrefill(fd: FormData) {
   const row = { items, org_changes: v(fd, "org_changes"), diplomas: v(fd, "diplomas"), trainings: v(fd, "trainings"), updated_at: new Date().toISOString(),
     ...(send ? { status: "submitted", submitted_at: new Date().toISOString() } : {}) };
   await db.from("competency_assessments").update(row).eq("id", id);
-  if (send) await log(db, s.person!.id, a.entity, id, "assessment_prefilled_sent", { person: a.person_name, form: a.form_ref, points: items.filter((i) => i.self).length });
+  if (send) {
+    await log(db, s.person!.id, a.entity, id, "assessment_prefilled_sent", { person: a.person_name, form: a.form_ref, points: items.filter((i) => i.self).length });
+    await db.from("tasks").update({ status: "superseded" }).eq("ref_id", id).eq("kind", "competency").eq("status", "open");
+    await db.from("tasks").insert({ entity: a.entity, kind: "competency", title: `Competency assessment of ${a.person_name}: pre-filled, to validate and sign`, detail: `${a.form_ref}. ${a.person_name} has pre-filled the sheet: grade each point, decide "fit for position", then sign.`, owner_role: "CMM", status: "open", link: `/np/assess/${id}`, ref_id: id });
+  }
   revalidatePath(`/np/assess/${id}`); revalidatePath("/np/assess");
   redirect(`/np/assess/${id}?${send ? "sent" : "saved"}=1`);
 }
@@ -73,11 +77,20 @@ export async function saveAssessment(fd: FormData) {
   };
   if (intent === "return" && a.person_id) { row.status = "draft"; row.submitted_at = null; }
   await db.from("competency_assessments").update(row).eq("id", id);
-  if (intent === "return" && a.person_id) await log(db, s.person?.id ?? null, a.entity, id, "assessment_returned_to_person", { person: a.person_name });
+  if (intent === "return" && a.person_id) {
+    await log(db, s.person?.id ?? null, a.entity, id, "assessment_returned_to_person", { person: a.person_name });
+    await db.from("tasks").update({ status: "done" }).eq("ref_id", id).eq("kind", "competency").eq("status", "open");
+    await db.from("tasks").insert({ entity: a.entity, kind: "competency", title: "Your competency assessment: to complete", detail: `${a.form_ref}. Compliance has given the sheet back to you: complete it and send it again.`, owner_person: a.person_id, status: "open", link: `/np/assess/${id}`, ref_id: id });
+  }
   if (intent === "sign" && s.person && !missingToSign({ ...a, ...row } as Assessment).length) {
     const at = new Date().toISOString();
     await db.from("competency_assessments").update({ status: "signed", signed_at: at, signed_by: s.person.id, assessor_id: s.person.id, assessor_name: s.name }).eq("id", id);
     await log(db, s.person.id, a.entity, id, "assessment_signed", { person: a.person_name, form: a.form_ref, outcome: row.outcome, assessed_on: row.assessed_on });
+    await db.from("tasks").update({ status: "done" }).eq("ref_id", id).eq("kind", "competency").eq("status", "open");
+    // the validity alerts of the sheets this one replaces are over
+    const { data: old } = await db.from("competency_assessments").select("id").eq("entity", a.entity).eq("form", a.form).ilike("person_name", a.person_name).neq("id", id);
+    const oldIds = ((old ?? []) as { id: string }[]).map((x) => x.id);
+    if (oldIds.length) await db.from("tasks").update({ status: "done" }).in("ref_id", oldIds).eq("kind", "competency_due").eq("status", "open");
   }
   revalidatePath(`/np/assess/${id}`); revalidatePath("/np/assess");
   redirect(`/np/assess/${id}?${intent === "sign" ? "signed" : intent === "return" ? "returned" : "saved"}=1`);

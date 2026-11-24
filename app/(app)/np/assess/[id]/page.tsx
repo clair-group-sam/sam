@@ -1,3 +1,4 @@
+import { PdfButton } from "@/components/RiskPdfButton";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -36,7 +37,7 @@ export default async function Sheet({ params, searchParams }: { params: Promise<
     <>
       <PageHeader eyebrow="NP management, Competency assessment" title={`${a.person_name}, competence assessment`}
         sub={`${a.form_ref}, ${a.form_edition ?? ""}${F.basis ? ", " + F.basis : ""}. ${ENT[a.entity]?.name ?? a.entity}.`} tag={tag}
-        right={<Link className="btn" href={`/np/assess?entity=${a.entity}`}>All assessments</Link>} />
+        right={<><PdfButton id={a.id} base="/api/assess/pdf" /><Link className="btn" href={`/np/assess?entity=${a.entity}`}>All assessments</Link></>} />
       {sp.saved && <p className="mini mb-3">Saved.</p>}
       {sp.sent && <p className="mini mb-3">Sent to Compliance, which validates and signs. You will find the signed sheet here.</p>}
       {sp.returned && <p className="mini mb-3">Returned to {a.person_name} for completion.</p>}

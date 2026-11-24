@@ -5,11 +5,11 @@ import { OPEN_STATUSES as FND_OPEN, CMM_TURN } from "@/lib/findings";
 /* DUE-01 · One calendar for every dated commitment S.A.M. holds (idea taken from the CAA point of 16/11): CAA applications, findings,
  * safety actions, MOR follow-up and final reports, audits of the programme, recurring compliance checks, regulatory watch entries,
  * certificates and validities, programme reviews, boards. Each one: when, what, whose turn, who, and the page behind it. */
-export type DueKind = "file" | "finding" | "action" | "mor" | "audit" | "check" | "watch" | "certificate" | "review" | "board";
+export type DueKind = "file" | "finding" | "action" | "mor" | "audit" | "check" | "watch" | "certificate" | "review" | "board" | "competency";
 export const DUE_KIND: Record<DueKind, { label: string; plural: string }> = {
   file: { label: "CAA application", plural: "CAA applications" }, finding: { label: "Finding", plural: "Findings" }, action: { label: "Safety action", plural: "Safety actions" },
   mor: { label: "MOR follow-up", plural: "MOR follow-ups" }, audit: { label: "Audit", plural: "Audits" }, check: { label: "Compliance check", plural: "Compliance checks" },
-  watch: { label: "Regulatory watch", plural: "Regulatory watch" }, certificate: { label: "Certificate", plural: "Certificates & validities" }, review: { label: "Programme review", plural: "Programme reviews" }, board: { label: "Board", plural: "Boards" },
+  watch: { label: "Regulatory watch", plural: "Regulatory watch" }, certificate: { label: "Certificate", plural: "Certificates & validities" }, review: { label: "Programme review", plural: "Programme reviews" }, board: { label: "Board", plural: "Boards" }, competency: { label: "Competency assessment", plural: "Competency assessments" },
 };
 export type Due = { key: string; kind: DueKind; entity: string; date: string; days: number; state: "late" | "soon" | "later"; ref: string; title: string; todo: string; who: string | null; ball: "us" | "authority" | null; href: string };
 const addDays = (d: string, n: number) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
@@ -20,7 +20,7 @@ export async function loadDeadlines(db: SupabaseClient, entities: string[], opts
   const t0 = today(); const from = opts.from ?? addDays(t0, -120); const to = opts.to ?? addDays(t0, 180);
   const want = (k: DueKind) => !opts.kinds?.length || opts.kinds.includes(k);
   const none = Promise.resolve({ data: [] as unknown[] });
-  const [fil, fnd, act, rep, aud, chk, wat, cer, prg, brd] = await Promise.all([
+  const [fil, fnd, act, rep, aud, chk, wat, cer, prg, brd, cmp] = await Promise.all([
     want("file") ? db.from("authority_files").select("id,entity,title,stage,target_date,portal_ref,authority,owner_role,next_task,next_owner,ball_override").in("entity", entities).in("stage", OPEN_STAGES).not("target_date", "is", null) : none,
     want("finding") ? db.from("findings").select("id,entity,number,title,status,due,level,authority,source,owner_role").in("entity", entities).in("status", FND_OPEN).not("due", "is", null) : none,
     want("action") ? db.from("safety_actions").select("id,entity,number,title,status,due,owner_role,owner_person").in("entity", entities).in("status", ["open", "in_progress"]).not("due", "is", null) : none,
@@ -31,6 +31,7 @@ export async function loadDeadlines(db: SupabaseClient, entities: string[], opts
     want("certificate") ? db.from("certificates").select("id,entity,kind,title,registration,valid_until,archived_at").in("entity", entities).is("archived_at", null).not("valid_until", "is", null) : none,
     want("review") ? db.from("audit_programmes").select("id,entity,title,next_review_on,status").in("entity", entities).eq("status", "approved").not("next_review_on", "is", null) : none,
     want("board") ? db.from("committees").select("id,entity,entities,number,title,planned_on,status").overlaps("entities", entities).eq("status", "planned").not("planned_on", "is", null) : none,
+    want("competency") ? db.from("competency_assessments").select("id,entity,person_name,form,form_ref,status,next_due,assessed_on").in("entity", entities).order("created_at", { ascending: false }) : none,
   ]);
   type R = Record<string, string | null> & { entities?: string[] | null; history?: unknown };
   const rows = (x: { data: unknown }) => (x.data ?? []) as R[];
@@ -58,6 +59,12 @@ export async function loadDeadlines(db: SupabaseClient, entities: string[], opts
   for (const c of rows(cer)) push("certificate", c.entity!, c.valid_until, c.id!, c.registration ? `${c.kind} ${c.registration}` : c.kind ?? "", c.title ?? "", "Valid until this date: renew before", null, "us", `/docs/files?entity=${c.entity}`);
   for (const p of rows(prg)) push("review", p.entity!, p.next_review_on, p.id!, "Programme", p.title ?? "", "Annual review of the audit programme", "CMM", "us", `/comp/prog/${p.id}`);
   for (const b of rows(brd)) for (const e of (b.entities?.length ? b.entities : [b.entity!]).filter((x) => entities.includes(x))) push("board", e, b.planned_on, b.id! + e, b.number ?? "", b.title ?? "", "Board planned: prepare the pack", "SM", "us", `/safe/comm/${b.id}`);
+  // NP-03 · the end of validity of the last signed sheet of each person on each form (12 months, MSM 4-5); a newer sheet in progress says so
+  const seenCmp = new Set<string>(); const renewing = new Set<string>();
+  for (const c of rows(cmp)) { const k = `${c.entity}|${c.form}|${(c.person_name ?? "").toLowerCase()}`;
+    if (c.status !== "signed") { if (!seenCmp.has(k)) renewing.add(k); continue; }
+    if (seenCmp.has(k)) continue; seenCmp.add(k);
+    push("competency", c.entity!, c.next_due, c.id!, c.form_ref ?? "", c.person_name ?? "", renewing.has(k) ? "New assessment in progress: validate and sign before this date" : "Valid until this date: assess again before (12 months, MSM 4-5)", "CMM", "us", `/np/assess?entity=${c.entity}`); }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.entity.localeCompare(b.entity));
 }
 export function dueCounts(ds: Due[]) { return { total: ds.length, late: ds.filter((d) => d.state === "late").length, lateOurs: ds.filter((d) => d.state === "late" && d.ball !== "authority").length, soon: ds.filter((d) => d.state === "soon").length, next: ds.find((d) => d.days >= 0) ?? null }; }

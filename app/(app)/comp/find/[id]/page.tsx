@@ -1,3 +1,4 @@
+import NoOwner from "@/components/NoOwner";
 import { fr } from "@/lib/dates";
 import { frdt } from "@/lib/dates";
 import { fr as frd } from "@/lib/dates";
@@ -115,6 +116,7 @@ export default async function FindingSheet({ params }: { params: Promise<{ id: s
       <PageHeader eyebrow={`Compliance, Findings, ${SOURCE_LABEL[f.source] ?? f.source}${f.authority ? `, ${f.authority}` : ""}`} title={`${f.number}, ${f.title}`} sub={`${LEVEL_LABEL[f.level] ?? f.level}${f.requirement ? `, ${f.requirement}` : ""}${f.audit_ref ? `, ${f.audit_ref}` : ""}, raised ${frd(f.notified)}, answer due ${frd(f.due)}, answered by ${who}, ${progress(f, changes, actions).label}`}
         right={<span className="flex gap-2 items-center"><BackButton fallback={f.audit_id ? `/comp/audits/${f.audit_id}` : "/comp/find"} />{f.source === "authority" && !closedOrCancelled && (f.authority_rca || f.authority_pac) ? <span className={"pill " + authorityStep(f).tone}>{authorityStep(f).label}</span> : <span className={"pill " + (STATUS_TONE[f.status] ?? "")}>{STATUS_LABEL[f.status] ?? f.status}</span>}</span>} />
 
+      <NoOwner show={!f.owner_role && !f.owner_person && !["closed", "cancelled"].includes(f.status)} what="finding" where="in “Owner” below" />
       <div className="fsteps mb-4">{STEPS_PATH.map((l, i) => <div key={l} className={"fstep" + (step > i + 1 || f.status === "closed" ? " done" : step === i + 1 ? " on" : "")}><i>{step > i + 1 || f.status === "closed" ? <Icon name="check" size={12} /> : i + 1}</i><span>{l}</span></div>)}</div>
 
       <div className="grid grid-cols-4 gap-4 mb-5">

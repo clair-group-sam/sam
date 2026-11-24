@@ -44,7 +44,16 @@ export default async function Inbox() {
   // what is late stays one line each, so that "Late" holds only what is really late (its project named above it); the rest is grouped
   const isLate = (t: { due: string | null }) => !!t.due && t.due < today;
   const lateLines: InboxLine[] = flat.filter((t) => !isTest(t) && isLate(t)).map((t) => { const p = fileProject.get(/^\/proj\/auth\/([^/?#]+)/.exec(t.link ?? "")?.[1] ?? ""); return p && !t.ctx ? { ...t, ctx: "Project: " + p.title, ctxLink: `/proj/boards/${p.id}` } : t; });
-  const tasks: InboxLine[] = [...lateLines, ...regroup(flat.filter((t) => !isTest(t) && !isLate(t)), today, fileProject), ...flat.filter((t) => isTest(t))];
+  // 24/11 · two late tasks on the same object (the same CAA application, the same finding) are one line, opened on a click
+  const lateMerged: InboxLine[] = []; const lateBy = new Map<string, InboxLine>();
+  for (const t of lateLines) {
+    const k = t.link && !t.id.startsWith("acts:") && !t.id.startsWith("proj:") ? t.entity + "|" + t.link : "";
+    const h = k ? lateBy.get(k) : undefined;
+    if (!h) { const line = { ...t }; if (k) lateBy.set(k, line); lateMerged.push(line); continue; }
+    if (!h.children) { h.children = [{ ...h, children: undefined } as InboxLine]; }
+    h.children.push(t); h.detail = `${h.children.length} late tasks on this item. First: ${h.children[0].title}`;
+  }
+  const tasks: InboxLine[] = [...lateMerged, ...regroup(flat.filter((t) => !isTest(t) && !isLate(t)), today, fileProject), ...flat.filter((t) => isTest(t))];
   // the list in groups, the most pressing first: late, the next 7 days, later, without a date; test objects apart
   const in7 = new Date(Date.parse(today) + 7 * 86_400_000).toISOString().slice(0, 10);
   const realT = tasks.filter((t) => !isTest(t));
