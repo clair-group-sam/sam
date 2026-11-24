@@ -43,29 +43,31 @@ export async function openFindingFromReading(fd: FormData) {
   revalidatePath("/comp/find"); revalidatePath(`/proj/auth/sync/${id}`); revalidatePath("/home/tasks");
   redirect(`/comp/find/${(data as { id: string }).id}`);
 }
-/** 24/11 · a finding the authority has closed and S.A.M. still holds open: closed here by the desk, in one click, with the date the
- *  authority closed it (the date of the reading unless another is given) written on the finding. */
+/** 24/11 · the findings the authority has closed and S.A.M. still holds open: the status of the portal is copied to S.A.M. by the desk,
+ *  one finding ("close") or all of them at once ("all"), with the date the authority closed each (the date of the reading unless another is given). */
 export async function closeFindingFromReading(fd: FormData) {
   const s = await desk(); const id = String(fd.get("id")); const key = String(fd.get("close") ?? "");
   const db = supabaseAdmin();
-  const { data: rd } = await db.from("portal_readings").select("read_on,source,lines,applied").eq("id", id).maybeSingle();
-  const reading = rd as { read_on: string; source: string | null; lines: unknown; applied: Record<string, unknown> | null } | null; if (!reading) fail("Reading not found");
-  const lines = parseLines(reading.lines); const l = lines.find((x) => x.key === key && x.kind === "finding" && x.closed); if (!l) fail("Line not found");
-  if (!s.group && !s.entities.includes(l.entity)) fail("Out of scope");
-  const { planSync } = await import("@/lib/portal-sync");
-  const p = (await planSync(db, lines, reading.read_on, {})).proposals.find((x) => x.line.key === key);
-  if (!p?.id) redirect(`/proj/auth/sync/${id}?msg=${encodeURIComponent("Already closed in S.A.M.")}`);
-  const given = String(fd.get(`closed_on_${key}`) ?? ""); const on = /^\d{4}-\d{2}-\d{2}$/.test(given) && given <= reading.read_on ? given : reading.read_on;
-  const authority = /meteor|dsac/i.test(`${reading.source} ${l.url ?? ""}`) ? "DSAC" : /tmcad|centrik/i.test(`${reading.source} ${l.url ?? ""}`) ? "TM-CAD" : "the authority";
-  const now = new Date().toISOString(); const { fr: frd } = await import("@/lib/dates");
-  const patch = { status: "closed", closed_at: now, closed_by: s.person?.id ?? null, closed_note: `Closed by ${authority} on ${frd(on)} (“${l.status}” read on the portal on ${frd(reading.read_on)})`, effective_closed_on: on, portal_status: l.status, portal_read_on: reading.read_on, updated_at: now };
-  const { data, error } = await db.from("findings").update(patch).eq("id", p!.id!).select("*").single();
-  if (error || !data) fail(error?.message ?? "Finding not closed");
-  const { syncFindingTasks } = await import("@/lib/findings");
-  await syncFindingTasks(db, data as never);
-  await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: l.entity, object_type: "finding", object_id: p!.id!, action: "finding_close", after: { ...patch, via: "portal_reading", reading: id } });
-  revalidatePath("/comp/find"); revalidatePath(`/comp/find/${p!.id}`); revalidatePath(`/proj/auth/sync/${id}`); revalidatePath("/home/tasks");
-  redirect(`/proj/auth/sync/${id}?msg=${encodeURIComponent(`${p!.holds}: closed in S.A.M., closed by ${authority} on ${frd(on)}.`)}`);
+  const { data: rd } = await db.from("portal_readings").select("read_on,source,lines").eq("id", id).maybeSingle();
+  const reading = rd as { read_on: string; source: string | null; lines: unknown } | null; if (!reading) fail("Reading not found");
+  const lines = parseLines(reading.lines);
+  const { planSync } = await import("@/lib/portal-sync"); const { syncFindingTasks } = await import("@/lib/findings"); const { fr: frd } = await import("@/lib/dates");
+  const todo = (await planSync(db, lines, reading.read_on, {})).proposals.filter((p) => p.line.closed && p.id && (key === "all" || p.line.key === key) && (s.group || s.entities.includes(p.line.entity)));
+  if (!todo.length) redirect(`/proj/auth/sync/${id}?msg=${encodeURIComponent("Nothing to close: already closed in S.A.M.")}`);
+  const done: string[] = []; const failed: string[] = [];
+  for (const p of todo) { const l = p.line;
+    const given = String(fd.get(`closed_on_${l.key}`) ?? ""); const on = /^\d{4}-\d{2}-\d{2}$/.test(given) && given <= reading.read_on ? given : reading.read_on;
+    const authority = /meteor|dsac/i.test(`${reading.source} ${l.url ?? ""}`) ? "DSAC" : /tmcad|centrik/i.test(`${reading.source} ${l.url ?? ""}`) ? "TM-CAD" : "the authority";
+    const now = new Date().toISOString();
+    const patch = { status: "closed", closed_at: now, closed_by: s.person?.id ?? null, closed_note: `Closed by ${authority} on ${frd(on)} (“${l.status}” read on the portal on ${frd(reading.read_on)})`, effective_closed_on: on, portal_status: l.status, portal_read_on: reading.read_on, updated_at: now };
+    const { data, error } = await db.from("findings").update(patch).eq("id", p.id!).select("*").single();
+    if (error || !data) { failed.push(`${p.holds}: ${error?.message ?? "not closed"}`); continue; }
+    await syncFindingTasks(db, data as never);
+    await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: l.entity, object_type: "finding", object_id: p.id!, action: "finding_close", after: { ...patch, via: "portal_reading", reading: id, together: key === "all" ? todo.length : 1 } });
+    revalidatePath(`/comp/find/${p.id}`); done.push(String(p.holds).split(" ")[0]);
+  }
+  revalidatePath("/comp/find"); revalidatePath(`/proj/auth/sync/${id}`); revalidatePath("/home/tasks");
+  redirect(`/proj/auth/sync/${id}?msg=${encodeURIComponent(`${done.length} finding${done.length === 1 ? "" : "s"} closed in S.A.M. as on the portal${done.length ? ": " + done.join(", ") : ""}.${failed.length ? " Not closed: " + failed.join("; ") : ""}`)}`);
 }
 export async function applyReading(fd: FormData) {
   const s = await desk(); const id = String(fd.get("id"));

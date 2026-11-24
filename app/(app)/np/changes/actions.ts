@@ -90,20 +90,20 @@ export async function applyChange(fd: FormData) {
   const b = before as { id: string; holder_person: string | null; deputy_person: string | null };
   const outId = c.seat === "holder" ? b.holder_person : b.deputy_person;
   const rights: Record<string, unknown> = { role };
-  type Pp = { id: string; display_name: string; roles: string[] | null; entities: string[] | null };
+  type Pp = { id: string; display_name: string; sam_roles: string[] | null; sam_entities: string[] | null };
   if (c.to_person) {
-    const { data: inP } = await db.from("people").select("id,display_name,roles,entities").eq("id", c.to_person).maybeSingle(); const p = inP as Pp | null;
-    if (p) { const roles = [...new Set([...(p.roles ?? []), role])]; const entities = [...new Set([...(p.entities ?? []), c.entity])];
-      await db.from("people").update({ roles, entities }).eq("id", p.id); rights.given_to = p.display_name;
-      await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { roles: p.roles, entities: p.entities }, after: { roles, entities, change: c.id } }); }
+    const { data: inP } = await db.from("people").select("id,display_name,sam_roles,sam_entities").eq("id", c.to_person).maybeSingle(); const p = inP as Pp | null;
+    if (p) { const roles = [...new Set([...(p.sam_roles ?? []), role])]; const entities = [...new Set([...(p.sam_entities ?? []), c.entity])];
+      await db.from("people").update({ sam_roles: roles, sam_entities: entities }).eq("id", p.id); rights.given_to = p.display_name;
+      await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { sam_roles: p.sam_roles, sam_entities: p.sam_entities }, after: { sam_roles: roles, sam_entities: entities, change: c.id } }); }
   } else if (c.to_name) rights.not_given = `${c.to_name} has no account in S.A.M. yet`;
   if (outId && outId !== c.to_person) {
     const col = c.seat === "holder" ? "holder_person" : "deputy_person";
     const { data: still } = await db.from("np_posts").select("id").eq("code", c.post_code).eq(col, outId).limit(1);
-    const { data: outP } = await db.from("people").select("id,display_name,roles,entities").eq("id", outId).maybeSingle(); const p = outP as Pp | null;
-    if (p && !(still ?? []).length && (p.roles ?? []).includes(role)) { const roles = (p.roles ?? []).filter((r) => r !== role);
-      await db.from("people").update({ roles: roles.length ? roles : ["USER"] }).eq("id", p.id); rights.removed_from = p.display_name;
-      await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { roles: p.roles }, after: { roles: roles.length ? roles : ["USER"], change: c.id } }); }
+    const { data: outP } = await db.from("people").select("id,display_name,sam_roles,sam_entities").eq("id", outId).maybeSingle(); const p = outP as Pp | null;
+    if (p && !(still ?? []).length && (p.sam_roles ?? []).includes(role)) { const roles = (p.sam_roles ?? []).filter((r) => r !== role);
+      await db.from("people").update({ sam_roles: roles.length ? roles : ["USER"] }).eq("id", p.id); rights.removed_from = p.display_name;
+      await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { sam_roles: p.sam_roles }, after: { sam_roles: roles.length ? roles : ["USER"], change: c.id } }); }
   }
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "np_post", object_id: b.id, action: "np_change_applied", before, after: { ...upd, change: c.id, seat: c.seat, acceptance: as, rights } });
   paths();

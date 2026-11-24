@@ -43,6 +43,24 @@ export async function removeGroup(fd: FormData) {
   await db().from("entra_groups").update({ role: null, entity: null, is_group_function: false, mapped_at: null }).eq("group_id", id); await log(s, "entra_group", id, "entra_group_unmapped", null);
   revalidatePath("/set/groups");
 }
+/** RIGHTS-02 · level 2: the roles, entities and group function S.A.M. gives a person. SUPERADMIN is only given or kept by a super
+ *  admin (and never lost: database trigger); the audit log keeps before and after. */
+export async function saveRights(fd: FormData) {
+  const s = await admin(); const id = String(fd.get("id"));
+  const { data: b } = await db().from("people").select("sam_roles,sam_entities,sam_group").eq("id", id).maybeSingle();
+  const before = b as { sam_roles: string[] | null; sam_entities: string[] | null; sam_group: boolean } | null; if (!before) fail("Person not found");
+  const typed = String(fd.get("roles") ?? "").toUpperCase().split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  const bad = typed.find((r) => !ROLE_RE.test(r)); if (bad) fail(`“${bad}” is not a post code (letters, figures and _ only, such as CMM, NPFO, NPFO_DEP, USER).`);
+  let roles = [...new Set(typed)];
+  const isSuper = s.roles.includes("SUPERADMIN"); const had = (before!.sam_roles ?? []).includes("SUPERADMIN");
+  if (!isSuper) { roles = roles.filter((r) => r !== "SUPERADMIN"); if (had) roles.push("SUPERADMIN"); }
+  if (!roles.length) roles = ["USER"];
+  const entities = fd.getAll("entities").map(String).filter((e) => ["ASJMT", "ASJFR", "ASFFR", "ASTFR"].includes(e));
+  const row = { sam_roles: roles, sam_entities: entities, sam_group: fd.get("sam_group") === "on" };
+  const { error } = await db().from("people").update(row).eq("id", id); if (error) fail(error.message);
+  await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: null, object_type: "person", object_id: id, action: "rights_changed", before, after: row });
+  revalidatePath("/users/book"); redirect(`/users/book?p=${id}`);
+}
 export async function savePerson(fd: FormData) {
   const s = await admin(); const id = String(fd.get("id"));
   const row = { job_title: String(fd.get("job_title") ?? "").trim() || null, can_create_manuals: fd.get("can_create_manuals") === "on" };

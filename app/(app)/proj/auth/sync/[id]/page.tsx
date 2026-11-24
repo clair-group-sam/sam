@@ -19,6 +19,7 @@ export default async function Reading({ params, searchParams }: { params: Promis
   const count = (a: Proposal["action"]) => proposals.filter((p) => p.action === a).length;
   const todo = proposals.filter((p) => (p.action === "create" || p.action === "update") && !p.applied).length;
   const ents = [...new Set(proposals.map((p) => p.line.entity))];
+  const closedThere = proposals.filter((p) => p.line.closed && p.id);
   return (
     <>
       <PageHeader eyebrow="Projects, CAA applications, Portal readings" title={`Portal reading of ${fr(r.read_on)}`} sub={`${r.source ?? "Portals"}: ${proposals.length} lines compared with S.A.M. Tick the lines to apply; a stage is never moved by a reading, the portal's wording is stored beside it.`} right={<Link className="btn" href="/proj/auth/sync">All readings</Link>} />
@@ -31,6 +32,9 @@ export default async function Reading({ params, searchParams }: { params: Promis
         <Metric label="In S.A.M., not read" value={unseen.length} tone={unseen.length ? "amber" : undefined} hint="at the authority here, absent from the reading" />
       </div>
       <form action={applyReading}><input type="hidden" name="id" value={r.id} />
+        {closedThere.length > 0 && <section className="card mb-4" role="alert" style={{ borderLeft: "4px solid var(--amber, #d98a00)" }}><div className="cb flex flex-wrap gap-3 items-center justify-between">
+          <span><b>{closedThere.length} finding{closedThere.length === 1 ? "" : "s"} closed by the authority, still open in S.A.M.</b> <span className="mini">{closedThere.map((p) => String(p.holds).split(" ")[0]).join(", ")}. The date of closure of each is in its line below (the day of the reading unless you change it).</span></span>
+          <button className="btn primary" type="submit" formAction={closeFindingFromReading} name="close" value="all">Copy the portal&apos;s status to S.A.M.: close {closedThere.length === 1 ? "it" : `the ${closedThere.length}`}</button></div></section>}
         {ents.map((e) => <section key={e} className="card mb-4"><div className="ch"><span className={"ent " + e}>{e}</span><span className="mini">{proposals.filter((p) => p.line.entity === e).length} lines</span></div>
           <div className="cb" style={{ padding: 0, overflowX: "auto" }}><table className="tbl"><thead><tr><th></th><th>Portal</th><th>Read on the portal</th><th>S.A.M.</th><th>What would change</th></tr></thead><tbody>
             {proposals.filter((p) => p.line.entity === e).map((p) => { const l = p.line; const can = (p.action === "create" || p.action === "update" || (p.action === "same" && !p.applied)) && p.object !== "none"; const done = r.applied?.[l.key];

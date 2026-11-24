@@ -91,7 +91,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
         </section>
       )}
 
-      <p className="mini mb-3">Applying a change also moves the rights in S.A.M.: the person who takes the seat receives the post and the entity, the person who leaves it loses the post. Where the rights of a person come from a Microsoft Entra group, the IT must move the person in that group too, otherwise the next sign-in puts the former rights back.</p>
+      <p className="mini mb-3">Applying a change also moves the rights in S.A.M.: the person who takes the seat receives the post and the entity, the person who leaves it loses the post. Rights are given in S.A.M. (Microsoft Entra only says who the person is and their entities), so nothing else has to be changed.</p>
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">In progress</span><span className="mini">{open.length}</span></div>
         <table className="tbl">

@@ -149,7 +149,7 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
   for (const p of plan.proposals) {
     if (p.action === "create" && !p.typeGuess) ex.push({ kind: "No type offered", ref: p.line.number, text: `${p.line.title}: no application type is offered for ${p.line.entity}, open it by hand`, href: "/proj/auth/new" });
     if (p.action === "missing") ex.push({ kind: "Finding not in S.A.M.", ref: p.line.number, text: `${p.line.title}: open it in S.A.M. from the reading, in one click, with the authority's text`, href: `/proj/auth/sync/${readingId}` });
-    if (p.note === CLOSED_NOTE) { ex.push({ kind: "Closed by the authority", ref: p.line.number, text: `${p.holds}: closed on the portal, still open in S.A.M. Close it from the reading in one click.`, href: `/proj/auth/sync/${readingId}` }); continue; }
+    if (p.note === CLOSED_NOTE) { ex.push({ kind: "Closed by the authority", ref: p.line.number, text: `${p.holds}: closed on the portal, still open in S.A.M. One button on the reading copies the status to S.A.M. for all of them.`, href: `/proj/auth/sync/${readingId}` }); continue; }
     if (p.note && p.action !== "create" && p.action !== "missing" && p.action !== "info") ex.push({ kind: "To check", ref: p.line.number, text: p.note, href: p.href });
   }
   // a file S.A.M. still holds at the authority and the portal lists as decided: the portal's wording is stored on the file, the close-out stays a decision

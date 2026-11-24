@@ -28,7 +28,7 @@ export default async function EntraGroups() {
   );
   return (
     <>
-      <PageHeader eyebrow="Settings, Entra groups sync" title="Entra groups sync" sub="Microsoft 365 groups seen in the sign-in token. Map each one to an entity and a post: people get their scope and posts at their next sign-in. Group names are typed here (S.A.M. does not read the directory)." />
+      <PageHeader eyebrow="Settings, Entra groups sync" title="Entra groups sync" sub="Microsoft 365 groups seen in the sign-in token. Map each one to an entity and a post: at their next sign-in people get the entity; the post is only a suggestion shown in Users & fleet, People, where the rights are given. Group names are typed here (S.A.M. does not read the directory)." />
       {pending.length > 0 && <section className="card mb-4 sentback"><div className="ch"><span className="eyebrow">To map</span><span className="mini">{pending.length} group(s) seen, not mapped yet</span></div>
         <div className="cb grid gap-3">{pending.map((g) => <div key={g.group_id}><div className="mono mini mb-1">{g.group_id}, first seen {fr(g.first_seen_at)}</div>{admin ? <Form g={g} /> : null}</div>)}</div></section>}
       <section className="card mb-4"><div className="ch"><span className="eyebrow">Mapped groups</span></div><div className="cb" style={{ padding: 0 }}>{!rows.filter((g) => g.mapped_at).length ? <p className="p-4 mini">No group mapped yet.</p> : (
