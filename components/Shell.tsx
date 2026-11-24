@@ -32,7 +32,9 @@ function useSlidePill(key: string, dep: string, sel: string) {
     const measure = () => {
       const on = b.querySelector<HTMLElement>(sel); if (!on) return null;
       const br = b.getBoundingClientRect(), r = on.getBoundingClientRect();
-      return { y: r.top - br.top + b.scrollTop, h: r.height, x: r.left - br.left, w: r.width };
+      // "Larger text" zooms the page (html{zoom}): rectangles come back zoomed while the pill is styled in layout pixels
+      const k = b.offsetWidth ? br.width / b.offsetWidth || 1 : 1;
+      return { y: (r.top - br.top) / k + b.scrollTop, h: r.height / k, x: (r.left - br.left) / k, w: r.width / k };
     };
     const set = (r: { y: number; h: number; x: number; w: number }) => { p.style.transform = `translate(${r.x}px,${r.y}px)`; p.style.width = r.w + "px"; p.style.height = r.h + "px"; };
     const place = (animate: boolean) => {
