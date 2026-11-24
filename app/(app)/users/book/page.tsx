@@ -7,7 +7,7 @@ import { ENT } from "@/lib/nav";
 import { isAdmin, restorePerson, reviewRights, savePerson, saveRights, suspendPerson } from "../../set/actions";
 import { ENTS4 } from "@/lib/nav";
 import { isDeputy } from "@/lib/session";
-import { GENERAL_ROLES, ROLE_WORDS } from "@/lib/role-words";
+import { ROLE_WORDS } from "@/lib/role-words";
 
 type P = { id: string; display_name: string; email: string | null; job_title: string | null; home_entity: string | null; entities: string[] | null; roles: string[] | null; is_group_function: boolean; last_seen_at: string | null; can_create_manuals: boolean; sam_roles: string[] | null; sam_entities: string[] | null; sam_group: boolean | null; entra_roles: string[] | null; entra_entities: string[] | null; entra_group: boolean | null; suspended_at: string | null; suspended_note: string | null; entra_changed_at: string | null; entra_change: string | null; rights_reviewed_at: string | null };
 const fr = (d: string | null) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "never");
@@ -26,10 +26,9 @@ export default async function People({ searchParams }: { searchParams: Promise<{
   const admin = await isAdmin(s);
   const open = sp.p ? all.find((p) => p.id === sp.p) ?? null : null;
   const t30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
-  // the posts of the organisation charts, one line per code with its name and the organisations that have it (rights are held by code)
+  // the posts of each organisation chart, with their names: a right is ticked under the organisation where it is held
   const { data: npd } = admin && open ? await db.from("np_posts").select("entity,code,title,ord").order("ord") : { data: [] };
-  const postList = [...((npd ?? []) as { entity: string; code: string; title: string | null }[]).reduce((m, p) => { const c = p.code.toUpperCase(); const x = m.get(c) ?? { code: c, title: p.title && p.title.toUpperCase() !== c ? p.title : ROLE_WORDS[c] ?? c, ents: [] as string[] }; if (!x.ents.includes(p.entity)) x.ents.push(p.entity); m.set(c, x); return m; }, new Map<string, { code: string; title: string; ents: string[] }>()).values()]
-    .map((x) => ({ code: x.code, title: x.title, where: x.ents.map((e) => ENT[e]?.name ?? e).join(", ") }));
+  const postsBy = ((npd ?? []) as { entity: string; code: string; title: string | null }[]).map((p) => { const c = p.code.toUpperCase(); return { entity: p.entity, code: c, title: p.title && p.title.toUpperCase() !== c ? p.title : ROLE_WORDS[c] ?? c }; });
   // RIGHTS-03 · rights to check: S.A.M. does not read the directory, so it shows who holds rights and no longer signs in (60 days),
   // and whose Microsoft groups changed at their last sign-in. It never removes a right by itself.
   const t60 = new Date(Date.now() - 60 * 86_400_000).toISOString();
@@ -68,24 +67,30 @@ export default async function People({ searchParams }: { searchParams: Promise<{
             <form action={saveRights} className="grid gap-3" style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}><input type="hidden" name="id" value={open.id} />
               <div className="eyebrow">Rights given in S.A.M.</div>
               <p className="mini">From Microsoft Entra: entities {(open.entra_entities ?? []).join(", ") || "none"}{open.entra_group ? ", group function" : ""}.{sugg.length ? ` The groups of this person suggest: ${sugg.join(", ")} (not given until written below).` : ""}</p>
-              {(() => { const mine = open.sam_roles ?? []; const has = (code: string, dep: boolean) => mine.some((r) => basePost(r) === code && isDeputy(r) === dep);
-                const general = GENERAL_ROLES.filter((c) => !postList.some((p) => p.code === c)); const known = new Set([...general, ...postList.map((p) => p.code), "SUPERADMIN"]);
-                const other = mine.filter((r) => !known.has(basePost(r)));
-                const line = (code: string, label: string, where: string) => <tr key={code}><td><b>{label}</b>{where && <div className="mini">{where}</div>}</td>
-                  <td style={{ width: 110 }}><label className="flex gap-1 items-center"><input type="checkbox" name="role" value={code} defaultChecked={has(code, false)} /> holder</label></td>
-                  <td style={{ width: 110 }}>{!["USER", "CREW", "EXT", "AUDITOR"].includes(code) && <label className="flex gap-1 items-center"><input type="checkbox" name="role" value={`${code}_DEP`} defaultChecked={has(code, true)} /> deputy</label>}</td>
-                  <td className="mono mini" style={{ width: 90 }}>{code}</td></tr>;
+              {(() => { const mine = open.sam_roles ?? [];
+                // RIGHTS-04 · a right is held in one organisation ("NPFO@ASJMT"); without "@" it is held in every organisation of the person
+                const key = (code: string, dep: boolean, ent: string) => `${code}${dep ? "_DEP" : ""}${ent ? "@" + ent : ""}`;
+                const norm = (r: string) => key(basePost(r), isDeputy(r), r.split("@")[1] ?? "");
+                const held = new Set(mine.map(norm)); const shown = new Set<string>();
+                const box = (code: string, dep: boolean, ent: string, label: string) => { const v = key(code, dep, ent); shown.add(v); return <label className="flex gap-1 items-center"><input type="checkbox" name="role" value={v} defaultChecked={held.has(v)} /> {label}</label>; };
+                const NO_DEP = ["USER", "CREW", "EXT", "AUDITOR"];
+                const line = (code: string, label: string, ent: string) => <tr key={code + ent}><td><b>{label}</b></td><td style={{ width: 110 }}>{box(code, false, ent, "holder")}</td><td style={{ width: 110 }}>{!NO_DEP.includes(code) && box(code, true, ent, "deputy")}</td><td className="mono mini" style={{ width: 90 }}>{code}</td></tr>;
+                const perEnt = ENTS4.map((e) => { const ps = postsBy.filter((p) => p.entity === e); const gen = ["AM", "CMM", "SM", "AUDITOR", "CREW"].filter((c) => !ps.some((p) => p.code === c));
+                  const rows = <>{ps.map((p) => line(p.code, p.title, e))}{gen.map((c) => line(c, ROLE_WORDS[c] ?? c, e))}</>;
+                  const n = mine.filter((r) => r.split("@")[1] === e).length;
+                  return <details key={e} open={n > 0 || (open.entities ?? []).includes(e)} className="card"><summary className="ch" style={{ cursor: "pointer" }}><span><span className={"ent " + e}>{e}</span> <b>{ENT[e]?.name ?? e}</b></span><span className="mini">{n ? `${n} right${n === 1 ? "" : "s"} held here` : "none here"}</span></summary>
+                    <table className="tbl"><tbody>{rows}</tbody></table></details>; });
+                const everywhere = <table className="tbl"><tbody>
+                  {["USER", "CMM", "SM", "AM", "AUDITOR", "EXT"].map((c) => line(c, ROLE_WORDS[c] ?? c, ""))}
+                  {s.superadmin && !s.viewAs && <tr><td><b>{ROLE_WORDS.SUPERADMIN}</b><div className="mini">sets S.A.M. up, sees every screen; given by a super admin only</div></td><td>{box("SUPERADMIN", false, "", "yes")}</td><td /><td className="mono mini">SUPERADMIN</td></tr>}
+                </tbody></table>;
+                const other = mine.filter((r) => !shown.has(norm(r)) && basePost(r) !== "SUPERADMIN");
                 return <>
-                  <table className="tbl"><thead><tr><th>General roles</th><th /><th /><th>Code</th></tr></thead><tbody>
-                    {general.map((c) => line(c, ROLE_WORDS[c] ?? c, ""))}
-                    {s.superadmin && !s.viewAs && <tr><td><b>{ROLE_WORDS.SUPERADMIN}</b><div className="mini">sets S.A.M. up, sees every screen; given by a super admin only</div></td><td><label className="flex gap-1 items-center"><input type="checkbox" name="role" value="SUPERADMIN" defaultChecked={mine.includes("SUPERADMIN")} /> yes</label></td><td /><td className="mono mini">SUPERADMIN</td></tr>}
-                  </tbody></table>
-                  <table className="tbl"><thead><tr><th>Posts of the organisation charts</th><th /><th /><th>Code</th></tr></thead><tbody>
-                    {postList.map((p) => line(p.code, p.title, p.where))}
-                    {!postList.length && <tr><td className="p-4 text-slate6" colSpan={4}>No post defined yet in NP management, Posts &amp; org chart.</td></tr>}
-                  </tbody></table>
-                  {other.length > 0 && <div className="flex flex-wrap gap-4 items-center"><span className="mini">Other roles this person holds (not a known post):</span>{other.map((r) => <label key={r} className="flex gap-1 items-center mono"><input type="checkbox" name="role" value={r} defaultChecked /> {r}</label>)}</div>}
-                  <details><summary className="mini underline" style={{ cursor: "pointer" }}>Give a role that is not in the lists</summary><label className="block mt-2"><span className="mini">Code, letters and figures (several separated by commas)</span><input name="roles" className="inp mono" style={{ maxWidth: 360 }} /></label></details>
+                  <p className="mini">A post or role is held in one organisation: tick it under that organisation. “In every organisation” is for a group function (and for what was given before rights were split: move it to its organisation when you pass by).</p>
+                  {perEnt}
+                  <details open className="card"><summary className="ch" style={{ cursor: "pointer" }}><b>In every organisation of this person</b><span className="mini">{mine.filter((r) => !r.includes("@")).length} held</span></summary>{everywhere}
+                    {other.length > 0 && <div className="cb flex flex-wrap gap-4 items-center"><span className="mini">Also held, outside the lists above (untick to remove, then tick it under its organisation):</span>{other.map((r) => <label key={r} className="flex gap-1 items-center mono"><input type="checkbox" name="role" value={r} defaultChecked /> {r}</label>)}</div>}</details>
+                  <details><summary className="mini underline" style={{ cursor: "pointer" }}>Give a role that is not in the lists</summary><label className="block mt-2"><span className="mini">Code, with @ and the organisation to hold it in one only (NPFO@ASJMT); several separated by commas</span><input name="roles" className="inp mono" style={{ maxWidth: 360 }} /></label></details>
                 </>; })()}
               <div className="flex flex-wrap gap-4 items-center"><span className="mini">Entities added by S.A.M.:</span>{ENTS4.map((e) => <label key={e} className="flex gap-1 items-center"><input type="checkbox" name="entities" value={e} defaultChecked={(open.sam_entities ?? []).includes(e)} /> {e}</label>)}
                 <label className="flex gap-1 items-center"><input type="checkbox" name="sam_group" defaultChecked={!!open.sam_group} /> group function (all entities)</label></div>

@@ -19,7 +19,7 @@ export default async function MyDomain() {
   const s = await getSession(); if (!s) redirect("/login");
   const ents = s.entity === "ALL" ? ENTS4.filter((e) => s.group || s.entities.includes(e)) : [s.entity];
   const posts = [...new Set(s.roles.map(basePost).filter((r) => !NOT_POSTS.includes(r)))];
-  const mine = (role: string | null | undefined) => !!role && posts.includes(basePost(role));
+  const mine = (role: string | null | undefined, entity?: string) => !!role && (entity && s.rolesByEntity[entity] ? s.rolesByEntity[entity].map(basePost) : posts).includes(basePost(role));   // RIGHTS-04: the post held in the organisation of the item
   const me = s.person?.id ?? "-"; const t0 = today(); const db = supabaseAdmin();
   const [{ data: fnd }, { data: act }, { data: fil }, { data: man }, dues, inbox, { data: asm }] = await Promise.all([
     db.from("findings").select("id,entity,number,title,status,due,level,owner_role,owner_person").in("entity", ents).in("status", OPEN_STATUSES).limit(2000),
@@ -34,13 +34,13 @@ export default async function MyDomain() {
   type A = { id: string; entity: string; number: string; title: string; status: string; due: string | null; owner_role: string | null; owner_person: string | null };
   type C = { id: string; entity: string; title: string; stage: Stage; target_date: string | null; portal_ref: string | null; owner_role: string | null; next_task: string | null; ball_override: "us" | "authority" | null };
   type M = { id: string; entity: string; code: string; title: string; owner_role: string };
-  const findings = ((fnd ?? []) as F[]).filter((f) => (f.owner_person ? f.owner_person === me : mine(f.owner_role))).sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
-  const actions = ((act ?? []) as A[]).filter((a) => (a.owner_person ? a.owner_person === me : mine(a.owner_role))) /* FB-143 · an action given to me by name is mine too */.sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
-  const files = ((fil ?? []) as C[]).filter((f) => mine(f.owner_role)).sort((a, b) => (a.target_date ?? "9").localeCompare(b.target_date ?? "9"));
-  const manuals = ((man ?? []) as M[]).filter((m) => mine(m.owner_role));
+  const findings = ((fnd ?? []) as F[]).filter((f) => (f.owner_person ? f.owner_person === me : mine(f.owner_role, f.entity))).sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
+  const actions = ((act ?? []) as A[]).filter((a) => (a.owner_person ? a.owner_person === me : mine(a.owner_role, a.entity))) /* FB-143 · an action given to me by name is mine too */.sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
+  const files = ((fil ?? []) as C[]).filter((f) => mine(f.owner_role, f.entity)).sort((a, b) => (a.target_date ?? "9").localeCompare(b.target_date ?? "9"));
+  const manuals = ((man ?? []) as M[]).filter((m) => mine(m.owner_role, m.entity));
   const { data: rv } = manuals.length ? await db.from("revisions").select("id,manual_id,rev,step").in("manual_id", manuals.map((m) => m.id)).not("step", "in", "(published,repository)") : { data: [] };
   const drafts = (rv ?? []) as { id: string; manual_id: string; rev: string; step: string }[];
-  const myDues = dues.filter((d) => mine(d.who)); const late = myDues.filter((d) => d.state === "late");
+  const myDues = dues.filter((d) => mine(d.who, d.entity)); const late = myDues.filter((d) => d.state === "late");
   const myTurn = findings.filter((f) => !CMM_TURN.includes(f.status) && f.status !== "accepted");
   const sheet = ((asm ?? []) as { id: string; entity: string; status: string; next_due: string | null }[]).find((a) => ents.includes(a.entity)) ?? null;
   const multi = ents.length > 1; const entCell = (e: string) => multi ? <td style={{ width: 70 }}><span className={"ent " + e}>{e}</span></td> : null;

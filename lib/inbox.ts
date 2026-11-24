@@ -24,7 +24,9 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
   if (s.entity !== "ALL") q = q.eq("entity", s.entity); else if (!s.group) q = q.in("entity", s.entities);
   const { data } = await q;
   const posts = new Set(s.roles.map(basePost));
-  const tasks: InboxItem[] = ((data ?? []) as InboxItem[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : true).slice(0, 100)
+  // RIGHTS-04 · a task addressed to a post reaches the person who holds that post in the organisation of the task
+  const postsIn = (e: string) => (s.rolesByEntity?.[e] ? new Set(s.rolesByEntity[e].map(basePost)) : posts);
+  const tasks: InboxItem[] = ((data ?? []) as InboxItem[]).filter((t) => t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? postsIn(t.entity).has(basePost(t.owner_role)) : true).slice(0, 100)
     // FB-152 · an escalation written "overdue 6 days" at its creation is read with today's count
     .map((t) => (t.kind === "escalation" && /: overdue \d+ days?$/.test(t.title) && /due (\d{4}-\d{2}-\d{2})/.test(t.detail ?? "") ? { ...t, title: t.title.replace(/: overdue \d+ days?$/, `: overdue ${Math.max(0, Math.round((Date.now() - Date.parse(/due (\d{4}-\d{2}-\d{2})/.exec(t.detail ?? "")![1])) / 864e5))} days`) } : t));
   // project tasks (PRJ-02): mine, open, with no open dependency — due = projected end
@@ -44,7 +46,7 @@ export async function myInbox(s: Session): Promise<InboxItem[]> {
     for (const p of projects) {
       const proj = projectDates(all.filter((t) => t.project_id === p.id), deps, p.started_at);
       for (const t of ptasks.filter((t) => t.project_id === p.id && t.link_kind !== "authority_file")) {
-        const mine = t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? posts.has(basePost(t.owner_role)) : (p.owner_person ? p.owner_person === s.person?.id : !!p.owner_role && posts.has(basePost(p.owner_role)));
+        const mine = t.owner_person ? t.owner_person === s.person?.id : t.owner_role ? postsIn(p.entity).has(basePost(t.owner_role)) : (p.owner_person ? p.owner_person === s.person?.id : !!p.owner_role && postsIn(p.entity).has(basePost(p.owner_role)));
         if (!mine || proj.get(t.id)?.openDeps.length) continue;
         tasks.push({ id: t.id, title: t.title, ctx: p.title, ctxLink: `/proj/boards/${p.id}`, detail: t.status === "blocked" ? "blocked" : t.status === "waiting" ? "waiting" : null, due: t.status === "waiting" ? null : proj.get(t.id)?.end ?? null, entity: p.entity, kind: "project", status: "open", link: `/proj/boards/${p.id}`, owner_person: t.owner_person, owner_role: t.owner_role });
       }

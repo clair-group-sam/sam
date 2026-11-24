@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { basePost } from "@/lib/session";
+import { basePost, rolesIn } from "@/lib/session";
 import { ANSWERABLE_KINDS, cardFor, ensureConversation, findingCard, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type FindingLite, type TaskRow, promoCard } from "@/lib/teams";
 import { answerFromTeams, type Finding } from "@/lib/findings";
 import { applyMove } from "@/lib/authority-moves";
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();
       const task = t as TaskRow | null;
       if (!task) return msgResponse("This task no longer exists.");
-      const mine = task.owner_person ? task.owner_person === p.id : task.owner_role ? p.roles.map(basePost).includes(basePost(task.owner_role)) : true;
+      const mine = task.owner_person ? task.owner_person === p.id : task.owner_role ? rolesIn(p, task.entity).map(basePost).includes(basePost(task.owner_role)) : true;
       if (!mine) return msgResponse("This task is not addressed to you.");
       if (task.status !== "open") return cardResponse(taskCard(task, stateOf(task)));
       if (!ANSWERABLE_KINDS.has(task.kind)) return msgResponse("This one is answered in S.A.M. (open it from the card).");
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
       const task = t as (TaskRow & { ref_id?: string | null }) | null;
       if (!task) return msgResponse("This task no longer exists.");
       if (task.status !== "open") return cardResponse(taskCard(task, stateOf(task)));
-      const mine = task.owner_person ? task.owner_person === p.id : task.owner_role ? p.roles.map(basePost).includes(basePost(task.owner_role)) : true;
+      const mine = task.owner_person ? task.owner_person === p.id : task.owner_role ? rolesIn(p, task.entity).map(basePost).includes(basePost(task.owner_role)) : true;
       const cmm = p.roles.map(basePost).some((r) => ["CMM", "SUPERADMIN"].includes(r));
       if (!mine && !cmm) return msgResponse("This finding is not addressed to you.");
       const { data: fd } = await db.from("findings").select("*").eq("id", String(data.findingId ?? task.ref_id ?? "")).maybeSingle();

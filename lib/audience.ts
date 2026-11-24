@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { NP_ROLES, basePost } from "@/lib/session";
+import { NP_ROLES, basePost, rolesIn } from "@/lib/session";
 import type { Manual } from "@/lib/docs";
 
 /** Who must read a manual. Tokens: ALL · ROLE:<post> (holders and deputies) · PERSON:<uuid>. No token = ALL. */
 export type Reader = { id: string; display_name: string; email: string | null; job_title: string | null; roles: string[] };
-type PersonRow = Reader & { entities: string[] | null; home_entity: string | null; is_group_function: boolean };
+type PersonRow = Reader & { sam_roles?: string[] | null; entities: string[] | null; home_entity: string | null; is_group_function: boolean };
 
 export const POSTS = ["AM", "CMM", "SM", ...NP_ROLES.filter((r) => r !== "NP")];
 
@@ -16,7 +16,7 @@ export async function audienceTokens(db: SupabaseClient, manualId: string): Prom
 
 /** People of the manual's entity (and group functions, who are only readers when named by post or by name). */
 export async function peopleFor(db: SupabaseClient, entity: string): Promise<PersonRow[]> {
-  const { data } = await db.from("people").select("id,display_name,email,job_title,roles,entities,home_entity,is_group_function").order("display_name");
+  const { data } = await db.from("people").select("id,display_name,email,job_title,roles,sam_roles,entities,home_entity,is_group_function").order("display_name");
   return ((data ?? []) as PersonRow[]).filter((p) => p.is_group_function || p.home_entity === entity || (p.entities ?? []).includes(entity));
 }
 
@@ -28,7 +28,7 @@ export function resolveReaders(people: PersonRow[], entity: string, tokens: stri
     const staff = p.home_entity === entity || (p.entities ?? []).includes(entity);
     if (named.has(p.id)) return true;
     if (all && staff && !p.is_group_function) return true;
-    return (p.roles ?? []).some((r) => posts.has(basePost(r)));
+    return rolesIn(p, entity).some((r) => posts.has(basePost(r)));   // RIGHTS-04: the post held in this organisation
   }).map(({ id, display_name, email, job_title, roles }) => ({ id, display_name, email, job_title, roles }));
 }
 

@@ -6,7 +6,7 @@ import { createPublicKey, verify as cryptoVerify } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { frText } from "@/lib/dates";
 import { CLIENT_ID, TENANT_ID } from "@/lib/msgraph-user";
-import { basePost } from "@/lib/session";
+import { basePost, rolesIn } from "@/lib/session";
 
 export const SERVICE_URL = (process.env.TEAMS_SERVICE_URL ?? "https://smba.trafficmanager.net/emea/").replace(/\/?$/, "/");
 export const teamsConfigured = () => !!process.env.GRAPH_CLIENT_SECRET;
@@ -104,15 +104,15 @@ export async function conversationOf(db: SupabaseClient, personId: string): Prom
   return c;
 }
 /** Person for a Teams user: by Entra object id, else by the e-mail the conversation members carry (and the oid is then kept). */
-export async function personFor(db: SupabaseClient, from: { id?: string; aadObjectId?: string }, ref: ConvRef, tenantId?: string, installedBy = "user"): Promise<{ id: string; display_name: string; roles: string[]; email: string | null } | null> {
-  type P = { id: string; display_name: string; roles: string[]; email: string | null };
+export async function personFor(db: SupabaseClient, from: { id?: string; aadObjectId?: string }, ref: ConvRef, tenantId?: string, installedBy = "user"): Promise<{ id: string; display_name: string; roles: string[]; sam_roles?: string[] | null; email: string | null } | null> {
+  type P = { id: string; display_name: string; roles: string[]; sam_roles?: string[] | null; email: string | null };
   let p: P | null = null;
-  if (from.aadObjectId) { const { data } = await db.from("people").select("id,display_name,roles,email").eq("entra_oid", from.aadObjectId).maybeSingle(); p = (data as P | null) ?? null; }
+  if (from.aadObjectId) { const { data } = await db.from("people").select("id,display_name,roles,sam_roles,email").eq("entra_oid", from.aadObjectId).maybeSingle(); p = (data as P | null) ?? null; }
   if (!p) {
     const ms = await members(ref);
     const me = ms.find((m) => (from.aadObjectId && m.aadObjectId === from.aadObjectId) || (from.id && m.id === from.id)) ?? (ms.length === 1 ? ms[0] : undefined);
     const mail = me?.email ?? me?.userPrincipalName;
-    if (mail) { const { data } = await db.from("people").select("id,display_name,roles,email").ilike("email", mail).maybeSingle(); p = (data as P | null) ?? null; }
+    if (mail) { const { data } = await db.from("people").select("id,display_name,roles,sam_roles,email").ilike("email", mail).maybeSingle(); p = (data as P | null) ?? null; }
     if (p && from.aadObjectId) await db.from("people").update({ entra_oid: from.aadObjectId }).eq("id", p.id).is("entra_oid", null);
   }
   // only a PERSONAL chat is kept as the person's conversation (a group chat or a channel must never receive their cards)
@@ -417,13 +417,13 @@ export function infoCard(title: string, text: string, link?: string): unknown {
 }
 
 /* ---------- who gets a task ---------- */
-type Person = { id: string; display_name: string; roles: string[]; email: string | null; entities: string[]; is_group_function: boolean };
-const isFor = (p: Person, t: Pick<TaskRow, "owner_person" | "owner_role" | "entity">) => t.owner_person ? p.id === t.owner_person : !!t.owner_role && (p.is_group_function || p.entities.includes(t.entity)) && p.roles.some((r) => basePost(r) === basePost(t.owner_role!));
+type Person = { id: string; display_name: string; roles: string[]; sam_roles?: string[] | null; email: string | null; entities: string[]; is_group_function: boolean };
+const isFor = (p: Person, t: Pick<TaskRow, "owner_person" | "owner_role" | "entity">) => t.owner_person ? p.id === t.owner_person : !!t.owner_role && (p.is_group_function || p.entities.includes(t.entity)) && rolesIn(p, t.entity).some((r) => basePost(r) === basePost(t.owner_role!));   // RIGHTS-04: the post held in the task's organisation
 /** People a task is addressed to: the named person, or the holders (and deputies) of the post in the task's entity. */
 export async function recipientsOf(db: SupabaseClient, t: Pick<TaskRow, "owner_person" | "owner_role" | "entity">): Promise<Person[]> {
-  if (t.owner_person) { const { data } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").eq("id", t.owner_person).maybeSingle(); return data ? [data as Person] : []; }
+  if (t.owner_person) { const { data } = await db.from("people").select("id,display_name,roles,sam_roles,email,entities,is_group_function").eq("id", t.owner_person).maybeSingle(); return data ? [data as Person] : []; }
   if (!t.owner_role) return [];
-  const { data } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").limit(500);
+  const { data } = await db.from("people").select("id,display_name,roles,sam_roles,email,entities,is_group_function").limit(500);
   return ((data ?? []) as Person[]).filter((p) => isFor(p, t));
 }
 type CardRow = { id: number; task_id: string; person_id: string; conversation_id: string; service_url: string; activity_id: string; card_kind: string; updated_at: string | null };
@@ -434,7 +434,7 @@ export async function notifyTasks(db: SupabaseClient, tasks: TaskRow[]): Promise
   if (!teamsConfigured() || !tasks.length) return 0;
   let n = 0;
   try {
-    const { data } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").limit(500);
+    const { data } = await db.from("people").select("id,display_name,roles,sam_roles,email,entities,is_group_function").limit(500);
     const people = (data ?? []) as Person[];
     const perPerson = new Map<string, TaskRow[]>();
     for (const t of tasks) for (const p of people) if (isFor(p, t)) perPerson.set(p.id, [...(perPerson.get(p.id) ?? []), t]);
@@ -497,7 +497,7 @@ export async function morningDigest(db: SupabaseClient): Promise<number> {
   if (!teamsConfigured()) return 0;
   const t0 = todayISO();
   const { data: convs } = await db.from("teams_conversations").select("*, digest_sent_on").limit(500);
-  const { data: ppl } = await db.from("people").select("id,display_name,roles,email,entities,is_group_function").limit(500);
+  const { data: ppl } = await db.from("people").select("id,display_name,roles,sam_roles,email,entities,is_group_function").limit(500);
   const { data: open } = await db.from("tasks").select("*").eq("status", "open").order("due", { ascending: true, nullsFirst: false }).limit(2000);
   const people = (ppl ?? []) as Person[]; const tasks = (open ?? []) as TaskRow[];
   const horizon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);

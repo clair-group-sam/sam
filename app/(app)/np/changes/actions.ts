@@ -86,7 +86,8 @@ export async function applyChange(fd: FormData) {
   await db.from("np_changes").update({ status: "applied", applied_as: as, applied_at: now, applied_by: s.person?.id ?? null }).eq("id", c.id);
   // 24/11 (Guillaume) · the rights in S.A.M. follow the post: the person who takes the seat receives the post (and the entity), the
   // person who leaves it loses the post unless another seat of the same post is still theirs. Written in the audit log.
-  const role = c.seat === "deputy" ? `${c.post_code}_DEP` : c.post_code;
+  const bare = c.seat === "deputy" ? `${c.post_code}_DEP` : c.post_code;
+  const role = `${bare}@${c.entity}`;   // RIGHTS-04: the post is held in the organisation of the change
   const b = before as { id: string; holder_person: string | null; deputy_person: string | null };
   const outId = c.seat === "holder" ? b.holder_person : b.deputy_person;
   const rights: Record<string, unknown> = { role };
@@ -99,9 +100,12 @@ export async function applyChange(fd: FormData) {
   } else if (c.to_name) rights.not_given = `${c.to_name} has no account in S.A.M. yet`;
   if (outId && outId !== c.to_person) {
     const col = c.seat === "holder" ? "holder_person" : "deputy_person";
-    const { data: still } = await db.from("np_posts").select("id").eq("code", c.post_code).eq(col, outId).limit(1);
+    const { data: stillHere } = await db.from("np_posts").select("id").eq("entity", c.entity).eq("code", c.post_code).eq(col, outId).limit(1);
+    const { data: stillAny } = await db.from("np_posts").select("id").eq("code", c.post_code).eq(col, outId).limit(1);
     const { data: outP } = await db.from("people").select("id,display_name,sam_roles,sam_entities").eq("id", outId).maybeSingle(); const p = outP as Pp | null;
-    if (p && !(still ?? []).length && (p.sam_roles ?? []).includes(role)) { const roles = (p.sam_roles ?? []).filter((r) => r !== role);
+    // the right held here goes; one written without organisation (given before the split) goes only when the person holds this post nowhere else
+    const drop = (r: string) => (r === role && !(stillHere ?? []).length) || (r === bare && !(stillAny ?? []).length);
+    if (p && (p.sam_roles ?? []).some(drop)) { const roles = (p.sam_roles ?? []).filter((r) => !drop(r));
       await db.from("people").update({ sam_roles: roles.length ? roles : ["USER"] }).eq("id", p.id); rights.removed_from = p.display_name;
       await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity: c.entity, object_type: "person", object_id: p.id, action: "roles_changed_by_np_change", before: { sam_roles: p.sam_roles }, after: { sam_roles: roles.length ? roles : ["USER"], change: c.id } }); }
   }

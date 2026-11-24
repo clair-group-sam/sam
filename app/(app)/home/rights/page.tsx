@@ -14,14 +14,14 @@ export default async function MyRights() {
   const db = supabaseAdmin();
   const { data: np } = await db.from("np_posts").select("entity,code,title,holder_person,holder_name,deputy_person,deputy_name");
   const posts = (np ?? []) as { entity: string; code: string; title: string | null; holder_person: string | null; holder_name: string | null; deputy_person: string | null; deputy_name: string | null }[];
-  const me = s.person?.id; const same = (a: string | null) => !!a && a.trim().toLowerCase() === s.name.trim().toLowerCase();
   const ents = s.group ? ENTS4 : s.entities;
-  const rows = [...new Set(s.roles)].filter((r) => basePost(r) !== "USER" || s.roles.length === 1).map((r) => {
-    const code = basePost(r); const dep = isDeputy(r);
-    const held = posts.filter((p) => p.code.toUpperCase() === code && (dep ? p.deputy_person === me || same(p.deputy_name) : p.holder_person === me || same(p.holder_name)));
-    const title = held[0]?.title ?? posts.find((p) => p.code.toUpperCase() === code && ents.includes(p.entity))?.title ?? ROLE_WORDS[code] ?? code;
-    return { code: r, label: `${dep ? "Deputy, " : ""}${title && title !== code ? title : ROLE_WORDS[code] ?? code}`, where: held.map((p) => ENT[p.entity]?.name ?? p.entity) };
-  });
+  // RIGHTS-04 · one line per post or role and per organisation where it is held
+  const everywhere = ents.length ? ents.reduce<string[]>((acc, e, i) => (i === 0 ? [...(s.rolesByEntity[e] ?? [])] : acc.filter((r) => (s.rolesByEntity[e] ?? []).includes(r))), []) : s.roles;
+  const label = (r: string) => { const code = basePost(r); const dep = isDeputy(r); const t = posts.find((p) => p.code.toUpperCase() === code && ents.includes(p.entity))?.title; return `${dep ? "Deputy, " : ""}${t && t.toUpperCase() !== code ? t : ROLE_WORDS[code] ?? code}`; };
+  const rows = [
+    ...everywhere.filter((r) => basePost(r) !== "USER" || ents.every((e) => (s.rolesByEntity[e] ?? []).length <= 1)).map((r) => ({ code: r, label: label(r), where: [s.group ? "every organisation" : ents.length > 1 ? "all your organisations" : ENT[ents[0]]?.name ?? ents[0] ?? ""] })),
+    ...[...new Set(ents.flatMap((e) => (s.rolesByEntity[e] ?? []).filter((r) => !everywhere.includes(r))))].map((r) => ({ code: r, label: label(r), where: ents.filter((e) => (s.rolesByEntity[e] ?? []).includes(r)).map((e) => ENT[e]?.name ?? e) })),
+  ];
   const R = ROLES[s.role]; const mods = MODULES.filter((m) => R.mods.includes(m.id) || (s.superadmin && !s.viewAs));
   const screens = (id: string) => (SUB[id] ?? []).filter((x) => !x.hidden && ((s.superadmin && !s.viewAs) || (R.subs[id] ?? []).includes(x.id))).map((x) => x.label);
   return (
@@ -47,9 +47,9 @@ export default async function MyRights() {
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">Your posts and roles</span></div>
         <table className="tbl"><thead><tr><th>Post or role</th><th>Where</th><th style={{ width: 140 }}>Code in S.A.M.</th></tr></thead><tbody>
-          {rows.map((r) => <tr key={r.code}><td><b>{r.label}</b>{basePost(r.code) === "SUPERADMIN" && <div className="mini">Sets S.A.M. up and can look at it as any other profile.</div>}</td><td>{r.where.length ? r.where.join(", ") : <span className="mini">{s.group ? "every organisation" : ents.map((e) => ENT[e]?.name ?? e).join(", ")}</span>}</td><td className="mono mini">{r.code}</td></tr>)}
+          {rows.map((r) => <tr key={r.code}><td><b>{r.label}</b>{basePost(r.code) === "SUPERADMIN" && <div className="mini">Sets S.A.M. up and can look at it as any other profile.</div>}</td><td>{r.where.join(", ")}</td><td className="mono mini">{r.code}</td></tr>)}
         </tbody></table>
-        <div className="cb mini">S.A.M. sends you the tasks addressed to these posts, and shows you what belongs to them. A deputy holds the same rights as the post they deputise.</div>
+        <div className="cb mini">S.A.M. sends you the tasks addressed to these posts in the organisation where you hold them, and shows you what belongs to them there. The menus you see are those of the organisation you are working in. A deputy holds the same rights as the post they deputise.</div>
       </section>
       <section className="card mb-4">
         <div className="ch"><span className="eyebrow">What you can open</span><span className="mini">{mods.length} menus</span></div>

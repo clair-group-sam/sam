@@ -50,7 +50,8 @@ export async function saveRights(fd: FormData) {
   const { data: b } = await db().from("people").select("sam_roles,sam_entities,sam_group").eq("id", id).maybeSingle();
   const before = b as { sam_roles: string[] | null; sam_entities: string[] | null; sam_group: boolean } | null; if (!before) fail("Person not found");
   const typed = [...fd.getAll("role").map(String), ...String(fd.get("roles") ?? "").split(/[\s,;]+/)].map((x) => x.trim().toUpperCase()).filter(Boolean);
-  const bad = typed.find((r) => !ROLE_RE.test(r)); if (bad) fail(`“${bad}” is not a post code (letters, figures and _ only, such as CMM, NPFO, NPFO_DEP, USER).`);
+  const SCOPED_RE = /^[A-Z][A-Z0-9_-]{1,20}(@(ASJMT|ASJFR|ASFFR|ASTFR))?$/;   // RIGHTS-04: "NPFO@ASJMT" = held in that organisation
+  const bad = typed.find((r) => !SCOPED_RE.test(r) || /^SUPERADMIN@/.test(r)); if (bad) fail(`“${bad}” is not a post code (letters, figures and _ only, such as CMM, NPFO, NPFO_DEP, USER).`);
   let roles = [...new Set(typed)];
   const isSuper = s.roles.includes("SUPERADMIN"); const had = (before!.sam_roles ?? []).includes("SUPERADMIN");
   if (!isSuper) { roles = roles.filter((r) => r !== "SUPERADMIN"); if (had) roles.push("SUPERADMIN"); }
