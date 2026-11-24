@@ -45,6 +45,8 @@ export default async function GoLive() {
     { ok: (days(lastCron) ?? 99) <= 1, what: "Daily jobs running by themselves (reminders, escalations, alerts, snapshots)", detail: lastCron ? `last automatic run ${days(lastCron)} day(s) ago` : `never ran automatically${lastHand ? `, last run by hand ${days(lastHand)} day(s) ago` : ""}: scheduled jobs only fire on the production deployment`, href: "/set/notif", go: "Notification rules" },
     { ok: (days(lastEar) ?? 99) <= 1, what: "EASA rules read every evening", detail: lastEar ? `last check ${days(lastEar)} day(s) ago` : "never checked", href: "/reg/ear", go: "Easy Access Rules" },
     { ok: !(tst ?? []).length, what: "Test data removed", detail: (tst ?? []).length ? `${(tst ?? []).length} safety report(s) named TEST, and the other test objects listed in scripts/cleanup-test-data.sql` : "no test report left", },
+    // 24/11 (Guillaume) · to check by hand before production: S.A.M. cannot read these settings
+    { ok: false, what: "Session duration decided and set (Supabase, Authentication, Sessions)", detail: "How long a person stays signed in without going back through Microsoft: to decide, then set on the production project. Until then a session opened before an account is disabled keeps working." },
   ];
   const done = lines.filter((l) => l.ok).length;
   return (
