@@ -4,14 +4,8 @@ import { getSession, basePost, isDeputy } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { ENT, ENTS4, MODULES, ROLES, SUB } from "@/lib/nav";
+import { ROLE_WORDS } from "@/lib/role-words";
 
-/** What a code means, in words, when no post of the organisation carries it. */
-const ROLE_WORDS: Record<string, string> = {
-  AM: "Accountable Manager", CMM: "Compliance Monitoring Manager", SM: "Safety Manager", SUPERADMIN: "Administrator of S.A.M.", USER: "User", CREW: "Crew member", EXT: "External person",
-  NPFO: "Nominated person, flight operations", NPCA: "Nominated person, continuing airworthiness", NPGO: "Nominated person, ground operations", NPCT: "Nominated person, crew training",
-  CFI: "Chief Flight Instructor", HT: "Head of Training", CTKI: "Chief Theoretical Knowledge Instructor", FSO: "Flight Safety Officer", MAM: "Maintenance and Airworthiness Manager", ISM: "Information Security Manager",
-  RE: "Responsable Entretien", RN: "Responsable Navigabilité", RRO: "Responsable de Revue d'Organisation", AUDITOR: "Auditor",
-};
 
 /* My access rights, in words (opened from the menu under the name): who I am for S.A.M., in which organisations, the posts I hold,
  * what they let me open, and whom to ask for a change. The technical view (JSON) stays for the super admin. */

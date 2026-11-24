@@ -49,7 +49,7 @@ export async function saveRights(fd: FormData) {
   const s = await admin(); const id = String(fd.get("id"));
   const { data: b } = await db().from("people").select("sam_roles,sam_entities,sam_group").eq("id", id).maybeSingle();
   const before = b as { sam_roles: string[] | null; sam_entities: string[] | null; sam_group: boolean } | null; if (!before) fail("Person not found");
-  const typed = String(fd.get("roles") ?? "").toUpperCase().split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  const typed = [...fd.getAll("role").map(String), ...String(fd.get("roles") ?? "").split(/[\s,;]+/)].map((x) => x.trim().toUpperCase()).filter(Boolean);
   const bad = typed.find((r) => !ROLE_RE.test(r)); if (bad) fail(`“${bad}” is not a post code (letters, figures and _ only, such as CMM, NPFO, NPFO_DEP, USER).`);
   let roles = [...new Set(typed)];
   const isSuper = s.roles.includes("SUPERADMIN"); const had = (before!.sam_roles ?? []).includes("SUPERADMIN");
