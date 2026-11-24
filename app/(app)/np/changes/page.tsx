@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { noticeFor, workingDays } from "@/lib/np-notice";
 import { fr as frd } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -10,38 +11,18 @@ import { postsOf } from "@/lib/np";
 import { STAGE_LABEL, STAGE_TONE, today, type Stage } from "@/lib/authority";
 import { applyChange, cancelChange, createChange, linkApplication, markAccepted, openApplication } from "./actions";
 
-type Sp = { entity?: string; err?: string; new?: string; post?: string };
+type Sp = { entity?: string; err?: string; new?: string; post?: string; legal?: string; left?: string };
 type Change = { id: string; entity: string; post_code: string; post_title: string | null; seat: "holder" | "deputy"; from_name: string | null; to_name: string | null; effective_on: string | null; reason: string | null;
-  acceptance: "required" | "not_required"; authority_file_id: string | null; authority_notice_days: number | null; status: "open" | "applied" | "cancelled"; applied_as: string | null; applied_at: string | null; cancel_note: string | null; created_at: string };
+  acceptance: "required" | "not_required"; authority_file_id: string | null; authority_notice_days: number | null; short_notice_reason: string | null; status: "open" | "applied" | "cancelled"; applied_as: string | null; applied_at: string | null; cancel_note: string | null; created_at: string };
 type FileRow = { id: string; title: string; stage: Stage; portal_ref: string | null; submitted_at: string | null; np_post_code: string | null; type_code: string };
 const fr = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : "—");
 const days = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
 const ACCEPTED: Stage[] = ["approved", "published", "closed"];
 const AS: Record<string, [string, string]> = { accepted: ["accepted by the authority", "green"], pending: ["acceptance pending", "amber"], not_required: ["no acceptance required", ""] };
-/** Notice to the authority before a planned change of nominated person, as the regulation reads (Easy Access Rules in S.A.M., 19/11/2026):
- *  AMC1 ORO.GEN.130(b) 20 days · AMC1 CAMO.A.130(b) 20 working days · AMC1 ORA.GEN.130(b) 10 days ·
- *  CAO.A.105(a)(2) before the change takes place, no number of days. Unforeseen changes: at the earliest opportunity. */
-type Notice = { days: number; working: boolean; ref: string; text: string };
-const AIRWORTHINESS = /^(D?NPCA|CAM|CAMO|ARS)/;
-/** 24/11 (Guillaume) · the longest notice applies: every rule that applies to the post, and the notice the authority set itself
- *  for this change when there is one; a working day counts for 7/5 of a day to compare them. */
-function noticeFor(entity: string, post: string, authorityDays?: number | null): Notice | null {
-  const all: Notice[] = [];
-  if (entity === "ASJMT" && AIRWORTHINESS.test(post.toUpperCase())) all.push({ days: 20, working: true, ref: "AMC1 CAMO.A.130(b)", text: "20 working days" });
-  if (entity === "ASJMT" || entity === "ASJFR") all.push({ days: 20, working: false, ref: "AMC1 ORO.GEN.130(b)", text: "20 days" });
-  if (entity === "ASFFR") all.push({ days: 10, working: false, ref: "AMC1 ORA.GEN.130(b)", text: "10 days" });
-  if (entity === "ASTFR") all.push({ days: 0, working: false, ref: "CAO.A.105(a)(2)", text: "before the change takes place" });
-  if (authorityDays && authorityDays > 0) all.push({ days: authorityDays, working: false, ref: "the notice set by the authority", text: `${authorityDays} days` });
-  const len = (n: Notice) => (n.working ? n.days * 1.4 : n.days);
-  return all.sort((a, b) => len(b) - len(a))[0] ?? null;
-}
 const RULES: Record<string, string> = {
   ASJMT: "AMC1 ORO.GEN.130(b): at least 20 days before; airworthiness posts, AMC1 CAMO.A.130(b): at least 20 working days before. The longest notice applies, a notice set by the authority included",
   ASJFR: "AMC1 ORO.GEN.130(b): at least 20 days before. A longer notice set by the authority applies", ASFFR: "AMC1 ORA.GEN.130(b): at least 10 days before. A longer notice set by the authority applies", ASTFR: "CAO.A.105(a)(2): notified before the change takes place; a notice set by the authority applies",
 };
-/** Monday to Friday between two dates (public holidays are not counted out). */
-function workingDays(from: string, to: string): number { let n = 0; const d = new Date(from + "T00:00:00Z"); const end = Date.parse(to + "T00:00:00Z"); const step = d.getTime() <= end ? 1 : -1;
-  while (d.getTime() !== end) { if (step > 0) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; d.setUTCDate(d.getUTCDate() + 1); } else { d.setUTCDate(d.getUTCDate() - 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; } } return n; }
 
 /* NP-02 · NP management › Changes & approvals: changes of holder or deputy, their CAA application, and the day they take effect. */
 export default async function Changes({ searchParams }: { searchParams: Promise<Sp> }) {
@@ -76,6 +57,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
       <PageHeader eyebrow="NP management, Changes & approvals" title={`Changes & approvals, ${ENT[entity]?.name ?? entity}`}
         sub="A change of holder or deputy is prepared here, followed with its CAA application, and applied to the post on the day it takes effect. Until then, Posts & org chart stays as it is." />
       {ents.length > 1 && s.entity === "ALL" && <div className="chips mb-4 flex items-center gap-2">{ents.map((e) => <Link key={e} href={`/np/changes?entity=${e}`} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
+      {sp.err === "notice" && <div className="card mb-3" role="alert" style={{ borderLeft: "4px solid var(--amber, #d98a00)" }}><div className="cb"><b>The legal notice is longer.</b> {sp.legal}; the date you gave leaves {sp.left}. Nothing was saved. To ask the authority for a shorter notice anyway, enter the change again and write why in “Shorter notice than the regulation”: S.A.M. keeps the reason on the change.</div></div>}
       {sp.err === "same" && <p className="mini red mb-3">The new name is the one already on the post: nothing to change.</p>}
       {sp.err === "file" && <p className="mini red mb-3">The CAA application could not be opened (the type “NP” is not offered for this entity): open it from Projects › CAA applications and link it here.</p>}
 
@@ -102,6 +84,7 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
                 <label style={{ width: 220 }}><span className="mini">Acceptance by the authority</span><select name="acceptance" className="inp" defaultValue="required"><option value="required">required (Form 4 / Form 2)</option><option value="not_required">not required</option></select></label>
               </div>
               <label className="block mt-3"><span className="mini">Reason</span><input name="reason" className="inp" placeholder="departure, reorganisation, new deputy…" /></label>
+              <label className="block mt-3"><span className="mini">Shorter notice than the regulation: why (only when the date above leaves less than the legal notice)</span><input name="short_notice_reason" className="inp" placeholder="unforeseen departure, agreed with the inspector on…" /></label>
               <div className="mt-3"><button className="btn primary" type="submit">Prepare the change</button></div>
             </form>
           ) : <div className="cb mini">No post defined for {ENT[entity]?.name ?? entity}: create them in <Link className="underline" href={`/np/over?entity=${entity}`}>Posts &amp; org chart</Link>.</div>}
@@ -125,7 +108,8 @@ export default async function Changes({ searchParams }: { searchParams: Promise<
                   <td>{c.acceptance === "not_required" ? <span className="pill">no acceptance required</span>
                     : f ? <><Link className="underline" href={`/proj/auth/${f.id}`}>{f.portal_ref ?? f.title}</Link> <span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{submitted && <div className="mini">submitted {fr(submitted)}{c.effective_on ? `, ${days(c.effective_on, submitted)} d before` : ""}</div>}</>
                     : <span className="pill amber">no application yet</span>}
-                    {short && nt && <div className="mini red">{nt.days ? `${Math.max(lead(submitted ?? t0), 0)} ${nt.working ? "working days" : "days"} of notice, ${nt.ref} asks for at least ${nt.text}` : `not notified yet: ${nt.ref}, ${nt.text}`}</div>}
+                    {short && nt && c.short_notice_reason && <div className="mini" style={{ color: "var(--amber-ink, #8a5a00)" }}>Shorter notice asked from the authority: {c.short_notice_reason}</div>}
+                    {short && nt && <div className={"mini" + (c.short_notice_reason ? "" : " red")}>{nt.days ? `${Math.max(lead(submitted ?? t0), 0)} ${nt.working ? "working days" : "days"} of notice, ${nt.ref} asks for at least ${nt.text}` : `not notified yet: ${nt.ref}, ${nt.text}`}</div>}
                     {cmm && c.acceptance === "required" && !f && <div className="flex flex-wrap gap-2 mt-2 items-center">
                       <form action={openApplication}><input type="hidden" name="id" value={c.id} /><button className="btn" type="submit">Open the CAA application</button></form>
                       {freeFiles.length > 0 && <form action={linkApplication} className="flex gap-1 items-center"><input type="hidden" name="id" value={c.id} /><select name="file_id" className="inp" style={{ marginTop: 0, width: 220 }}>{freeFiles.map((x) => <option key={x.id} value={x.id}>{x.portal_ref ?? x.title}</option>)}</select><button className="btn" type="submit">Link</button></form>}

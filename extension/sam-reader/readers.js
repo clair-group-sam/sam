@@ -60,8 +60,10 @@ async function readTmcad() {
       for (const r of T ? [...T.rows].slice(1) : []) {
         const c = [...r.cells].map((x) => txt(x));
         if (c.length === 1) { const m = /^Phase:\s*(.*?)\s*\(\d+\)$/.exec(c[0]); if (m) phase = m[1]; continue; }
-        if (c.length < 8 || /^closed$/i.test(phase)) continue;                       // closed by the authority: nothing left to follow
+        if (c.length < 8) continue;
         const off = head.length - c.length; const at = (n) => head.indexOf(n) - off;   // data rows have no cell under the first (selector) header
+        // closed by the authority: only the number and the title are kept, so that S.A.M. can say when it still holds the finding open
+        if (/^closed$/i.test(phase)) { const ca = r.querySelector('a[href*="FindingDetail.aspx"]'); lines.push({ entity: "ASJMT", kind: "finding", closed: true, number: c[at("audit") + 1] || "", title: c[at("audit") + 2] || "", status: "Closed", origin: c[at("audit")] || null, url: ca ? new URL(ca.getAttribute("href"), location.origin).href : null }); continue; }
         const a = r.querySelector('a[href*="FindingDetail.aspx"]'); const sev = c[at("severity")] || "";
         const l = { entity: "ASJMT", kind: "finding", number: c[at("audit") + 1] || "", title: c[at("audit") + 2] || "", level: (/\d/.exec(sev) || [""])[0] || sev, status: phase || "Open", origin: c[at("audit")] || null,
           notified: iso(c[at("date")]), due: iso(c[at("close by")]) || iso(c[at("respond by")]), url: a ? new URL(a.getAttribute("href"), location.origin).href : null,
@@ -155,11 +157,11 @@ async function readMeteor() {
       const c = [...r.cells].map((td) => (td.children.length > 1 ? [...td.children].map(txt).filter(Boolean).join(", ") : txt(td))); if (c.length < 6) continue;
       const [num, title, level, limit, state, act] = c;
       if (/observation/i.test(level) || /class[ée]e|non suivie/i.test(state)) { observations++; continue; }
-      if (/^(sans suite|cl[oô]tur|clos|ferm)/i.test(state)) continue;
+      if (/^(sans suite|cl[oô]tur|clos|ferm)/i.test(state)) { lines.push({ entity, kind: "finding", closed: true, number: `#${num}`, title, level, status: state, origin: act, url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#constatation/${num}` }); continue; }
       lines.push({ entity, kind: "finding", number: `#${num}`, title, level, due: iso(limit), status: state, origin: act, url: `https://meteor-app.dsac.aviation-civile.gouv.fr/meteor-externe/#constatation/${num}`, turn: /attente de correction|à traiter|réponse attendue|refus/i.test(state) ? "us" : "authority" });
     }
     // 3. each constatation followed: the page loads its description, its corrective actions and the exchanges; the reader keeps the text
-    for (const l of lines.filter((x) => x.kind === "finding")) {
+    for (const l of lines.filter((x) => x.kind === "finding" && !x.closed)) {
       const num = l.number.slice(1); const at = (p) => new RegExp(`/constatations/${num}/${p}`);
       if (!(await go(`#constatation/${num}`, at("description")))) { skipped.push(`${l.number}: detail not read`); continue; }
       await sleep(900);

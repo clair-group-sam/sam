@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ENT } from "@/lib/nav";
 import { FORMS, OUTCOME, VALIDITY_MONTHS, maySee, type Assessment } from "@/lib/competency";
+import { signatureDataUri } from "@/lib/signature";
 
 export const dynamic = "force-dynamic";
 const CSS = `
@@ -15,7 +16,7 @@ body{background:#fff}
 .ca table{width:100%;border-collapse:collapse;margin:4px 0}.ca th,.ca td{border:1px solid #c9d3dc;padding:4px 6px;vertical-align:top;text-align:left}.ca th{background:#f1f5f8;font-weight:700}
 .ca .kv td:first-child{width:32%;color:#44546a;background:#f8fafb}.ca tr{page-break-inside:avoid}
 .ca .c{text-align:center;width:34px}.ca .mini{font-size:9.5px;color:#6b7a8c}.ca .box{display:inline-block;width:10px;height:10px;border:1px solid #0d2a3f;margin-right:5px;vertical-align:-1px;text-align:center;line-height:9px;font-size:9px}
-.ca .sig td{height:52px}.ca pre{font:inherit;white-space:pre-wrap;margin:0}
+.ca .sig td{height:84px}.ca pre{font:inherit;white-space:pre-wrap;margin:0}
 `;
 
 /** Printable competency assessment, laid out as the house form (ENR-COMP-01 OPS, ENR-COMP-02 CAMO): page 1 heading, the points with
@@ -26,6 +27,8 @@ export default async function PrintAssessment({ params }: { params: Promise<{ id
   const { data } = await supabaseAdmin().from("competency_assessments").select("*").eq("id", id).maybeSingle();
   const a = data as Assessment | null;
   if (!a || !maySee(s, a)) notFound();
+  // 24/11 (Guillaume) · the handwritten signature of the assessor only, and only on a sheet the assessor signed in S.A.M.
+  const sig = a.status === "signed" ? await signatureDataUri(supabaseAdmin(), a.signed_by) : null;
   const F = FORMS[a.form]; const signed = a.status === "signed";
   const sections = [...new Set(a.items.map((i) => i.section))];
   const lines = (t: string | null) => (t ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
@@ -61,7 +64,7 @@ export default async function PrintAssessment({ params }: { params: Promise<{ id
         <tr><td>Validity</td><td>{VALIDITY_MONTHS} months (MSM 4-5){a.next_due ? `: next assessment due by ${fr(a.next_due)}` : ""}</td></tr>
       </tbody></table>
       <table className="sig"><thead><tr><th style={{ width: "50%" }}>Assessor</th><th>Assessed</th></tr></thead><tbody><tr>
-        <td>{signed ? <><b>{a.assessor_name}</b>, Compliance Monitoring Manager<br />Signed electronically in S.A.M. on {fr(a.signed_at)}</> : ""}</td>
+        <td>{signed ? <>{sig && <>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={sig} alt="" style={{ maxHeight: 46, maxWidth: 200, display: "block" }} /></>}<b>{a.assessor_name}</b>, Compliance Monitoring Manager<br />Signed in S.A.M. on {fr(a.signed_at)}</> : ""}</td>
         <td><b>{a.person_name}</b>{a.submitted_at ? <><br />Pre-filled and sent in S.A.M. on {fr(a.submitted_at)}</> : ""}</td></tr></tbody></table>
       {F.page3 && (
         <div style={{ pageBreakBefore: "always" }}>

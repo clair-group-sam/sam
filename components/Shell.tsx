@@ -340,6 +340,7 @@ function TopBar({ session, ent, mode, crumb }: { session: Session; ent: string; 
                 </select></div>
               </div>
             )}
+            <Link href="/home/signature" className="mi">My signature</Link>
             <Link href="/api/me" className="mi" target="_blank">My access rights</Link>
             <form action="/auth/signout" method="post"><button type="submit" className="mi">Sign out</button></form>
           </div>

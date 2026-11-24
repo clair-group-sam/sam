@@ -9,7 +9,8 @@ const frd = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
  * Nothing is changed by the plan: it lists, per line, what S.A.M. holds and what would change. The desk ticks, then applies.
  * A stage is never moved by a reading (the stage carries tasks and signatures): the portal's wording is stored beside it. */
 export type PortalLine = { key: string; entity: string; kind: "file" | "finding" | "info"; number: string; title: string; status: string; assessor: string | null; level: string | null; due: string | null; turn: "us" | "authority" | null; last: string | null; lastOn: string | null; next: string | null; who: string | null; url: string | null; submitted: string | null; hint: string | null;
-  /** a finding as the authority wrote it (METEOR): text, regulatory reference, date notified, surveillance act */ description: string | null; requirement: string | null; notified: string | null; origin: string | null };
+  /** a finding as the authority wrote it (METEOR): text, regulatory reference, date notified, surveillance act */ description: string | null; requirement: string | null; notified: string | null; origin: string | null;
+  /** 24/11 · a finding the authority has closed: read only to say when S.A.M. still holds it open */ closed: boolean };
 const ENT: Record<string, string> = { AJD: "ASJMT", ASJ: "ASJFR", ASF: "ASFFR", TEC: "ASTFR", ASJMT: "ASJMT", ASJFR: "ASJFR", ASFFR: "ASFFR", ASTFR: "ASTFR" };
 const s = (v: unknown) => { const t = v == null ? "" : String(v).trim(); return t && t !== "—" && t !== "None" && t !== "null" ? t : ""; };
 const day = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(s(v)) ? s(v) : null);
@@ -24,7 +25,7 @@ export function parseLines(raw: unknown): PortalLine[] {
       assessor: s(r.autorite ?? r.assessor) || null, level: s(r.niveau ?? r.level) || null, due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : null,
       turn: (/nous|us|ours/.test(turn) ? "us" : /autorit|authority/.test(turn) ? "authority" : null) as PortalLine["turn"], last: s(r.dernier ?? r.last_exchange) || null, next: s(r.a_faire ?? r.next_task) || null, who: s(r.qui ?? r.who) || null,
       lastOn: day(r.last_exchange_on), url: /^https:\/\//.test(s(r.url)) ? s(r.url) : null, submitted: day(r.submitted_on), hint: s(r.type_hint) || null,
-      description: s(r.description) || null, requirement: s(r.requirement) || null, notified: day(r.notified), origin: s(r.origin) || null };
+      description: s(r.description) || null, requirement: s(r.requirement) || null, notified: day(r.notified), origin: s(r.origin) || null, closed: r.closed === true };
   }).filter((l) => l.entity && (l.number || l.title));
 }
 /** The numbers a portal reference is recognised by: every run of 4+ digits ("APP/AJD/OPS_6/36884" → 36884, "#252470" → 252470), or "2026-605". */
@@ -54,6 +55,7 @@ export type Change = { field: string; label: string; from: string | null; to: st
 export type Proposal = { line: PortalLine; object: "file" | "finding" | "none"; id: string | null; href: string | null; holds: string | null; action: "create" | "update" | "same" | "missing" | "info"; changes: Change[]; note: string | null; typeGuess: string | null; applied: boolean };
 type FRow = AuthorityFile; type Fnd = { id: string; entity: string; number: string; title: string; status: string; due: string | null; authority_ref: string | null; audit_ref: string | null; portal_status: string | null; portal_read_on: string | null; description: string | null; requirement: string | null; notified: string | null };
 
+export const CLOSED_NOTE = "Closed by the authority, still open in S.A.M.: close it here in one click";
 export async function planSync(db: SupabaseClient, lines: PortalLine[], readOn: string, applied: Record<string, unknown> = {}): Promise<{ proposals: Proposal[]; unseen: { id: string; entity: string; ref: string; title: string; stage: string }[]; types: FileType[] }> {
   const ents = [...new Set(lines.map((l) => l.entity))];
   const [{ data: fl }, { data: fd }, { data: ty }] = await Promise.all([
@@ -79,6 +81,12 @@ export async function planSync(db: SupabaseClient, lines: PortalLine[], readOn: 
     } else {
       const f = finds.find((x) => x.entity === l.entity && toks.some((t) => refTokens(`${x.authority_ref ?? ""} ${x.audit_ref ?? ""}`).includes(t)))
         ?? finds.find((x) => x.entity === l.entity && l.title.length > 12 && x.title.toLowerCase().includes(l.title.toLowerCase().slice(0, 28)));
+      // closed by the authority: a line only when S.A.M. still holds the finding open (closing it stays a click of the desk); otherwise nothing to say
+      if (l.closed) {
+        const g = finds.find((x) => x.entity === l.entity && toks.some((t) => refTokens(`${x.authority_ref ?? ""} ${x.audit_ref ?? ""}`).includes(t)));   // by reference only: never close on a title that looks alike
+        if (g && !["closed", "cancelled"].includes(g.status)) out.push({ line: l, object: "finding", id: g.id, href: `/comp/find/${g.id}`, holds: `${g.number} ${g.title}`, action: g.portal_status === l.status ? "same" : "update", changes: g.portal_status === l.status ? [] : [{ field: "portal_status", label: "Status at the authority", from: g.portal_status, to: l.status }], note: CLOSED_NOTE, typeGuess: null, applied: done });
+        continue;
+      }
       if (!f) { out.push({ line: l, object: "finding", id: null, href: "/comp/find", holds: null, action: "missing", changes: [], note: "Not in S.A.M.: open it from here with the text of the authority, or raise it by hand in Compliance › Findings", typeGuess: null, applied: done }); continue; }
       const c: Change[] = []; ch(c, "portal_status", "Status at the authority", f.portal_status, l.status); ch(c, "due", "Due date", f.due, l.due);
       // the authority's own text fills what S.A.M. does not hold yet; what was written in S.A.M. is never overwritten
@@ -141,6 +149,7 @@ export async function autoApply(db: SupabaseClient, actor: { personId: string | 
   for (const p of plan.proposals) {
     if (p.action === "create" && !p.typeGuess) ex.push({ kind: "No type offered", ref: p.line.number, text: `${p.line.title}: no application type is offered for ${p.line.entity}, open it by hand`, href: "/proj/auth/new" });
     if (p.action === "missing") ex.push({ kind: "Finding not in S.A.M.", ref: p.line.number, text: `${p.line.title}: open it in S.A.M. from the reading, in one click, with the authority's text`, href: `/proj/auth/sync/${readingId}` });
+    if (p.note === CLOSED_NOTE) { ex.push({ kind: "Closed by the authority", ref: p.line.number, text: `${p.holds}: closed on the portal, still open in S.A.M. Close it from the reading in one click.`, href: `/proj/auth/sync/${readingId}` }); continue; }
     if (p.note && p.action !== "create" && p.action !== "missing" && p.action !== "info") ex.push({ kind: "To check", ref: p.line.number, text: p.note, href: p.href });
   }
   // a file S.A.M. still holds at the authority and the portal lists as decided: the portal's wording is stored on the file, the close-out stays a decision

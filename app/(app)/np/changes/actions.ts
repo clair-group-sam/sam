@@ -1,4 +1,5 @@
 "use server";
+import { leadOf, noticeFor } from "@/lib/np-notice";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
@@ -34,6 +35,12 @@ export async function createChange(fd: FormData) {
   const row = { entity, post_code: post.code, post_title: post.title, seat, from_name: seat === "holder" ? post.holder_name : post.deputy_name, to_name: person?.display_name ?? v(fd, "to_name"), to_person: person?.id ?? null,
     effective_on: v(fd, "effective_on"), authority_notice_days: Number(v(fd, "authority_notice_days") ?? 0) > 0 ? Math.min(365, Math.round(Number(v(fd, "authority_notice_days")))) : null, reason: v(fd, "reason"), acceptance: fd.get("acceptance") === "not_required" ? "not_required" : "required", created_by: s.person?.id ?? null };
   if ((row.from_name ?? "") === (row.to_name ?? "")) redirect(`/np/changes?entity=${entity}&err=same`);
+  // 24/11 (Guillaume) · a notice shorter than the regulation can be asked, once the desk has been told the legal notice and has written why
+  const nt = row.acceptance === "required" && row.effective_on ? noticeFor(entity, post.code, row.authority_notice_days) : null;
+  const left = nt && nt.days ? leadOf(nt, new Date().toISOString().slice(0, 10), row.effective_on!) : null;
+  const why = v(fd, "short_notice_reason");
+  if (nt && left !== null && left < nt.days && !why) redirect(`/np/changes?entity=${entity}&new=1&post=${encodeURIComponent(post.code)}&err=notice&legal=${encodeURIComponent(`${nt.ref} asks for at least ${nt.text}`)}&left=${encodeURIComponent(`${Math.max(left, 0)} ${nt.working ? "working days" : "days"}`)}`);
+  Object.assign(row, { short_notice_reason: nt && left !== null && left < nt.days ? why : null });
   const { data: ins } = await db.from("np_changes").insert(row).select("id").single();
   await db.from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "np_change", object_id: (ins as { id: string } | null)?.id ?? code, action: "np_change_prepared", after: row });
   paths(); redirect(`/np/changes?entity=${entity}`);
