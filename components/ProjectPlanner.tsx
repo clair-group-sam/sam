@@ -3,6 +3,8 @@ import { useState } from "react";
 import { proposePlan, createFromPlan } from "@/app/(app)/proj/boards/plan/actions";
 import type { Plan, PlanResult } from "@/lib/project-plan";
 import { Icon } from "@/lib/icons";
+import { ENT_COLOR } from "@/lib/nav";
+import SamBusy from "@/components/SamBusy";
 
 const LINK: Record<string, string> = { manual: "Manual revision", authority_file: "CAA application", certificate: "Certificate", moc: "MOC / risk assessment" };
 
@@ -47,8 +49,9 @@ export default function ProjectPlanner({ entity: ent0, entities }: { entity: str
           <label><span className="mini">What you already know (optional)</span><textarea className="inp" rows={2} value={context} onChange={(e) => setContext(e.target.value)} maxLength={3000} placeholder="Constraints, what is decided, what the authority already said, suppliers, what is out of scope." /></label>
           <div className="flex items-center gap-4 flex-wrap">
             <label className="mini flex items-center gap-2"><input type="checkbox" checked={web} onChange={(e) => setWeb(e.target.checked)} /> Search official sources on the web (EASA, the authority, the manufacturer)</label>
-            <button className="btn primary ml-auto" type="submit" disabled={!!busy || title.trim().length < 4 || goal.trim().length < 20}>{busy === "plan" && !plan ? "Researching, one to two minutes…" : plan ? "Start the research again" : "Research and propose a plan"}</button>
+            <button className="btn primary ml-auto" type="submit" disabled={!!busy || title.trim().length < 4 || goal.trim().length < 20}>{busy === "plan" && !feedback ? <><SamBusy entity={entity} />Researching…</> : plan ? "Start the research again" : "Research and propose a plan"}</button>
           </div>
+          {busy === "plan" && <div className="samwait" role="status"><span style={{ color: ENT_COLOR[entity] }}><SamBusy entity={entity} size={30} /></span><span><b>S.A.M. is researching.</b><span className="mini block">Its own records first (posts, manuals, application types, templates, lessons learned), then official sources on the web. One to two minutes; you can keep this page open and wait.</span></span></div>}
           {err && <p className="mini red">{err}</p>}
         </form>
       </section>
@@ -95,7 +98,7 @@ export default function ProjectPlanner({ entity: ent0, entities }: { entity: str
             <div className="cb grid gap-3">
               <div className="flex gap-2 items-end">
                 <label className="grow"><span className="mini">Ask S.A.M. to change the plan</span><input className="inp" value={feedback} onChange={(e) => setFeedback(e.target.value)} maxLength={2000} placeholder="e.g. the aircraft stays on the Maltese register; add the crew training; the CAMO part is subcontracted" /></label>
-                <button className="btn" type="button" onClick={() => run(true)} disabled={!!busy || feedback.trim().length < 6}>{busy === "plan" ? "Reworking…" : "Rework the plan"}</button>
+                <button className="btn" type="button" onClick={() => run(true)} disabled={!!busy || feedback.trim().length < 6}>{busy === "plan" && feedback ? <><SamBusy entity={entity} />Reworking…</> : "Rework the plan"}</button>
               </div>
               <div className="flex gap-3 items-end flex-wrap">
                 <label><span className="mini">Owner post</span><input className="inp mono" style={{ width: 110 }} value={owner} onChange={(e) => setOwner(e.target.value.toUpperCase())} /></label>

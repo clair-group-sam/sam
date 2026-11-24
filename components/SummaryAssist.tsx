@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { aiSummary } from "@/app/(app)/docs/editor/[rev]/actions";
 import { Icon } from "@/lib/icons";
+import SamBusy from "@/components/SamBusy";
 
 /** "What changed" for the readers: SAM drafts it from the changed chapters (base text vs draft); the author edits and saves. */
 export default function SummaryAssist({ revisionId, textareaName = "summary" }: { revisionId: string; textareaName?: string }) {
@@ -19,7 +20,7 @@ export default function SummaryAssist({ revisionId, textareaName = "summary" }: 
   }
   return (
     <div className="flex items-center gap-2 mt-2 mini">
-      <button type="button" className="btn" onClick={run} disabled={busy}>{busy ? "SAM is reading the changes…" : <><Icon name="bulb" size={14} /> Draft it with SAM</>}</button>
+      <button type="button" className="btn" onClick={run} disabled={busy}>{busy ? <><SamBusy />SAM is reading the changes…</> : <><Icon name="bulb" size={14} /> Draft it with SAM</>}</button>
       <span>{msg || "From the chapters marked as changed. A short note typed above is used as the reason."}</span>
     </div>
   );

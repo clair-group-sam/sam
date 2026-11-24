@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { askManual, type ManualAnswer } from "@/app/(app)/docs/manual/[id]/actions";
 import { Icon } from "@/lib/icons";
+import SamBusy from "@/components/SamBusy";
 
 /** Ask this manual: a question in any language, an answer drawn only from the chapters of the revision being read, with the chapters cited. */
 export default function AskManual({ manualId, revisionId, rev }: { manualId: string; revisionId: string; rev: string }) {
@@ -22,7 +23,7 @@ export default function AskManual({ manualId, revisionId, rev }: { manualId: str
       <form className="askm-f" onSubmit={ask}>
         <label htmlFor="askm-q" className="askm-l"><Icon name="bulb" size={15} /> Ask this manual</label>
         <input id="askm-q" className="inp" value={q} onChange={(e) => setQ(e.target.value)} maxLength={600} placeholder="e.g. Who approves a temporary revision? Qui signe la LEP ?" />
-        <button className="btn primary" type="submit" disabled={busy || q.trim().length < 6}>{busy ? "Reading the chapters…" : "Ask"}</button>
+        <button className="btn primary" type="submit" disabled={busy || q.trim().length < 6}>{busy ? <><SamBusy />Reading the chapters…</> : "Ask"}</button>
       </form>
       {err && <p className="mini red px-4 pb-3">{err}</p>}
       {a && (

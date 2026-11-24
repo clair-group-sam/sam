@@ -666,6 +666,11 @@ button:focus-visible,.btn:focus-visible,a:focus-visible,summary:focus-visible,in
 .inp,select.inp,textarea.inp{border-color:var(--field)}
 .inp::placeholder,textarea::placeholder,input::placeholder{color:var(--slate6);opacity:1}
 ::selection{background:var(--blue175);color:var(--navy)}
+/* S.A.M. at work (components/SamBusy): propeller, turbofan or gear turning; still under reduced motion (rule below) */
+@keyframes samspin{to{transform:rotate(360deg)}}
+.sambusy{display:inline-block;vertical-align:-2px;margin-right:6px;flex:none}.sambusy .spin{transform-origin:12px 12px;animation:samspin .9s linear infinite}
+.sambusy.fan .spin{animation-duration:.7s}.sambusy.gear .spin{animation-duration:2.6s}
+.samwait{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--blue05)}.samwait .sambusy{margin:0}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
 /* a form being sent: its submit button shows it is working */
 form[aria-busy="true"] button[type="submit"],form[aria-busy="true"] button:not([type]){opacity:.7;cursor:progress}

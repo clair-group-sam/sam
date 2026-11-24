@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { reviewRevision, type Review } from "@/app/(app)/docs/editor/[rev]/actions";
 import { Icon } from "@/lib/icons";
+import SamBusy from "@/components/SamBusy";
 
 const SEV: Record<string, string> = { major: "amber", minor: "", suggestion: "green" };
 
@@ -17,7 +18,7 @@ export default function ReviewPanel({ revisionId, initial, editable }: { revisio
     <div>
       <div className="flex items-center gap-3 mb-3">
         <span className="mini">{r ? `Reviewed ${new Date(r.at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · ${r.comments.length} comment${r.comments.length === 1 ? "" : "s"}` : "Not reviewed yet."}</span>
-        {editable && <button type="button" className="btn primary ml-auto" disabled={busy} onClick={run}>{busy ? "SAM is reading the document…" : r ? "Ask SAM to review again" : <><Icon name="bulb" size={14} /> Ask SAM to review</>}</button>}
+        {editable && <button type="button" className="btn primary ml-auto" disabled={busy} onClick={run}>{busy ? <><SamBusy />SAM is reading the document…</> : r ? "Ask SAM to review again" : <><Icon name="bulb" size={14} /> Ask SAM to review</>}</button>}
       </div>
       {err && <p className="mini red mb-2">{err}</p>}
       {r && <p className="text-[13px] mb-3">{r.summary}</p>}

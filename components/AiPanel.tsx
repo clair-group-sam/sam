@@ -4,6 +4,7 @@ import type { Editor } from "@tiptap/react";
 import { aiPropose } from "@/app/(app)/docs/editor/[rev]/actions";
 import type { AiAgent } from "@/lib/ai";
 import { Icon } from "@/lib/icons";
+import SamBusy from "@/components/SamBusy";
 
 type Note = { where: string; change: string; why: string };
 type Props = { editor: Editor; revisionId: string; sectionId: string; onInserted: () => void; onClose: () => void; initialRequest?: string };
@@ -53,7 +54,7 @@ export default function AiPanel({ editor, revisionId, sectionId, onInserted, onC
         <div className="seg mb-2">{AGENTS.map(([k, l, t]) => <button key={k} type="button" className={agent === k ? "on" : ""} title={t} onClick={() => setAgent(k)}>{l}</button>)}</div>
         <textarea className="inp" rows={4} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={agent === "draft" ? "What do you want to integrate in this chapter? (any language, the chapter keeps its own)" : agent === "check" ? "Optional: what to pay attention to" : agent === "explain" ? "The requirement to explain (ORO.GEN.200(a)(3), CAMO.A.305…) or paste its text, default: the references cited in this chapter" : agent === "translate" ? "Target language (default: the chapter's)" : "Optional: which passages"} />
         <div className="flex items-center gap-2 mt-2">
-          <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? stage : "Ask SAM"}</button>
+          <button type="button" className="btn primary" onClick={propose} disabled={busy || (agent === "draft" && !request.trim())}>{busy ? <><SamBusy />{stage}</> : "Ask SAM"}</button>
           <span className="mini">SAM proposes; nothing enters the manual until you insert it.</span>
         </div>
         {err && <div className="lockbar mt-3" style={{ margin: "12px 0 0" }}>{err}</div>}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { proposePrecisions, submitReport, type NewReport } from "@/app/(app)/safe/new/actions";
 import { PHASES, type Precision } from "@/lib/safety-shared";
+import SamBusy from "@/components/SamBusy";
 
 const DKS: Record<string, string> = { fr: "Je ne sais pas", en: "I don't know", it: "Non lo so", es: "No lo sé", de: "Weiß ich nicht" };
 const DKRE = /(ne sais? pas|don'?t know|unknown|inconnu|non lo so|no lo s[ée]|wei(ß|ss) (ich )?nicht)/i;
@@ -65,7 +66,7 @@ export default function ReportForm({ entities, defaultEntity, registrations = []
           <label className="block mb-3"><span className="eyebrow">Where</span><input className="inp w-full" value={r.location} onChange={(e) => set({ location: e.target.value })} placeholder="aerodrome, stand, airspace…" disabled={step !== "write"} /></label>
           <label className="block mb-3"><span className="eyebrow">Contributing factors in your view (optional)</span><textarea className="inp w-full" rows={2} value={r.contributing} onChange={(e) => set({ contributing: e.target.value })} disabled={step !== "write"} /></label>
           <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={r.anonymous} onChange={(e) => set({ anonymous: e.target.checked })} disabled={step !== "write"} /> Send anonymously (your name is not stored; the Safety Manager cannot ask you questions)</label>
-          {step === "write" && <div className="mt-4 flex justify-end"><button className="btn primary" disabled={!ready || busy} onClick={next}>{busy ? "Reading your report…" : "Send"}</button></div>}
+          {step === "write" && <div className="mt-4 flex justify-end"><button className="btn primary" disabled={!ready || busy} onClick={next}>{busy ? <><SamBusy />Reading your report…</> : "Send"}</button></div>}
         </div>
       </section>
 

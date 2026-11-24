@@ -3,6 +3,7 @@ import { useState } from "react";
 import { frdt } from "@/lib/dates";
 import { proposeRoute, decideRoute, type RouteProposal as Proposal } from "@/app/(app)/docs/editor/[rev]/actions";
 import { Icon } from "@/lib/icons";
+import SamBusy from "@/components/SamBusy";
 
 const LABEL: Record<string, string> = { approval: "Approval by the authority", notification: "Notification to the authority" };
 
@@ -17,7 +18,7 @@ export default function RouteProposal({ revisionId, initial, route, authority }:
       <div className="flex items-center gap-3 mb-3">
         <span className="mini">Decided route:</span>
         <b>{route ? LABEL[route] ?? route : "not decided yet"}</b>
-        <button type="button" className="btn ml-auto" disabled={busy} onClick={ask}>{busy ? "SAM is reading the changes…" : p ? "Ask SAM again" : <><Icon name="bulb" size={14} /> Ask SAM for the route</>}</button>
+        <button type="button" className="btn ml-auto" disabled={busy} onClick={ask}>{busy ? <><SamBusy />SAM is reading the changes…</> : p ? "Ask SAM again" : <><Icon name="bulb" size={14} /> Ask SAM for the route</>}</button>
       </div>
       {err && <p className="mini red mb-2">{err}</p>}
       {p && (
