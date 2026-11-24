@@ -1,7 +1,7 @@
 // Server-side Claude calls (AI-01). The key lives in Vercel only; every call is logged in ai_usage.
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "explain" | "summary" | "route" | "file" | "coffee" | "safety" | "ask";
+export type AiAgent = "draft" | "rewrite" | "translate" | "check" | "explain" | "summary" | "route" | "file" | "coffee" | "safety" | "ask" | "plan";
 const HEADERS = (key: string) => ({ "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" });
 let modelCache: { id: string; at: number } | null = null;
 /** Lists the models available to the group's key (ids + display names). */
@@ -48,6 +48,43 @@ export async function callClaude(opts: { agent: AiAgent; personId: string | null
   if (!ok) throw new Error(j.error?.message ?? `Claude API error ${r.status}`);
   const text = (j.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
   return { text, model: MODEL };
+}
+
+export type WebSource = { url: string; title: string };
+const SEARCH_RATE = Number(process.env.AI_RATE_SEARCH_EUR ?? "0.0093"); // per web search (10 USD / 1000)
+/** A Claude call that may search the web (Anthropic server tool, the searches run at Anthropic, not from S.A.M.).
+ *  Returns the text and every page the searches returned. If web search is not enabled for the key, it answers without it and says so. */
+export async function callClaudeResearch(opts: { agent: AiAgent; personId: string | null; entity: string | null; system: string; user: string; maxTokens?: number; web: boolean; maxSearches?: number }): Promise<{ text: string; model: string; sources: WebSource[]; searches: number; webNote: string | null }> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY is not set in Vercel.");
+  const db = supabaseAdmin();
+  const MODEL = await writeModel();
+  type Block = { type: string; text?: string; content?: unknown };
+  type Resp = { content?: Block[]; stop_reason?: string; usage?: { input_tokens: number; output_tokens: number; server_tool_use?: { web_search_requests?: number } }; error?: { message: string } };
+  const run = async (web: boolean) => {
+    const messages: { role: string; content: unknown }[] = [{ role: "user", content: opts.user }];
+    const blocks: Block[] = []; let inT = 0, outT = 0, searches = 0, err: string | null = null, ok = true;
+    for (let turn = 0; turn < 3; turn++) { // a long search turn may pause: it is sent back as it is to be continued
+      const body: Record<string, unknown> = { model: MODEL, max_tokens: opts.maxTokens ?? 8000, system: opts.system, messages };
+      if (web) body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: opts.maxSearches ?? 6 }];
+      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: HEADERS(key), body: JSON.stringify(body) });
+      const j = (await r.json()) as Resp;
+      inT += j.usage?.input_tokens ?? 0; outT += j.usage?.output_tokens ?? 0; searches += j.usage?.server_tool_use?.web_search_requests ?? 0;
+      if (!r.ok || j.error) { ok = false; err = j.error?.message ?? `HTTP ${r.status}`; break; }
+      blocks.push(...(j.content ?? []));
+      if (j.stop_reason !== "pause_turn") break;
+      messages.push({ role: "assistant", content: j.content });
+    }
+    await db.from("ai_usage").insert({ person_id: opts.personId, entity: opts.entity, agent: opts.agent, model: MODEL, input_tokens: inT, output_tokens: outT, cost_eur: (inT * IN_RATE + outT * OUT_RATE) / 1_000_000 + searches * SEARCH_RATE, ok, error: err });
+    return { ok, err, blocks, searches };
+  };
+  let res = await run(opts.web); let webNote: string | null = null;
+  if (!res.ok && opts.web && /web_search|tool|not enabled|not supported|permission/i.test(res.err ?? "")) { webNote = `Web search is not available for S.A.M.'s key (${(res.err ?? "").slice(0, 140)}): plan built from S.A.M. data and the model's knowledge only.`; res = await run(false); }
+  if (!res.ok) throw new Error(res.err ?? "Claude API error");
+  const sources: WebSource[] = []; const seen = new Set<string>();
+  for (const b of res.blocks) if (b.type === "web_search_tool_result" && Array.isArray(b.content)) for (const x of b.content as { type?: string; url?: string; title?: string }[]) if (x.type === "web_search_result" && x.url && !seen.has(x.url)) { seen.add(x.url); sources.push({ url: x.url, title: x.title ?? x.url }); }
+  const text = res.blocks.filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
+  return { text, model: MODEL, sources, searches: res.searches, webNote };
 }
 
 export function parseJsonBlock(text: string, opts?: { allowEmptyHtml?: boolean }): { html: string; notes: { where: string; change: string; why: string }[] } {

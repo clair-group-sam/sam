@@ -34,8 +34,9 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
           <div className="cb grid gap-2">
             {recent.length > 0 && <><div className="eyebrow">Recently used</div>
               {recent.map((t) => <Link key={t.code} href={`/proj/boards/new?entity=${entity}&template=${t.code}`} className={"tplrow" + (chosen?.code === t.code ? " on" : "")}><b>{t.name}</b><span className="mini">{t.code}, {t.phases.length} phases, {t.tasks.length} tasks</span></Link>)}</>}
-            <div className="eyebrow mt-1">Blank</div>
+            <div className="eyebrow mt-1">New kind of project</div>
             <Link href={`/proj/boards/new?entity=${entity}`} className={"tplrow" + (!chosen ? " on" : "")}><b>Blank project</b><span className="mini">Add your own tasks and applications.</span></Link>
+            <Link href={`/proj/boards/plan?entity=${entity}`} className="tplrow"><b>Plan with S.A.M.</b><span className="mini">Never done before: S.A.M. researches what it takes and proposes the tasks.</span></Link>
             {others.length > 0 && <><div className="eyebrow mt-1">All templates</div>
               {others.map((t) => <Link key={t.code} href={`/proj/boards/new?entity=${entity}&template=${t.code}`} className={"tplrow" + (chosen?.code === t.code ? " on" : "")}><b>{t.name}</b><span className="mini">{t.code}, {t.phases.length} phases, {t.tasks.length} tasks</span></Link>)}</>}
             <p className="mini">Templates are kept in References › Project templates; a change applies to projects opened afterwards.</p>

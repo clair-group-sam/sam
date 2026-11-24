@@ -3,7 +3,7 @@ import { Metric, PageHeader } from "@/components/Page";
 import { registersSession, scopeOf } from "../guard";
 
 type U = { at: string; person_id: string | null; entity: string | null; agent: string; model: string; input_tokens: number; output_tokens: number; cost_eur: number; ok: boolean };
-const AGENT: Record<string, string> = { draft: "Editor: draft", rewrite: "Editor: rewrite", translate: "Editor: translate", check: "Check and review", explain: "Editor: explain a rule", summary: "What changed summary", route: "Authority route", file: "Drop a document", coffee: "Morning coffee", safety: "Safety analysis", ask: "Ask this manual" };
+const AGENT: Record<string, string> = { draft: "Editor: draft", rewrite: "Editor: rewrite", translate: "Editor: translate", check: "Check and review", explain: "Editor: explain a rule", summary: "What changed summary", route: "Authority route", file: "Drop a document", coffee: "Morning coffee", plan: "Project plan (research)", safety: "Safety analysis", ask: "Ask this manual" };
 const eur = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 
 /* Registers · AI agents & usage (AI-01): every call to Claude, by month, entity, agent and person, against the monthly budget. */
