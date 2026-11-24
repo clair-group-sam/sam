@@ -34,8 +34,8 @@ What a good plan is:
 - detail: one or two sentences on what is expected, only when the title is not enough.
 - What you could not establish and that only someone OUTSIDE the company knows (the authority's real lead time or form, an airport's or a supplier's conditions, a manufacturer's data) is NEVER a question: make it a task at the right place in the plan, "Ask <who>: <what to confirm>", owned by the post that has the contact, with "unknown": true, and make the tasks that depend on the answer depend on it.
 - questions: ONLY decisions or facts the project owner can answer from inside the company, today, in a few words: scope (which aircraft, which crews, which base), choices (in-house or subcontracted, which provider among those known), what is already held (an approval, a contract, a trained instructor), budget or priority. Each question short, one subject, answerable by a name, a number, yes or no. Max 6; none if nothing is needed.
-- assumptions: what you assumed in the absence of an answer (max 6). risks: what could make the project slip or fail (max 4, one line each).
-- summary: 2 or 3 short sentences: what the project takes and where the critical path runs. No list, no figures you cannot support.
+- assumptions: what you assumed ABOUT THE PROJECT in the absence of an answer (max 6), each one a plain statement the owner can confirm or reject. Never an assumption about S.A.M. itself, its data or its fields. risks: what could make the project slip or fail (max 4, one line each).
+- summary: 2 or 3 short sentences, 60 words at most: what the project takes and where the critical path runs. No list, no figures you cannot support.
 Write in English. Answer ONLY with one JSON object, no text before or after:
 {"summary":"…","risks":["…"],"assumptions":["…"],"questions":["…"],"phases":[{"key":"short_key","label":"Phase label"}],"tasks":[{"key":"short_key","phase":"phase key","title":"…","detail":"…","owner_role":"POST","days":5,"deps":["key"],"link_kind":"manual","link_ref":"OM-A","basis":"…","unknown":false}]}`;
 
