@@ -52,7 +52,10 @@ function useSlidePill(key: string, dep: string, sel: string) {
     };
     place(true);
     const ro = new ResizeObserver(() => place(false)); ro.observe(b);
-    return () => { ro.disconnect(); window.clearTimeout(timer); };
+    // the list itself can change under the same current item (another profile, another entity, a menu that appears):
+    // the highlight follows its item instead of staying where the item used to be
+    const mo = new MutationObserver(() => place(false)); mo.observe(b, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); window.clearTimeout(timer); };
   }, [key, dep]);
   return { box, pill };
 }
