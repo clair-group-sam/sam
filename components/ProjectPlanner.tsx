@@ -56,7 +56,7 @@ export default function ProjectPlanner({ entity: ent0, entities }: { entity: str
       {plan && res && (
         <>
           <section className="card">
-            <div className="ch"><span className="eyebrow"><Icon name="bulb" size={14} /> What S.A.M. found</span><span className="mini">{res.context}{res.searches ? `, ${res.searches} web search${res.searches === 1 ? "" : "es"}` : ", no web search"}</span></div>
+            <div className="ch"><span className="eyebrow"><Icon name="bulb" size={14} /> What S.A.M. found</span><span className="mini">{res.context}{res.searches ? `, ${res.searches} web search${res.searches === 1 ? "" : "es"}` : ", no web search"}, {res.model}</span></div>
             <div className="cb grid gap-3">
               <p style={{ maxWidth: "80ch" }}>{plan.summary}</p>
               {res.webNote && <p className="mini red">{res.webNote}</p>}

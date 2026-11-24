@@ -21,7 +21,17 @@ export async function writeModel(): Promise<string> {
   modelCache = { id, at: Date.now() };
   return id;
 }
-// €/M tokens, overridable from Vercel if pricing changes
+let researchCache: { id: string; at: number } | null = null;
+/** Research model (Plan with S.A.M.): AI_MODEL_RESEARCH if set, else the newest Opus available to the key, else the writing model. */
+export async function researchModel(): Promise<string> {
+  if (process.env.AI_MODEL_RESEARCH) return process.env.AI_MODEL_RESEARCH;
+  if (researchCache && Date.now() - researchCache.at < 3_600_000) return researchCache.id;
+  const id = (await listModels()).filter((m) => /opus/i.test(m.id)).sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0]?.id ?? await writeModel();
+  researchCache = { id, at: Date.now() };
+  return id;
+}
+// €/M tokens, overridable from Vercel if pricing changes (Opus has its own rates)
+const OPUS_IN = Number(process.env.AI_RATE_OPUS_IN_EUR ?? "4.7"), OPUS_OUT = Number(process.env.AI_RATE_OPUS_OUT_EUR ?? "23.5");
 const IN_RATE = Number(process.env.AI_RATE_IN_EUR ?? "2.8"), OUT_RATE = Number(process.env.AI_RATE_OUT_EUR ?? "14");
 
 const SYSTEM = `You are the technical writer of an aviation organisation's regulatory manuals (EASA Part-CAO / Part-CAMO / AOC / ATO). You help a nominated person revise ONE chapter of a manual.
@@ -58,7 +68,8 @@ export async function callClaudeResearch(opts: { agent: AiAgent; personId: strin
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set in Vercel.");
   const db = supabaseAdmin();
-  const MODEL = await writeModel();
+  const MODEL = await researchModel();
+  const opus = /opus/i.test(MODEL); const inRate = opus ? OPUS_IN : IN_RATE, outRate = opus ? OPUS_OUT : OUT_RATE;
   type Block = { type: string; text?: string; content?: unknown };
   type Resp = { content?: Block[]; stop_reason?: string; usage?: { input_tokens: number; output_tokens: number; server_tool_use?: { web_search_requests?: number } }; error?: { message: string } };
   const run = async (web: boolean) => {
@@ -75,7 +86,7 @@ export async function callClaudeResearch(opts: { agent: AiAgent; personId: strin
       if (j.stop_reason !== "pause_turn") break;
       messages.push({ role: "assistant", content: j.content });
     }
-    await db.from("ai_usage").insert({ person_id: opts.personId, entity: opts.entity, agent: opts.agent, model: MODEL, input_tokens: inT, output_tokens: outT, cost_eur: (inT * IN_RATE + outT * OUT_RATE) / 1_000_000 + searches * SEARCH_RATE, ok, error: err });
+    await db.from("ai_usage").insert({ person_id: opts.personId, entity: opts.entity, agent: opts.agent, model: MODEL, input_tokens: inT, output_tokens: outT, cost_eur: (inT * inRate + outT * outRate) / 1_000_000 + searches * SEARCH_RATE, ok, error: err });
     return { ok, err, blocks, searches };
   };
   let res = await run(opts.web); let webNote: string | null = null;
