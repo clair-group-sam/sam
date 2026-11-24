@@ -9,8 +9,8 @@ import { loadTypes } from "@/lib/authority";
 import { ruleCodesIn } from "@/lib/regulation-items";
 import { ENT } from "@/lib/nav";
 
-export type PlanTask = TemplateTask & { basis?: string; rules?: { code: string; found: boolean }[]; flags?: string[] };
-export type Plan = { summary: string; assumptions: string[]; questions: string[]; phases: { key: string; label: string }[]; tasks: PlanTask[] };
+export type PlanTask = TemplateTask & { basis?: string; unknown?: boolean; rules?: { code: string; found: boolean }[]; flags?: string[] };
+export type Plan = { summary: string; risks: string[]; assumptions: string[]; questions: string[]; phases: { key: string; label: string }[]; tasks: PlanTask[] };
 export type PlanResult = { plan: Plan; sources: WebSource[]; searches: number; model: string; webNote: string | null; context: string };
 export type PlanInput = { entity: string; title: string; goal: string; context?: string; target?: string | null; web: boolean; previous?: Plan | null; feedback?: string };
 
@@ -32,9 +32,12 @@ What a good plan is:
 - A change with a safety impact has a management of change with its risk assessment early in the plan, and the manuals affected are revised before the application that needs them.
 - basis: where the task comes from: the rule (e.g. "ORO.GEN.130(b)"), the authority procedure, the template or lesson reused, or "good practice". One line.
 - detail: one or two sentences on what is expected, only when the title is not enough.
-- questions: what the project owner must decide or find out before the plan is reliable (max 8). assumptions: what you assumed (max 8).
+- What you could not establish and that only someone OUTSIDE the company knows (the authority's real lead time or form, an airport's or a supplier's conditions, a manufacturer's data) is NEVER a question: make it a task at the right place in the plan, "Ask <who>: <what to confirm>", owned by the post that has the contact, with "unknown": true, and make the tasks that depend on the answer depend on it.
+- questions: ONLY decisions or facts the project owner can answer from inside the company, today, in a few words: scope (which aircraft, which crews, which base), choices (in-house or subcontracted, which provider among those known), what is already held (an approval, a contract, a trained instructor), budget or priority. Each question short, one subject, answerable by a name, a number, yes or no. Max 6; none if nothing is needed.
+- assumptions: what you assumed in the absence of an answer (max 6). risks: what could make the project slip or fail (max 4, one line each).
+- summary: 2 or 3 short sentences: what the project takes and where the critical path runs. No list, no figures you cannot support.
 Write in English. Answer ONLY with one JSON object, no text before or after:
-{"summary":"3-5 sentences: what the project takes, the critical path, the main risk","assumptions":["…"],"questions":["…"],"phases":[{"key":"short_key","label":"Phase label"}],"tasks":[{"key":"short_key","phase":"phase key","title":"…","detail":"…","owner_role":"POST","days":5,"deps":["key"],"link_kind":"manual","link_ref":"OM-A","basis":"…"}]}`;
+{"summary":"…","risks":["…"],"assumptions":["…"],"questions":["…"],"phases":[{"key":"short_key","label":"Phase label"}],"tasks":[{"key":"short_key","phase":"phase key","title":"…","detail":"…","owner_role":"POST","days":5,"deps":["key"],"link_kind":"manual","link_ref":"OM-A","basis":"…","unknown":false}]}`;
 
 /** What S.A.M. holds that helps to plan: compact text for the prompt. */
 async function contextFor(db: SupabaseClient, entity: string): Promise<{ text: string; posts: Set<string>; manuals: Set<string>; types: Set<string> }> {
@@ -86,6 +89,7 @@ export function sanitizePlan(raw: unknown, known: { posts: Set<string>; manuals:
     const x: PlanTask = { key, phase, title, owner_role: owner, days, deps: (Array.isArray(t?.deps) ? t.deps : []).map(String), basis, source: basis };
     const detail = String(t?.detail ?? "").trim().slice(0, 600); if (detail) x.detail = detail;
     if (link_kind) x.link_kind = link_kind; if (link_ref) x.link_ref = link_ref; if (flags.length) x.flags = flags;
+    if (t?.unknown === true) x.unknown = true;
     tasks.push(x); if (tasks.length >= 60) break;
   }
   // dependencies: on kept tasks only, never on itself, and no loop (a dependency that would close a loop is dropped)
@@ -96,7 +100,7 @@ export function sanitizePlan(raw: unknown, known: { posts: Set<string>; manuals:
   // tasks in the order of their phases
   const ord = new Map(phases.map((p, i) => [p.key, i]));
   tasks.sort((a, b) => (ord.get(a.phase) ?? 0) - (ord.get(b.phase) ?? 0));
-  return { summary: String(j.summary ?? "").trim().slice(0, 1500), assumptions: strs(j.assumptions, 8), questions: strs(j.questions, 8), phases: phases.filter((p) => tasks.some((t) => t.phase === p.key)).length ? phases.filter((p) => tasks.some((t) => t.phase === p.key)) : phases, tasks };
+  return { summary: String(j.summary ?? "").trim().slice(0, 900), risks: strs(j.risks, 4), assumptions: strs(j.assumptions, 6), questions: strs(j.questions, 6), phases: phases.filter((p) => tasks.some((t) => t.phase === p.key)).length ? phases.filter((p) => tasks.some((t) => t.phase === p.key)) : phases, tasks };
 }
 
 /** Rule codes cited by the plan, checked against the EARs loaded for the entity: found = the text is in S.A.M. */
