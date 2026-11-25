@@ -16,7 +16,7 @@ import { acknowledge, saveAudience, setNature, toggleFavourite } from "./actions
 import EntityBand from "@/components/EntityBand";
 import ManualClass from "@/components/ManualClass";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { audienceTokens, describeTokens, peopleFor, resolveReaders, POSTS } from "@/lib/audience";
+import { audienceTokens, describeTokens, peopleFor, resolveReaders, postsOf, POSTS } from "@/lib/audience";
 import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
 import { ENT } from "@/lib/nav";
 import { linkIndex, rewriteLinks } from "@/lib/links";
@@ -140,10 +140,13 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
 
   // Readers: who must read (audience) and who has acknowledged
   let audience: string[] = []; let expected: { id: string; display_name: string; job_title: string | null; roles: string[] }[] = []; let entityPeople: { id: string; display_name: string; job_title: string | null; roles: string[] }[] = []; let audienceText = "";
+  let entityPosts: string[] = POSTS;
   if (tab === "readers" && s.role !== "user") {
     const admin = supabaseAdmin();
     const [tok, ppl, rd] = await Promise.all([audienceTokens(admin, manual.id), peopleFor(admin, manual.entity), current ? admin.from("readings").select("person_id,acknowledged_at,via,people(display_name,job_title)").eq("revision_id", current.id) : Promise.resolve({ data: [] })]);
     audience = tok; entityPeople = ppl; expected = resolveReaders(ppl, manual.entity, tok);
+    // the posts offered are those of the manual's entity (NP management), plus any post already ticked
+    entityPosts = [...new Set([...(await postsOf(admin, manual.entity)), ...tok.filter((t) => t.startsWith("ROLE:")).map((t) => t.slice(5))])];
     readings = ((rd as { data: unknown }).data ?? []) as Reading[];
     audienceText = describeTokens(tok, ENT[manual.entity]?.name ?? manual.entity, new Map(ppl.map((p) => [p.id, p.display_name])));
   }
@@ -285,8 +288,8 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             <form action={saveAudience} className="cb">
               <input type="hidden" name="manual_id" value={manual.id} />
               <label className="flex items-center gap-2 mb-3"><input type="checkbox" name="all" defaultChecked={audience.includes("ALL")} /> <b>All staff of {ENT[manual.entity]?.name ?? manual.entity}</b><span className="mini">(everyone attached to the entity; group functions only when named below)</span></label>
-              <div className="eyebrow mb-1">Posts, holders and their deputies</div>
-              <div className="audgrid mb-3">{POSTS.map((p) => <label key={p} className="audchk"><input type="checkbox" name="post" value={p} defaultChecked={audience.includes(`ROLE:${p}`)} /> {p}</label>)}</div>
+              <div className="eyebrow mb-1">Post holders and their deputies <span className="mini" style={{ fontWeight: 400 }}>posts of {ENT[manual.entity]?.name ?? manual.entity}, from NP management</span></div>
+              <div className="audgrid mb-3">{entityPosts.map((p) => <label key={p} className="audchk"><input type="checkbox" name="post" value={p} defaultChecked={audience.includes(`ROLE:${p}`)} /> {p}</label>)}</div>
               <div className="eyebrow mb-1">People by name</div>
               <div className="audgrid people mb-3">{entityPeople.map((p) => <label key={p.id} className="audchk"><input type="checkbox" name="person" value={p.id} defaultChecked={audience.includes(`PERSON:${p.id}`)} /> {p.display_name}<span className="mini"> {p.roles.join(", ")}</span></label>)}
                 {!entityPeople.length && <span className="mini">Nobody of this entity has signed in to S.A.M. yet.</span>}</div>

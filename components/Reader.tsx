@@ -68,7 +68,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
     const onScroll = () => {
       const max = el.scrollHeight - el.clientHeight; setProgress(max > 0 ? Math.min(100, Math.round((el.scrollTop / max) * 100)) : 100);
       // DOC-15 · the page being read: the last page mark above the middle of what is visible (the last one once the end is reached)
-      const r = el.getBoundingClientRect(); const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight); const line = top + (bottom - top) * 0.45;
+      const r = el.getBoundingClientRect(); const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight); const line = top + (bottom - top) * 0.6;
       const marks = [...el.querySelectorAll<HTMLElement>(".pgmark")]; const atEnd = max > 0 && el.scrollTop >= max - 4 && r.bottom <= window.innerHeight + 4;
       const l = atEnd ? marks[marks.length - 1] : marks.filter((m) => m.getBoundingClientRect().top <= line).pop();
       const nx = l ? { pg: l.dataset.pg ?? "", date: l.dataset.date ?? "", rev: l.dataset.rev ?? "" } : null;

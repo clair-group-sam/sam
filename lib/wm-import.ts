@@ -50,7 +50,7 @@ export function cleanHtml(h: string, imgSrc: (id: string) => string): string {
     let rest = (a + b).replace(/\stype="[^"]*"/, ""); let type = T;
     const st = /\sstart="(\d+)"/.exec(rest); const letter = ({ 50: 12, 100: 3, 500: 4, 1000: 13 } as Record<number, number>)[Number(st?.[1] ?? 0)];
     if ((T === "i" || T === "I") && letter) { type = T === "i" ? "a" : "A"; rest = rest.replace(/\sstart="\d+"/, ` start="${letter}"`); }
-    return `<ol${rest} type="${type}">`;
+    return `<ol${rest} type="${type}" data-samol="${type === "a" ? "la" : type === "A" ? "ua" : type === "i" ? "lr" : type === "I" ? "ur" : "d"}">`;
   });
   // large lines (cover and title pages) keep their rank: three sizes above the body text
   s = s.replace(/<(p|span|strong|b|h[1-6]|td)([^>]*?)\sstyle="([^"]*font-size:\s*([\d.]+)(px|pt)[^"]*)"([^>]*)>/g, (m, tag: string, a: string, st: string, n: string, u: string, b: string) => {
@@ -65,7 +65,8 @@ export function cleanHtml(h: string, imgSrc: (id: string) => string): string {
   s = s.replace(/<img[^>]*src="sam-img:\/\/(\d+)"[^>]*>/g, (_m, id: string) => `<img src="${imgSrc(id)}" alt="figure" loading="lazy" />`);
   s = s.replace(/<(div|section)(?![^>]*data-samrev)[^>]*>/g, "<div>").replace(/<\/(section)>/g, "</div>");
   s = s.replace(/<div data-samrev="1">/g, '<div class="revbar">');
-  s = s.replace(/\s(style|class|id|width|height|border|cellpadding|cellspacing|align|valign|bgcolor|data-[\w-]+)="[^"]*"/g, (m, attr: string) => (attr === "colspan" || attr === "rowspan" || m === ' class="revbar"' || m === ' data-samtc="1"' || /^ data-samfs="[123]"$/.test(m) ? m : ""));
+  s = s.replace(/\s(style|class|id|width|height|border|cellpadding|cellspacing|align|valign|bgcolor|data-[\w-]+)="[^"]*"/g, (m, attr: string) => (attr === "colspan" || attr === "rowspan" || m === ' class="revbar"' || m === ' data-samtc="1"' || /^ data-samfs="[123]"$/.test(m) || /^ data-samol="[a-z]+"$/.test(m) ? m : ""));
+  s = s.replace(/ data-samol="([a-z]+)"/g, ' class="ol-$1"'); // the type attribute cannot tell a from A in a style rule
   s = s.replace(/<(\w+)(\s[^>]*data-sam(?:tc|fs)="\d"[^>]*)>/g, (_m, tag: string, at: string) => { const fs = /samfs="(\d)"/.exec(at)?.[1]; return `<${tag}${at.replace(/ data-sam(?:tc|fs)="\d"/g, "")} class="${[/samtc/.test(at) ? "tc" : "", fs ? "fs" + fs : ""].filter(Boolean).join(" ")}">`; });
   for (let i = 0; i < 6; i++) { const before = s; s = s.replace(/<span>\s*<\/span>/g, "").replace(/<span>((?:(?!<span>)[\s\S])*?)<\/span>/g, "$1"); if (s === before) break; }
   s = s.replace(/<p>(\s|&nbsp;)*<\/p>/g, "").replace(/<div>\s*<\/div>/g, "");
