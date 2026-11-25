@@ -1155,3 +1155,5 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 .toc .sh.l3{padding-left:26px;font-size:13px;font-weight:400;color:var(--slate6)}.toc .sh.l3 .shn{font-weight:500;color:var(--slate6)}
 .toc .sh:hover{background:var(--blue05);border-left-color:var(--cyan);color:var(--navy)}
 .toc .sh.on{background:var(--blue05);border-left-color:var(--cyan-ink);color:var(--navy)}.toc .sh.on .shn{color:var(--cyan-ink);font-weight:700}
+.toc .tocall{display:flex;justify-content:flex-end;padding:6px 8px 2px}.toc .tocall button{border:1px solid var(--line);background:var(--white);border-radius:var(--r-sm);padding:3px 10px;font-size:12.5px;font-weight:600;color:var(--navy);cursor:pointer}.toc .tocall button:hover{background:var(--blue05)}
+.toc .tocch .fold{cursor:pointer;padding:2px 6px;border-radius:var(--r-xs);min-width:22px;text-align:center}.toc .tocch .fold:hover{background:var(--blue1);color:var(--navy)}

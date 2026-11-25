@@ -22,11 +22,15 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Set<string>>(() => new Set(parts.map((p) => p.key)));
   const [progress, setProgress] = useState(0);
-  const [folded, setFolded] = useState(false);
+  // chapters whose sub-chapters are shown in the contents: they stay open while the reader moves from one chapter to another
+  const [shown, setShown] = useState<Set<string>>(() => new Set(active ? [active.ref] : []));
   const [here, setHere] = useState<string | null>(null); // the sub-chapter being read, shown in the contents
   // the page being read: the last page mark above the top of the reading area
   const [cur, setCur] = useState<{ pg: string; date: string; rev: string } | null>(null);
-  useEffect(() => { setFolded(false); setCur(null); setHere(null); }, [active?.ref]);
+  useEffect(() => { setCur(null); setHere(null); if (active) setShown((x) => (x.has(active.ref) ? x : new Set(x).add(active.ref))); }, [active?.ref]);
+  const toggle = (ref: string) => setShown((x) => { const n = new Set(x); if (n.has(ref)) n.delete(ref); else n.add(ref); return n; });
+  const withSubs = toc.filter((t) => t.headings.length > 0);
+  const allShown = withSubs.length > 0 && withSubs.every((t) => shown.has(t.ref));
   const art = useRef<HTMLDivElement>(null);
   const colorOf = useMemo(() => Object.fromEntries(parts.map((p) => [p.key, p.color])), [parts]);
   const idx = toc.findIndex((t) => t.ref === active?.ref);
@@ -115,6 +119,9 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
               {!hits.length && <div className="p-4 text-slate6 text-sm">No chapter contains {q.trim().split(/\s+/).length > 1 ? "all these words" : "this word"} (preliminary pages are left out). Try fewer or shorter words.</div>}
             </div>
           )}
+          {(mode === "toc" || !hits) && withSubs.length > 0 && !ql && (
+            <div className="tocall"><button type="button" onClick={() => { setShown(allShown ? new Set() : new Set(withSubs.map((t) => t.ref))); setOpen(new Set(parts.map((p) => p.key))); }}>{allShown ? "Close all" : "Expand all"}</button></div>
+          )}
           {(mode === "toc" || !hits) && grouped.map(({ part, items }) => (
             <div key={part.key} className="tocpart">
               <button type="button" className="ph" style={{ color: part.color }} onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(part.key)) n.delete(part.key); else n.add(part.key); return n; })}>
@@ -123,11 +130,11 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
               {(open.has(part.key) || !!ql) && items.map((t) => (
                 <div key={t.id}>
                   <Link href={href(t.ref)} className={"tocch" + (active?.ref === t.ref ? " on" : "")}
-                    onClick={(e) => { if (active?.ref === t.ref && t.headings.length) { e.preventDefault(); setFolded((f) => !f); } }}>
+                    onClick={(e) => { if (active?.ref === t.ref && t.headings.length) { e.preventDefault(); toggle(t.ref); } }}>
                     <span className="badge" style={{ background: part.color }}>{t.ref}</span><span>{t.title}</span>
-                    {t.headings.length > 0 && <b className="fold">{active?.ref === t.ref && !folded ? "▾" : "▸"}</b>}
+                    {t.headings.length > 0 && <b className="fold" role="button" aria-label={shown.has(t.ref) ? "Hide the sub-chapters" : "Show the sub-chapters"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(t.ref); }}>{shown.has(t.ref) ? "▾" : "▸"}</b>}
                   </Link>
-                  {((active?.ref === t.ref && !folded) || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
+                  {(shown.has(t.ref) || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
                     <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level + (active?.ref === t.ref && here === h.id ? " on" : "")} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" }); } }}>{(() => { const mm = /^([A-Z]{0,3}\.?\d+(?:\.\d+)*\.?)\s+(\S[\s\S]*)$/.exec(h.text); return mm ? <><span className="shn">{mm[1]}</span><span>{mm[2]}</span></> : <span>{h.text}</span>; })()}</a>
                   ))}
                 </div>
