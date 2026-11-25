@@ -1146,3 +1146,12 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 .pm-plate dl{display:grid;grid-template-columns:auto 1fr;gap:.3mm 3mm;align-content:center;font-size:7.5pt}.pm-plate dt{color:#44546a}.pm-plate dd{margin:0;text-align:right;font-weight:700;font-family:ui-monospace,Menlo,monospace}
 @media print{.pm-sheet+.pm-sheet{break-before:page}}
 @media screen{.pm-sheet+.pm-sheet{margin-top:12mm;border-top:1px dashed #9aa9b6}.pm-sheet+.pm-sheet>thead>tr>td{padding-top:10mm}}
+
+/* Reader contents (25/11): sub-chapters readable at a glance. The number sits in its own column, the level shows in weight and indent,
+   the sub-chapter being read is marked. */
+.toc .sh{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:baseline;margin-left:20px;padding:5px 8px 5px 12px;border-left:2px solid var(--line);border-radius:0 var(--r-sm) var(--r-sm) 0;font-size:13.5px;color:var(--navy);line-height:1.3}
+.toc .sh .shn{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;color:var(--cyan-ink);white-space:nowrap}
+.toc .sh.l2{font-weight:600}
+.toc .sh.l3{padding-left:26px;font-size:13px;font-weight:400;color:var(--slate6)}.toc .sh.l3 .shn{font-weight:500;color:var(--slate6)}
+.toc .sh:hover{background:var(--blue05);border-left-color:var(--cyan);color:var(--navy)}
+.toc .sh.on{background:var(--blue05);border-left-color:var(--cyan-ink);color:var(--navy)}.toc .sh.on .shn{color:var(--cyan-ink);font-weight:700}

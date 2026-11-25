@@ -23,9 +23,10 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
   const [open, setOpen] = useState<Set<string>>(() => new Set(parts.map((p) => p.key)));
   const [progress, setProgress] = useState(0);
   const [folded, setFolded] = useState(false);
+  const [here, setHere] = useState<string | null>(null); // the sub-chapter being read, shown in the contents
   // the page being read: the last page mark above the top of the reading area
   const [cur, setCur] = useState<{ pg: string; date: string; rev: string } | null>(null);
-  useEffect(() => { setFolded(false); setCur(null); }, [active?.ref]);
+  useEffect(() => { setFolded(false); setCur(null); setHere(null); }, [active?.ref]);
   const art = useRef<HTMLDivElement>(null);
   const colorOf = useMemo(() => Object.fromEntries(parts.map((p) => [p.key, p.color])), [parts]);
   const idx = toc.findIndex((t) => t.ref === active?.ref);
@@ -73,6 +74,8 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
       const l = atEnd ? marks[marks.length - 1] : marks.filter((m) => m.getBoundingClientRect().top <= line).pop();
       const nx = l ? { pg: l.dataset.pg ?? "", date: l.dataset.date ?? "", rev: l.dataset.rev ?? "" } : null;
       setCur((c) => (c?.pg === nx?.pg ? c : nx));
+      const hd = [...el.querySelectorAll<HTMLElement>("h2[id],h3[id]")].filter((x) => x.getBoundingClientRect().top <= top + 90).pop();
+      setHere((c) => (c === (hd?.id ?? null) ? c : hd?.id ?? null));
     };
     onScroll(); el.addEventListener("scroll", onScroll); window.addEventListener("scroll", onScroll, { passive: true });
     const onKey = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === "INPUT") return; if (e.key === "ArrowRight" && next) router.push(href(next.ref)); if (e.key === "ArrowLeft" && prev) router.push(href(prev.ref)); };
@@ -125,7 +128,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
                     {t.headings.length > 0 && <b className="fold">{active?.ref === t.ref && !folded ? "▾" : "▸"}</b>}
                   </Link>
                   {((active?.ref === t.ref && !folded) || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
-                    <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" }); } }}>{h.text}</a>
+                    <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level + (active?.ref === t.ref && here === h.id ? " on" : "")} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" }); } }}>{(() => { const mm = /^([A-Z]{0,3}\.?\d+(?:\.\d+)*\.?)\s+(\S[\s\S]*)$/.exec(h.text); return mm ? <><span className="shn">{mm[1]}</span><span>{mm[2]}</span></> : <span>{h.text}</span>; })()}</a>
                   ))}
                 </div>
               ))}
