@@ -54,7 +54,8 @@
     const toc = (await j(`/rest/api/reader/manual/${d.id}/toc/${R}`)).data || [];
     const out = new Array(pages.length); const imgs = new Map(); let i = 0;
     const work = async () => { for (;;) { const k = i++; if (k >= pages.length) return; const p = pages[k]; const pd = (await j(`/rest/api/reader/manual/${d.id}/page/${R}/${p.id}`)).data;
-      const html = String(pd.html || '').replace(/<img([^>]*)src="(\/file\/[^"]+)"/g, (m, a, src) => { const id = (/fileId=(\d+)/.exec(src) || [])[1]; if (!id) return m; const name = decodeURIComponent(src.split('?')[0].split('/').pop() || ('img' + id)); if (!imgs.has(id)) imgs.set(id, { src: src.replace(/&amp;/g, '&'), name }); return `<img${a}data-sam-img="${id}" src="sam-img://${id}"`; });
+      // the logo of the page header belongs to the Web Manuals design, not to the files: it gets an id of its own (9000000000000 + design)
+      const html = String(pd.html || '').replace(/<img([^>]*)src="(\/rest\/api\/reader\/design\/(\d+)\/logo)"/g, (m, a, src, dz) => { const id = String(9000000000000 + Number(dz)); if (!imgs.has(id)) imgs.set(id, { src, name: 'logo' }); return `<img${a}data-sam-img="${id}" src="sam-img://${id}"`; }).replace(/<img([^>]*)src="(\/file\/[^"]+)"/g, (m, a, src) => { const id = (/fileId=(\d+)/.exec(src) || [])[1]; if (!id) return m; const name = decodeURIComponent(src.split('?')[0].split('/').pop() || ('img' + id)); if (!imgs.has(id)) imgs.set(id, { src: src.replace(/&amp;/g, '&'), name }); return `<img${a}data-sam-img="${id}" src="sam-img://${id}"`; });
       out[k] = { id: p.id, number: p.number, name: p.name, isChapter: p.isChapter, html }; } };
     await Promise.all(Array.from({ length: 6 }, work));
     const have = new Set((await send({ type: 'SAM_WM_HAVE', entity, code })).have || []);

@@ -13,20 +13,20 @@ type Item = { type: string; seq: number; meta: BridgeMeta; bundle?: Omit<WmBundl
 
 export default function WmBridge() {
   const [linked, setLinked] = useState(false); const [n, setN] = useState({ ok: 0, ko: 0 }); const [log, setLog] = useState<string[]>([]);
-  const chain = useRef<Promise<void>>(Promise.resolve()); const have = useRef(new Map<string, Set<string>>());
+  const chain = useRef<Promise<void>>(Promise.resolve()); const have = useRef(new Map<string, Map<string, string>>()); // folder → image id → extension as stored
   useEffect(() => {
     const sb = supabaseBrowser();
     const say = (m: string) => setLog((l) => [m, ...l].slice(0, 300));
     const listed = async (folder: string) => {
       if (have.current.has(folder)) return have.current.get(folder)!;
-      const set = new Set<string>();
-      for (let off = 0; ; off += 1000) { const { data } = await sb.storage.from("manuals").list(folder, { limit: 1000, offset: off }); for (const f of data ?? []) set.add(f.name.replace(/\.[^.]+$/, "")); if (!data || data.length < 1000) break; }
+      const set = new Map<string, string>();
+      for (let off = 0; ; off += 1000) { const { data } = await sb.storage.from("manuals").list(folder, { limit: 1000, offset: off }); for (const f of data ?? []) set.set(f.name.replace(/\.[^.]+$/, ""), f.name.split(".").pop() ?? "png"); if (!data || data.length < 1000) break; }
       have.current.set(folder, set); return set;
     };
     const handle = async (m: Item): Promise<Record<string, unknown>> => {
       if (m.type === "SAM_WM_PING") return { ok: true, info: "bridge ready" };
       if (m.type === "SAM_WM_STATS") return { ...(await bridgeStats(m.entity ?? "")) };
-      if (m.type === "SAM_WM_HAVE") return { ok: true, have: [...(await listed(`${m.entity}/${safeKey(m.code ?? "")}/wm`))] };
+      if (m.type === "SAM_WM_HAVE") return { ok: true, have: [...(await listed(`${m.entity}/${safeKey(m.code ?? "")}/wm`)).keys()] };
       if (m.type !== "SAM_WM_ITEM") return { ok: false, error: "unknown message" };
       const meta = m.meta;
       if (meta.kind === "file") {
@@ -39,10 +39,10 @@ export default function WmBridge() {
       const b = m.bundle; if (!b) return { ok: false, error: "no bundle" };
       const folder = `${meta.entity}/${safeKey(meta.code)}/wm`; const set = await listed(folder);
       const images = b.images ?? {}; const ext: Record<string, string> = {}; const ids = Object.keys(images); let up = 0; const errs: string[] = [];
-      const todo = ids.filter((id) => { ext[id] = imageExt(images[id].name, images[id].type); return images[id].buf && !set.has(id); });
+      const todo = ids.filter((id) => { ext[id] = set.get(id) ?? imageExt(images[id].name, images[id].type); return images[id].buf && !set.has(id); });
       const work = async () => { for (;;) { const id = todo.shift(); if (!id) return; const im = images[id]; const e = ext[id];
         const { error } = await sb.storage.from("manuals").upload(`${folder}/${id}.${e}`, im.buf!, { upsert: true, contentType: im.type && im.type !== "application/octet-stream" ? im.type : e === "png" ? "image/png" : e === "jpg" ? "image/jpeg" : "application/octet-stream" });
-        if (error) errs.push(`${id}: ${error.message}`); else { up++; set.add(id); } } };
+        if (error) errs.push(`${id}: ${error.message}`); else { up++; set.set(id, e); } } };
       await Promise.all([work(), work(), work(), work()]);
       const slim = { ...b, images: Object.fromEntries(ids.map((id) => [id, { name: images[id].name, type: images[id].type, size: images[id].size }])) };
       const stash = `_import/${meta.entity}/${safeKey(meta.code)}-${meta.draft ? "draft" : "pub"}.json`;
