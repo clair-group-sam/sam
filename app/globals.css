@@ -1132,3 +1132,6 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 .pm-body ol.ol-la{list-style:lower-alpha}.pm-body ol.ol-ua{list-style:upper-alpha}.pm-body ol.ol-lr{list-style:lower-roman}.pm-body ol.ol-ur{list-style:upper-roman}
 .pm-body .tc{text-align:center}.pm-body h4.nh{display:flex;gap:3mm;align-items:baseline}.pm-body h4.nh .hn{flex:none;color:var(--cyan-ink)}
 .pm-body .pgmark{text-align:right;font:600 7pt Inter,Arial,sans-serif;color:#7a8794;border-top:.3pt dashed #c9d3dc;margin:3mm 0 2mm;padding-top:.8mm}.pm-body .pgmark::before{content:"page " attr(data-pg)}
+/* DOC-15 · in the PDF a new sheet starts where the original page starts, so the sheets and the page numbers the LEP refers to stay together */
+@media print{.pm-body .pgmark{break-before:page;border-top:0;margin:0 0 3mm;padding:0}}
+@media screen{.pm-body .pgmark{margin:8mm -16mm 6mm;padding:1mm 16mm 0;border-top:1px dashed #9aa9b6}}
