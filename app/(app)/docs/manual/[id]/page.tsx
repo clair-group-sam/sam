@@ -9,7 +9,7 @@ import { canDownloadPdf, getSession } from "@/lib/session";
 import DownloadMenu from "@/components/DownloadMenu";
 import { supabaseServer } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/Page";
-import { STEPS, STEP_LABEL, linkRefs, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
+import { STEPS, STEP_LABEL, partOf, partsOf, structureHtml, type Heading, type Manual, type Revision, type Section } from "@/lib/docs";
 import Reader, { type TocItem } from "@/components/Reader";
 import AskManual from "@/components/AskManual";
 import { acknowledge, saveAudience, setNature, toggleFavourite } from "./actions";
@@ -19,8 +19,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { audienceTokens, describeTokens, peopleFor, resolveReaders, postsOf, POSTS } from "@/lib/audience";
 import { diffBlocks, revbarPassages, type Row, type Word } from "@/lib/diff";
 import { ENT } from "@/lib/nav";
-import { linkIndex, rewriteLinks } from "@/lib/links";
-import { renderCharts } from "@/lib/orgchart";
+import { chapterHtml, type ChapterRow } from "@/lib/chapter-render";
 import { startRevision } from "@/app/(app)/docs/editor/[rev]/actions";
 import { isCmm, ownsManual } from "@/lib/revisions";
 import { Icon } from "@/lib/icons";
@@ -90,27 +89,8 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
   const activeStructured = active ? (active.body.structured ? { html: active.body.html ?? "", headings: active.body.headings ?? [] } : structureHtml(active.body.html ?? `<p>${active.body.text ?? ""}</p>`, `s${active.ord}`, active.ref)) : null;
   const parts = partsOf(sections.map((x) => x.ref));
   const toc: TocItem[] = sections.map((x) => ({ id: x.id, ref: x.ref, title: x.title, part: partOf(x.ref), headings: (x.id === active?.id ? activeStructured?.headings : x.body.headings) ?? [] }));
-  // references inside the manual's own table of contents → links
-  const chapterRefs = new Map(sections.map((x) => [x.ref, x.id]));
-  const subRefs = new Map<string, { ref: string; id: string }>();
-  for (const x of toc) for (const h of x.headings) { const mm = /^([A-Z]{0,2}\d*(?:\.\d+){1,3})\b/.exec(h.text); if (mm && !chapterRefs.has(mm[1])) subRefs.set(mm[1], { ref: x.ref, id: h.id }); }
-  const base = current ? `/docs/manual/${manual.id}?rev=${current.id}` : `/docs/manual/${manual.id}?x=1`;
-  // links copied from the source system first (same manual → its chapter, other manuals → S.A.M., web addresses in a new tab),
-  // then the plain chapter numbers of the manual's own table of contents become links
-  const refHref = (inner: string): string | null => {
-    const mm = /^\s*([A-Z]{0,2}\d*(?:\.\d+){0,4})\b/.exec(inner.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " "));
-    let k = mm?.[1] ?? "";
-    while (k) { if (chapterRefs.has(k)) return `${base}&sec=${encodeURIComponent(k)}`; const sr = subRefs.get(k); if (sr) return `${base}&sec=${encodeURIComponent(sr.ref)}#${sr.id}`; k = k.includes(".") ? k.slice(0, k.lastIndexOf(".")) : ""; }
-    return null;
-  };
-  const srcHtml = activeStructured?.html ?? "";
-  const linked = /<a\b/i.test(srcHtml)
-    ? rewriteLinks(srcHtml, {
-        idx: /\/reader\/#\/|\/docs\/link\/ch\//.test(srcHtml) ? await linkIndex(supabaseAdmin()) : null, selfManualId: manual.id, base: "", newTab: true, selfUids,
-        self: (ref) => (ref ? `${base}&sec=${encodeURIComponent(ref)}` : null), textTarget: refHref,
-      })
-    : srcHtml;
-  const activeHtml = renderCharts(active && activeStructured ? (/table des mati|contents|sommaire/i.test(active.title ?? "") ? linkRefs(linked, chapterRefs, subRefs, base) : linked) : "");
+  // DOC-16 · the chapter made ready to read (links, charts): the same code serves the chapters opened afterwards without reloading the page
+  const activeHtml = active && activeStructured ? await chapterHtml(supabaseAdmin, { manualId: manual.id, revId: current?.id ?? null, sections: sections.map((x) => ({ id: x.id, ref: x.ref, uid: [...selfUids].find(([, r]) => r === x.ref)?.[0] ?? null, headings: x.body.headings ?? [] })), active: active as unknown as ChapterRow, structured: activeStructured }) : "";
   const stepIdx = current ? STEPS.indexOf(current.step) : -1;
   const canAudience = isCmm(s) || ownsManual(s, manual.owner_role);
 
@@ -223,7 +203,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       {tab === "read" && current && (
         <Reader manualId={manual.id} revId={current.id} parts={parts} toc={toc} initialQuery={q}
           plate={active ? (() => { const st = (active.body as { page_start?: { pg: string; date: string; rev: string; logo?: string } | null }).page_start ?? null; const pad = (n: number) => String(n).padStart(2, "0");
-            return { brand: ENT[manual.entity]?.name ?? manual.entity, code: manual.code, docTitle: manual.title, issue: current.issue, rev: current.rev, pg: st?.pg ?? active.body.pages?.[0] ?? "", date: st?.date ?? (current.published_at ? frd(current.published_at) : ""), pageRev: st?.rev || `${pad(current.issue)} / ${current.rev}`, owner: ENT[manual.entity]?.name ?? manual.entity, logo: st?.logo }; })() : null}
+            return { brand: ENT[manual.entity]?.name ?? manual.entity, code: manual.code, docTitle: manual.title, issue: current.issue, rev: current.rev, pg: st?.pg ?? active.body.pages?.[0] ?? "", date: st?.date ?? (current.published_at ? frd(current.published_at) : ""), pageRev: st?.rev || `${pad(current.issue)} / ${current.rev}`, owner: ENT[manual.entity]?.name ?? manual.entity, logo: st?.logo, fbDate: current.published_at ? frd(current.published_at) : "", fbRev: `${pad(current.issue)} / ${current.rev}` }; })() : null}
           active={active ? { ref: active.ref, title: active.title, html: activeHtml, part: partOf(active.ref), pages: active.body.pages?.length ?? 0, cover: /^(cover|couverture|page de garde)$/i.test((active.title ?? "").trim()) } : null} />
       )}
       {tab === "read" && !current && <section className="card"><div className="cb text-slate6">No revision to read yet.</div></section>}

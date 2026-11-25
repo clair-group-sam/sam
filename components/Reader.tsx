@@ -10,12 +10,33 @@ type Props = {
   manualId: string; revId: string; parts: Part[]; toc: TocItem[];
   active: { ref: string; title: string | null; html: string; part: string; pages: number; cover?: boolean } | null;
   /** DOC-15 · the document plate: what the Web Manuals page header carried (brand, code, page, date, issue / revision) */
-  plate?: { brand: string; code: string; docTitle: string; issue: number; rev: string; pg: string; date: string; pageRev: string; owner: string; logo?: string } | null;
+  plate?: { brand: string; code: string; docTitle: string; issue: number; rev: string; pg: string; date: string; pageRev: string; owner: string; logo?: string; fbDate?: string; fbRev?: string } | null;
   initialQuery?: string;
 };
 
-export default function Reader({ manualId, revId, parts, toc, active, plate = null, initialQuery = "" }: Props) {
+type Chapter = NonNullable<Props["active"]>;
+type Loaded = { ref: string; title: string | null; html: string; pages: number; firstPage: string; cover: boolean; start: { pg: string; date: string; rev: string; logo?: string } | null };
+export default function Reader({ manualId, revId, parts, toc, active: first, plate: plate0 = null, initialQuery = "" }: Props) {
   const router = useRouter();
+  // DOC-16 · a chapter opens without reloading the page: only its text is asked for, the contents and the header stay in place; the chapters
+  // around the one being read are fetched ahead. The address still changes, so a link or a reload lands on the same chapter.
+  const [active, setActive] = useState<Chapter | null>(first);
+  const [plate, setPlate] = useState(plate0);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => { setActive(first); setPlate(plate0); }, [first?.ref, first?.html, revId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const store = useRef(new Map<string, Promise<Loaded | null>>());
+  useEffect(() => { store.current = new Map(); }, [revId]);
+  const load = (ref: string) => { const k = ref; let p = store.current.get(k); if (!p) { p = fetch(`/api/docs/section?manual=${manualId}&rev=${revId}&sec=${encodeURIComponent(ref)}`).then((r) => (r.ok ? (r.json() as Promise<Loaded>) : null)).catch(() => null); store.current.set(k, p); p.then((v) => { if (!v) store.current.delete(k); }); } return p; };
+  const go = async (ref: string, hash = "") => {
+    const url = `/docs/manual/${manualId}?rev=${revId}&sec=${encodeURIComponent(ref)}${hash}`;
+    setLoading(true); const c = await load(ref); setLoading(false);
+    if (!c) { router.push(url); return; }
+    setActive({ ref: c.ref, title: c.title, html: c.html, part: toc.find((t) => t.ref === c.ref)?.part ?? "?", pages: c.pages, cover: c.cover });
+    if (plate0) setPlate({ ...plate0, pg: c.cover ? "cover" : c.start?.pg ?? c.firstPage, date: c.start?.date || plate0.fbDate || "", pageRev: c.start?.rev || plate0.fbRev || plate0.pageRev, logo: c.start?.logo ?? plate0.logo });
+    window.history.pushState(null, "", url);
+    const box = art.current?.parentElement; if (box) box.scrollTop = 0;
+    if (hash) setTimeout(() => toView(document.getElementById(hash.slice(1))), 60);
+  };
   const [mode, setMode] = useState<"toc" | "full">(initialQuery ? "full" : "toc");
   const [q, setQ] = useState(initialQuery);
   const [hits, setHits] = useState<Hit[] | null>(null);
@@ -37,6 +58,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
   const colorOf = useMemo(() => Object.fromEntries(parts.map((p) => [p.key, p.color])), [parts]);
   const idx = toc.findIndex((t) => t.ref === active?.ref);
   const prev = idx > 0 ? toc[idx - 1] : null, next = idx >= 0 && idx < toc.length - 1 ? toc[idx + 1] : null;
+  useEffect(() => { const t = setTimeout(() => { if (next) void load(next.ref); if (prev) void load(prev.ref); }, 400); return () => clearTimeout(t); }, [active?.ref]); // eslint-disable-line react-hooks/exhaustive-deps
   const href = (ref: string, extra = "") => `/docs/manual/${manualId}?rev=${revId}&sec=${encodeURIComponent(ref)}${extra}`;
 
   // full-text search (debounced)
@@ -84,7 +106,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
       setHere((c) => (c === (hd?.id ?? null) ? c : hd?.id ?? null));
     };
     onScroll(); el.addEventListener("scroll", onScroll); window.addEventListener("scroll", onScroll, { passive: true });
-    const onKey = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === "INPUT") return; if (e.key === "ArrowRight" && next) router.push(href(next.ref)); if (e.key === "ArrowLeft" && prev) router.push(href(prev.ref)); };
+    const onKey = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === "INPUT") return; if (e.key === "ArrowRight" && next) void go(next.ref); if (e.key === "ArrowLeft" && prev) void go(prev.ref); };
     window.addEventListener("keydown", onKey);
     return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("scroll", onScroll); window.removeEventListener("keydown", onKey); };
   });
@@ -132,12 +154,13 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
               {(open.has(part.key) || !!ql) && items.map((t) => (
                 <div key={t.id}>
                   <Link href={href(t.ref)} className={"tocch" + (active?.ref === t.ref ? " on" : "")}
-                    onClick={(e) => { if (active?.ref === t.ref && t.headings.length) { e.preventDefault(); toggle(t.ref); } }}>
+                    onMouseEnter={() => { if (active?.ref !== t.ref) void load(t.ref); }}
+                    onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); if (active?.ref === t.ref) { if (t.headings.length) toggle(t.ref); } else void go(t.ref); }}>
                     <span className="badge" style={{ background: part.color }}>{t.ref}</span><span>{t.title}</span>
                     {t.headings.length > 0 && <b className="fold" role="button" aria-label={shown.has(t.ref) ? "Hide the sub-chapters" : "Show the sub-chapters"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(t.ref); }}>{shown.has(t.ref) ? "▾" : "▸"}</b>}
                   </Link>
                   {(shown.has(t.ref) || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
-                    <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level + (active?.ref === t.ref && here === h.id ? " on" : "")} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); toView(document.getElementById(h.id)); } }}>{(() => { const mm = /^([A-Z]{0,3}\.?\d+(?:\.\d+)*\.?)\s+(\S[\s\S]*)$/.exec(h.text); return mm ? <><span className="shn">{mm[1]}</span><span>{mm[2]}</span></> : <span>{h.text}</span>; })()}</a>
+                    <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level + (active?.ref === t.ref && here === h.id ? " on" : "")} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); if (active?.ref === t.ref) toView(document.getElementById(h.id)); else void go(t.ref, `#${h.id}`); }}>{(() => { const mm = /^([A-Z]{0,3}\.?\d+(?:\.\d+)*\.?)\s+(\S[\s\S]*)$/.exec(h.text); return mm ? <><span className="shn">{mm[1]}</span><span>{mm[2]}</span></> : <span>{h.text}</span>; })()}</a>
                   ))}
                 </div>
               ))}
@@ -146,7 +169,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
           {!grouped.length && mode === "toc" && <div className="p-4 text-slate6 text-sm">No chapter matches.</div>}
         </aside>
 
-        <section className="card flex-1 min-w-0 readwrap" style={{ borderTopColor: active ? colorOf[active.part] : undefined }}>
+        <section className={"card flex-1 min-w-0 readwrap" + (loading ? " loading" : "")} style={{ borderTopColor: active ? colorOf[active.part] : undefined }}>
           {active ? (<>
             {plate ? (
               <div className="docplate" style={{ "--pc": colorOf[active.part] } as React.CSSProperties}>
@@ -161,11 +184,14 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
             </div>)}
             <div className="readscroll">
-              <article ref={art} className={"reader" + (active.cover ? " iscover" : "")} onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => toView(document.getElementById(u.hash.slice(1))), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
+              <article ref={art} className={"reader" + (active.cover ? " iscover" : "")} onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); const sec = u.searchParams.get("sec");
+                // a link to another chapter of this revision opens like a click in the contents; anything else is a real navigation
+                if (u.pathname === `/docs/manual/${manualId}` && u.searchParams.get("rev") === revId && sec && toc.some((t) => t.ref === sec)) { if (sec === active.ref) { if (u.hash) toView(document.getElementById(u.hash.slice(1))); } else void go(sec, u.hash); }
+                else { router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => toView(document.getElementById(u.hash.slice(1))), 400); } } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
               {plate && <div className="docfoot"><span>{plate.code}, {plate.docTitle}, Iss {plate.issue} Rev {plate.rev}</span><span>© {plate.owner}</span><span className="mono">{(cur ?? plate).pg}</span></div>}
               <div className="pager">
-                {prev ? <Link href={href(prev.ref)}>‹ {prev.ref} {prev.title}</Link> : <span />}
-                {next ? <Link href={href(next.ref)}>{next.ref} {next.title} ›</Link> : <span />}
+                {prev ? <Link href={href(prev.ref)} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); void go(prev.ref); }}>‹ {prev.ref} {prev.title}</Link> : <span />}
+                {next ? <Link href={href(next.ref)} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); void go(next.ref); }}>{next.ref} {next.title} ›</Link> : <span />}
               </div>
             </div>
           </>) : <div className="cb text-slate6">Nothing to read.</div>}
