@@ -15,6 +15,25 @@ import { Icon } from "@/lib/icons";
 
 export const maxDuration = 300; // "Name and explain with S.A.M." searches the web
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "not_needed", "blocked"];
+const dnum = (d: string) => Math.round(new Date(d.slice(0, 10) + "T00:00:00Z").getTime() / 86400000);
+/** The summary written at creation holds the plan's assumptions, risks and decisions as labelled paragraphs: split them back so they fold away. */
+function brief(d: string) {
+  const out = { summary: [] as string[], assumptions: [] as string[], risks: [] as string[], decisions: [] as string[] };
+  for (const part of d.split(/\n\s*\n/)) {
+    const m = part.match(/^\s*(Assumptions|Risks|Decisions)\s*:\s*([\s\S]+)$/);
+    if (!m) { if (part.trim()) out.summary.push(part.trim()); continue; }
+    const k = m[1].toLowerCase() as "assumptions" | "risks" | "decisions"; const body = m[2].trim();
+    out[k] = (body.includes("\n") ? body.split(/\n+/) : k === "assumptions" ? body.split(/(?<=\])\s+(?=\S)/) : k === "decisions" ? body.split(/(?<=\(open\))\s+(?=\S)/) : [body]).map((x) => x.trim()).filter(Boolean);
+  }
+  return out;
+}
+/** "Form SM 113: Application for…" gives the plate "SM 113" and the name; without a form number the plate is the fallback. */
+function plateOf(title: string, fallback: string): { plate: string; name: string } {
+  const m = title.match(/^\s*(?:(?:Form|Formulaire|Cerfa|CERFA)\s+)?((?:[A-Z][A-Za-z]{0,7}[ ./-]?)?(?:[A-Z]{1,6}[ ./-]?)?\d[\w./-]{0,9})\s*[:,]\s+(\S[\s\S]*)$/);
+  return m && m[1].length <= 16 ? { plate: m[1].trim(), name: m[2].trim() } : { plate: fallback, name: title };
+}
+const TONES = ["tone-a", "tone-b", "tone-c", "tone-d"];
+const APP_STEPS = ["Preparing", "Filed", "With the authority", "Granted"];
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
   const s = await getSession();
@@ -56,60 +75,130 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const nameOf = new Map(((people ?? []) as { id: string; display_name: string }[]).map((x) => [x.id, x.display_name]));
   const pivotTxt = Object.entries(p.pivot ?? {}).map(([k, v]) => `${PIVOT_LABEL[k] ?? k} ${v}`).join(", ");
   const groups = DEPARTMENTS.map((d) => ({ dept: d, tasks: work.filter((t) => departmentOf(t.owner_role) === d).sort((a, b) => (proj.get(a.id)!.start < proj.get(b.id)!.start ? -1 : proj.get(a.id)!.start > proj.get(b.id)!.start ? 1 : a.ord - b.ord)) })).filter((g) => g.tasks.length);
+  const readyIds = new Set(ready.map((t) => t.id));
+  const endLate = !!(end && p.target_date && end > p.target_date);
+  // time line: from the start to the latest of target, projected end and today
+  const d0 = dnum(p.started_at); const span = Math.max(1, Math.max(dnum(end ?? p.started_at), dnum(p.target_date ?? p.started_at), dnum(t0)) - d0);
+  const pos = (d: string) => Math.min(100, Math.max(0, Math.round(((dnum(d) - d0) / span) * 1000) / 10));
+  // one colour per place an application is filed (authority portal), shared by the plates and the diamonds of the time line
+  const toneKeys: string[] = [];
+  const appRows = apps.sort((a, b) => (proj.get(a.id)!.start < proj.get(b.id)!.start ? -1 : 1)).map((a) => {
+    const f = files.find((x) => x.id === a.link_id);
+    const up = upstream(a.id, deps, byId).filter((t) => t.status !== "not_needed");
+    const ty = a.link_ref ? appTypes.get(a.link_ref) : undefined;
+    const where: string = ty?.routes?.[p.entity]?.portal || f?.authority || "";
+    const key = where || (ENT[p.entity]?.auth ?? "Authority");
+    if (!toneKeys.includes(key)) toneKeys.push(key);
+    return { a, f, up, doneUp: up.filter((t) => t.status === "done").length, ty, where, tone: TONES[toneKeys.indexOf(key) % 4] };
+  });
+  const isGranted = (r: (typeof appRows)[number]) => (r.f ? ["approved", "published", "closed"].includes(r.f.stage) : r.a.status === "done");
+  const appsCounted = appRows.filter((r) => r.a.status !== "not_needed").length, appsGranted = appRows.filter(isGranted).length;
+  const appMarks = appRows.filter((r) => r.a.status !== "not_needed").map((r) => ({ id: r.a.id, title: r.a.title, tone: r.tone, done: isGranted(r), at: (isGranted(r) && r.a.done_at ? r.a.done_at : proj.get(r.a.id)!.end).slice(0, 10) }));
 
   return (
     <>
       <EntityBand entity={p.entity} current={s.entity} multi={s.group || s.entities.length > 1} what="project" />
       <PageHeader eyebrow={`Projects, ${p.entity}, ${p.template_code ?? "project"}`} title={p.title}
-        sub={`${ENT[p.entity]?.name ?? p.entity}${pivotTxt ? `, ${pivotTxt}` : ""}, owner ${p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "—"}, started ${fr(p.started_at)}${p.target_date ? `, target ${fr(p.target_date)}` : ""}`}
+        tag={<div className="pchips">
+          <span className={"ent " + p.entity} style={{ borderRadius: 999, padding: "2px 10px", fontSize: 13, fontWeight: 600 }}>{ENT[p.entity]?.name ?? p.entity}</span>
+          {pivotTxt && <span className="pchip">{pivotTxt}</span>}
+          <span className="pchip"><i>Owner</i>{p.owner_person ? nameOf.get(p.owner_person) ?? "" : p.owner_role ?? "not set"}</span>
+          <span className="pchip"><i>Started</i>{fr(p.started_at)}</span>
+          {p.target_date && <span className="pchip"><i>Target</i>{fr(p.target_date)}</span>}
+        </div>}
         right={<><span className={"pill " + (p.status === "closed" ? "green" : p.status === "open" ? "amber" : "")} style={{ alignSelf: "center" }}>{PROJECT_STATUS_LABEL[p.status]}</span><Link href="/proj/boards" className="btn">‹ Projects</Link></>} />
-      {p.description && <p className="mini mb-4" style={{ maxWidth: 1000 }}>{p.description}</p>}
-      {(() => { const miss = [...links.values()].filter((l) => l.state === "create it").length; return miss >= 3 ? <div className="lockbar mb-4">{miss} manuals of this template do not exist in {ENT[p.entity]?.name ?? p.entity} yet, each task below offers to create its manual; the rest of the project is not blocked.</div> : null; })()}
+      {p.description && (() => { const b = brief(p.description); const n = (a: string[]) => (a.length > 1 ? <span className="n">{a.length}</span> : null); return (
+        <section className="card pbrief mb-4">
+          {b.summary.length > 0 && <p className="psum">{b.summary.join("\n\n")}</p>}
+          {(b.decisions.length > 0 || b.assumptions.length > 0 || b.risks.length > 0) && <div className="pdraws">
+            {b.decisions.length > 0 && <details className="pdraw"><summary>Decisions {n(b.decisions)}{b.decisions.some((x) => /\(open\)\s*$/.test(x)) && <span className="pill amber">some open</span>}</summary><ul>{b.decisions.map((x, i) => { const open = /\(open\)\s*$/.test(x); const [q, a] = open ? [x.replace(/\s*\(open\)\s*$/, ""), ""] : x.split(/\s+→\s+/, 2); return <li key={i}>{q} {open ? <span className="pill amber">open</span> : a ? <b>{a}</b> : null}</li>; })}</ul></details>}
+            {b.assumptions.length > 0 && <details className="pdraw"><summary>Assumptions {n(b.assumptions)}{b.assumptions.some((x) => /\[not reviewed\]\s*$/.test(x)) && <span className="pill amber">not all reviewed</span>}</summary><ul>{b.assumptions.map((x, i) => { const m = x.match(/^([\s\S]*?)\s*\[([^\]]*)\]\s*$/); const v = m?.[2] ?? ""; return <li key={i}>{m ? m[1] : x} {v && <span className={"pill " + (/^confirm/i.test(v) ? "green" : /^reject/i.test(v) ? "red" : /^not reviewed/i.test(v) ? "amber" : "")}>{v}</span>}</li>; })}</ul></details>}
+            {b.risks.length > 0 && <details className="pdraw"><summary>Risks {n(b.risks)}</summary><ul>{b.risks.map((x, i) => <li key={i}>{x}</li>)}</ul></details>}
+          </div>}
+        </section>); })()}
+      {(() => { const miss = [...links.values()].filter((l) => l.state === "create it").length; return miss >= 3 ? <div className="lockbar mb-4" style={{ marginLeft: 0, marginRight: 0 }}>{miss} manuals of this template do not exist in {ENT[p.entity]?.name ?? p.entity} yet, each task below offers to create its manual; the rest of the project is not blocked.</div> : null; })()}
 
-      <div className="grid grid-cols-4 gap-4 mb-5">
-        <Metric label="Progress" value={`${pr.pct} %`} hint={`${pr.done} / ${pr.total} tasks${tasks.length - pr.total ? `, ${tasks.length - pr.total} not needed` : ""}`} tone={pr.pct === 100 ? "green" : undefined} />
-        <Metric label="Projected end" value={end ? fr(end) : "—"} hint={p.target_date ? (end && end > p.target_date ? `after the target (${fr(p.target_date)})` : `target ${fr(p.target_date)}`) : "from durations and dependencies"} tone={end && p.target_date && end > p.target_date ? "red" : undefined} />
-        <Metric label="Late" value={late} tone={late ? "red" : undefined} hint="due date passed, or started and over its duration" />
-        <Metric label="Ready to do" value={ready.length} hint="no open dependency" tone={ready.length ? "amber" : undefined} />
-      </div>
+      {/* where the project stands: figures on one line, then the time line from start to target with the applications on it */}
+      <section className="card mb-4">
+        <div className="pband">
+          <div><div className="big" style={pr.pct === 100 ? { color: "var(--green)" } : undefined}>{pr.pct} %</div><div className="bar mt-2" style={{ width: 120 }}><i style={{ width: `${pr.pct}%` }} /></div></div>
+          <div className="pfigs">
+            <div className="pfig"><b>{pr.done} / {pr.total}</b><span>tasks done{tasks.length - pr.total ? `, ${tasks.length - pr.total} not needed` : ""}</span></div>
+            <div className="pfig"><b className={endLate ? "red" : ""}>{end ? fr(end) : "not set"}</b><span>projected end{p.target_date ? (endLate ? `, after the target (${fr(p.target_date)})` : `, target ${fr(p.target_date)}`) : ""}</span></div>
+            <div className="pfig"><b className={late ? "red" : ""}>{late}</b><span>late</span></div>
+            <div className="pfig"><b>{ready.length}</b><span>to do now</span></div>
+            {apps.length > 0 && <div className="pfig"><b>{appsGranted} / {appsCounted}</b><span>applications granted</span></div>}
+          </div>
+        </div>
+        <div className="pline" aria-hidden="true">
+          <div className="track" /><div className="fill" style={{ width: `${pos(t0)}%` }} />
+          {end && <span className="tick" style={{ left: `${pos(end)}%` }} title={`Projected end ${fr(end)}`} />}
+          {appMarks.map((m) => <span key={m.id} className={"dia " + m.tone + (m.done ? " done" : "")} style={{ left: `${pos(m.at)}%` }} title={`${m.title}, ${m.done ? "granted" : "expected"} ${fr(m.at)}`} />)}
+          <span className="lab" style={{ left: 0, transform: "none" }}>{fr(p.started_at)}</span>
+          {pos(t0) > 8 && pos(t0) < 100 && <span className="lab up" style={{ left: `${pos(t0)}%` }}>Today</span>}
+          <span className="now" style={{ left: `${pos(t0)}%` }} />
+          {p.target_date ? <span className="lab flag" style={pos(p.target_date) > 88 ? { right: 0, transform: "none" } : { left: `${pos(p.target_date)}%` }}>Target {fr(p.target_date)}</span> : end ? <span className="lab" style={{ right: 0, transform: "none" }}>{fr(end)}</span> : null}
+          {p.target_date && <span className="tgt" style={{ left: `${pos(p.target_date)}%` }} />}
+        </div>
+        {toneKeys.length > 0 && <div className="plegend">{toneKeys.map((k, i) => <span key={k}><i className={"dia " + TONES[i % 4]} />{k}</span>)}<span className="mini">applications, placed at their projected date</span></div>}
+      </section>
+
+      {/* everything that can move today: several tasks run side by side, none waits for the others of this list */}
+      {view === "tasks" && active && ready.length > 0 && (
+        <section className="card mb-4">
+          <div className="ch"><span className="eyebrow">To do now</span><span className="mini">{ready.length} {ready.length > 1 ? "tasks can run side by side" : "task"}, nothing blocks {ready.length > 1 ? "them" : "it"}</span></div>
+          <div className="cb nowgrid">
+            {ready.map((t) => { const pj = proj.get(t.id)!; const canWork = mayWork(t); return (
+              <div key={t.id} className={"nowitem" + (pj.late ? " late" : t.status === "in_progress" ? " going" : "")}>
+                <div className="flex-1 min-w-0">
+                  <a href={`#t-${t.id}`} className="tt">{t.title}</a>
+                  <div className="tmeta"><span className="post">{t.owner_person ? nameOf.get(t.owner_person) : t.owner_role ?? "no post"}</span><span className={pj.late ? "red" : ""}>by {fr(pj.end)}</span>{pj.critical && <span className="crit"><Icon name="bolt" size={12} /> sets the end date</span>}</div>
+                </div>
+                {canWork && (t.status === "todo"
+                  ? <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="btn">Start</button></form>
+                  : <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="btn primary">Done</button></form>)}
+                {!canWork && <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
+              </div>); })}
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-3 gap-4 items-start">
         <div className="col-span-2 grid gap-4">
-          <div className="tabs"><Link href={`/proj/boards/${p.id}`} className={"tab" + (view === "tasks" ? " on" : "")}>Tasks by department</Link><Link href={`/proj/boards/${p.id}?view=gantt`} className={"tab" + (view === "gantt" ? " on" : "")}>Timeline</Link><span className="mini ml-auto"><Icon name="bolt" size={13} /> critical path. Dates are projected from durations and dependencies.</span></div>
+          <div className="tabs"><Link href={`/proj/boards/${p.id}`} className={"tab" + (view === "tasks" ? " on" : "")}>Tasks by department</Link><Link href={`/proj/boards/${p.id}?view=gantt`} className={"tab" + (view === "gantt" ? " on" : "")}>Timeline</Link><span className="mini ml-auto">Dates are projected from durations and dependencies.</span></div>
           {view === "gantt" && <section className="card"><div className="ch"><span className="eyebrow">Timeline</span><span className="mini">projected, {fr(p.started_at)} → {end ? fr(end) : "—"}</span></div><div className="cb"><Gantt projectId={p.id} phases={phases} tasks={tasks} proj={proj} startedAt={p.started_at} target={p.target_date} /></div></section>}
           {view === "tasks" && groups.map((g) => {
             const done = g.tasks.filter((t) => t.status === "done").length, counted = g.tasks.filter((t) => t.status !== "not_needed").length;
+            const live = g.tasks.filter((t) => readyIds.has(t.id) || proj.get(t.id)?.late).length;
             return (
-              <section key={g.dept} className="card">
-                <div className="ch"><span className="eyebrow">{g.dept}</span><span className="mini">{done} / {counted}</span></div>
-                <table className="tbl ptasks"><tbody>
-                  {g.tasks.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const canWork = mayWork(t) && active; const tf = taskFiles.filter((f) => f.task_id === t.id); const open = t.status !== "done" && t.status !== "not_needed"; return (
-                    <tr key={t.id} id={`t-${t.id}`} className={"prow" + (t.status === "done" ? " isdone" : t.status === "not_needed" ? " muted" : "")}>
-                      <td style={{ width: 34 }}>
-                        <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
-                          <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!canWork || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done, click to reopen" : "Mark as done"}>{t.status === "done" ? <Icon name="check" size={14} /> : ""}</button></form>
-                      </td>
-                      <td style={{ width: 96 }}>
-                        {t.status === "todo" && pj.openDeps.length > 0 ? <span className="pill later" title={`After: ${openDs.map((d) => d.title).join(", ")}`}>Later</span>
-                          : t.status === "todo" && canWork ? <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill" title="Start now, it also starts by itself when the linked manual or a document is touched">To do ▸</button></form>
-                          : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
-                      </td>
-                      <td>
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          {pj.critical && open && <span title="critical path"><Icon name="bolt" size={13} /></span>}
-                          <b>{t.title}</b>
+              <details key={g.dept} className="card dept" open={live > 0}>
+                <summary><span className="dname">{g.dept}</span>{live > 0 ? <span className="pill amber">{live} to do now</span> : done === counted && counted > 0 ? <span className="pill green">all done</span> : <span className="pill later">later</span>}<span className="bar" style={{ marginLeft: "auto" }}><i style={{ width: `${counted ? Math.round((100 * done) / counted) : 0}%` }} /></span><span className="mini mono">{done} / {counted}</span></summary>
+                <div className="trows">
+                  {g.tasks.map((t) => { const pj = proj.get(t.id)!; const lk = links.get(t.id); const ds = depsOf(t); const openDs = ds.filter((d) => pj.openDeps.includes(d.id)); const canWork = mayWork(t) && active; const tf = taskFiles.filter((f) => f.task_id === t.id); const open = t.status !== "done" && t.status !== "not_needed"; const later = t.status === "todo" && pj.openDeps.length > 0; return (
+                    <div key={t.id} id={`t-${t.id}`} className={"trow" + (t.status === "done" ? " isdone" : t.status === "not_needed" ? " muted" : later ? " later" : "")}>
+                      <form action={tickTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} />
+                        <button type="submit" className={"chk" + (t.status === "done" ? " on" : "")} disabled={!canWork || t.status === "not_needed"} aria-label={t.status === "done" ? "Reopen" : "Mark as done"} title={t.status === "done" ? "Done, click to reopen" : "Mark as done"}>{t.status === "done" ? <Icon name="check" size={14} /> : ""}</button></form>
+                      <div className="min-w-0">
+                        <div className="tt">{t.title}</div>
+                        {t.detail && open && !later && <div className="mini" style={{ marginTop: 2 }}>{t.detail}</div>}
+                        {t.status === "not_needed" && t.not_needed_reason && <div className="mini">Not needed: {t.not_needed_reason}</div>}
+                        <div className="tmeta">
+                          <span className="post">{t.owner_person ? nameOf.get(t.owner_person) : t.owner_role ?? "no post"}</span>
+                          {t.status === "done" ? <span className="green">done {fr(t.done_at)}</span> : t.status === "not_needed" ? null : <span className={pj.late ? "red" : ""}>{fr(pj.start)} to {fr(pj.end)}{t.days ? `, ${t.days} d` : ""}{t.due ? ", fixed date" : ""}</span>}
+                          {openDs.length > 0 && <span title={`Waits for: ${openDs.map((d) => d.title).join(", ")}`}>after {openDs[0].title.length > 44 ? openDs[0].title.slice(0, 42) + "…" : openDs[0].title}{openDs.length > 1 ? ` and ${openDs.length - 1} more` : ""}</span>}
+                          {pj.critical && open && <span className="crit" title="On the critical path: a day lost here moves the end of the project"><Icon name="bolt" size={12} /> sets the end date</span>}
                           {lk && t.status === "done" && !t.link_id && (lk.tone === "" || lk.tone === "amber") && lk.state !== "filed" ? ( // FB-031 · ticked done by hand, object not in S.A.M.: no call to action
                             <span className="objlink" title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> done outside S.A.M.{t.link_kind === "certificate" ? <>, <Link className="underline" href={lk.href}>attach the certificate</Link></> : t.link_kind === "manual" && lk.state === "create it" ? <>, {t.link_ref} not in S.A.M. yet</> : null}</span>
                           ) : lk ? (lk.href ? <Link className="objlink" href={lk.href} title={lk.label}><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}, <span className={"pill " + lk.tone}>{lk.state}</span></Link> : <span className="objlink"><span className="nature">{LINK_LABEL[t.link_kind!]}</span> {lk.label}</span>) : t.link_kind ? <span className="nature">{LINK_LABEL[t.link_kind]}{t.link_ref ? `, ${t.link_ref}` : ""}</span> : null}
-                          {tf.length > 0 && <span className="mini" title={tf.map((f) => f.name).join(", ")}><Icon name="clip" size={13} /> {tf.length}</span>}
-                          {openDs.length > 0 && t.status !== "todo" && <span className="mini amber" title={`waits for: ${openDs.map((d) => d.title).join(", ")}`}>waits for {openDs.length}</span>}
+                          {tf.length > 0 && <span title={tf.map((f) => f.name).join(", ")}><Icon name="clip" size={13} /> {tf.length}</span>}
                         </div>
-                        {t.detail && open && <div className="mini">{t.detail}</div>}
-                        {t.status === "not_needed" && t.not_needed_reason && <div className="mini">Not needed: {t.not_needed_reason}</div>}
-                      </td>
-                      <td className="mini" style={{ width: 70 }}>{t.owner_person ? nameOf.get(t.owner_person) : t.owner_role ?? ""}</td>
-                      <td className="mono mini" style={{ width: 150 }}>{t.status === "done" ? <span className="green">done {fr(t.done_at)}</span> : t.status === "not_needed" ? "" : <span className={pj.late ? "red" : ""}>{fr(pj.start)} → {fr(pj.end)}{t.due ? " ·fixed" : ""}</span>}</td>
-                      <td style={{ width: 36 }}>
+                      </div>
+                      <div>
+                        {later ? <span className="pill later" title={`After: ${openDs.map((d) => d.title).join(", ")}`}>Later</span>
+                          : t.status === "todo" && canWork ? <form action={startTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={t.id} /><button type="submit" className="pill startbtn" title="Start now, it also starts by itself when the linked manual or a document is touched">Start</button></form>
+                          : <span className={"pill " + STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</span>}
+                      </div>
+                      <div>
                         {(canWork || tf.length > 0) && (
                           <details className="more"><summary title="Documents, details, edit">⋯</summary>
                             <div className="morepanel">
@@ -145,10 +234,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                             </div>
                           </details>
                         )}
-                      </td>
-                    </tr>); })}
-                </tbody></table>
-              </section>);
+                      </div>
+                    </div>); })}
+                </div>
+              </details>);
           })}
           {view === "tasks" && mayEdit && active && (
             <details className="addtask"><summary className="mini">+ Add a task</summary>
@@ -166,33 +255,46 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <section className="card">
             <div className="ch"><span className="eyebrow">Applications</span><span className="mini">{apps.length}, prepared and filed by S.A.M.</span></div>
             <div className="cb grid gap-3">
-              {apps.sort((a, b) => (proj.get(a.id)!.start < proj.get(b.id)!.start ? -1 : 1)).map((a) => {
-                const f = files.find((x) => x.id === a.link_id);
-                const up = upstream(a.id, deps, byId).filter((t) => t.status !== "not_needed");
-                const doneUp = up.filter((t) => t.status === "done").length;
-                const pct = f && ["approved", "published", "closed"].includes(f.stage) ? 100 : up.length ? Math.round((100 * doneUp) / up.length) : a.status === "done" ? 100 : 0;
-                const stageTone = f ? STAGE_TONE[f.stage] : "";
+              {appRows.map(({ a, f, up, doneUp, ty, where, tone }) => {
+                const granted = (f && ["approved", "published", "closed"].includes(f.stage)) || (!f && a.status === "done");
+                const step = granted ? 4 : !f ? -1 : f.stage === "submitted" || f.stage === "remarks" ? 2 : 0; // index of the current step; 4 = all done, -1 = not opened yet
                 const canOpen = mayWork(a) && !a.link_id && a.status !== "done" && a.status !== "not_needed" && active;
+                const canSkip = mayEdit && a.status !== "not_needed" && !a.link_id && active;
+                const canDone = cmm && a.status !== "done" && a.status !== "not_needed" && !a.link_id && active;
+                const canReopen = cmm && a.status === "done" && !a.link_id && active;
+                const { plate, name } = plateOf(a.title, a.link_ref ?? ENT[p.entity]?.auth ?? "CAA");
+                const what = a.detail ?? ty?.notes ?? null;
+                const left = up.filter((t) => t.status !== "done");
                 return (
-                  <div key={a.id} className="appcard">
-                    {/* the name the authority gives the application, where it is filed, then one sentence on what it is for */}
-                    <div className="flex items-baseline gap-2">
-                      <b className="appname">{f ? <Link className="underline" href={`/proj/auth/${f.id}`}>{a.title}</Link> : a.title}</b>
-                      <span className="mini ml-auto" style={{ flex: "none" }}>{a.owner_role ?? "CMM"}</span>
+                  <div key={a.id} className={"appc " + tone + (a.status === "not_needed" ? " off" : "")}>
+                    {/* the plate carries the form number, then the name the authority gives the application and one sentence on what it is for */}
+                    <div className="apphead">
+                      <span className="plate">{plate}</span>
+                      <div className="flex-1 min-w-0">
+                        {where && <div className="appauth">{where}</div>}
+                        <b className="appname">{f ? <Link className="underline" href={`/proj/auth/${f.id}`}>{name}</Link> : name}</b>
+                      </div>
+                      {(canOpen || canSkip || canDone || canReopen) && (
+                        <details className="more"><summary title="Open now, not needed, already granted">⋯</summary>
+                          <div className="morepanel" style={{ width: 340 }}>
+                            {canOpen && <form action={openFileForTask} className="flex items-center gap-2"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><button className="btn" type="submit">Open the application now</button><span className="mini">without waiting for the tasks</span></form>}
+                            {canSkip && <form action={updateTask} className="grid gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="not_needed" /><span className="mini">Not needed in this project, because (kept for the authority)</span><div className="flex gap-2"><input name="not_needed_reason" className="inp" placeholder="reason" required /><button className="btn" type="submit">Not needed</button></div></form>}
+                            {canDone && <form action={updateTask} className="grid gap-1" title="Application already granted outside S.A.M. (project taken over from Monday / Centrik)"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="done" /><span className="mini">Already granted outside S.A.M., on</span><div className="flex gap-2"><input name="done_at" type="date" className="inp" /><button className="btn" type="submit">Already granted</button></div></form>}
+                            {canReopen && <form action={updateTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="todo" /><button className="btn" type="submit">Reopen</button></form>}
+                          </div>
+                        </details>
+                      )}
                     </div>
-                    {(() => { const ty = a.link_ref ? appTypes.get(a.link_ref) : undefined; const portal = ty?.routes?.[p.entity]?.portal; const where = [portal, ty && ty.name !== a.title ? ty.name : null].filter(Boolean).join(", "); const what = a.detail ?? ty?.notes ?? null; return (<>
-                      {where && <div className="mini">{where}</div>}
-                      {what && <p className="appwhat">{what}</p>}
-                    </>); })()}
-                    <div className="bar wide mt-1"><i style={{ width: `${pct}%` }} /></div>
-                    <div className="mini flex items-center gap-2 flex-wrap mt-1">
-                      {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : isConditional(a) ? <span><span className="pill">Conditional</span> {up.length ? `${doneUp} / ${up.length} tasks done, ` : ""}your call: open it, or mark it not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"}, {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
-                      {canOpen && <form action={openFileForTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><button className="linkbtn" type="submit">open now</button></form>}
-                      {mayEdit && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="not_needed" /><input name="not_needed_reason" className="inp" style={{ height: 22, fontSize: 12, width: 150 }} placeholder="not needed because…" required /><button className="linkbtn" type="submit">not needed</button></form>}
-                      {cmm && a.status !== "done" && a.status !== "not_needed" && !a.link_id && active && <form action={updateTask} className="flex items-center gap-1" title="Application already granted outside S.A.M. (project taken over from Monday / Centrik)"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="done" /><input name="done_at" type="date" className="inp" style={{ height: 22, fontSize: 12, width: 130 }} /><button className="linkbtn" type="submit">already done</button></form>}
-                      {cmm && a.status === "done" && !a.link_id && active && <form action={updateTask}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="task_id" value={a.id} /><input type="hidden" name="status" value="todo" /><button className="linkbtn" type="submit">reopen</button></form>}
-                    </div>
-                    {up.length > 0 && !f && <div className="mini" style={{ color: "var(--slate5)" }} title={up.map((t) => `${t.title}${t.status === "done" ? " (done)" : ""}`).join("\n")}>{up.filter((t) => t.status !== "done").slice(0, 3).map((t) => t.title).join(", ")}{up.filter((t) => t.status !== "done").length > 3 ? ", …" : ""}</div>}
+                    {what && <p className="appwhat">{what}</p>}
+                    {a.status === "not_needed" ? <div className="mini"><span className="pill">Not needed</span> {a.not_needed_reason ?? ""}</div> : (<>
+                      <div className="steps">{APP_STEPS.map((l, i) => <span key={l} className={i < step ? "done" : i === step ? "cur" : ""}>{l}</span>)}</div>
+                      <div className="mini flex items-center gap-2 flex-wrap">
+                        {f ? <><span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}<span className="ml-auto">{a.owner_role ?? "CMM"}</span></>
+                          : granted ? <span className="green">granted {fr(a.done_at)}, outside S.A.M.</span>
+                          : isConditional(a) ? <span><span className="pill">Conditional</span> your call: open it from the menu, or mark it not needed</span>
+                          : left.length ? <span title={left.map((t) => t.title).join("\n")}><b>Waits for {left.length} {left.length > 1 ? "tasks" : "task"}</b>{up.length ? `, ${doneUp} of ${up.length} done` : ""}. Next: {left[0].title.length > 60 ? left[0].title.slice(0, 58) + "…" : left[0].title}</span>
+                          : <span>Ready, S.A.M. opens the file</span>}
+                      </div></>)}
                   </div>);
               })}
               {!apps.length && <p className="mini text-slate6">No application in this project.</p>}
