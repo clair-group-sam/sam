@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Heading, Part } from "@/lib/docs";
+import ReadEnd from "@/components/ReadEnd";
 
 export type TocItem = { id: string; ref: string; title: string | null; part: string; headings: Heading[] };
 type Hit = { ref: string; title: string | null; snippet: string; n: number };
@@ -12,11 +13,14 @@ type Props = {
   /** DOC-15 · the document plate: what the Web Manuals page header carried (brand, code, page, date, issue / revision) */
   plate?: { brand: string; code: string; docTitle: string; issue: number; rev: string; pg: string; date: string; pageRev: string; owner: string; logo?: string; fbDate?: string; fbRev?: string } | null;
   initialQuery?: string;
+  /** DOC-17 · the person has not acknowledged the revision in force: reading its changed chapters to their end acknowledges it */
+  ack?: { needed: string[] } | null;
 };
 
 type Chapter = NonNullable<Props["active"]>;
 type Loaded = { ref: string; title: string | null; html: string; pages: number; firstPage: string; cover: boolean; start: { pg: string; date: string; rev: string; logo?: string } | null };
-export default function Reader({ manualId, revId, parts, toc, active: first, plate: plate0 = null, initialQuery = "" }: Props) {
+export default function Reader({ manualId, revId, parts, toc, active: first, plate: plate0 = null, initialQuery = "", ack = null }: Props) {
+  const [readLeft, setReadLeft] = useState<number | null>(null);
   const router = useRouter();
   // DOC-16 · a chapter opens without reloading the page: only its text is asked for, the contents and the header stay in place; the chapters
   // around the one being read are fetched ahead. The address still changes, so a link or a reload lands on the same chapter.
@@ -188,6 +192,8 @@ export default function Reader({ manualId, revId, parts, toc, active: first, pla
                 // a link to another chapter of this revision opens like a click in the contents; anything else is a real navigation
                 if (u.pathname === `/docs/manual/${manualId}` && u.searchParams.get("rev") === revId && sec && toc.some((t) => t.ref === sec)) { if (sec === active.ref) { if (u.hash) toView(document.getElementById(u.hash.slice(1))); } else void go(sec, u.hash); }
                 else { router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => toView(document.getElementById(u.hash.slice(1))), 400); } } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
+              {ack && ack.needed.includes(active.ref) && <ReadEnd key={active.ref} manualId={manualId} revId={revId} refKey={active.ref} onDone={(r) => setReadLeft(r.acknowledged ? 0 : r.left)} />}
+              {ack && readLeft !== null && <div className={"readnote" + (readLeft === 0 ? " ok" : "")}>{readLeft === 0 ? "Reading recorded: this revision is acknowledged." : `Chapter read. ${readLeft} changed chapter${readLeft > 1 ? "s" : ""} still to read before this revision counts as read.`}</div>}
               {plate && <div className="docfoot"><span>{plate.code}, {plate.docTitle}, Iss {plate.issue} Rev {plate.rev}</span><span>© {plate.owner}</span><span className="mono">{(cur ?? plate).pg}</span></div>}
               <div className="pager">
                 {prev ? <Link href={href(prev.ref)} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); void go(prev.ref); }}>‹ {prev.ref} {prev.title}</Link> : <span />}

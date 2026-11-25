@@ -241,6 +241,8 @@ export function taskCard(t: TaskRow, state?: CardState, opts: CardOpts = {}): un
 export async function cardFor(db: SupabaseClient, t: TaskRow, state?: CardState): Promise<unknown> {
   if (state) return taskCard(t, state);
   try {
+    // DOC-17 · a manual to read: the person reads in S.A.M. (or ForeFlight), then acknowledges from the card
+    if (t.kind === "reading" && t.ref_id && t.status === "open") return readAckCard(t);
     if (t.kind === "authority" && t.ref_id) {
       const { movesFrom } = await import("@/lib/authority");
       const { data: f } = await db.from("authority_files").select("id,stage,type_code,owner_role,owner_person,authority,portal_status,portal_read_on,last_exchange,last_exchange_on").eq("id", t.ref_id).maybeSingle();
@@ -384,6 +386,24 @@ export function submitConfirmCard(t: TaskRow, f: { id: string; title: string; au
   ], msteams: { width: "Full" } };
 }
 /** One card listing several tasks (new batch, or the morning digest): title, due, entity — and the Inbox. */
+/** DOC-17 · reading of a manual revision: open it, then "I have read" records the acknowledgement as in S.A.M. (via Teams). */
+export function readAckCard(t: TaskRow, state?: CardState): unknown {
+  const url = t.link ? `${origin()}${t.link}` : origin();
+  const body: unknown[] = [
+    { type: "TextBlock", text: `${t.entity} · Read & acknowledge`, size: "Small", weight: "Bolder", color: "Accent", spacing: "None" },
+    { type: "TextBlock", text: t.title, size: "Medium", weight: "Bolder", wrap: true },
+  ];
+  if (t.detail) body.push({ type: "TextBlock", text: frText(t.detail), wrap: true, spacing: "Small" });
+  if (t.due) body.push({ type: "FactSet", facts: [{ title: "Due", value: fr(t.due) + (t.due < todayISO() ? ", overdue" : "") }], spacing: "Small" });
+  if (state) {
+    body.push({ type: "TextBlock", text: `✓ Read, ${state.by}, ${state.at}`, wrap: true, color: "Good", weight: "Bolder", spacing: "Medium" });
+    return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body, actions: [{ type: "Action.OpenUrl", title: "Open in S.A.M.", url }], msteams: { width: "Full" } };
+  }
+  body.push({ type: "TextBlock", text: "Read what changed, then confirm here. Your acknowledgement is recorded in S.A.M. with the date and time.", wrap: true, isSubtle: true, spacing: "Medium" });
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.5", body,
+    actions: [{ type: "Action.OpenUrl", title: "Read what changed", url }, { type: "Action.Execute", title: "I have read it", verb: "manual_ack", style: "positive", data: { taskId: t.id } }], msteams: { width: "Full" } };
+}
+
 /** FB-158 · one card for a whole portal reading: the figures, what moved, what needs a decision — instead of one card per file. */
 export function readingCard(r: { created: number; updated: number; same: number; exceptions: { kind: string; ref: string; text: string }[] }, link: string): unknown {
   const moved = r.exceptions.filter((e) => e.kind === "Stage moved"); const look = r.exceptions.filter((e) => e.kind !== "Stage moved");
@@ -464,7 +484,7 @@ export async function notifyTasksByRef(db: SupabaseClient, refId: string): Promi
 export async function refreshCards(db: SupabaseClient, t: TaskRow, state: CardState | undefined, exceptConversation?: string): Promise<void> {
   const { data } = await db.from("teams_cards").select("*").eq("task_id", t.id).is("updated_at", null);
   for (const c of (data ?? []) as CardRow[]) {
-    if (c.card_kind === "task" && c.conversation_id !== exceptConversation) await updateCard(c, c.activity_id, taskCard(t, state), t.title);
+    if (c.card_kind === "task" && c.conversation_id !== exceptConversation) await updateCard(c, c.activity_id, t.kind === "reading" ? readAckCard(t, state) : taskCard(t, state), t.title);
     await db.from("teams_cards").update({ updated_at: new Date().toISOString() }).eq("id", c.id);
   }
 }

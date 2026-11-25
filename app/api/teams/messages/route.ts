@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { basePost, rolesIn } from "@/lib/session";
-import { ANSWERABLE_KINDS, cardFor, ensureConversation, findingCard, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type FindingLite, type TaskRow, promoCard } from "@/lib/teams";
+import { ANSWERABLE_KINDS, cardFor, ensureConversation, findingCard, infoCard, personFor, refreshCards, sendCard, sendText, stateOf, submitConfirmCard, taskCard, teamsConfigured, verifyBotJwt, type FindingLite, type TaskRow, promoCard, readAckCard } from "@/lib/teams";
 import { answerFromTeams, type Finding } from "@/lib/findings";
 import { applyMove } from "@/lib/authority-moves";
 import { completeAction, verifyActionCore } from "@/lib/actions-core";
@@ -93,6 +93,22 @@ export async function POST(req: NextRequest) {
       const state = { answered: verb === "task_done" ? "done" as const : "not_yet" as const, by: p.display_name, at: hhmm(), comment: comment || null };
       if (verb === "task_done") await refreshCards(db, { ...task, status: "done", answered_via: "teams", answer: comment || null }, state, ref.conversation_id);
       return cardResponse(taskCard(task, state));
+    }
+    if (verb === "manual_ack") {
+      // DOC-17 · acknowledgement of a manual revision from the card: the same record as the button in S.A.M., "via Teams"
+      const { data: t } = await db.from("tasks").select("*").eq("id", data.taskId ?? "").maybeSingle();
+      const task = t as TaskRow | null;
+      if (!task || task.kind !== "reading" || task.owner_person !== p.id) return msgResponse("This one is not addressed to you.");
+      const state = { answered: "done" as const, by: p.display_name, at: hhmm() };
+      if (task.status === "open" && task.ref_id) {
+        const at = now();
+        await db.from("readings").upsert({ revision_id: task.ref_id, person_id: p.id, acknowledged_at: at, via: "teams" }, { onConflict: "revision_id,person_id" });
+        await db.from("tasks").update({ status: "done", answered_via: "teams", answered_at: at }).eq("id", task.id);
+        await db.from("teams_inbound").insert({ person_id: p.id, aad_object_id: a.from.aadObjectId ?? null, kind: "action", verb, task_id: task.id, text: null, meta: { title: task.title } });
+        await db.from("audit_log").insert({ actor: p.id, entity: task.entity, object_type: "revision", object_id: task.ref_id, action: "acknowledged", after: { via: "teams" } });
+        await refreshCards(db, { ...task, status: "done", answered_via: "teams" }, state, ref.conversation_id);
+      }
+      return cardResponse(readAckCard(task, state));
     }
     if (verb === "promo_ack") {
       // SAF-09 · the person reads / acknowledges a bulletin or a notice on the card — recorded as in S.A.M., "via Teams"

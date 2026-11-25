@@ -145,3 +145,39 @@ export async function askManual(input: { manualId: string; revisionId: string; q
     return { ok: false, error: e instanceof Error ? e.message : "SAM could not answer, try again." };
   }
 }
+
+/* DOC-17 · acknowledgement by reading (manuals only). A person who reads to its end every chapter changed in the current published revision
+ * (or, for a first issue or a revision without marked changes, every chapter), or the whole "What changed" page, has the revision
+ * acknowledged for them: recorded with via = "reading", the reading task closes. Each chapter read is kept in the audit log. */
+const FRONT = /^(cover|couverture|table des mati|contents|sommaire|liste des pages|list of effective|r[ée]visions?$|record of revisions|liste de diffusion|distribution list)/i;
+export async function markRead(manualId: string, revisionId: string, ref: string): Promise<{ acknowledged: boolean; left: number }> {
+  const s = await getSession();
+  if (!s?.person || !manualId || !revisionId || !ref) return { acknowledged: false, left: -1 };
+  const sb = await supabaseServer(); const db = supabaseAdmin();
+  // only the revision in force, read with the person's own rights (the database refuses a manual outside their entities)
+  const { data: m } = await sb.from("manuals").select("id,entity").eq("id", manualId).maybeSingle();
+  if (!m) return { acknowledged: false, left: -1 };
+  const { data: revs } = await sb.from("revisions").select("id,step,published_at").eq("manual_id", manualId).in("step", ["published", "repository"]).order("published_at", { ascending: false, nullsFirst: false }).limit(1);
+  if ((revs ?? [])[0]?.id !== revisionId) return { acknowledged: false, left: -1 };
+  const { data: done } = await sb.from("readings").select("acknowledged_at").eq("revision_id", revisionId).eq("person_id", s.person.id).maybeSingle();
+  if ((done as { acknowledged_at?: string | null } | null)?.acknowledged_at) return { acknowledged: true, left: 0 };
+  const entity = (m as { entity: string }).entity;
+  await db.from("audit_log").insert({ actor: s.person.id, entity, object_type: "revision", object_id: revisionId, action: "chapter_read", after: { ref } });
+  let left = 0;
+  if (ref !== "*changes") {
+    const { data: secs } = await sb.from("revision_sections").select("ref,title,changed,deleted_at").eq("revision_id", revisionId);
+    const live = ((secs ?? []) as { ref: string; title: string | null; changed: boolean; deleted_at: string | null }[]).filter((x) => !x.deleted_at);
+    const changed = live.filter((x) => x.changed).map((x) => x.ref);
+    const needed = changed.length ? changed : live.filter((x) => x.ref !== "0" && !/^0(\.|$)/.test(x.ref) && !FRONT.test((x.title ?? "").trim())).map((x) => x.ref);
+    const { data: seen } = await db.from("audit_log").select("after").eq("actor", s.person.id).eq("object_id", revisionId).eq("action", "chapter_read").limit(2000);
+    const read = new Set(((seen ?? []) as { after: { ref?: string } | null }[]).map((x) => x.after?.ref ?? ""));
+    left = needed.filter((r) => !read.has(r)).length;
+  }
+  if (left > 0) return { acknowledged: false, left };
+  const at = new Date().toISOString();
+  await sb.from("readings").upsert({ revision_id: revisionId, person_id: s.person.id, acknowledged_at: at, via: "reading" }, { onConflict: "revision_id,person_id" });
+  await db.from("tasks").update({ status: "done", answered_via: "reading", answered_at: at }).eq("kind", "reading").eq("owner_person", s.person.id).eq("ref_id", revisionId).eq("status", "open");
+  await db.from("audit_log").insert({ actor: s.person.id, entity, object_type: "revision", object_id: revisionId, action: "acknowledged_by_reading", after: { last: ref } });
+  revalidatePath(`/docs/manual/${manualId}`); revalidatePath("/home/tasks");
+  return { acknowledged: true, left: 0 };
+}

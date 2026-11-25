@@ -1169,3 +1169,5 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 .pm-body p.np1.lead{font-weight:700;margin-top:4mm;border-bottom:.4pt solid #c9d3dc;padding-bottom:1mm}.pm-body p.np2{padding-left:4mm}.pm-body p.np3{padding-left:10mm}
 /* the editor shows the page marks too */
 .ProseMirror .pgmark{position:relative;text-align:center;margin:24px 0;font-size:12px;color:var(--slate6);line-height:1;user-select:none}.ProseMirror .pgmark.ProseMirror-selectednode{outline:2px solid var(--cyan);outline-offset:4px;border-radius:var(--r-xs)}
+.readend{height:1px}
+.readnote{max-width:82ch;margin:18px auto 0;padding:8px 12px;border-radius:var(--r-sm);background:var(--blue05);border:1px solid var(--line);font-size:13px;color:var(--slate7)}.readnote.ok{background:var(--green-s);border-color:transparent;color:var(--green-ink);font-weight:600}
