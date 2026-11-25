@@ -49,6 +49,12 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
   // figures: private bucket → one batch of signed URLs (10 min) instead of one redirect per image; no lazy loading in print
   const keys = new Set<string>();
   for (const x of sections) for (const mm of (x.body.html ?? "").matchAll(/src="\/api\/files\/manuals\/([^"?#]+)"/g)) keys.add(decodeURIComponent(mm[1]));
+  // DOC-15 · the document plate on every sheet: its logo comes from the page header of the manual, kept with the chapter
+  type Start = { pg: string; date: string; rev: string; logo?: string };
+  const startOf = (x: Section) => (x.body as { page_start?: Start | null }).page_start ?? null;
+  const usePlates = sections.some((x) => !!startOf(x));
+  const logoKey = (u?: string) => (u && u.startsWith("/api/files/manuals/") ? decodeURIComponent(u.slice("/api/files/manuals/".length)) : null);
+  for (const x of sections) { const k = logoKey(startOf(x)?.logo); if (k) keys.add(k); }
   const signed = new Map<string, string>();
   if (keys.size) {
     const { data } = await supabaseAdmin().storage.from("manuals").createSignedUrls([...keys], 600);
@@ -110,8 +116,9 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
 
   const pageCss = `
 @page { size: A4; margin: 20mm 15mm 18mm 20mm;
-  @top-left { content: ${css(head)}; font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; vertical-align: bottom; padding-bottom: 3mm; border-bottom: .4pt solid #c9d3dc; }
-  @top-right { content: ${css(right)}; font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; vertical-align: bottom; padding-bottom: 3mm; border-bottom: .4pt solid #c9d3dc; }
+  ${usePlates ? "margin-top: 12mm;" : ""}
+  @top-left { content: ${usePlates ? "none" : css(head)}; font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; vertical-align: bottom; padding-bottom: 3mm; border-bottom: .4pt solid #c9d3dc; }
+  @top-right { content: ${usePlates ? "none" : css(right)}; font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; vertical-align: bottom; padding-bottom: 3mm; border-bottom: .4pt solid #c9d3dc; }
   @bottom-left { content: ${css(foot)}; font: 7pt Inter, Arial, sans-serif; color: ${state === "published" ? "#7a8794" : "#b3261e"}; }
   @bottom-right { content: "Page " counter(page) " / " counter(pages); font: 600 7.5pt Inter, Arial, sans-serif; color: #44546a; }
 }
@@ -184,10 +191,36 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
           <div key={x.id}>
             <article id={chapId(x.ref)} className={"pm-ch" + (newPart ? " newpart" : "") + (cover ? " cover" : "")}>
               {newPart && parts.length > 1 && <h1 className="pm-part">{partLabel.get(p) ?? p}</h1>}
+              {usePlates && !stampedHere ? (() => {
+                // one sheet per original page: the plate (logo, title, page, date, issue / revision) heads each sheet and repeats if the page runs over
+                const st = startOf(x); const pad = (n: number) => String(n).padStart(2, "0");
+                const first = { pg: cover ? "" : st?.pg ?? x.body.pages?.[0] ?? "", date: st?.date || (current.published_at ? frd(current.published_at) : ""), rev: st?.rev || `${pad(current.issue)} / ${current.rev}` };
+                const html = linkify(fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`), toc);
+                const sheets: { pg: string; date: string; rev: string; html: string }[] = []; let cur = { ...first, html: "" }; let last = 0;
+                const re = /<div class="pgmark" data-pg="([^"]*)" data-date="([^"]*)" data-rev="([^"]*)"><\/div>/g; let mm: RegExpExecArray | null;
+                while ((mm = re.exec(html))) { cur.html = html.slice(last, mm.index); sheets.push(cur); cur = { pg: mm[1], date: mm[2] || first.date, rev: mm[3] || first.rev, html: "" }; last = mm.index + mm[0].length; }
+                cur.html = html.slice(last); sheets.push(cur);
+                const lk = logoKey(st?.logo ?? sections.map((y) => startOf(y)?.logo).find(Boolean)); const logo = lk ? signed.get(lk) : null;
+                const title = cover ? manual.title : /^\d+(\.\d+)*\s/.test(x.title ?? "") ? x.title : `${x.ref} ${x.title ?? ""}`;
+                return (<>
+                  <h2 className="pm-cht vh">{title}</h2>
+                  {sheets.map((sh, k) => (
+                    <table key={k} className="pm-sheet"><thead><tr><td>
+                      <div className="pm-plate">
+                        <div className="l">{logo ? <img src={logo} alt="" /> : <b>{ent?.name ?? manual.entity}</b>}</div>
+                        <div className="t">{!cover && <small>{manual.title}</small>}<b>{title}</b>{x.changed && <i className="pm-revtag">revised</i>}</div>
+                        <dl>{!cover && <><dt>Page</dt><dd>{sh.pg || "-"}</dd></>}<dt>Date</dt><dd>{sh.date || "-"}</dd><dt>Iss / Rev</dt><dd>{sh.rev}</dd></dl>
+                      </div>
+                    </td></tr></thead>
+                      <tbody><tr><td><div className="pm-body" dangerouslySetInnerHTML={{ __html: sh.html }} /></td></tr></tbody></table>
+                  ))}
+                </>);
+              })() : (<>
               <h2 className={"pm-cht" + (cover ? " vh" : "")}>{/^\d+(\.\d+)*\s/.test(x.title ?? "") ? null : <span>{x.ref}</span>} {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h2>
               {stampedHere
                 ? <p className="pm-small">Replaced by the list of effective pages stamped by {ent?.auth ?? "the authority"} ({lepPages.length} page{lepPages.length === 1 ? "" : "s"}).</p>
                 : <div className="pm-body" dangerouslySetInnerHTML={{ __html: linkify(fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`), toc) }} />}
+              </>)}
             </article>
             {stampedHere && lepPages.map((l) => <section key={l.path} className="pm-scan">{retSigned.get(l.path) && <img src={retSigned.get(l.path)} alt="" />}</section>)}
             {i === afterCover && approvalPages.length > 0 && <AuthorityPages />}

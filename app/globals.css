@@ -1137,3 +1137,12 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 @media screen{.pm-body .pgmark{margin:8mm -16mm 6mm;padding:1mm 16mm 0;border-top:1px dashed #9aa9b6}}
 .pm-ch.cover .pm-body table{width:auto;min-width:90mm;margin:6mm auto;border:.6pt solid var(--navy);border-collapse:separate;border-radius:1.5mm}.pm-ch.cover .pm-body td{border:0;padding:5mm 10mm;background:none}
 .pm-ch.cover .pm-body img{max-width:120mm;margin:0 auto;display:block}.pm-ch.cover .pm-body{text-align:center}
+/* DOC-15 · PDF sheets: the three-cell plate heads every sheet (a table header repeats when one original page runs over two sheets) */
+.pm-sheet{width:100%;border-collapse:collapse;table-layout:fixed}.pm-sheet>thead{display:table-header-group}.pm-sheet>thead>tr>td,.pm-sheet>tbody>tr>td{padding:0;border:0;vertical-align:top}
+.pm-plate{display:grid;grid-template-columns:38mm minmax(0,1fr) 40mm;border-bottom:1.2pt solid var(--navy);margin-bottom:6mm}
+.pm-plate>*{padding:2.5mm 3mm;display:flex;flex-direction:column;justify-content:center;min-width:0;margin:0}.pm-plate>*+*{border-left:.5pt solid #c9d3dc}
+.pm-plate .l img{max-width:100%;max-height:13mm;object-fit:contain;align-self:flex-start}.pm-plate .l b{font-size:9pt;letter-spacing:.1em;text-transform:uppercase}
+.pm-plate .t{text-align:center}.pm-plate .t small{font-size:7.5pt;color:#44546a;font-weight:600}.pm-plate .t b{font-size:11.5pt;line-height:1.25;color:var(--navy)}
+.pm-plate dl{display:grid;grid-template-columns:auto 1fr;gap:.3mm 3mm;align-content:center;font-size:7.5pt}.pm-plate dt{color:#44546a}.pm-plate dd{margin:0;text-align:right;font-weight:700;font-family:ui-monospace,Menlo,monospace}
+@media print{.pm-sheet+.pm-sheet{break-before:page}}
+@media screen{.pm-sheet+.pm-sheet{margin-top:12mm;border-top:1px dashed #9aa9b6}.pm-sheet+.pm-sheet>thead>tr>td{padding-top:10mm}}
