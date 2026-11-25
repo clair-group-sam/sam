@@ -131,9 +131,9 @@ export default function ProjectPlanner({ entity: ent0, entities }: { entity: str
             </div>
           </section>
 
-          {plan.phases.map((ph) => { const list = plan.tasks.filter((t) => t.phase === ph.key); if (!list.length) return null; return (
+          {plan.phases.map((ph, pi) => { const list = plan.tasks.filter((t) => t.phase === ph.key); if (!list.length) return null; return (
             <section key={ph.key} className="card">
-              <div className="ch"><span className="eyebrow">{ph.label}</span><span className="mini">{list.filter((t) => keep.has(t.key)).length} / {list.length} kept</span></div>
+              <div className="ch planphase"><h2><span className="num">{pi + 1}</span>{ph.label.replace(/^\s*\d+\s*[·.:)-]\s*/, "")}</h2><span className="mini">{list.filter((t) => keep.has(t.key)).length} / {list.length} kept, {list.filter((t) => keep.has(t.key)).reduce((a, t) => a + (t.days ?? 0), 0)} days</span></div>
               <div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th style={{ width: 36 }}></th><th>Task</th><th style={{ width: 118 }}>Post</th><th style={{ width: 88 }}>Days</th><th style={{ width: "24%" }}>After</th></tr></thead><tbody>
                 {list.map((t) => { const on = keep.has(t.key); return (
                   <tr key={t.key} style={on ? undefined : { opacity: 0.45 }}>

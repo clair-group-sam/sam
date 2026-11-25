@@ -682,6 +682,8 @@ button:focus-visible,.btn:focus-visible,a:focus-visible,summary:focus-visible,in
 .assume{display:grid;gap:5px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm)}.assume .seg{justify-self:start}.assume .seg button{font-size:12px;padding:3px 10px}
 /* planner: the post and days of a task are edited in the row; the whole value must show, even under Larger text */
 .inp.plancell{padding:6px 8px;text-align:center;min-width:0}
+/* planner: a phase is a chapter of the plan: numbered title on a tinted band */
+.card .ch.planphase{background:var(--blue1);border-radius:var(--r) var(--r) 0 0}.planphase h2{margin:0;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;color:var(--navy);letter-spacing:0}.planphase .num{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--navy);color:var(--white);font-size:12.5px;font-weight:700}
 .samwait{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--blue05)}.samwait .sb{margin:0}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
 /* a form being sent: its submit button shows it is working */
