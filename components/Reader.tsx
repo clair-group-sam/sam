@@ -32,6 +32,8 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
   const withSubs = toc.filter((t) => t.headings.length > 0);
   const allShown = withSubs.length > 0 && withSubs.every((t) => shown.has(t.ref));
   const art = useRef<HTMLDivElement>(null);
+  // moves inside the reading area only: scrollIntoView also shifts the clipped cards around it, and the top of the page can no longer be reached
+  const toView = (node: Element | null, center = false) => { const box = art.current?.parentElement; if (!box || !node) return; const d = node.getBoundingClientRect().top - box.getBoundingClientRect().top; box.scrollTo({ top: box.scrollTop + d - (center ? box.clientHeight / 2 : 8), behavior: "smooth" }); };
   const colorOf = useMemo(() => Object.fromEntries(parts.map((p) => [p.key, p.color])), [parts]);
   const idx = toc.findIndex((t) => t.ref === active?.ref);
   const prev = idx > 0 ? toc[idx - 1] : null, next = idx >= 0 && idx < toc.length - 1 ? toc[idx + 1] : null;
@@ -64,7 +66,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
       while ((m = re.exec(t.data))) { frag.appendChild(document.createTextNode(t.data.slice(last, m.index))); const mk = document.createElement("mark"); mk.className = "hl"; mk.textContent = m[0]; frag.appendChild(mk); first = first ?? mk; last = m.index + m[0].length; }
       frag.appendChild(document.createTextNode(t.data.slice(last))); t.replaceWith(frag);
     }
-    first?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (first) toView(first, true);
   }, [q, mode, active?.ref, active?.html]);
 
   // reading progress + keyboard navigation
@@ -135,7 +137,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
                     {t.headings.length > 0 && <b className="fold" role="button" aria-label={shown.has(t.ref) ? "Hide the sub-chapters" : "Show the sub-chapters"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(t.ref); }}>{shown.has(t.ref) ? "▾" : "▸"}</b>}
                   </Link>
                   {(shown.has(t.ref) || !!ql) && t.headings.filter((h) => !ql || h.text.toLowerCase().includes(ql) || `${t.ref} ${t.title ?? ""}`.toLowerCase().includes(ql)).map((h) => (
-                    <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level + (active?.ref === t.ref && here === h.id ? " on" : "")} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" }); } }}>{(() => { const mm = /^([A-Z]{0,3}\.?\d+(?:\.\d+)*\.?)\s+(\S[\s\S]*)$/.exec(h.text); return mm ? <><span className="shn">{mm[1]}</span><span>{mm[2]}</span></> : <span>{h.text}</span>; })()}</a>
+                    <a key={h.id} href={active?.ref === t.ref ? `#${h.id}` : href(t.ref) + `#${h.id}`} className={"sh l" + h.level + (active?.ref === t.ref && here === h.id ? " on" : "")} onClick={(e) => { if (active?.ref === t.ref) { e.preventDefault(); toView(document.getElementById(h.id)); } }}>{(() => { const mm = /^([A-Z]{0,3}\.?\d+(?:\.\d+)*\.?)\s+(\S[\s\S]*)$/.exec(h.text); return mm ? <><span className="shn">{mm[1]}</span><span>{mm[2]}</span></> : <span>{h.text}</span>; })()}</a>
                   ))}
                 </div>
               ))}
@@ -159,7 +161,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
             </div>)}
             <div className="readscroll">
-              <article ref={art} className={"reader" + (active.cover ? " iscover" : "")} onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
+              <article ref={art} className={"reader" + (active.cover ? " iscover" : "")} onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => toView(document.getElementById(u.hash.slice(1))), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
               {plate && <div className="docfoot"><span>{plate.code}, {plate.docTitle}, Iss {plate.issue} Rev {plate.rev}</span><span>© {plate.owner}</span><span className="mono">{(cur ?? plate).pg}</span></div>}
               <div className="pager">
                 {prev ? <Link href={href(prev.ref)}>‹ {prev.ref} {prev.title}</Link> : <span />}
