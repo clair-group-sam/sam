@@ -1171,3 +1171,8 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 .ProseMirror .pgmark{position:relative;text-align:center;margin:24px 0;font-size:12px;color:var(--slate6);line-height:1;user-select:none}.ProseMirror .pgmark.ProseMirror-selectednode{outline:2px solid var(--cyan);outline-offset:4px;border-radius:var(--r-xs)}
 .readend{height:1px}
 .readnote{max-width:82ch;margin:18px auto 0;padding:8px 12px;border-radius:var(--r-sm);background:var(--blue05);border:1px solid var(--line);font-size:13px;color:var(--slate7)}.readnote.ok{background:var(--green-s);border-color:transparent;color:var(--green-ink);font-weight:600}
+/* Certificates: sub-panels inside a family (approval categories, aircraft types, registrations) */
+details.certsub{border-top:1px solid var(--line)}details.certsub>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 18px 10px 34px}details.certsub>summary::-webkit-details-marker{display:none}
+details.certsub>summary::before{content:"";flex:none;width:6px;height:6px;border-right:2px solid var(--slate6);border-bottom:2px solid var(--slate6);transform:rotate(-45deg);transition:transform .12s}details.certsub[open]>summary::before{transform:rotate(45deg)}
+details.certsub>summary:hover{background:var(--blue05)}details.certsub .cname{font-weight:650;font-size:14px}details.certsub.l2>summary{padding-left:52px}details.certsub.l2 .cname{font-size:13px}
+details.certsub .tbl{margin:0 0 6px}
