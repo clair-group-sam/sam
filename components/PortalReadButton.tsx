@@ -8,7 +8,9 @@ import { receivePortalReading } from "@/app/(app)/proj/auth/sync/actions";
  * read them (read-only) and hand the lines back; S.A.M. applies what mirrors the portal and shows only the exceptions. */
 type Result = { portal: string; label?: string; account?: string | null; entity?: string | null; observations?: number; lines?: unknown[]; signIn?: boolean; error?: string; skipped?: string[] };
 type Summary = Awaited<ReturnType<typeof receivePortalReading>>;
-export default function PortalReadButton({ portals }: { portals: { key: string; label: string }[] }) {
+const ACCOUNT: Record<string, string> = { ASFFR: "ASTONFLY", ASJFR: "ASTONJET" };
+/** `entity`: the entity chosen in the top bar; null in the Group view. Only its portals are asked for, and a METEOR session signed in with the other entity's account is not applied. */
+export default function PortalReadButton({ portals, entity = null }: { portals: { key: string; label: string }[]; entity?: string | null }) {
   const router = useRouter(); const [ext, setExt] = useState<string | null | undefined>(undefined);
   const [busy, setBusy] = useState<string | null>(null); const [sum, setSum] = useState<Summary | null>(null); const [notes, setNotes] = useState<string[]>([]);
   const reqId = useRef("");
@@ -22,7 +24,9 @@ export default function PortalReadButton({ portals }: { portals: { key: string; 
       if (m.done && m.results) {
         reqId.current = ""; const n: string[] = [];
         for (const r of m.results) { if (r.signIn) n.push(`${r.label ?? r.portal}: sign in on the portal in Chrome, then click again.`); else if (r.error) n.push(`${r.label ?? r.portal}: ${r.error}`); for (const sk of r.skipped ?? []) n.push(sk);
-          if (r.portal === "meteor" && r.entity) n.push(`METEOR read with the ${r.entity === "ASFFR" ? "ASTONFLY" : "ASTONJET"} account (${r.lines?.length ?? 0} open lines, ${r.observations ?? 0} observations not followed). METEOR allows one account at a time: sign in with the ${r.entity === "ASFFR" ? "ASTONJET" : "ASTONFLY"} account and click again to read the other entity.`); }
+          if (r.portal === "meteor" && r.entity && entity && r.entity !== entity) { n.push(`METEOR is signed in with the ${ACCOUNT[r.entity] ?? r.entity} account, which belongs to ${r.entity}: nothing was applied. Sign in on METEOR with the ${ACCOUNT[entity] ?? entity} account and click again, or choose ${r.entity} in the top bar.`); r.lines = []; }
+          else if (r.portal === "meteor" && r.entity && entity) n.push(`METEOR read with the ${ACCOUNT[r.entity] ?? r.entity} account (${r.lines?.length ?? 0} open lines, ${r.observations ?? 0} observations not followed).`);
+          else if (r.portal === "meteor" && r.entity) n.push(`METEOR read with the ${r.entity === "ASFFR" ? "ASTONFLY" : "ASTONJET"} account (${r.lines?.length ?? 0} open lines, ${r.observations ?? 0} observations not followed). METEOR allows one account at a time: sign in with the ${r.entity === "ASFFR" ? "ASTONJET" : "ASTONFLY"} account and click again to read the other entity.`); }
         setNotes(n);
         const ok = m.results.filter((r) => Array.isArray(r.lines) && r.lines.length);
         if (!ok.length) { setBusy(null); return; }
@@ -32,7 +36,7 @@ export default function PortalReadButton({ portals }: { portals: { key: string; 
       }
     };
     window.addEventListener("message", on); return () => window.removeEventListener("message", on);
-  }, [router]);
+  }, [router, entity]);
   const start = () => { setSum(null); setNotes([]); reqId.current = Math.random().toString(36).slice(2); setBusy("Asking the S.A.M. Reader…"); window.postMessage({ type: "SAM_READ_PORTALS", id: reqId.current, portals: portals.map((p) => p.key) }, location.origin); };
   if (ext === undefined) return null;
   return (

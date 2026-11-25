@@ -15,7 +15,11 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
   if (!s) redirect("/login");
   const sp = await searchParams;
   const ents = s.group ? ENTS4 : s.entities;
-  const entity = sp.entity && (sp.entity === "ALL" ? s.group : ents.includes(sp.entity)) ? sp.entity : s.entity;
+  // the scope is the entity chosen in the top bar (Group = every entity of the person): no second entity filter on the page
+  const entity = s.entity;
+  // TMCAD serves Astonjet Ltd (Malta), METEOR the two DSAC entities; OSAC (Astontec) has no portal read here
+  const PORTALS = [{ key: "tmcad", label: "TMCAD", ents: ["ASJMT"] }, { key: "meteor", label: "METEOR", ents: ["ASJFR", "ASFFR"] }];
+  const portals = PORTALS.filter((x) => (entity === "ALL" ? x.ents.some((e) => ents.includes(e)) : x.ents.includes(entity))).map(({ key, label }) => ({ key, label }));
   const db = supabaseAdmin();
   let q = db.from("authority_files").select("*").order("updated_at", { ascending: false }).limit(500);
   if (entity !== "ALL") q = q.eq("entity", entity); else q = q.in("entity", ents);
@@ -47,13 +51,13 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
   const ours = o.filter((x) => ballOf(x) === "us").length;
   const lateOurs = o.filter((x) => x.target_date && x.target_date < t0 && ballOf(x) === "us").length;
   const soon = o.filter((x) => dueState(x.target_date, t0).state === "soon").length;
-  const link = (p: Record<string, string | undefined>) => { const u = new URLSearchParams(); const all = { entity, stage, type: sp.type, q: sp.q, ...p }; for (const [k, v] of Object.entries(all)) if (v) u.set(k, v); return `/proj/auth?${u}`; };
+  const link = (p: Record<string, string | undefined>) => { const u = new URLSearchParams(); const all = { stage, type: sp.type, q: sp.q, ...p }; for (const [k, v] of Object.entries(all)) if (v) u.set(k, v); return `/proj/auth?${u}`; };
 
   return (
     <>
       <PageHeader eyebrow="Projects, CAA applications" title="CAA applications" sub="Applications, notifications and reports to TM-CAD, the DSAC and the OSAC, one file per change, from the trigger to the close-out."
         right={<div className="flex gap-2"><Link href="/dash/due" className="btn">Deadlines</Link><Link href="/proj/auth/new" className="btn primary">+ New file</Link></div>} />
-      {reader && <PortalReadButton portals={[{ key: "tmcad", label: "TMCAD" }, { key: "meteor", label: "METEOR" }]} />}
+      {reader && portals.length > 0 && <PortalReadButton key={entity} portals={portals} entity={entity === "ALL" ? null : entity} />}
       <div className="grid grid-cols-5 gap-4 mb-5">
         <Metric label="Open files" value={o.length} hint={entity === "ALL" ? "all entities" : ENT[entity]?.name} />
         <Metric label="Our turn" value={ours} tone={ours ? "amber" : undefined} hint="an action is expected from us" />
@@ -62,9 +66,8 @@ export default async function AuthorityFiles({ searchParams }: { searchParams: P
         <Metric label="Due within 15 days" value={soon} tone={soon ? "amber" : undefined} hint="target date" />
       </div>
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        {ents.length > 1 && <div className="chips">{(s.group ? ["ALL", ...ents] : ents).map((e) => <Link key={e} href={link({ entity: e })} className={"ent " + e + (e === entity ? " on" : "")}>{e}</Link>)}</div>}
         <div className="chips">{[["open", "Open"], ["draft", "Draft"], ["compliance", "Compliance"], ["ready", "Ready"], ["submitted", "At the authority"], ["remarks", "Remarks"], ["approved", "Decision"], ["closed", "Closed"], ["all", "All"]].map(([k, l]) => <Link key={k} href={link({ stage: k })} className={"ent" + (stage === k ? " on" : "")}>{l}</Link>)}</div>
-        <form className="flex gap-2 ml-auto" action="/proj/auth"><input type="hidden" name="entity" value={entity} /><input type="hidden" name="stage" value={stage} /><input name="q" defaultValue={sp.q ?? ""} placeholder="Search title, reference, finding, registration" className="inp" style={{ width: 300, marginTop: 0 }} /><button className="btn" type="submit">Search</button></form>
+        <form className="flex gap-2 ml-auto" action="/proj/auth"><input type="hidden" name="stage" value={stage} /><input name="q" defaultValue={sp.q ?? ""} placeholder="Search title, reference, finding, registration" className="inp" style={{ width: 300, marginTop: 0 }} /><button className="btn" type="submit">Search</button></form>
       </div>
       <section className="card">
         <table className="tbl">
