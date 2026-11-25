@@ -170,8 +170,8 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       {current && !(current.step === "published" || current.step === "repository") && (
         <div className="previewbar mb-4">
           <div><b>Preview. Rev {current.rev} is not published</b> ({STEP_LABEL[current.step]}). This is how readers will see it once published{published[0] ? `; today they read Rev ${published[0].rev}` : ""}.</div>
-          {(isCmm(s) || ownsManual(s, manual.owner_role)) && <Link className="btn primary" href={`/docs/editor/${current.id}?tab=write${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`}>‹ Back to the draft</Link>}
-          {published[0] && <Link className="btn" href={`/docs/manual/${manual.id}`}>Published version</Link>}
+          {(isCmm(s) || ownsManual(s, manual.owner_role)) && <Link className="btn primary" href={`/docs/editor/${current.id}?tab=write${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`}>Edit this draft</Link>}
+          {published[0] && <Link className="btn" href={`/docs/manual/${manual.id}?rev=${published[0].id}${sec ? `&sec=${encodeURIComponent(sec)}` : ""}`}>Read the published Rev {published[0].rev}</Link>}
         </div>
       )}
       {current && (current.step === "published" || current.step === "repository") && tab !== "history" && (
