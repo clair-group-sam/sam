@@ -522,7 +522,8 @@ details.more>summary::-webkit-details-marker{display:none}details.more[open]>sum
 details.addtask>summary{list-style:none;cursor:pointer;padding:8px 14px;color:var(--slate6)}details.addtask>summary::-webkit-details-marker{display:none}details.addtask>summary:hover{color:var(--navy)}
 .pill.later{color:var(--slate45, var(--field));border-color:var(--line);background:var(--white)}
 .prow.isdone td{background:var(--green-s)}.prow.isdone b{color:var(--slate6);font-weight:500}
-.appcard{padding:10px 0;border-top:1px solid var(--line)}.appcard:first-child{border-top:0;padding-top:0}
+.appcard{padding:12px 0;border-top:1px solid var(--line)}.appcard:first-child{border-top:0;padding-top:0}
+.appname{font-size:14.5px;line-height:1.3;color:var(--navy)}.appwhat{margin:4px 0 6px;font-size:13px;line-height:1.45;color:var(--slate7);max-width:60ch}
 .bar.wide{width:100%;height:8px}
 details.card>summary{list-style:none}details.card>summary::-webkit-details-marker{display:none}
 /* Inbox: what each item is */

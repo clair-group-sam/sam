@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader, Metric } from "@/components/Page";
 import { ENT } from "@/lib/nav";
 import { isCmm } from "@/lib/revisions";
-import { STAGE_LABEL, STAGE_TONE, fr, today, type AuthorityFile } from "@/lib/authority";
+import { STAGE_LABEL, STAGE_TONE, fr, loadTypes, today, type AuthorityFile } from "@/lib/authority";
 import { DEPARTMENTS, LINK_LABEL, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, departmentOf, isConditional, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, upstream, type Task, type TaskStatus } from "@/lib/projects";
 import { addTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startDraftForTask, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
@@ -46,6 +46,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   // left: what people do; right: the applications S.A.M. prepares and files
   const work = tasks.filter((t) => t.link_kind !== "authority_file");
   const apps = tasks.filter((t) => t.link_kind === "authority_file");
+  const appTypes = apps.length ? new Map((await loadTypes(db)).map((t) => [t.code, t])) : new Map();
   const { data: afData } = await db.from("authority_files").select("*").eq("project_id", p.id);
   const files = (afData ?? []) as AuthorityFile[];
   const personIds = [...new Set([p.owner_person, ...tasks.map((t) => t.done_by), ...tasks.map((t) => t.owner_person)].filter((x): x is string => !!x))];
@@ -172,11 +173,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 const canOpen = mayWork(a) && !a.link_id && a.status !== "done" && a.status !== "not_needed" && active;
                 return (
                   <div key={a.id} className="appcard">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <b>{f ? <Link className="underline" href={`/proj/auth/${f.id}`}>{a.title}</Link> : a.title}</b>
-                      <span className="nature">{a.link_ref}</span>
-                      <span className="mini ml-auto">{a.owner_role ?? "CMM"}</span>
+                    {/* the name the authority gives the application, where it is filed, then one sentence on what it is for */}
+                    <div className="flex items-baseline gap-2">
+                      <b className="appname">{f ? <Link className="underline" href={`/proj/auth/${f.id}`}>{a.title}</Link> : a.title}</b>
+                      <span className="mini ml-auto" style={{ flex: "none" }}>{a.owner_role ?? "CMM"}</span>
                     </div>
+                    {(() => { const ty = a.link_ref ? appTypes.get(a.link_ref) : undefined; const portal = ty?.routes?.[p.entity]?.portal; const where = [portal, ty && ty.name !== a.title ? ty.name : null].filter(Boolean).join(", "); const what = a.detail ?? ty?.notes ?? null; return (<>
+                      {where && <div className="mini">{where}</div>}
+                      {what && <p className="appwhat">{what}</p>}
+                    </>); })()}
                     <div className="bar wide mt-1"><i style={{ width: `${pct}%` }} /></div>
                     <div className="mini flex items-center gap-2 flex-wrap mt-1">
                       {f ? <><span className={"pill " + stageTone}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}</> : a.status === "not_needed" ? <span className="pill">Not needed</span> : isConditional(a) ? <span><span className="pill">Conditional</span> {up.length ? `${doneUp} / ${up.length} tasks done, ` : ""}your call: open it, or mark it not needed</span> : <span>{up.length ? `${doneUp} / ${up.length} tasks done` : "ready"}, {pct === 100 ? "S.A.M. opens the file" : "opened by S.A.M. when the tasks are done"}</span>}
