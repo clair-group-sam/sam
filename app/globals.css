@@ -680,6 +680,8 @@ button:focus-visible,.btn:focus-visible,a:focus-visible,summary:focus-visible,in
 @keyframes sbspin{to{transform:rotate(360deg)}}.sb .sb-spin{animation:sbspin 1.1s linear infinite}.sb .sb-spin.fast{animation-duration:.8s}
 .planpath{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;counter-reset:pp}.planpath li{counter-increment:pp;display:grid;gap:1px;padding:6px 10px 6px 30px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--white);position:relative;max-width:260px;font-size:12.5px;line-height:1.3}.planpath li::before{content:counter(pp);position:absolute;left:9px;top:6px;font:600 11px var(--mono,ui-monospace,monospace);color:var(--slate6)}
 .assume{display:grid;gap:5px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm)}.assume .seg{justify-self:start}.assume .seg button{font-size:12px;padding:3px 10px}
+/* planner: the post and days of a task are edited in the row; the whole value must show, even under Larger text */
+.inp.plancell{padding:6px 8px;text-align:center;min-width:0}
 .samwait{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--blue05)}.samwait .sb{margin:0}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
 /* a form being sent: its submit button shows it is working */

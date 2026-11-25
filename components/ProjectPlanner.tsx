@@ -134,7 +134,7 @@ export default function ProjectPlanner({ entity: ent0, entities }: { entity: str
           {plan.phases.map((ph) => { const list = plan.tasks.filter((t) => t.phase === ph.key); if (!list.length) return null; return (
             <section key={ph.key} className="card">
               <div className="ch"><span className="eyebrow">{ph.label}</span><span className="mini">{list.filter((t) => keep.has(t.key)).length} / {list.length} kept</span></div>
-              <div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th style={{ width: 36 }}></th><th>Task</th><th style={{ width: 96 }}>Post</th><th style={{ width: 76 }}>Days</th><th style={{ width: "24%" }}>After</th></tr></thead><tbody>
+              <div className="cb" style={{ padding: 0 }}><table className="tbl"><thead><tr><th style={{ width: 36 }}></th><th>Task</th><th style={{ width: 118 }}>Post</th><th style={{ width: 88 }}>Days</th><th style={{ width: "24%" }}>After</th></tr></thead><tbody>
                 {list.map((t) => { const on = keep.has(t.key); return (
                   <tr key={t.key} style={on ? undefined : { opacity: 0.45 }}>
                     <td><input type="checkbox" checked={on} onChange={() => toggle(t.key)} aria-label={`Keep: ${t.title}`} /></td>
@@ -146,8 +146,8 @@ export default function ProjectPlanner({ entity: ent0, entities }: { entity: str
                         {(t.rules ?? []).map((r) => <span key={r.code} className={"pill " + (r.found ? "green" : "amber")}>{r.code} {r.found ? "in the EAR" : "to check"}</span>)}
                         {(t.flags ?? []).map((f) => <span key={f} className="pill amber">{f}</span>)}
                       </div></td>
-                    <td><input className="inp mono" value={t.owner_role ?? ""} onChange={(e) => edit(t.key, { owner_role: e.target.value.toUpperCase() })} aria-label="Post" /></td>
-                    <td><input className="inp mono" type="number" min={0} value={t.days ?? ""} onChange={(e) => edit(t.key, { days: e.target.value ? Number(e.target.value) : null })} aria-label="Days" /></td>
+                    <td><input className="inp mono plancell" value={t.owner_role ?? ""} onChange={(e) => edit(t.key, { owner_role: e.target.value.toUpperCase() })} aria-label="Post" /></td>
+                    <td><input className="inp mono plancell" inputMode="numeric" maxLength={3} value={t.days ?? ""} onChange={(e) => { const n = e.target.value.replace(/\D/g, ""); edit(t.key, { days: n ? Number(n) : null }); }} aria-label="Days" /></td>
                     <td className="mini">{(t.deps ?? []).map((d) => <div key={d} style={keep.has(d) ? undefined : { textDecoration: "line-through" }}>{titleOf(d)}</div>)}</td>
                   </tr>); })}
               </tbody></table></div>
