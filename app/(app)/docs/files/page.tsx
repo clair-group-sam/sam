@@ -39,9 +39,10 @@ export default async function Certificates({ searchParams }: { searchParams: Pro
         <Metric label="Expiring ≤ 90 days" value={soon.length - expired.length} tone={soon.length - expired.length ? "amber" : undefined} />
         <Metric label="Expired" value={expired.length} tone={expired.length ? "red" : undefined} />
       </div>
-      {groups.map(([key, list]) => (
-        <section key={key} className="card mb-4">
-          <div className="ch"><span className="eyebrow"><span className={"ent " + list[0].entity}>{list[0].entity}</span> {list[0].folder ?? "Unfiled"}</span><span className="mini">{list.length}</span></div>
+      {groups.map(([key, list]) => { const ds = list.map((c) => daysUntil(c.valid_until)); const ex = ds.filter((d) => d !== null && d < 0).length, sn = ds.filter((d) => d !== null && d >= 0 && d <= 90).length; return (
+        // one folded panel per folder, closed by default (open when the page is filtered to that folder); what needs attention shows on the closed panel
+        <details key={key} className="card dept mb-3" open={!!qf || groups.length === 1}>
+          <summary><span className={"ent " + list[0].entity}>{list[0].entity}</span><span className="dname">{(list[0].folder ?? "Unfiled").replace(/ › /g, " / ")}</span>{ex > 0 && <span className="pill red">{ex} expired</span>}{sn > 0 && <span className="pill amber">{sn} ≤ 90 days</span>}<span className="mini mono" style={{ marginLeft: "auto" }}>{list.length}</span></summary>
           <table className="tbl"><thead><tr><th>Kind</th><th>Title</th><th>Issuer</th><th>Valid until</th>{canDrop && <th>Folder</th>}</tr></thead>
             <tbody>
               {list.map((c) => { const d = daysUntil(c.valid_until); return (
@@ -58,8 +59,7 @@ export default async function Certificates({ searchParams }: { searchParams: Pro
                     </form></td>}
                 </tr>); })}
             </tbody></table>
-        </section>
-      ))}
+        </details>); })}
       {!rows.length && <section className="card"><div className="cb text-slate6">No certificate in this scope yet.</div></section>}
     </>
   );
