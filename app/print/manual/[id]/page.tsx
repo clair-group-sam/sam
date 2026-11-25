@@ -3,7 +3,7 @@ import { fr as frd } from "@/lib/dates";
 import { canDownloadPdf, getSession } from "@/lib/session";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { STEP_LABEL, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
+import { STEP_LABEL, numberParas, partOf, partsOf, type Manual, type Revision, type Section } from "@/lib/docs";
 import { ENT } from "@/lib/nav";
 import PrintAuto from "@/components/PrintAuto";
 import { headers } from "next/headers";
@@ -96,7 +96,7 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
     return out;
   };
   const shift = (h: string) => h.replace(/<(\/?)h([1-6])(\s|>)/gi, (_m, sl: string, n: string, tail: string) => `<${sl}h${Math.min(6, Number(n) + 2)}${tail}`);
-  const fix = (h: string) => shift(renderCharts(h))
+  const fix = (h: string) => numberParas(shift(renderCharts(h)))
     .replace(/src="\/api\/files\/manuals\/([^"?#]+)"/g, (all, k: string) => { const u = signed.get(decodeURIComponent(k)); return u ? `src="${u}"` : all; })
     .replace(/\sloading="lazy"/g, "");
 

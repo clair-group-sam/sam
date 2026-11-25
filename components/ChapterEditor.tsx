@@ -9,6 +9,7 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import LinkExt from "@tiptap/extension-link";
+import { KeepClass, KeepSpan, PageMark } from "@/components/DocLayoutExt";
 import { OrgChartNode } from "@/components/OrgChartNode";
 import LinkPicker, { type Chap } from "@/components/LinkPicker";
 import { saveSection, revertSection, uploadImage, orgSnapshot } from "@/app/(app)/docs/editor/[rev]/actions";
@@ -38,7 +39,7 @@ export default function ChapterEditor({ revisionId, sectionId, refCode, title: t
   const baseNorm = useRef<string | null>(null);
   const editor = useEditor({
     extensions: [StarterKit, Image.configure({ inline: false }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
-      LinkExt.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } }), OrgChartNode],
+      LinkExt.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } }), OrgChartNode, KeepClass, PageMark, KeepSpan],
     content: html,
     editable,
     immediatelyRender: false,

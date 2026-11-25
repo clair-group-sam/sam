@@ -96,3 +96,16 @@ export function linkRefs(html: string, chapters: Map<string, string>, subs: Map<
     return `<td><a class="ref" data-nav href="${href}">${key}</a></td><td><a class="ref" data-nav href="${href}">${title}</a></td>`;
   });
 }
+
+/** Reading aid: paragraphs numbered by hand ("3. Responsibilities:", "3.1. Astonjet designates…") get their number in a column of its own
+ *  and an indent by depth, so the structure reads at a glance. Applied when a chapter is shown, never stored: the text is not changed.
+ *  Only when a chapter has at least three of them (a lone "1.5 hours…" is left alone); numbers of one or two digits (not dates). */
+export function numberParas(html: string): string {
+  const re = /<p>\s*((?:\d{1,2}\.)+(?:\d{1,2})?)(?:&nbsp;|\s)+((?:(?!<\/p>)[\s\S])+?)<\/p>/g;
+  if ((html.match(re) ?? []).length < 3) return html;
+  return html.replace(re, (_m, num: string, rest: string) => {
+    const depth = Math.min(3, num.replace(/\.$/, "").split(".").length);
+    const lead = depth === 1 && rest.replace(/<[^>]+>/g, "").trim().length <= 90;
+    return `<p class="np np${depth}${lead ? " lead" : ""}"><span class="pn">${num}</span><span>${rest}</span></p>`;
+  });
+}

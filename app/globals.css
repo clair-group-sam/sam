@@ -1160,3 +1160,12 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 /* a clipped box can still be scrolled by a script (a jump to a search hit, to an anchor): the reading card must not be */
 .card.readwrap{overflow:clip}
 .readwrap.loading .readscroll{opacity:.45;transition:opacity .15s .12s}
+/* paragraphs numbered by hand: the number in its own column, an indent by depth, the short level-1 lines read as headings */
+.reader p.np{display:grid;grid-template-columns:3.2em minmax(0,1fr);gap:0 10px;align-items:baseline;margin:10px 0}
+.reader p.np .pn{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:600;color:var(--pc,var(--cyan-ink));text-align:right;white-space:nowrap}
+.reader p.np1{margin-top:20px}.reader p.np1.lead{font-weight:700;font-size:15px;color:var(--navy);margin:26px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.reader p.np2{padding-left:14px}.reader p.np3{padding-left:38px;color:var(--slate7)}
+.pm-body p.np{display:grid;grid-template-columns:11mm minmax(0,1fr);gap:0 2mm;align-items:baseline}.pm-body p.np .pn{font-weight:700;color:var(--cyan-ink);text-align:right;white-space:nowrap}
+.pm-body p.np1.lead{font-weight:700;margin-top:4mm;border-bottom:.4pt solid #c9d3dc;padding-bottom:1mm}.pm-body p.np2{padding-left:4mm}.pm-body p.np3{padding-left:10mm}
+/* the editor shows the page marks too */
+.ProseMirror .pgmark{position:relative;text-align:center;margin:24px 0;font-size:12px;color:var(--slate6);line-height:1;user-select:none}.ProseMirror .pgmark.ProseMirror-selectednode{outline:2px solid var(--cyan);outline-offset:4px;border-radius:var(--r-xs)}

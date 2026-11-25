@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { linkRefs, structureHtml, type Heading } from "@/lib/docs";
+import { linkRefs, numberParas, structureHtml, type Heading } from "@/lib/docs";
 import { linkIndex, rewriteLinks } from "@/lib/links";
 import { renderCharts } from "@/lib/orgchart";
 
@@ -31,5 +31,5 @@ export async function chapterHtml(admin: () => SupabaseClient, o: { manualId: st
   const linked = /<a\b/i.test(src)
     ? rewriteLinks(src, { idx: /\/reader\/#\/|\/docs\/link\/ch\//.test(src) ? await linkIndex(admin()) : null, selfManualId: o.manualId, base: "", newTab: true, selfUids, self: (ref) => (ref ? `${base}&sec=${encodeURIComponent(ref)}` : null), textTarget: refHref })
     : src;
-  return renderCharts(/table des mati|contents|sommaire/i.test(o.active.title ?? "") ? linkRefs(linked, chapterRefs, subRefs, base) : linked);
+  return numberParas(renderCharts(/table des mati|contents|sommaire/i.test(o.active.title ?? "") ? linkRefs(linked, chapterRefs, subRefs, base) : linked));
 }
