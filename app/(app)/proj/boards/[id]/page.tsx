@@ -9,11 +9,9 @@ import { STAGE_LABEL, STAGE_TONE, fr, loadTypes, today, type AuthorityFile } fro
 import { DEPARTMENTS, LINK_LABEL, PIVOT_LABEL, PROJECT_STATUS_LABEL, STATUS_LABEL, STATUS_TONE, departmentOf, isConditional, loadProject, progress, project as projectDates, projectedEnd, resolveLinks, upstream, type Task, type TaskStatus } from "@/lib/projects";
 import { addTask, deleteTask, openFileForTask, pushToTemplate, removeTaskFile, saveProject, startDraftForTask, startTask, tickTask, updateTask, uploadTaskFile } from "../actions";
 import Gantt from "@/components/Gantt";
-import ClarifyApps from "@/components/ClarifyApps";
 import EntityBand from "@/components/EntityBand";
 import { Icon } from "@/lib/icons";
 
-export const maxDuration = 300; // "Name and explain with S.A.M." searches the web
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "not_needed", "blocked"];
 const dnum = (d: string) => Math.round(new Date(d.slice(0, 10) + "T00:00:00Z").getTime() / 86400000);
 /** The summary written at creation holds the plan's assumptions, risks and decisions as labelled paragraphs: split them back so they fold away. */
@@ -302,7 +300,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   </div>);
               })}
               {!apps.length && <p className="mini text-slate6">No application in this project.</p>}
-              {mayEdit && active && apps.some((a) => !a.link_id && a.status !== "done" && a.status !== "not_needed") && <div className="appcard"><ClarifyApps projectId={p.id} entity={p.entity} /><p className="mini mt-1">Gives each application still to file the name its authority uses and one sentence on what it is for. The former wording stays in the audit log.</p></div>}
               {mayEdit && active && (
                 <details className="addtask" style={{ marginTop: 4 }}><summary className="mini">+ Add an application</summary>
                   <form action={addTask} className="grid grid-cols-3 gap-2 mt-2"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="link_kind" value="authority_file" /><input type="hidden" name="phase_id" value={phases[phases.length - 1]?.id ?? ""} />
