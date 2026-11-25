@@ -8,11 +8,13 @@ export type TocItem = { id: string; ref: string; title: string | null; part: str
 type Hit = { ref: string; title: string | null; snippet: string; n: number };
 type Props = {
   manualId: string; revId: string; parts: Part[]; toc: TocItem[];
-  active: { ref: string; title: string | null; html: string; part: string; pages: number } | null;
+  active: { ref: string; title: string | null; html: string; part: string; pages: number; cover?: boolean } | null;
+  /** DOC-15 · the document plate: what the Web Manuals page header carried (brand, code, page, date, issue / revision) */
+  plate?: { brand: string; code: string; docTitle: string; issue: number; rev: string; pg: string; date: string; pageRev: string; owner: string } | null;
   initialQuery?: string;
 };
 
-export default function Reader({ manualId, revId, parts, toc, active, initialQuery = "" }: Props) {
+export default function Reader({ manualId, revId, parts, toc, active, plate = null, initialQuery = "" }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<"toc" | "full">(initialQuery ? "full" : "toc");
   const [q, setQ] = useState(initialQuery);
@@ -21,7 +23,9 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
   const [open, setOpen] = useState<Set<string>>(() => new Set(parts.map((p) => p.key)));
   const [progress, setProgress] = useState(0);
   const [folded, setFolded] = useState(false);
-  useEffect(() => { setFolded(false); }, [active?.ref]);
+  // the page being read: the last page mark above the top of the reading area
+  const [cur, setCur] = useState<{ pg: string; date: string; rev: string } | null>(null);
+  useEffect(() => { setFolded(false); setCur(null); }, [active?.ref]);
   const art = useRef<HTMLDivElement>(null);
   const colorOf = useMemo(() => Object.fromEntries(parts.map((p) => [p.key, p.color])), [parts]);
   const idx = toc.findIndex((t) => t.ref === active?.ref);
@@ -124,13 +128,21 @@ export default function Reader({ manualId, revId, parts, toc, active, initialQue
 
         <section className="card flex-1 min-w-0 readwrap" style={{ borderTopColor: active ? colorOf[active.part] : undefined }}>
           {active ? (<>
+            {plate ? (
+              <div className="plate" style={{ "--pc": colorOf[active.part] } as React.CSSProperties}>
+                <div className="pl-logo"><b>{plate.brand}</b><span>{plate.code}</span></div>
+                <div className="pl-title" title={parts.find((p) => p.key === active.part)?.label}><span>{plate.docTitle}</span><h2>{active.cover || /^\d+(\.\d+)*\s/.test(active.title ?? "") ? active.title : <><i>{active.ref}</i>{active.title}</>}</h2></div>
+                <dl className="pl-kv"><dt>Page</dt><dd>{(cur ?? plate).pg || "-"}</dd><dt>Date</dt><dd>{(cur?.date || plate.date) || "-"}</dd><dt>Iss / Rev</dt><dd>{cur?.rev || plate.pageRev}</dd></dl>
+              </div>
+            ) : (
             <div className="chaphead" style={{ background: `${colorOf[active.part]}12` }}>
               <span className="badge big" style={{ background: colorOf[active.part] }}>{active.ref}</span>
               <div title={parts.find((p) => p.key === active.part)?.label}><h2>{active.title}</h2></div>
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
-            </div>
-            <div className="readscroll">
-              <article ref={art} className="reader" onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
+            </div>)}
+            <div className="readscroll" onScroll={(e) => { const box = e.currentTarget; const top = box.getBoundingClientRect().top + 24; let last: HTMLElement | null = null; box.querySelectorAll<HTMLElement>(".pgmark").forEach((m) => { if (m.getBoundingClientRect().top <= top) last = m; }); const l = last as HTMLElement | null; const nx = l ? { pg: l.dataset.pg ?? "", date: l.dataset.date ?? "", rev: l.dataset.rev ?? "" } : null; setCur((c) => (c?.pg === nx?.pg ? c : nx)); }}>
+              <article ref={art} className={"reader" + (active.cover ? " iscover" : "")} onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
+              {plate && <div className="docfoot"><span>{plate.code}, {plate.docTitle}, Iss {plate.issue} Rev {plate.rev}</span><span>© {plate.owner}</span><span className="mono">{(cur ?? plate).pg}</span></div>}
               <div className="pager">
                 {prev ? <Link href={href(prev.ref)}>‹ {prev.ref} {prev.title}</Link> : <span />}
                 {next ? <Link href={href(next.ref)}>{next.ref} {next.title} ›</Link> : <span />}

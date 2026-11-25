@@ -219,7 +219,9 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       {tab === "read" && current && <AskManual manualId={manual.id} revisionId={current.id} rev={current.rev} />}
       {tab === "read" && current && (
         <Reader manualId={manual.id} revId={current.id} parts={parts} toc={toc} initialQuery={q}
-          active={active ? { ref: active.ref, title: active.title, html: activeHtml, part: partOf(active.ref), pages: active.body.pages?.length ?? 0 } : null} />
+          plate={active ? (() => { const st = (active.body as { page_start?: { pg: string; date: string; rev: string } | null }).page_start ?? null; const pad = (n: number) => String(n).padStart(2, "0");
+            return { brand: ENT[manual.entity]?.name ?? manual.entity, code: manual.code, docTitle: manual.title, issue: current.issue, rev: current.rev, pg: st?.pg ?? active.body.pages?.[0] ?? "", date: st?.date ?? (current.published_at ? frd(current.published_at) : ""), pageRev: st?.rev || `${pad(current.issue)} / ${current.rev}`, owner: ENT[manual.entity]?.name ?? manual.entity }; })() : null}
+          active={active ? { ref: active.ref, title: active.title, html: activeHtml, part: partOf(active.ref), pages: active.body.pages?.length ?? 0, cover: /^(cover|couverture|page de garde)$/i.test((active.title ?? "").trim()) } : null} />
       )}
       {tab === "read" && !current && <section className="card"><div className="cb text-slate6">No revision to read yet.</div></section>}
 

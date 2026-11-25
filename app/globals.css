@@ -1097,3 +1097,32 @@ button.pill.startbtn{border:1px solid var(--navy);background:var(--white);cursor
 .appc .appwhat{margin:0}
 .appsteps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.appsteps span{font-size:12px;line-height:1.25;color:var(--slate6);border-top:3px solid var(--line);padding-top:4px}.appsteps span.done{border-color:var(--green);color:var(--green-ink)}.appsteps span.cur{border-color:var(--cyan);color:var(--navy);font-weight:700}
 @media (max-width:900px){.pdraws{grid-template-columns:1fr}.pdraw{border-left:0;border-top:1px solid var(--line)}.pdraw:first-child{border-top:0}.trow{grid-template-columns:22px minmax(0,1fr) 28px}.trow>div:nth-child(3){grid-column:2;grid-row:2}.nowgrid{grid-template-columns:1fr}}
+
+/* DOC-15 (25/11) · document layout. The landmarks of the Web Manuals page are kept (the plate with page, date, issue / revision; the page
+   numbers; the centred cover; lettered lists; numbered headings), drawn with the S.A.M. identity. Reading is continuous: a page mark shows
+   where each original page starts, and the plate follows it. */
+.plate{display:grid;grid-template-columns:170px minmax(0,1fr) 190px;border-bottom:2px solid var(--navy);background:var(--white)}
+.plate>*{padding:12px 16px;display:flex;flex-direction:column;justify-content:center;min-width:0;margin:0}.plate>*+*{border-left:1px solid var(--line)}
+.pl-logo b{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:14px;line-height:1.2}.pl-logo span{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;color:var(--slate6);margin-top:3px;overflow-wrap:anywhere}
+.pl-title{text-align:center}.pl-title>span{font-size:12.5px;font-weight:600;color:var(--slate6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-title h2{font-size:18px;font-weight:700;line-height:1.25;margin:2px 0 0;letter-spacing:-.005em}.pl-title h2 i{font-style:normal;color:var(--pc,var(--cyan-ink));margin-right:8px}
+.pl-kv{display:grid!important;grid-template-columns:auto 1fr;gap:1px 12px;align-content:center;font-size:12.5px}.pl-kv dt{color:var(--slate6)}.pl-kv dd{margin:0;text-align:right;font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-weight:600;font-size:12px}
+.readscroll .reader{max-width:82ch;margin:0 auto;padding-top:12px}
+.readscroll .reader p,.readscroll .reader ul,.readscroll .reader ol,.readscroll .reader h2,.readscroll .reader h3,.readscroll .reader h4,.readscroll .reader .revbar{max-width:none}
+.reader ul{list-style:disc}.reader ul ul{list-style:circle}.reader ol{list-style:decimal}.reader ol[type="a"]{list-style:lower-alpha}.reader ol[type="A"]{list-style:upper-alpha}.reader ol[type="i"]{list-style:lower-roman}.reader ol[type="I"]{list-style:upper-roman}
+.reader ol>li{padding-left:6px;margin:9px 0}.reader ol>li::marker{font-weight:700}
+.reader .tc{text-align:center}
+.reader h4.nh{display:flex;gap:10px;align-items:baseline;font-size:15.5px;font-weight:800;margin:26px 0 8px;color:var(--navy)}
+.reader h4.nh .hn{flex:none;font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:13px;font-weight:600;color:var(--pc,var(--cyan-ink));min-width:18px}
+.reader .pgmark{position:relative;text-align:center;margin:24px 0;font-size:12px;color:var(--slate6);line-height:1}
+.reader .pgmark::after{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--line2)}
+.reader .pgmark::before{content:"page " attr(data-pg);position:relative;z-index:1;background:var(--white);padding:0 12px}
+.reader.iscover{text-align:center;padding:34px 0 20px}.reader.iscover p{font-size:16px;margin:10px 0}.reader.iscover strong,.reader.iscover b{font-size:19px}
+.reader.iscover img{border:0;max-width:min(420px,80%)}.reader.iscover table{width:auto;min-width:300px;margin:24px auto;text-align:left}.reader.iscover em,.reader.iscover i{font-size:13.5px;color:var(--slate6)}
+.docfoot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:82ch;margin:28px auto 0;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--slate6)}
+.readscroll .pager{max-width:82ch;margin-left:auto;margin-right:auto}
+@media (max-width:760px){.plate{grid-template-columns:1fr}.plate>*+*{border-left:0;border-top:1px solid var(--line)}.pl-title{text-align:left}.pl-kv{grid-template-columns:repeat(3,auto 1fr)}}
+/* the same marks in the PDF: lettered lists, centred cover lines, numbered headings, the original page number in the outer margin */
+.pm-body ol[type="a"]{list-style:lower-alpha}.pm-body ol[type="A"]{list-style:upper-alpha}.pm-body ol[type="i"]{list-style:lower-roman}.pm-body ol[type="I"]{list-style:upper-roman}
+.pm-body .tc{text-align:center}.pm-body h4.nh{display:flex;gap:3mm;align-items:baseline}.pm-body h4.nh .hn{flex:none;color:var(--cyan-ink)}
+.pm-body .pgmark{text-align:right;font:600 7pt Inter,Arial,sans-serif;color:#7a8794;border-top:.3pt dashed #c9d3dc;margin:3mm 0 2mm;padding-top:.8mm}.pm-body .pgmark::before{content:"page " attr(data-pg)}

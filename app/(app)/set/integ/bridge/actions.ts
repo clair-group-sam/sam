@@ -74,7 +74,7 @@ async function importPages(meta: BridgeMeta, personId: string | null, email: str
   const ext = meta.imageExt ?? {};
   const sections = buildSections(b, (id) => `${meta.imageBase}/${id}.${ext[id] ?? "png"}`);
   await db.from("revision_sections").delete().eq("revision_id", revisionId);
-  const rows = sections.map((x) => { const st = structureHtml(x.html, `s${x.ord}`, x.ref); return { revision_id: revisionId, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { html: st.html, text: x.text, pages: x.pages, page_revs: x.pageRevs, page_ids: x.pageIds, uid: createHash("md5").update(`${manualId}:${x.ref}`).digest("hex"), headings: st.headings, structured: true } }; });
+  const rows = sections.map((x) => { const st = structureHtml(x.html, `s${x.ord}`, x.ref); return { revision_id: revisionId, ord: x.ord, ref: x.ref, title: x.title, changed: x.changed, body: { html: st.html, text: x.text, pages: x.pages, page_revs: x.pageRevs, page_ids: x.pageIds, page_meta: x.pageMeta, page_start: x.start, uid: createHash("md5").update(`${manualId}:${x.ref}`).digest("hex"), headings: st.headings, structured: true } }; });
   for (let i = 0; i < rows.length; i += 40) { const { error } = await db.from("revision_sections").insert(rows.slice(i, i + 40)); if (error) return { ok: false, error: error.message }; }
   await db.from("audit_log").insert({ actor: personId, entity: meta.entity, object_type: "revision", object_id: revisionId, action: "import_webmanuals", after: { code: meta.code, rev, issue, draft: !!meta.draft, sections: rows.length, pages: b.pages.length, images: Object.keys(b.images ?? {}).length, wmId: meta.wmId, via: "bridge" } });
   await db.storage.from("manuals").remove([meta.stash]);
