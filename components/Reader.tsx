@@ -129,7 +129,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
         <section className="card flex-1 min-w-0 readwrap" style={{ borderTopColor: active ? colorOf[active.part] : undefined }}>
           {active ? (<>
             {plate ? (
-              <div className="plate" style={{ "--pc": colorOf[active.part] } as React.CSSProperties}>
+              <div className="docplate" style={{ "--pc": colorOf[active.part] } as React.CSSProperties}>
                 <div className="pl-logo"><b>{plate.brand}</b><span>{plate.code}</span></div>
                 <div className="pl-title" title={parts.find((p) => p.key === active.part)?.label}><span>{plate.docTitle}</span><h2>{active.cover || /^\d+(\.\d+)*\s/.test(active.title ?? "") ? active.title : <><i>{active.ref}</i>{active.title}</>}</h2></div>
                 <dl className="pl-kv"><dt>Page</dt><dd>{(cur ?? plate).pg || "-"}</dd><dt>Date</dt><dd>{(cur?.date || plate.date) || "-"}</dd><dt>Iss / Rev</dt><dd>{cur?.rev || plate.pageRev}</dd></dl>
