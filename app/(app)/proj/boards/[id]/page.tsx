@@ -30,7 +30,8 @@ function brief(d: string) {
 /** "Form SM 113: Application for…" gives the plate "SM 113" and the name; without a form number the plate is the fallback. */
 function plateOf(title: string, fallback: string): { plate: string; name: string } {
   const m = title.match(/^\s*(?:(?:Form|Formulaire|Cerfa|CERFA)\s+)?((?:[A-Z][A-Za-z]{0,7}[ ./-]?)?(?:[A-Z]{1,6}[ ./-]?)?\d[\w./-]{0,9})\s*[:,]\s+(\S[\s\S]*)$/);
-  return m && m[1].length <= 16 ? { plate: m[1].trim(), name: m[2].trim() } : { plate: fallback, name: title };
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  return m && m[1].length <= 16 ? { plate: m[1].trim(), name: cap(m[2].trim()) } : { plate: fallback, name: title };
 }
 const TONES = ["tone-a", "tone-b", "tone-c", "tone-d"];
 const APP_STEPS = ["Preparing", "Filed", "With the authority", "Granted"];
@@ -86,8 +87,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     const f = files.find((x) => x.id === a.link_id);
     const up = upstream(a.id, deps, byId).filter((t) => t.status !== "not_needed");
     const ty = a.link_ref ? appTypes.get(a.link_ref) : undefined;
-    const where: string = ty?.routes?.[p.entity]?.portal || f?.authority || "";
-    const key = where || (ENT[p.entity]?.auth ?? "Authority");
+    // the authority is the one the application names (a project can file with a foreign CAA), else the entity's own
+    const named = `${a.title} ${a.detail ?? ""}`.match(/\b(San Marino CAA|TM-?CAD|Transport Malta|DSAC|DGAC|OSAC|EASA|FAA|UK CAA|[A-Z][a-z]+(?: [A-Z][a-z]+)? CAA)\b/)?.[1];
+    const key: string = named ?? f?.authority ?? ENT[p.entity]?.auth ?? "Authority";
+    const portal: string = ty?.routes?.[p.entity]?.portal ?? "";
+    const where = !named && portal ? portal : key;
     if (!toneKeys.includes(key)) toneKeys.push(key);
     return { a, f, up, doneUp: up.filter((t) => t.status === "done").length, ty, where, tone: TONES[toneKeys.indexOf(key) % 4] };
   });
@@ -287,7 +291,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     </div>
                     {what && <p className="appwhat">{what}</p>}
                     {a.status === "not_needed" ? <div className="mini"><span className="pill">Not needed</span> {a.not_needed_reason ?? ""}</div> : (<>
-                      <div className="steps">{APP_STEPS.map((l, i) => <span key={l} className={i < step ? "done" : i === step ? "cur" : ""}>{l}</span>)}</div>
+                      <div className="appsteps">{APP_STEPS.map((l, i) => <span key={l} className={i < step ? "done" : i === step ? "cur" : ""}>{l}</span>)}</div>
                       <div className="mini flex items-center gap-2 flex-wrap">
                         {f ? <><span className={"pill " + STAGE_TONE[f.stage]}>{STAGE_LABEL[f.stage]}</span>{f.portal_ref && <span className="mono">{f.portal_ref}</span>}<span className="ml-auto">{a.owner_role ?? "CMM"}</span></>
                           : granted ? <span className="green">granted {fr(a.done_at)}, outside S.A.M.</span>
