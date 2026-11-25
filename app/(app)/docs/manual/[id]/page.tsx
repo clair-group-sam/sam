@@ -201,9 +201,9 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
       </div>
 
       {tab === "read" && current && <AskManual manualId={manual.id} revisionId={current.id} rev={current.rev} />}
+      {(tab === "read" || tab === "changed") && current && s.person && !mine?.acknowledged_at && published[0]?.id === current.id && <ReadEnd manualId={manual.id} revId={current.id} />}
       {tab === "read" && current && (
         <Reader manualId={manual.id} revId={current.id} parts={parts} toc={toc} initialQuery={q}
-          ack={s.person && !mine?.acknowledged_at && published[0]?.id === current.id ? { needed: (sections.some((x) => x.changed) ? sections.filter((x) => x.changed) : sections.filter((x) => !isFront(x))).map((x) => x.ref) } : null}
           plate={active ? (() => { const st = (active.body as { page_start?: { pg: string; date: string; rev: string; logo?: string } | null }).page_start ?? null; const pad = (n: number) => String(n).padStart(2, "0");
             return { brand: ENT[manual.entity]?.name ?? manual.entity, code: manual.code, docTitle: manual.title, issue: current.issue, rev: current.rev, pg: st?.pg ?? active.body.pages?.[0] ?? "", date: st?.date ?? (current.published_at ? frd(current.published_at) : ""), pageRev: st?.rev || `${pad(current.issue)} / ${current.rev}`, owner: ENT[manual.entity]?.name ?? manual.entity, logo: st?.logo, fbDate: current.published_at ? frd(current.published_at) : "", fbRev: `${pad(current.issue)} / ${current.rev}` }; })() : null}
           active={active ? { ref: active.ref, title: active.title, html: activeHtml, part: partOf(active.ref), pages: active.body.pages?.length ?? 0, cover: /^(cover|couverture|page de garde)$/i.test((active.title ?? "").trim()) } : null} />
@@ -239,7 +239,6 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
               <form action={acknowledge} className="mt-5"><input type="hidden" name="revision_id" value={current.id} /><input type="hidden" name="manual_id" value={manual.id} />
                 <button className="btn primary" type="submit">I have read the changes of Rev {current.rev}</button></form>
             )}
-            {current && s.person && !mine?.acknowledged_at && changes.length > 0 && published[0]?.id === current.id && <ReadEnd manualId={manual.id} revId={current.id} refKey="*changes" />}
           </div>
         </section>
       )}
@@ -260,7 +259,7 @@ export default async function ManualPage({ params, searchParams }: { params: Pro
             <tbody>
               {expected.map((p) => { const r = readings.find((x) => x.person_id === p.id); return (
                 <tr key={p.id}><td><b>{p.display_name}</b><div className="mini">{p.job_title}</div></td><td className="mini">{p.roles.join(", ")}</td>
-                  <td className="mono">{r?.acknowledged_at ? frdt(r.acknowledged_at) : <span className="pill amber">to read</span>}</td><td className="mini">{r?.via === "reading" ? "read to the end in S.A.M." : r?.via === "teams" ? "Teams" : r?.via === "app" ? "button in S.A.M." : r?.via ?? ""}</td></tr>); })}
+                  <td className="mono">{r?.acknowledged_at ? frdt(r.acknowledged_at) : <span className="pill amber">to read</span>}</td><td className="mini">{r?.via === "opened" ? "opened in S.A.M." : r?.via === "reading" ? "read to the end in S.A.M." : r?.via === "teams" ? "Teams" : r?.via === "app" ? "button in S.A.M." : r?.via ?? ""}</td></tr>); })}
               {readings.filter((r) => r.acknowledged_at && !expected.some((p) => p.id === r.person_id)).map((r) => (
                 <tr key={r.person_id}><td><b>{r.people?.display_name}</b><div className="mini">{r.people?.job_title} · not in the readers list</div></td><td /><td className="mono">{frdt(r.acknowledged_at)}</td><td className="mini">{r.via ?? ""}</td></tr>))}
               {!expected.length && <tr><td colSpan={4} className="p-5 text-slate6">Nobody must read this manual with the current list (below).</td></tr>}

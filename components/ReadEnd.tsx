@@ -1,20 +1,17 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { markRead } from "@/app/(app)/docs/manual/[id]/actions";
+import { markOpened } from "@/app/(app)/docs/manual/[id]/actions";
 
-/** DOC-17 · placed at the end of what must be read: once it has stayed in view a few seconds, the part counts as read. */
-export default function ReadEnd({ manualId, revId, refKey, onDone }: { manualId: string; revId: string; refKey: string; onDone?: (r: { acknowledged: boolean; left: number }) => void }) {
-  const el = useRef<HTMLDivElement>(null); const router = useRouter(); const [sent, setSent] = useState<string | null>(null);
+/** DOC-17 · the revision in force is acknowledged once the manual has been on screen a few seconds (a background tab does not count). */
+export default function ReadEnd({ manualId, revId }: { manualId: string; revId: string }) {
+  const router = useRouter();
   useEffect(() => {
-    if (!el.current || sent === refKey) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !timer) timer = setTimeout(async () => { io.disconnect(); setSent(refKey); const r = await markRead(manualId, revId, refKey).catch(() => null); if (r) { onDone?.(r); if (r.acknowledged) router.refresh(); } }, 4000);
-      if (!e.isIntersecting && timer) { clearTimeout(timer); timer = null; }
-    }, { threshold: 0.5 });
-    io.observe(el.current);
-    return () => { io.disconnect(); if (timer) clearTimeout(timer); };
-  }, [manualId, revId, refKey, sent]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <div ref={el} className="readend" aria-hidden="true" />;
+    let timer: ReturnType<typeof setTimeout> | null = null; let sent = false;
+    const arm = () => { if (sent || timer || document.visibilityState !== "visible") return; timer = setTimeout(async () => { sent = true; const r = await markOpened(manualId, revId).catch(() => null); if (r?.acknowledged) router.refresh(); }, 3000); };
+    const vis = () => { if (document.visibilityState === "visible") arm(); else if (timer) { clearTimeout(timer); timer = null; } };
+    arm(); document.addEventListener("visibilitychange", vis);
+    return () => { document.removeEventListener("visibilitychange", vis); if (timer) clearTimeout(timer); };
+  }, [manualId, revId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
 }
