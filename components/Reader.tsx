@@ -10,7 +10,7 @@ type Props = {
   manualId: string; revId: string; parts: Part[]; toc: TocItem[];
   active: { ref: string; title: string | null; html: string; part: string; pages: number; cover?: boolean } | null;
   /** DOC-15 · the document plate: what the Web Manuals page header carried (brand, code, page, date, issue / revision) */
-  plate?: { brand: string; code: string; docTitle: string; issue: number; rev: string; pg: string; date: string; pageRev: string; owner: string } | null;
+  plate?: { brand: string; code: string; docTitle: string; issue: number; rev: string; pg: string; date: string; pageRev: string; owner: string; logo?: string } | null;
   initialQuery?: string;
 };
 
@@ -65,11 +65,19 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
   // reading progress + keyboard navigation
   useEffect(() => {
     const el = art.current?.parentElement; if (!el) return;
-    const onScroll = () => { const max = el.scrollHeight - el.clientHeight; setProgress(max > 0 ? Math.min(100, Math.round((el.scrollTop / max) * 100)) : 100); };
-    onScroll(); el.addEventListener("scroll", onScroll);
+    const onScroll = () => {
+      const max = el.scrollHeight - el.clientHeight; setProgress(max > 0 ? Math.min(100, Math.round((el.scrollTop / max) * 100)) : 100);
+      // DOC-15 · the page being read: the last page mark above the middle of what is visible (the last one once the end is reached)
+      const r = el.getBoundingClientRect(); const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight); const line = top + (bottom - top) * 0.45;
+      const marks = [...el.querySelectorAll<HTMLElement>(".pgmark")]; const atEnd = max > 0 && el.scrollTop >= max - 4 && r.bottom <= window.innerHeight + 4;
+      const l = atEnd ? marks[marks.length - 1] : marks.filter((m) => m.getBoundingClientRect().top <= line).pop();
+      const nx = l ? { pg: l.dataset.pg ?? "", date: l.dataset.date ?? "", rev: l.dataset.rev ?? "" } : null;
+      setCur((c) => (c?.pg === nx?.pg ? c : nx));
+    };
+    onScroll(); el.addEventListener("scroll", onScroll); window.addEventListener("scroll", onScroll, { passive: true });
     const onKey = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === "INPUT") return; if (e.key === "ArrowRight" && next) router.push(href(next.ref)); if (e.key === "ArrowLeft" && prev) router.push(href(prev.ref)); };
     window.addEventListener("keydown", onKey);
-    return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("keydown", onKey); };
+    return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("scroll", onScroll); window.removeEventListener("keydown", onKey); };
   });
 
   const ql = q.trim().toLowerCase();
@@ -130,7 +138,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
           {active ? (<>
             {plate ? (
               <div className="docplate" style={{ "--pc": colorOf[active.part] } as React.CSSProperties}>
-                <div className="pl-logo"><b>{plate.brand}</b><span>{plate.code}</span></div>
+                <div className="pl-logo">{plate.logo ? <img src={plate.logo} alt={plate.brand} /> : <b>{plate.brand}</b>}</div>
                 <div className="pl-title" title={parts.find((p) => p.key === active.part)?.label}><span>{plate.docTitle}</span><h2>{active.cover || /^\d+(\.\d+)*\s/.test(active.title ?? "") ? active.title : <><i>{active.ref}</i>{active.title}</>}</h2></div>
                 <dl className="pl-kv"><dt>Page</dt><dd>{(cur ?? plate).pg || "-"}</dd><dt>Date</dt><dd>{(cur?.date || plate.date) || "-"}</dd><dt>Iss / Rev</dt><dd>{cur?.rev || plate.pageRev}</dd></dl>
               </div>
@@ -140,7 +148,7 @@ export default function Reader({ manualId, revId, parts, toc, active, plate = nu
               <div title={parts.find((p) => p.key === active.part)?.label}><h2>{active.title}</h2></div>
               <span className="mini ml-auto">{active.pages} page{active.pages > 1 ? "s" : ""}</span>
             </div>)}
-            <div className="readscroll" onScroll={(e) => { const box = e.currentTarget; const top = box.getBoundingClientRect().top + 24; let last: HTMLElement | null = null; box.querySelectorAll<HTMLElement>(".pgmark").forEach((m) => { if (m.getBoundingClientRect().top <= top) last = m; }); const l = last as HTMLElement | null; const nx = l ? { pg: l.dataset.pg ?? "", date: l.dataset.date ?? "", rev: l.dataset.rev ?? "" } : null; setCur((c) => (c?.pg === nx?.pg ? c : nx)); }}>
+            <div className="readscroll">
               <article ref={art} className={"reader" + (active.cover ? " iscover" : "")} onClick={(e) => { const a = (e.target as HTMLElement).closest("a[data-nav]") as HTMLAnchorElement | null; if (a) { e.preventDefault(); const u = new URL(a.href); router.push(u.pathname + u.search + u.hash); if (u.hash) setTimeout(() => document.getElementById(u.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "smooth" }), 400); } }} style={{ "--pc": colorOf[active.part] } as React.CSSProperties} />
               {plate && <div className="docfoot"><span>{plate.code}, {plate.docTitle}, Iss {plate.issue} Rev {plate.rev}</span><span>© {plate.owner}</span><span className="mono">{(cur ?? plate).pg}</span></div>}
               <div className="pager">

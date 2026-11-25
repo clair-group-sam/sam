@@ -7,8 +7,8 @@ export type WmBundle = {
   toc: WmToc[]; pages: WmPage[]; images?: Record<string, { name: string; type: string; size: number; b64?: string }>;
   file?: { name: string; type: string; size: number; b64?: string };
 };
-export type PageMeta = { title: string; date: string; iss: string; rev: string };
-export type BuiltSection = { ord: number; ref: string; title: string; html: string; text: string; pages: string[]; pageRevs: string[]; pageIds: string[]; pageMeta: (PageMeta | null)[]; start: { pg: string; date: string; rev: string } | null; changed: boolean };
+export type PageMeta = { title: string; date: string; iss: string; rev: string; logo?: string };
+export type BuiltSection = { ord: number; ref: string; title: string; html: string; text: string; pages: string[]; pageRevs: string[]; pageIds: string[]; pageMeta: (PageMeta | null)[]; start: { pg: string; date: string; rev: string; logo?: string } | null; changed: boolean };
 
 const decode = (s: string) => s.replace(/&nbsp;/g, " ").replace(/&eacute;/g, "é").replace(/&egrave;/g, "è").replace(/&agrave;/g, "à").replace(/&ecirc;/g, "ê").replace(/&acirc;/g, "â").replace(/&ocirc;/g, "ô").replace(/&icirc;/g, "î").replace(/&ucirc;/g, "û").replace(/&ccedil;/g, "ç").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, "’").replace(/&laquo;/g, "«").replace(/&raquo;/g, "»").replace(/&deg;/g, "°").replace(/&ndash;/g, "–").replace(/&mdash;/g, "—");
 
@@ -27,7 +27,8 @@ export function pageHeader(html: string): PageMeta | null {
   const date = marks.find((x) => /^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/.test(x) || /^\d{4}-\d{2}-\d{2}$/.test(x)) ?? "";
   const tail = marks.filter((x) => x !== date && /^[A-Za-z0-9.]{1,6}$/.test(x));
   const rev = marks.length ? marks[marks.length - 1] : ""; const iss = tail.length >= 2 && tail[tail.length - 1] === rev ? tail[tail.length - 2] : "";
-  return { title, date, iss: /^\d/.test(iss) ? iss : "", rev: rev === date ? "" : rev };
+  const logo = /sam-img:\/\/(\d+)/.exec(head)?.[1];
+  return { title, date, iss: /^\d/.test(iss) ? iss : "", rev: rev === date ? "" : rev, logo };
 }
 export function pageContent(html: string): string {
   const m = /<!-- CONTENT_MARKER_START -->([\s\S]*?)<!-- CONTENT_MARKER_END -->/.exec(html);
@@ -51,6 +52,11 @@ export function cleanHtml(h: string, imgSrc: (id: string) => string): string {
     if ((T === "i" || T === "I") && letter) { type = T === "i" ? "a" : "A"; rest = rest.replace(/\sstart="\d+"/, ` start="${letter}"`); }
     return `<ol${rest} type="${type}">`;
   });
+  // large lines (cover and title pages) keep their rank: three sizes above the body text
+  s = s.replace(/<(p|span|strong|b|h[1-6]|td)([^>]*?)\sstyle="([^"]*font-size:\s*([\d.]+)(px|pt)[^"]*)"([^>]*)>/g, (m, tag: string, a: string, st: string, n: string, u: string, b: string) => {
+    const px = Number(n) * (u === "pt" ? 1.333 : 1); const k = px >= 27 ? 3 : px >= 21 ? 2 : px >= 17 ? 1 : 0;
+    return k ? `<${tag}${a} style="${st}"${b} data-samfs="${k}">` : m;
+  });
   // centred lines (cover pages) stay centred
   s = s.replace(/<(p|h[1-6]|td)([^>]*?)(?:\sstyle="[^"]*text-align:\s*center[^"]*"|\salign="center")([^>]*)>/g, '<$1$2$3 data-samtc="1">');
   s = s.replace(/<div style="clear: both;"><\/div>/g, "");
@@ -59,11 +65,11 @@ export function cleanHtml(h: string, imgSrc: (id: string) => string): string {
   s = s.replace(/<img[^>]*src="sam-img:\/\/(\d+)"[^>]*>/g, (_m, id: string) => `<img src="${imgSrc(id)}" alt="figure" loading="lazy" />`);
   s = s.replace(/<(div|section)(?![^>]*data-samrev)[^>]*>/g, "<div>").replace(/<\/(section)>/g, "</div>");
   s = s.replace(/<div data-samrev="1">/g, '<div class="revbar">');
-  s = s.replace(/\s(style|class|id|width|height|border|cellpadding|cellspacing|align|valign|bgcolor|data-[\w-]+)="[^"]*"/g, (m, attr: string) => (attr === "colspan" || attr === "rowspan" || m === ' class="revbar"' || m === ' data-samtc="1"' ? m : ""));
-  s = s.replace(/ data-samtc="1"/g, ' class="tc"');
+  s = s.replace(/\s(style|class|id|width|height|border|cellpadding|cellspacing|align|valign|bgcolor|data-[\w-]+)="[^"]*"/g, (m, attr: string) => (attr === "colspan" || attr === "rowspan" || m === ' class="revbar"' || m === ' data-samtc="1"' || /^ data-samfs="[123]"$/.test(m) ? m : ""));
+  s = s.replace(/<(\w+)(\s[^>]*data-sam(?:tc|fs)="\d"[^>]*)>/g, (_m, tag: string, at: string) => { const fs = /samfs="(\d)"/.exec(at)?.[1]; return `<${tag}${at.replace(/ data-sam(?:tc|fs)="\d"/g, "")} class="${[/samtc/.test(at) ? "tc" : "", fs ? "fs" + fs : ""].filter(Boolean).join(" ")}">`; });
   for (let i = 0; i < 6; i++) { const before = s; s = s.replace(/<span>\s*<\/span>/g, "").replace(/<span>((?:(?!<span>)[\s\S])*?)<\/span>/g, "$1"); if (s === before) break; }
   s = s.replace(/<p>(\s|&nbsp;)*<\/p>/g, "").replace(/<div>\s*<\/div>/g, "");
-  s = s.replace(/<p(?: class="tc")?>\s*(<img[^>]*>)\s*<\/p>/g, '<figure>$1</figure>');
+  s = s.replace(/<p(?: class="[a-z0-9 ]+")?>\s*(<img[^>]*>)\s*<\/p>/g, '<figure>$1</figure>');
   s = s.replace(/<(table|tbody|tr|td|th)\s*>/g, "<$1>");
   s = s.replace(/\s{2,}/g, " ");
   // a paragraph entirely in bold that starts with a number ("1. OBJECT", "3.2 Scope") is a heading: number in the margin, title in bold
@@ -141,7 +147,7 @@ export function buildSections(bundle: WmBundle, imgSrc: (id: string) => string):
     });
     // the page the chapter starts on: its first page mark when the chapter opens a page, otherwise the page already running
     const sm = atStart || !prevPage ? pageMeta[0] : headers.get(prevId) ?? null; const sp = atStart || !prevPage ? pages[0] ?? "" : prevPage;
-    const start = sp || sm ? { pg: sp || "cover", date: sm?.date ?? "", rev: sm ? [sm.iss, sm.rev].filter(Boolean).join(" / ") : "" } : null;
+    const start = sp || sm ? { pg: sp || "cover", date: sm?.date ?? "", rev: sm ? [sm.iss, sm.rev].filter(Boolean).join(" / ") : "", logo: sm?.logo ? imgSrc(sm.logo) : undefined } : null;
     return { ord, ref: p.ref, title: p.title, html, text: htmlToText(html), pages, pageRevs, pageIds, pageMeta, start, changed: html.includes('class="revbar"') || (!composite && usePageRevs && !!rev && pageRevs.includes(rev)) };
   });
 }
