@@ -184,7 +184,7 @@ export default async function PrintManual({ params, searchParams }: { params: Pr
           <div key={x.id}>
             <article id={chapId(x.ref)} className={"pm-ch" + (newPart ? " newpart" : "") + (cover ? " cover" : "")}>
               {newPart && parts.length > 1 && <h1 className="pm-part">{partLabel.get(p) ?? p}</h1>}
-              <h2 className={"pm-cht" + (cover ? " vh" : "")}><span>{x.ref}</span> {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h2>
+              <h2 className={"pm-cht" + (cover ? " vh" : "")}>{/^\d+(\.\d+)*\s/.test(x.title ?? "") ? null : <span>{x.ref}</span>} {x.title}{x.changed && <i className="pm-revtag">revised</i>}</h2>
               {stampedHere
                 ? <p className="pm-small">Replaced by the list of effective pages stamped by {ent?.auth ?? "the authority"} ({lepPages.length} page{lepPages.length === 1 ? "" : "s"}).</p>
                 : <div className="pm-body" dangerouslySetInnerHTML={{ __html: linkify(fix(x.body.html ?? `<p>${(x.body.text ?? "").replace(/</g, "&lt;")}</p>`), toc) }} />}
