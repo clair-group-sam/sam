@@ -86,7 +86,7 @@ function EntityColumn({ d, compact }: { d: EntityDash; compact: boolean }) {
     { label: "Overdue items", value: d.overdue.total, tone: d.overdue.total ? (d.overdue.am ? "red" : "amber") : "green", href: "/dash/cs/overdue", hint: d.overdue.escalated ? `${d.overdue.escalated} escalated, ${d.overdue.am} at the AM` : undefined },
     { label: "Findings past due", value: d.findings.late, tone: d.findings.late ? "red" : "green", href: "/comp/find?tab=open" },
     { label: "Files late at the authority", value: d.files.late, tone: d.files.late ? "amber" : "green", href: "/proj/auth" },
-    { label: "Watch streams to check", value: d.watch.late, tone: d.watch.late ? "amber" : "green", href: "/comp/watch" },
+    { label: "Watch streams to check", value: d.watch.late, tone: d.watch.late ? "amber" : "green", href: "/reg/watch" },
     ...(p ? [
       { label: "Safety actions overdue", value: p.actions.late, tone: (p.actions.late ? "red" : "green") as Tone, href: "/safe/actions" },
       { label: "Reports open over 90 days", value: p.reports.openOld, tone: (p.reports.openOld ? "amber" : "green") as Tone, href: "/safe/reports" },
@@ -112,10 +112,10 @@ function EntityColumn({ d, compact }: { d: EntityDash; compact: boolean }) {
           { label: "to review", value: d.findings.cmmTurn, tone: d.findings.cmmTurn ? "amber" : undefined, href: "/comp/find?tab=review" },
           { label: "plan in progress", value: d.findings.inPlan, href: "/comp/find?tab=open" },
         ]} />
-        <Area title="Regulatory watch" link={{ href: "/comp/watch", label: "Open streams and entries" }} figs={[
-          { label: "streams", value: d.watch.streams, href: "/comp/watch", hint: d.watch.late ? `${d.watch.late} to check now` : "all checked on time", tone: d.watch.late ? "amber" : "green" },
-          { label: "open entries", value: d.watch.entries, href: "/comp/watch?tab=open", tone: d.watch.entriesLate ? "amber" : undefined, hint: d.watch.entriesLate ? `${d.watch.entriesLate} past return date` : undefined },
-          { label: "to analyse", value: d.watch.toAnalyse, href: "/comp/watch?tab=analyse" },
+        <Area title="Regulatory watch" link={{ href: "/reg/watch", label: "Open streams and entries" }} figs={[
+          { label: "streams", value: d.watch.streams, href: "/reg/watch", hint: d.watch.late ? `${d.watch.late} to check now` : "all checked on time", tone: d.watch.late ? "amber" : "green" },
+          { label: "open entries", value: d.watch.entries, href: "/reg/watch?tab=open", tone: d.watch.entriesLate ? "amber" : undefined, hint: d.watch.entriesLate ? `${d.watch.entriesLate} past return date` : undefined },
+          { label: "to analyse", value: d.watch.toAnalyse, href: "/reg/watch?tab=analyse" },
         ]} />
         {p && <Area title={`Safety since the last SRB${p.since ? `, ${frd(p.since)}` : ""}`} link={{ href: "/safe/over", label: "Open the overview" }} figs={[
           { label: "reports", value: p.reports.total, href: "/safe/reports", hint: `${p.reports.mor} MOR, ${p.reports.significant} ERC ≥ 100, ${p.reports.open} open` },

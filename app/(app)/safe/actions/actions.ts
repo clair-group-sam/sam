@@ -47,7 +47,7 @@ export async function createAction(fd: FormData) {
   await log(a.id, "created", s.person?.id ?? null, `${a.number} raised by ${s.name}`);
   touch(a); if (row.spi_id) revalidatePath(`/safe/over/spi/${row.spi_id}`); if (row.committee_id) revalidatePath(`/safe/comm/${row.committee_id}`); if (row.investigation_id) revalidatePath(`/safe/inv/${row.investigation_id}`);
   if (finding) { revalidatePath(`/comp/find/${finding}`); return; }
-  if (watch) { revalidatePath(`/comp/watch/${watch}`); return; }
+  if (watch) { revalidatePath(`/reg/watch/${watch}`); return; }
   if (str(fd, "stay")) return;
   redirect(`/safe/actions/${a.id}`);
 }

@@ -102,8 +102,8 @@ function OneEntity({ r, band }: { r: Review; band?: React.ReactNode }) {
           <Fig label="past target date" value={r.files.late} tone={r.files.late ? "amber" : undefined} href="/proj/auth" />
           <Fig label="manuals with civil aviation" value={r.docs.atAuthority} tone={r.docs.atAuthority ? "amber" : undefined} href="/proj/auth" />
           <Fig label="manuals in revision" value={r.docs.drafts} href="/docs/drafts" />
-          <Fig label="watch streams to check" value={r.watch.late} tone={r.watch.late ? "amber" : undefined} href="/comp/watch" />
-          <Fig label="watch entries to analyse" value={r.watch.toAnalyse} href="/comp/watch?tab=analyse" />
+          <Fig label="watch streams to check" value={r.watch.late} tone={r.watch.late ? "amber" : undefined} href="/reg/watch" />
+          <Fig label="watch entries to analyse" value={r.watch.toAnalyse} href="/reg/watch?tab=analyse" />
         </Area>
         {p && <Area title={`Safety since the last ${b.kindLabel}${p.since ? `, ${d10(p.since)}` : ""}`} link={{ href: "/safe/over", label: "Open the overview" }} tone={tone(p.hazards.red.length + p.actions.late, (p.spiCounts.improve ?? 0) + p.reports.openOld)}>
           <Fig label="reports" value={p.reports.total} href="/safe/reports" hint={`${p.reports.mor} MOR, ${p.reports.significant} ERC ≥ 100, ${p.reports.open} open`} />

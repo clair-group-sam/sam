@@ -77,7 +77,7 @@ export default async function ComplianceOverview() {
     const fRev = fo.filter((f) => CMM_TURN.includes(f.status)).length; if (fRev) alerts.push({ tone: "amber", text: `${fRev} finding${fRev > 1 ? "s" : ""} for Compliance to review`, href: "/comp/find?tab=review" });
     const wo = watch.filter((w) => w.entity === e && WATCH_OPEN.includes(w.status));
     const wAn = wo.filter((w) => w.applicability === "to_analyse").length, wLate = wo.filter((w) => w.due && w.due < t0).length;
-    if (wLate) alerts.push({ tone: "red", text: `${wLate} regulatory change${wLate > 1 ? "s" : ""} past due`, href: "/comp/watch" });
+    if (wLate) alerts.push({ tone: "red", text: `${wLate} regulatory change${wLate > 1 ? "s" : ""} past due`, href: "/reg/watch" });
     // — Means
     const kv = kpis[e] ?? []; const kOff = kv.filter((v) => v.status === "off_target").length;
     if (kOff) alerts.push({ tone: "red", text: `${kOff} indicator${kOff > 1 ? "s" : ""} off target`, href: `/comp/kpi?ent=${e}` });
@@ -116,7 +116,7 @@ export default async function ComplianceOverview() {
                 </div>
                 <div className="ovcol"><div className="ovh"><Icon name="clip" size={16} /> Findings <span className="mini">what is open?</span></div>
                   <Row href="/comp/find?tab=open" label="Open findings" value={c.fo.length} sub={`${fAuth} from the authority, ${c.fo.length - fAuth} internal`} parts={[{ n: fNp, tone: "amber", label: "waiting for the analysis" }, { n: fCmm, tone: "blue", label: "with Compliance" }, { n: fPlan, tone: "green", label: "plan in progress" }]} />
-                  <Row href="/comp/watch" label="Regulatory watch" value={c.wo.n} sub="open regulatory changes" parts={[{ n: c.wo.an, tone: "amber", label: "to analyse" }, { n: c.wo.late, tone: "red", label: "past due" }, { n: Math.max(0, c.wo.n - c.wo.an - c.wo.late), tone: "blue", label: "in progress" }]} />
+                  <Row href="/reg/watch" label="Regulatory watch" value={c.wo.n} sub="open regulatory changes" parts={[{ n: c.wo.an, tone: "amber", label: "to analyse" }, { n: c.wo.late, tone: "red", label: "past due" }, { n: Math.max(0, c.wo.n - c.wo.an - c.wo.late), tone: "blue", label: "in progress" }]} />
                 </div>
                 <div className="ovcol"><div className="ovh"><Icon name="users" size={16} /> Means <span className="mini">people, indicators, texts</span></div>
                   <Link href={`/comp/kpi?ent=${e}`} className="ovrow"><div className="ovtop"><span className="ovl">Indicators ENR-CM-06</span><span className="ovv">{c.kv.filter((v) => v.status === "on_target").length} / {c.kv.filter((v) => v.status !== "n_a").length}</span></div>

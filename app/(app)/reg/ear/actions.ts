@@ -11,7 +11,7 @@ const str = (fd: FormData, k: string) => { const v = String(fd.get(k) ?? "").tri
 const desk = (s: Session) => s.role === "cmm" || s.roles.map(basePost).some((r) => ["CMM", "SM", "SUPERADMIN"].includes(r));
 async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); return s; }
 async function reg(id: string): Promise<Regulation> { const { data } = await db().from("regulations").select("*").eq("id", id).maybeSingle(); if (!data) fail("Regulation not found"); return data as Regulation; }
-const touch = () => { revalidatePath("/reg/ear"); revalidatePath("/comp/watch"); revalidatePath("/home/tasks"); };
+const touch = () => { revalidatePath("/reg/ear"); revalidatePath("/reg/watch"); revalidatePath("/home/tasks"); };
 
 export async function checkNow(fd: FormData) {
   const s = await me(); if (!desk(s)) fail("Compliance desk only.");

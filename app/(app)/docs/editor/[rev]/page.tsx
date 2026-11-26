@@ -9,7 +9,7 @@ import Workflow, { type StepRow } from "@/components/Workflow";
 import { postsOf } from "@/lib/np";
 import { basePost } from "@/lib/session";
 import { decideFindingChange } from "./actions";
-import { addressedInDraft } from "@/app/(app)/comp/watch/actions";
+import { addressedInDraft } from "@/app/(app)/reg/watch/actions";
 import { CHANGE_LABEL } from "@/lib/findings";
 import { PageHeader } from "@/components/Page";
 import ChapterEditor from "@/components/ChapterEditor";
@@ -88,7 +88,7 @@ export default async function Editor({ params, searchParams }: { params: Promise
     <section className="card mb-4 samcard">
       <div className="ch"><span className="eyebrow">Regulatory changes to consider in this revision</span><span className="mini">{wentries.length} open watch entr{wentries.length === 1 ? "y" : "ies"} name this manual, information, your call</span></div>
       <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{wentries.map((w) => (
-        <tr key={w.id}><td><Link href={`/comp/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${frd(w.due)}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
+        <tr key={w.id}><td><Link href={`/reg/watch/${w.id}`} className="mono"><b>{w.number}</b></Link> {w.title}{w.reference && <span className="mono"> · {w.reference}</span>}<div className="mini">{w.applicability.replace("_", " ")}{w.task ? ` · ${w.task}` : ""}{w.due ? ` · return before ${frd(w.due)}` : ""}{(w.assistant?.chapters ?? []).filter((c) => c.manual === manual.code).map((c) => ` · ${c.ref}`).join("")}</div></td>
           <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{editable && (owner || cmm) && <Link className="btn" href={`/docs/editor/${rev.id}?tab=write${(w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)?.ref ? `&sec=${encodeURIComponent((w.assistant?.chapters ?? []).find((c) => c.manual === manual.code)!.ref)}` : sec ? `&sec=${encodeURIComponent(sec)}` : ""}&ai=${encodeURIComponent(`Regulatory change ${w.number}${w.reference ? ` (${w.reference})` : ""}: ${w.title}. Integrate what this change requires in this chapter.`)}`} style={{ marginRight: 4 }}>Draft it with SAM</Link>}{w.revision_ids.includes(rev.id) ? <span className="pill green">Addressed in this draft</span> : editable && (owner || cmm) ? <form action={addressedInDraft} style={{ display: "inline" }}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="rev" value={rev.id} /><button className="btn" type="submit">Addressed in this draft</button></form> : null}</td></tr>))}</tbody></table></div>
     </section>
   ) : null;

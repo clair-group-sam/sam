@@ -91,7 +91,7 @@ export const KNOWN_TEXTS: { pattern: string; label: string; key?: string }[] = [
   { pattern: "2023/203", label: "Part-IS (EU) 2023/203", key: "information-security" },
   { pattern: "376/2014", label: "Occurrence reporting (EU) 376/2014", key: "occurrence-reporting" },
   { pattern: "2015/1018", label: "Occurrence classification (EU) 2015/1018", key: "occurrence-classification" },
-  { pattern: "923/2012", label: "SERA (EU) 923/2012" },
+  { pattern: "923/2012", label: "SERA (EU) 923/2012", key: "sera" },
   { pattern: "748/2012", label: "Initial Airworthiness / Part-21 (EU) 748/2012", key: "initial-airworthiness" },
   { pattern: "452/2014", label: "Third Country Operators (EU) 452/2014" },
   { pattern: "2025/23", label: "Ground handling (EU) 2025/23" },

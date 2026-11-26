@@ -99,7 +99,7 @@ export async function syncEntryTask(db: SupabaseClient, e: Entry): Promise<void>
   if (wanted) {
     if (!rows.some((r) => r.title === title)) {
       if (rows.length) await db.from("tasks").update({ status: "done" }).in("id", rows.map((r) => r.id));
-      await db.from("tasks").insert({ entity: e.entity, kind: "watch", title, detail: `${e.reference ?? ""}${e.impact ? ` · ${e.impact.slice(0, 300)}` : ""}`.trim() || "Regulatory watch entry to handle.", due: e.due, owner_role: e.owner_person ? null : e.owner_role, owner_person: e.owner_person, status: "open", link: `/comp/watch/${e.id}`, ref_id: e.id });
+      await db.from("tasks").insert({ entity: e.entity, kind: "watch", title, detail: `${e.reference ?? ""}${e.impact ? ` · ${e.impact.slice(0, 300)}` : ""}`.trim() || "Regulatory watch entry to handle.", due: e.due, owner_role: e.owner_person ? null : e.owner_role, owner_person: e.owner_person, status: "open", link: `/reg/watch/${e.id}`, ref_id: e.id });
     }
   } else if (rows.length) await db.from("tasks").update({ status: "done" }).in("id", rows.map((r) => r.id));
 }
@@ -113,7 +113,7 @@ export async function sweepWatch(db: SupabaseClient): Promise<number> {
     const { data: ex } = await db.from("tasks").select("id").eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open").limit(1);
     if (ex?.length) continue;
     for (const ent of t.entities.slice(0, 1)) {
-      await db.from("tasks").insert({ entity: ent, kind: "watch_check", title: `Regulatory watch · ${t.title}`.slice(0, 200), detail: `${t.sources.length} source${t.sources.length === 1 ? "" : "s"} to open${t.last_checked_on ? ` · last check ${t.last_checked_on}` : " · never checked"}. Tick each source: nothing new, or raise an entry.`, due: t.nextDue ?? today(), owner_role: t.owner_person ? null : t.owner_role ?? "CMM", owner_person: t.owner_person, status: "open", link: `/comp/watch/topic/${t.id}`, ref_id: t.id });
+      await db.from("tasks").insert({ entity: ent, kind: "watch_check", title: `Regulatory watch · ${t.title}`.slice(0, 200), detail: `${t.sources.length} source${t.sources.length === 1 ? "" : "s"} to open${t.last_checked_on ? ` · last check ${t.last_checked_on}` : " · never checked"}. Tick each source: nothing new, or raise an entry.`, due: t.nextDue ?? today(), owner_role: t.owner_person ? null : t.owner_role ?? "CMM", owner_person: t.owner_person, status: "open", link: `/reg/watch/topic/${t.id}`, ref_id: t.id });
       n++;
     }
   }

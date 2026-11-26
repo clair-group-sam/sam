@@ -14,7 +14,7 @@ const desk = (s: Session) => s.role === "cmm" || s.roles.map(basePost).some((r) 
 const owns = (s: Session, o: { owner_role: string | null; owner_person: string | null; entity?: string; entities?: string[] }) =>
   (!!o.owner_person && o.owner_person === s.person?.id) || (!!o.owner_role && s.roles.map(basePost).includes(basePost(o.owner_role)) && (o.entity ? s.entities.includes(o.entity) : (o.entities ?? []).some((e) => s.entities.includes(e))));
 async function me(): Promise<Session> { const s = await getSession(); if (!s) redirect("/login"); return s; }
-const touch = (paths: string[]) => { for (const p of ["/comp/watch", "/home/tasks", ...paths]) revalidatePath(p); };
+const touch = (paths: string[]) => { for (const p of ["/reg/watch", "/home/tasks", ...paths]) revalidatePath(p); };
 async function topic(id: string): Promise<Topic> { const { data } = await db().from("watch_topics").select("*").eq("id", id).maybeSingle(); if (!data) fail("Topic not found"); return data as Topic; }
 async function entry(id: string): Promise<Entry> { const e = await loadEntry(db(), id); if (!e) fail("Entry not found"); return e; }
 
@@ -32,7 +32,7 @@ export async function checkSource(fd: FormData) {
   const all = ((srcs ?? []) as { id: string; last_checked_on: string | null }[]).every((x) => x.last_checked_on && (!t.last_checked_on || x.last_checked_on > t.last_checked_on));
   if (all || !sourceId) await db().from("watch_topics").update({ last_checked_on: on, last_checked_by: s.person?.id ?? null }).eq("id", t.id);
   if (all || !sourceId) await db().from("tasks").update({ status: "done" }).eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open");
-  touch([`/comp/watch/topic/${t.id}`]);
+  touch([`/reg/watch/topic/${t.id}`]);
 }
 
 /* ---------- topics & sources (Compliance / Safety desk) ---------- */
@@ -42,22 +42,22 @@ export async function saveTopic(fd: FormData) {
   const row = { title: str(fd, "title") ?? "Watch", domain: str(fd, "domain") ?? "compliance", entities: fd.getAll("entities").map(String).filter(Boolean), owner_role: str(fd, "owner_role")?.toUpperCase() ?? null, owner_person: str(fd, "owner_person"), every_days: Math.max(7, Number(fd.get("every_days") ?? 30) || 30) };
   if (!row.entities.length) fail("Pick at least one entity.");
   if (id) await db().from("watch_topics").update(row).eq("id", id); else await db().from("watch_topics").insert(row);
-  touch(id ? [`/comp/watch/topic/${id}`] : []);
+  touch(id ? [`/reg/watch/topic/${id}`] : []);
 }
 export async function archiveTopic(fd: FormData) {
   const s = await me(); if (!desk(s)) fail("Not allowed");
-  await db().from("watch_topics").update({ active: false }).eq("id", String(fd.get("id"))); touch([]); redirect("/comp/watch");
+  await db().from("watch_topics").update({ active: false }).eq("id", String(fd.get("id"))); touch([]); redirect("/reg/watch");
 }
 export async function saveSource(fd: FormData) {
   const s = await me(); if (!desk(s)) fail("Compliance / Safety desk only.");
   const id = str(fd, "id"); const topicId = String(fd.get("topic"));
   const row = { topic_id: topicId, name: str(fd, "name") ?? "Source", kind: str(fd, "kind") ?? "misc", url: str(fd, "url"), domain: str(fd, "domain"), note: str(fd, "note") };
   if (id) await db().from("watch_sources").update(row).eq("id", id); else await db().from("watch_sources").insert(row);
-  touch([`/comp/watch/topic/${topicId}`]);
+  touch([`/reg/watch/topic/${topicId}`]);
 }
 export async function removeSource(fd: FormData) {
   const s = await me(); if (!desk(s)) fail("Not allowed");
-  await db().from("watch_sources").update({ active: false }).eq("id", String(fd.get("id"))); touch([`/comp/watch/topic/${String(fd.get("topic"))}`]);
+  await db().from("watch_sources").update({ active: false }).eq("id", String(fd.get("id"))); touch([`/reg/watch/topic/${String(fd.get("topic"))}`]);
 }
 
 /* ---------- entries ---------- */
@@ -85,9 +85,9 @@ export async function createEntry(fd: FormData) {
   if (e.reference) { const cit = await findCitations(db(), e.entity, e.reference); const a = await analyseEntry(e, cit); await db().from("watch_entries").update({ assistant: a }).eq("id", e.id); }
   await syncEntryTask(db(), e);
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "watch_entry", object_id: e.id, action: "watch_entry_created", after: row });
-  touch(t ? [`/comp/watch/topic/${t.id}`] : []);
+  touch(t ? [`/reg/watch/topic/${t.id}`] : []);
   if (str(fd, "stay")) return;
-  redirect(`/comp/watch/${e.id}`);
+  redirect(`/reg/watch/${e.id}`);
 }
 
 const EDIT = ["title", "reference", "url", "published_on", "applicable_on", "applicability", "task", "impact", "owner_role", "owner_person", "due", "domain", "source_kind"] as const;
@@ -100,7 +100,7 @@ export async function updateEntry(fd: FormData) {
   if (patch.applicability === "not_applicable" && ["open", "in_progress"].includes(e.status)) { patch.status = "not_applicable"; patch.closed_at = new Date().toISOString(); patch.closed_by = s.person?.id ?? null; }
   await db().from("watch_entries").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", e.id);
   await syncEntryTask(db(), (await entry(e.id)));
-  touch([`/comp/watch/${e.id}`]);
+  touch([`/reg/watch/${e.id}`]);
 }
 /** S.A.M. reads the entry again (citations + Claude). */
 export async function analyse(fd: FormData) {
@@ -109,7 +109,7 @@ export async function analyse(fd: FormData) {
   const cit = e.reference ? await findCitations(db(), e.entity, e.reference) : [];
   const a = await analyseEntry(e, cit);
   await db().from("watch_entries").update({ assistant: a, updated_at: new Date().toISOString() }).eq("id", e.id);
-  touch([`/comp/watch/${e.id}`]);
+  touch([`/reg/watch/${e.id}`]);
 }
 /** Opens (or resumes) the draft of a manual to address the entry; the revision is remembered on the entry. */
 export async function draftFor(fd: FormData) {
@@ -120,7 +120,7 @@ export async function draftFor(fd: FormData) {
   if (!d) fail("Could not open the draft.");
   await db().from("watch_entries").update({ revision_ids: [...new Set([...e.revision_ids, d.id])], manual_ids: [...new Set([...e.manual_ids, manualId])], status: e.status === "open" ? "in_progress" : e.status, updated_at: new Date().toISOString() }).eq("id", e.id);
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: e.entity, object_type: "watch_entry", object_id: e.id, action: "watch_draft_opened", after: { revision_id: d.id, created: d.created } });
-  touch([`/comp/watch/${e.id}`]);
+  touch([`/reg/watch/${e.id}`]);
   redirect(`/docs/editor/${d.id}`);
 }
 /** Status: in progress → done (owner, with what was done) → closed (desk) ; or not applicable with the reason. */
@@ -136,7 +136,7 @@ export async function setEntryStatus(fd: FormData) {
   await db().from("watch_entries").update(patch).eq("id", e.id);
   await syncEntryTask(db(), (await entry(e.id)));
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: e.entity, object_type: "watch_entry", object_id: e.id, action: `watch_${what}`, after: { note } });
-  touch([`/comp/watch/${e.id}`]);
+  touch([`/reg/watch/${e.id}`]);
 }
 /** FND-02 style: the author of a draft says the entry is addressed in this revision. */
 export async function addressedInDraft(fd: FormData) {
@@ -144,5 +144,5 @@ export async function addressedInDraft(fd: FormData) {
   const rev = String(fd.get("rev")); if (!rev) return;
   await db().from("watch_entries").update({ revision_ids: [...new Set([...e.revision_ids, rev])], status: e.status === "open" ? "in_progress" : e.status, updated_at: new Date().toISOString() }).eq("id", e.id);
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity: e.entity, object_type: "watch_entry", object_id: e.id, action: "watch_addressed_in_draft", after: { revision_id: rev } });
-  revalidatePath(`/docs/editor/${rev}`); touch([`/comp/watch/${e.id}`]);
+  revalidatePath(`/docs/editor/${rev}`); touch([`/reg/watch/${e.id}`]);
 }

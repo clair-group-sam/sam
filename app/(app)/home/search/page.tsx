@@ -66,7 +66,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
     add("Safety actions", "/safe/actions", rows(act).map((a) => ({ href: `/safe/actions/${a.id}`, code: a.number ?? "", title: a.title ?? "", sub: a.status ?? "", entity: a.entity ?? undefined })));
     add("Findings", "/comp/find", rows(fnd).map((f) => ({ href: `/comp/find/${f.id}`, code: f.number ?? "", title: f.title ?? "", sub: f.status ?? "", entity: f.entity ?? undefined })));
     add("Audits", "/comp/audits", rows(aud).map((a) => ({ href: `/comp/audits/${a.id}`, code: a.number ?? "", title: a.title ?? "", sub: a.status ?? "", entity: a.entity ?? undefined })));
-    add("Regulatory watch", "/comp/watch", rows(wat).map((w) => ({ href: `/comp/watch/${w.id}`, code: w.number ?? "", title: w.title ?? "", entity: w.entity ?? undefined })));
+    add("Regulatory watch", "/reg/watch", rows(wat).map((w) => ({ href: `/reg/watch/${w.id}`, code: w.number ?? "", title: w.title ?? "", entity: w.entity ?? undefined })));
     add("Projects", "/proj/boards", rows(prj).map((p) => ({ href: `/proj/boards/${p.id}`, title: p.title ?? "", sub: p.status ?? "", entity: p.entity ?? undefined })));
     add("CAA applications", "/proj/auth", rows(fil).map((f) => ({ href: `/proj/auth/${f.id}`, code: f.portal_ref ?? "", title: f.title ?? "", sub: f.stage ?? "", entity: f.entity ?? undefined })));
     add("Committees and meetings", "/safe/comm", rows(com).map((c) => ({ href: `/safe/comm/${c.id}`, code: c.number ?? "", title: c.title ?? "", sub: c.status ?? "", entity: c.entity ?? undefined })));
