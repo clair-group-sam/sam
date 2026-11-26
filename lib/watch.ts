@@ -104,16 +104,17 @@ export async function syncEntryTask(db: SupabaseClient, e: Entry): Promise<void>
   } else if (rows.length) await db.from("tasks").update({ status: "done" }).in("id", rows.map((r) => r.id));
 }
 
-/** Daily: a topic past its cadence → one open task for its owner (renewed when done). */
+/** Daily: a watch round due within 3 days or late → one open reminder for the Compliance department (MSM: the CMM runs and supervises
+ *  the external monitoring, twice a month). The round is never run by S.A.M. on its own: the reminder asks Compliance to launch it. */
 export async function sweepWatch(db: SupabaseClient): Promise<number> {
   const topics = await loadTopics(db, null);
   let n = 0;
   for (const t of topics) {
-    if (t.overdue < 0) { await db.from("tasks").update({ status: "done" }).eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open"); continue; }
+    if (t.overdue < -3) { await db.from("tasks").update({ status: "done" }).eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open"); continue; }
     const { data: ex } = await db.from("tasks").select("id").eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open").limit(1);
     if (ex?.length) continue;
     for (const ent of t.entities.slice(0, 1)) {
-      await db.from("tasks").insert({ entity: ent, kind: "watch_check", title: `Regulatory watch · ${t.title}`.slice(0, 200), detail: `${t.sources.length} source${t.sources.length === 1 ? "" : "s"} to open${t.last_checked_on ? ` · last check ${t.last_checked_on}` : " · never checked"}. Tick each source: nothing new, or raise an entry.`, due: t.nextDue ?? today(), owner_role: t.owner_person ? null : t.owner_role ?? "CMM", owner_person: t.owner_person, status: "open", link: `/reg/watch/topic/${t.id}`, ref_id: t.id });
+      await db.from("tasks").insert({ entity: ent, kind: "watch_check", title: `Regulatory watch · ${t.title}`.slice(0, 200), detail: `${t.sources.length} source${t.sources.length === 1 ? "" : "s"} to open${t.last_checked_on ? ` · last check ${t.last_checked_on}` : " · never checked"}. Tick each source: nothing new, or raise an entry.`, due: t.nextDue ?? today(), owner_role: "CMM", owner_person: null, status: "open", link: `/reg/watch/topic/${t.id}`, ref_id: t.id });
       n++;
     }
   }
