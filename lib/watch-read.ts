@@ -18,6 +18,13 @@ export async function readSource(url: string): Promise<Reading> {
     const body = (html.match(/<main[\s\S]*?<\/main>/i)?.[0] ?? html.match(/<body[\s\S]*<\/body>/i)?.[0] ?? html)
       .replace(/<(script|style|noscript|svg|header|nav|footer|form)[\s\S]*?<\/\1>/gi, " ");
     const seen = new Set<string>(); const items: Item[] = [];
+    // lists drawn as tables (EASA safety publications…): one row = one entry, its text = the row, its link = the row's first link
+    for (const row of body.matchAll(/<tr\b[\s\S]*?<\/tr>/gi)) {
+      const a = row[0].match(/<a\b[^>]*href="([^"#][^"]*)"/i); if (!a) continue;
+      const text = decode(row[0]).slice(0, 240); if (text.length < 12) continue;
+      let href: string; try { href = new URL(a[1].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
+      const k = `${text}|${href}`; if (seen.has(k)) continue; seen.add(k); items.push({ title: text, url: href }); if (items.length >= 60) break;
+    }
     for (const m of body.matchAll(/<a\b[^>]*href="([^"#][^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)) {
       const text = decode(m[2]); if (text.length < 12 || text.length > 300 || NAV.test(text)) continue;
       let href: string; try { href = new URL(m[1].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
