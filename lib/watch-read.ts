@@ -7,6 +7,8 @@ export type Item = { title: string; url: string };
 export type Reading = { ok: boolean; status: number; finalUrl: string; title: string | null; items: Item[]; note?: string; ms: number };
 
 const NAV = /^(home|accueil|menu|search|recherche|login|log in|sign in|connexion|contact|cookies?|privacy|legal|mentions l[ée]gales|english|fran[çc]ais|next|previous|suivant|pr[ée]c[ée]dent|more|plus|read more|en savoir plus|share|partager|top|back|retour|skip to .*|subscribe|newsletter|facebook|twitter|linkedin|youtube|instagram|rss)$/i;
+/** share buttons of the ministry pages (« Partager sur Facebook », « Copier le lien »…) */
+const SHARE = /^(partager|share)( (sur|on|via))?\b|copier le lien|copy (the )?link|imprimer|print this|envoyer par (e-?mail|courriel)/i;
 export async function readSource(url: string): Promise<Reading> {
   const t0 = Date.now();
   try {
@@ -26,7 +28,7 @@ export async function readSource(url: string): Promise<Reading> {
       const k = `${text}|${href}`; if (seen.has(k)) continue; seen.add(k); items.push({ title: text, url: href }); if (items.length >= 60) break;
     }
     for (const m of body.matchAll(/<a\b[^>]*href="([^"#][^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)) {
-      const text = decode(m[2]); if (text.length < 12 || text.length > 300 || NAV.test(text)) continue;
+      const text = decode(m[2]); if (text.length < 12 || text.length > 300 || NAV.test(text) || SHARE.test(text)) continue;
       let href: string; try { href = new URL(m[1].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
       if (/^(mailto|tel|javascript):/i.test(href)) continue;
       const k = `${text}|${href}`; if (seen.has(k)) continue; seen.add(k);

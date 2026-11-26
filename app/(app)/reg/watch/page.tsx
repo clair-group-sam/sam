@@ -7,8 +7,10 @@ import { getSession, basePost } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Metric, PageHeader } from "@/components/Page";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
-import { APPL_LABEL, APPL_TONE, DOMAIN_LABEL, loadTopics, OPEN_STATUSES, STATUS_LABEL, TASK_LABEL, type Entry } from "@/lib/watch";
-import { createEntry, saveTopic } from "./actions";
+import { APPL_LABEL, APPL_TONE, DOMAIN_LABEL, FAMILIES, loadTopics, OPEN_STATUSES, STATUS_LABEL, TASK_LABEL, type Entry, type Source } from "@/lib/watch";
+import { createEntry, launchRound, saveTopic } from "./actions";
+
+export const maxDuration = 60;
 
 type Sp = { tab?: string; view?: string };
 /* REG-01 · Compliance › Regulatory watch. Top: the watch streams (topics) and whether they were checked on time — the proof.
@@ -49,7 +51,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
   const ents = scope ?? ENTS4;
   return (
     <>
-      <PageHeader eyebrow="Regulation, Regulatory watch" title="Regulatory watch" sub="Each watch stream has an owner, a cadence and its sources. Opening the sources on time is the proof; what we found and what we did is the record." right={desk ? <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Watch stream</summary>
+      <PageHeader eyebrow="Regulation, Regulatory watch" title="Regulatory watch" sub="One stream per entity and family (regulatory, safety, manufacturer), from each MSM. The round on time is the proof; what we found and what we did is the record." right={desk ? <details className="inlineedit" style={{ position: "relative" }}><summary className="btn">+ Watch stream</summary>
         <form action={saveTopic} className="card cb grid gap-2" style={{ position: "absolute", right: 0, top: 36, width: 420, zIndex: 5 }}>
           <label><span className="mini">Title</span><input name="title" className="inp" required placeholder="Compliance watch. Astontec" /></label>
           <div className="grid grid-cols-2 gap-2"><label><span className="mini">Domain</span><select name="domain" className="inp" defaultValue="compliance">{Object.entries(DOMAIN_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label><label><span className="mini">Every (days)</span><input name="every_days" type="number" className="inp" defaultValue={30} /></label></div>
@@ -63,16 +65,26 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
         <Metric label="Applicable, in work" value={open.filter((e) => e.applicability === "applicable").length} />
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        {topics.map((t) => (
-          <Link key={t.id} href={`/reg/watch/topic/${t.id}`} className={"card wtopic" + (t.overdue >= 0 ? " late" : "")}>
-            <div className="ch"><span className="eyebrow">{DOMAIN_LABEL[t.domain] ?? t.domain}</span><span className={"pill " + (t.overdue >= 0 ? (t.overdue > 14 ? "red" : "amber") : "green")}>{t.overdue >= 0 ? (t.overdue === 9999 ? "never checked" : t.overdue === 0 ? "due today" : `${t.overdue} d late`) : `due in ${-t.overdue} d`}</span></div>
-            <div className="cb"><b>{t.title}</b><div className="mini mt-1">{t.entities.map((e) => <span key={e}><span className="entdot" style={{ background: ENT_COLOR[e] ?? "var(--field)" }} />{e} </span>)}· {t.sources.length} source{t.sources.length === 1 ? "" : "s"}, every {t.every_days} d, {t.owner_person ? name(t.owner_person) : t.owner_role ?? "—"}</div>
-              <div className="mini">{t.last_checked_on ? `last check ${frd(t.last_checked_on)}${t.last_checked_by ? `, ${name(t.last_checked_by)}` : ""}` : "no check recorded yet"}</div></div>
-          </Link>
-        ))}
-        {!topics.length && <section className="card"><div className="cb mini">No watch stream in your scope yet.</div></section>}
-      </div>
+      <section className="card mb-5">
+        <div className="ch"><span className="eyebrow">Watch rounds, as set by the MSMs</span>
+          {desk && <form action={launchRound} className="flex gap-1">{FAMILIES.map(([k, l]) => <button key={k} className="btn" name="family" value={k} type="submit" title={`Read the public ${l.toLowerCase()} sources now`}>Launch {l}</button>)}<button className="btn primary" type="submit" title="Read the public sources of the three families">Launch all</button></form>}</div>
+        <div className="cb mini" style={{ paddingBottom: 0 }}>S.A.M. never runs a round on its own: the Compliance department is reminded 3 days before each stream is due. Launching reads the public pages (each address once for all entities) and keeps what is new since the previous round; pages S.A.M. cannot read, or behind a login, stay to open.</div>
+        <div className="grid grid-cols-3 gap-3 p-3">{FAMILIES.map(([k, l, sub]) => { const fam = topics.filter((t) => t.domain === k); return (
+          <div key={k} className="wfam">
+            <div className="flex items-center justify-between"><b>{l}</b><span className="mini">{sub}</span></div>
+            {fam.map((t) => { const done = (x: Source) => !!x.last_checked_on && !!t.last_checked_on && x.last_checked_on >= t.last_checked_on && t.overdue < 0;
+              const news = t.sources.reduce((n, x) => n + (x.last_result === "new" ? (x.last_new?.length ?? 0) : 0), 0);
+              const toOpen = t.sources.filter((x) => (x.access === "open" || x.access === "login") && !done(x));
+              const auto = t.sources.filter((x) => x.access === "read");
+              return (
+              <Link key={t.id} href={`/reg/watch/topic/${t.id}`} className={"wtopic" + (t.overdue >= 0 ? " late" : "")}>
+                <div className="flex items-center justify-between"><span><span className="entdot" style={{ background: ENT_COLOR[t.entities[0]] ?? "var(--field)" }} /><b>{t.title.split(" — ")[0]}</b></span><span className={"pill " + (t.overdue >= 0 ? (t.overdue > 14 ? "red" : "amber") : "green")}>{t.overdue >= 0 ? (t.overdue === 9999 ? "never checked" : t.overdue === 0 ? "due today" : `${t.overdue} d late`) : `due in ${-t.overdue} d`}</span></div>
+                <div className="mini">{auto.length} read by S.A.M.{news ? <b className="wnew">, {news} new to review</b> : ""}{toOpen.length ? `, ${toOpen.length} to open (${toOpen.filter((x) => x.access === "login").length} signed in)` : ""}</div>
+                <div className="mini">{t.last_checked_on ? `last round ${frd(t.last_checked_on)}${t.last_checked_by ? `, ${name(t.last_checked_by)}` : ""}` : "no round recorded yet"}</div>
+              </Link>); })}
+            {!fam.length && <p className="mini">No stream in your scope.</p>}
+          </div>); })}</div>
+      </section>
 
       <div className="flex items-center justify-between mb-2" style={{ gap: 8, flexWrap: "wrap" }}><div className="tabs">{tabs.map(([k, l, n]) => <Link key={k} href={`/reg/watch?tab=${k}&view=${view}`} className={"tab" + (tab === k ? " on" : "")}>{l} <span className="mini">{n}</span></Link>)}</div>
         <div className="seg" style={{ display: "inline-flex", marginLeft: "auto" }}><Link href={`/reg/watch?tab=${tab}&view=board`} className={view === "board" ? "on" : ""}>Board</Link><Link href={`/reg/watch?tab=${tab}&view=list`} className={view === "list" ? "on" : ""}>List</Link></div>

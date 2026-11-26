@@ -5,7 +5,7 @@ import { addDays, today } from "@/lib/authority";
  * S.A.M. helps on an entry: finds the chapters citing the reference, suggests applicability / impact / task. It signals, never edits. */
 
 export type Topic = { id: string; key: string | null; title: string; domain: string; entities: string[]; owner_role: string | null; owner_person: string | null; every_days: number; last_checked_on: string | null; last_checked_by: string | null; active: boolean };
-export type Source = { id: string; topic_id: string; name: string; kind: string; url: string | null; domain: string | null; note: string | null; active: boolean; last_checked_on: string | null; last_checked_by: string | null; last_result: string | null };
+export type Source = { id: string; topic_id: string; name: string; kind: string; url: string | null; domain: string | null; note: string | null; active: boolean; last_checked_on: string | null; last_checked_by: string | null; last_result: string | null; access?: string; snapshot?: { title: string; url: string }[] | null; read_at?: string | null; read_note?: string | null; last_new?: { title: string; url: string }[] | null };
 export type Check = { id: string; topic_id: string; source_id: string | null; checked_on: string; checked_by: string | null; result: string; note: string | null; created_at: string };
 export type Citation = { manual_id: string; code: string; title: string; ref: string; section_title: string | null; snippet: string };
 export type EntryAssistant = { applicability: string; summary: string; chapters: { manual: string; ref: string; why: string }[]; task: string | null; model: string; at: string };
@@ -14,6 +14,9 @@ export type Entry = { id: string; key: string | null; number: string; entity: st
   assistant: EntryAssistant | null; closed_at: string | null; closed_by: string | null; imported_from: string | null; created_by: string | null; created_at: string; updated_at: string };
 
 export const DOMAIN_LABEL: Record<string, string> = { compliance: "Compliance", safety: "Safety", ato_fstd: "ATO & FSTD", manufacturer: "Manufacturer documentation" };
+/** REG-07 · the three families of the watch (Guillaume 26/11), each stream = one entity × one family. */
+export const FAMILIES: [string, string, string][] = [["compliance", "Regulatory", "rules, decisions, official journals, authority"], ["safety", "Safety", "bulletins, investigations, conflict zones"], ["manufacturer", "Manufacturer", "type documentation, service bulletins, MMEL"]];
+export const ACCESS_LABEL: Record<string, string> = { read: "S.A.M. reads it", open: "to open", login: "to open, signed in", regulation: "followed in Regulation" };
 export const KIND_LABEL: Record<string, string> = { easa: "EASA", dsac: "DSAC / METEOR", osac: "OSAC", tmcad: "TM-CAD", jorf: "JORF / Légifrance", bea: "BEA", manufacturer: "Manufacturer", icao: "ICAO / FSF", misc: "Other" };
 export const APPL_LABEL: Record<string, string> = { to_analyse: "To analyse", applicable: "Applicable", for_information: "For information", not_applicable: "Not applicable" };
 export const APPL_TONE: Record<string, string> = { to_analyse: "amber", applicable: "red", for_information: "", not_applicable: "" };

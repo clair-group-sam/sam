@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { analyseEntry, findCitations, loadEntry, nextEntryNumber, syncEntryTask, type Entry, type Topic } from "@/lib/watch";
+import { analyseEntry, FAMILIES, findCitations, loadEntry, nextEntryNumber, syncEntryTask, type Entry, type Source, type Topic } from "@/lib/watch";
+import { newSince, readSource, type Item } from "@/lib/watch-read";
 import { openDraft } from "@/lib/revisions-server";
 import { today } from "@/lib/authority";
 
@@ -26,13 +27,56 @@ export async function checkSource(fd: FormData) {
   const sourceId = str(fd, "source"); const result = str(fd, "result") ?? "nothing_new";
   const on = today();
   await db().from("watch_checks").insert({ topic_id: t.id, source_id: sourceId, checked_on: on, checked_by: s.person?.id ?? null, result, note: str(fd, "note") });
-  if (sourceId) await db().from("watch_sources").update({ last_checked_on: on, last_checked_by: s.person?.id ?? null, last_result: result }).eq("id", sourceId);
-  // the topic is "checked" when every active source has been looked at since the previous topic check
-  const { data: srcs } = await db().from("watch_sources").select("id,last_checked_on").eq("topic_id", t.id).eq("active", true);
-  const all = ((srcs ?? []) as { id: string; last_checked_on: string | null }[]).every((x) => x.last_checked_on && (!t.last_checked_on || x.last_checked_on > t.last_checked_on));
-  if (all || !sourceId) await db().from("watch_topics").update({ last_checked_on: on, last_checked_by: s.person?.id ?? null }).eq("id", t.id);
-  if (all || !sourceId) await db().from("tasks").update({ status: "done" }).eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open");
+  if (sourceId) await db().from("watch_sources").update({ last_checked_on: on, last_checked_by: s.person?.id ?? null, last_result: result, last_new: null }).eq("id", sourceId);
+  await settle(t, s.person?.id ?? null, on, !sourceId);
   touch([`/reg/watch/topic/${t.id}`]);
+}
+/** The stream is "checked" when every active source has been looked at since the previous check of the stream. */
+async function settle(t: Topic, who: string | null, on: string, force = false) {
+  const { data: srcs } = await db().from("watch_sources").select("id,last_checked_on").eq("topic_id", t.id).eq("active", true);
+  const all = ((srcs ?? []) as { id: string; last_checked_on: string | null }[]).every((x) => x.last_checked_on && (!t.last_checked_on || x.last_checked_on > t.last_checked_on || x.last_checked_on === on));
+  if (!all && !force) return false;
+  await db().from("watch_topics").update({ last_checked_on: on, last_checked_by: who }).eq("id", t.id);
+  await db().from("tasks").update({ status: "done" }).eq("ref_id", t.id).eq("kind", "watch_check").eq("status", "open");
+  return true;
+}
+
+/* ---------- REG-07 · a watch round launched by Compliance (never on its own) ---------- */
+/** Reads the public sources of the chosen families (one reading per address, shared by the entities), keeps what is new since the
+ * previous round for review, records "nothing new" where nothing changed. Sources to open or behind a login stay to tick. */
+export async function launchRound(fd: FormData) {
+  const s = await me(); if (!desk(s)) fail("Compliance department only.");
+  const fams = fd.getAll("family").map(String).filter(Boolean);
+  const scope = s.entity === "ALL" ? (s.group ? null : s.entities) : [s.entity];
+  const { data: td } = await db().from("watch_topics").select("*").eq("active", true).in("domain", fams.length ? fams : FAMILIES.map((f) => f[0]));
+  const topics = ((td ?? []) as Topic[]).filter((t) => !scope || t.entities.some((e) => scope.includes(e)));
+  if (!topics.length) fail("No watch stream in your scope for this family.");
+  const { data: sd } = await db().from("watch_sources").select("*").in("topic_id", topics.map((t) => t.id)).eq("active", true);
+  const sources = (sd ?? []) as Source[];
+  const urls = [...new Set(sources.filter((x) => x.access === "read" && x.url).map((x) => x.url!))];
+  const readings = new Map(await Promise.all(urls.map(async (u) => [u, await readSource(u)] as const)));
+  const on = today(), now = new Date().toISOString(), who = s.person?.id ?? null;
+  for (const x of sources) {
+    if (x.access === "regulation") {
+      await db().from("watch_sources").update({ last_checked_on: on, last_checked_by: who, last_result: "nothing_new", read_at: now, read_note: "followed in Regulation, EASA rules" }).eq("id", x.id);
+      continue;
+    }
+    if (x.access !== "read" || !x.url) continue;
+    const r = readings.get(x.url)!;
+    if (!r.ok) { await db().from("watch_sources").update({ read_at: now, read_note: `not read (${r.note ?? `HTTP ${r.status}`}), open it` }).eq("id", x.id); continue; }
+    const first = !x.snapshot?.length;
+    const pending: Item[] = x.last_result === "new" ? (x.last_new ?? []) : [];
+    const fresh = newSince(x.snapshot ?? null, r.items).filter((i) => !pending.some((p) => p.url === i.url));
+    const waiting = [...fresh, ...pending].slice(0, 40);
+    const note = first ? `first reading: ${r.items.length} entries kept as the reference` : fresh.length ? `${fresh.length} new since the previous round` : pending.length ? "nothing more, earlier news still to review" : "nothing new";
+    if (waiting.length) await db().from("watch_sources").update({ snapshot: r.items, read_at: now, read_note: note, last_new: waiting, last_result: "new" }).eq("id", x.id);
+    else {
+      await db().from("watch_sources").update({ snapshot: r.items, read_at: now, read_note: note, last_new: null, last_checked_on: on, last_checked_by: who, last_result: "nothing_new" }).eq("id", x.id);
+      await db().from("watch_checks").insert({ topic_id: x.topic_id, source_id: x.id, checked_on: on, checked_by: who, result: "nothing_new", note: `read by S.A.M., ${note}` });
+    }
+  }
+  for (const t of topics) await settle(t, who, on);
+  touch(topics.map((t) => `/reg/watch/topic/${t.id}`));
 }
 
 /* ---------- topics & sources (Compliance / Safety desk) ---------- */
@@ -72,7 +116,12 @@ export async function createEntry(fd: FormData) {
   if (t) { // the entry is itself the proof the source was looked at
     const { data: c } = await db().from("watch_checks").insert({ topic_id: t.id, source_id: sourceId, checked_on: today(), checked_by: s.person?.id ?? null, result: "entries", note: title.slice(0, 200) }).select("id").single();
     checkId = (c as { id: string } | null)?.id ?? null;
-    if (sourceId) await db().from("watch_sources").update({ last_checked_on: today(), last_checked_by: s.person?.id ?? null, last_result: "entries" }).eq("id", sourceId);
+    if (sourceId) {
+      const { data: cur } = await db().from("watch_sources").select("last_new").eq("id", sourceId).maybeSingle();
+      const item = str(fd, "item_url"); const left = ((cur as { last_new: Item[] | null } | null)?.last_new ?? []).filter((i) => !item || i.url !== item);
+      const more = !!item && left.length > 0; // other news of the reading still to review: the source is not done yet
+      await db().from("watch_sources").update(more ? { last_new: left } : { last_checked_on: today(), last_checked_by: s.person?.id ?? null, last_result: "entries", last_new: null }).eq("id", sourceId);
+    }
   }
   const { data: src } = sourceId ? await db().from("watch_sources").select("kind,domain").eq("id", sourceId).maybeSingle() : { data: null };
   const row = { number: await nextEntryNumber(db(), entity), entity, topic_id: t?.id ?? null, source_id: sourceId, check_id: checkId, source_kind: str(fd, "source_kind") ?? (src as { kind: string } | null)?.kind ?? null, domain: str(fd, "domain") ?? (src as { domain: string | null } | null)?.domain ?? null,
