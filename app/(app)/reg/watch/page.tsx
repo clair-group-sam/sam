@@ -67,7 +67,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
 
       <section className="card mb-5">
         <div className="ch"><span className="eyebrow">Watch rounds, as set by the MSMs</span>
-          {desk && <form action={launchRound} className="flex gap-1">{FAMILIES.map(([k, l]) => <button key={k} className="btn" name="family" value={k} type="submit" title={`Read the public ${l.toLowerCase()} sources now`}>Launch {l}</button>)}<button className="btn primary" type="submit" title="Read the public sources of the three families">Launch all</button></form>}</div>
+          {desk && <form action={launchRound} className="flex gap-1">{FAMILIES.filter(([k]) => topics.some((t) => t.domain === k)).map(([k, l]) => <button key={k} className="btn" name="family" value={k} type="submit" title={`Read the public ${l.toLowerCase()} sources now`}>Launch {l}</button>)}<button className="btn primary" type="submit" title="Read the public sources of the three families">Launch all</button></form>}</div>
         <div className="cb mini" style={{ paddingBottom: 0 }}>S.A.M. never runs a round on its own: the Compliance department is reminded 3 days before each stream is due. Launching reads the public pages (each address once for all entities) and keeps what is new since the previous round; pages S.A.M. cannot read, or behind a login, stay to open.</div>
         <div className="grid grid-cols-3 gap-3 p-3">{FAMILIES.map(([k, l, sub]) => { const fam = topics.filter((t) => t.domain === k); return (
           <div key={k} className="wfam">
@@ -82,7 +82,7 @@ export default async function RegulatoryWatch({ searchParams }: { searchParams: 
                 <div className="mini">{auto.length} read by S.A.M.{news ? <b className="wnew">, {news} new to review</b> : ""}{toOpen.length ? `, ${toOpen.length} to open (${toOpen.filter((x) => x.access === "login").length} signed in)` : ""}</div>
                 <div className="mini">{t.last_checked_on ? `last round ${frd(t.last_checked_on)}${t.last_checked_by ? `, ${name(t.last_checked_by)}` : ""}` : "no round recorded yet"}</div>
               </Link>); })}
-            {!fam.length && <p className="mini">No stream in your scope.</p>}
+            {!fam.length && <p className="mini">{k === "manufacturer" ? "On standby: the manufacturer portals will be set up later." : "No stream in your scope."}</p>}
           </div>); })}</div>
       </section>
 

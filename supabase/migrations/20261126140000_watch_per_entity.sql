@@ -70,3 +70,6 @@ insert into watch_sources (topic_id, name, kind, url, access, note) select id, '
 -- the former shared streams: history kept, no more reminders
 update tasks set status = 'done' where kind = 'watch_check' and status = 'open' and ref_id in (select id from watch_topics where key in ('compliance','ato_fstd','safety','cessna','dassault','bombardier'));
 update watch_topics set active = false where key in ('compliance','ato_fstd','safety','cessna','dassault','bombardier');
+-- 26/11 (Guillaume): the manufacturer streams are on standby (portals to set up later): seeded, inactive, no reminder
+update tasks set status = 'done' where kind = 'watch_check' and status = 'open' and ref_id in (select id from watch_topics where key like '%-manufacturer');
+update watch_topics set active = false where key like '%-manufacturer';
