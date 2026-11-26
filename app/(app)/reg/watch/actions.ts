@@ -2,6 +2,8 @@
 import { fail } from "@/lib/fail";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { impactFor } from "@/lib/impact";
 import { getSession, basePost, type Session } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { analyseEntry, FAMILIES, findCitations, loadEntry, nextEntryNumber, syncEntryTask, type Entry, type Source, type Topic } from "@/lib/watch";
@@ -131,7 +133,8 @@ export async function createEntry(fd: FormData) {
   if (error || !data) fail(error?.message ?? "Entry not created.");
   const e = data as Entry;
   // S.A.M. reads it at once when a reference is given
-  if (e.reference) { const cit = await findCitations(db(), e.entity, e.reference); const a = await analyseEntry(e, cit); await db().from("watch_entries").update({ assistant: a }).eq("id", e.id); }
+  // S.A.M. reads it after the answer: citations, then the impact on our manuals and certificates (REG-08)
+  after(async () => { const cit = e.reference ? await findCitations(db(), e.entity, e.reference) : []; const [a, impact] = await Promise.all([analyseEntry(e, cit), impactFor(db(), e)]); await db().from("watch_entries").update({ assistant: { ...a, impact } }).eq("id", e.id); });
   await syncEntryTask(db(), e);
   await db().from("audit_log").insert({ actor: s.person?.id ?? null, entity, object_type: "watch_entry", object_id: e.id, action: "watch_entry_created", after: row });
   touch(t ? [`/reg/watch/topic/${t.id}`] : []);
@@ -156,8 +159,8 @@ export async function analyse(fd: FormData) {
   const s = await me(); const e = await entry(String(fd.get("id")));
   if (!desk(s) && !owns(s, e)) fail("Not allowed");
   const cit = e.reference ? await findCitations(db(), e.entity, e.reference) : [];
-  const a = await analyseEntry(e, cit);
-  await db().from("watch_entries").update({ assistant: a, updated_at: new Date().toISOString() }).eq("id", e.id);
+  const [a, impact] = await Promise.all([analyseEntry(e, cit), impactFor(db(), e)]);
+  await db().from("watch_entries").update({ assistant: { ...a, impact }, updated_at: new Date().toISOString() }).eq("id", e.id);
   touch([`/reg/watch/${e.id}`]);
 }
 /** Opens (or resumes) the draft of a manual to address the entry; the revision is remembered on the entry. */

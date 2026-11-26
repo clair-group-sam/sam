@@ -33,7 +33,7 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader eyebrow="Regulation, Easy Access Rules" title="Easy Access Rules" sub="The rules we work with, always in the version EASA publishes today. S.A.M. checks the EASA pages every evening; a new version replaces the previous one here and is raised in the regulatory watch to analyse."
-        right={desk ? <div className="flex gap-2"><form action={checkNow}><button className="btn">Check EASA now</button></form><Link className="btn" href={sp.cited ? "/reg/ear" : "/reg/ear?cited=1#cited"}>{sp.cited ? "Hide" : "Texts cited in our manuals"}</Link></div> : undefined} />
+        right={desk ? <div className="flex gap-2"><form action={checkNow}><button className="btn">Check EASA now</button></form><Link className="btn" href={sp.cited ? "/reg/ear" : "/reg/ear?cited=1#cited"}>{sp.cited ? "Hide" : "Who to warn when a text changes"}</Link></div> : undefined} />
       {desk && <div className="grid grid-cols-4 gap-4 mb-5">
         <Metric label="Texts" value={regs.length} hint={`${regs.filter((r) => r.kind === "ear").length} Easy Access Rules`} />
         <Metric label="Last check" value={last ? last.slice(0, 10) : "—"} hint={last ? `${last.slice(11, 16)} UTC` : "never"} />
@@ -80,11 +80,14 @@ export default async function EasyAccessRules({ searchParams }: { searchParams: 
           <div className="flex justify-end"><button className="btn primary">Add. S.A.M. reads the version</button></div>
         </form></details>}
 
-      {cited && <section className="card" id="cited"><div className="ch"><span className="eyebrow">Texts cited in our manuals</span><span className="mini">current published revisions, {scope.join(", ")}</span></div><div className="cb" style={{ padding: 0 }}>
-        <table className="tbl"><thead><tr><th>Text</th><th>Sections citing it</th><th>Manuals</th><th>In this menu</th></tr></thead><tbody>
+      {cited && <section className="card" id="cited"><div className="ch"><span className="eyebrow">Who to warn when a text changes</span><span className="mini">manuals citing it (current published revisions) and certificates it bears on, {scope.join(", ")}. When a new version comes in, its watch entry shows the impact, before / after.</span></div><div className="cb" style={{ padding: 0 }}>
+        <table className="tbl"><thead><tr><th>Text</th><th>Manuals citing it, NP to warn</th><th>Certificates</th><th>Changes detected</th></tr></thead><tbody>
           {cited.filter((c) => c.count > 0).sort((a, b) => b.count - a.count).map((c) => {
             const inMenu = !!c.key && regs.some((r) => r.key === c.key);
-            return <tr key={c.pattern}><td><b>{c.label}</b><div className="mini mono">“{c.pattern}”</div></td><td>{c.count}</td><td className="mini">{c.manuals.slice(0, 8).map((m) => `${m.entity} ${m.code} (${m.sections})`).join(", ")}{c.manuals.length > 8 ? " …" : ""}</td><td>{inMenu ? <span className="pill green">yes</span> : <span className="pill amber">not yet</span>}</td></tr>;
+            return <tr key={c.pattern}><td><b>{c.label}</b><div className="mini">{c.count} section{c.count === 1 ? "" : "s"} cite “{c.pattern}”</div></td>
+              <td className="mini">{c.manuals.slice(0, 10).map((m) => <div key={m.entity + m.code}><span className="entdot" style={{ background: ENT_COLOR[m.entity] ?? "var(--field)" }} />{m.entity} <b className="mono">{m.code}</b> ({m.sections}) <span className="pill">{m.owner_role}</span></div>)}{c.manuals.length > 10 ? <div>+ {c.manuals.length - 10} more</div> : null}</td>
+              <td className="mini">{c.certificates.length ? c.certificates.slice(0, 6).map((x, i) => <div key={i}>{x.entity} {x.title}</div>) : "—"}{c.certificates.length > 6 ? <div>+ {c.certificates.length - 6} more</div> : null}</td>
+              <td>{inMenu ? <span className="pill green" title="S.A.M. reads its EASA page every evening and raises a watch entry when the version changes">followed</span> : <span className="pill amber" title="Not followed by S.A.M.: add it above (+ Add a text) to be warned of a new version">not followed</span>}</td></tr>;
           })}
           {!cited.some((c) => c.count > 0) && <tr><td colSpan={4} className="mini">No published manual text found in this scope.</td></tr>}
         </tbody></table></div></section>}

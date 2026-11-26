@@ -7,6 +7,7 @@ import { Metric, PageHeader } from "@/components/Page";
 import { ENT, ENT_COLOR, ENTS4 } from "@/lib/nav";
 import { ACCESS_LABEL, APPL_LABEL, DOMAIN_LABEL, KIND_LABEL, OPEN_STATUSES, STATUS_LABEL, TASK_LABEL, type Check, type Entry, type Source, type Topic } from "@/lib/watch";
 import { addDays } from "@/lib/authority";
+export const maxDuration = 60;
 import { archiveTopic, checkSource, createEntry, removeSource, saveSource, saveTopic } from "../../actions";
 
 /* REG-01 · one watch stream: its sources as a checklist (nothing new / raise an entry / not reachable), the log of checks, its entries. */

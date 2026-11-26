@@ -10,6 +10,7 @@ import EntityBand from "@/components/EntityBand";
 import NewActionForm from "@/components/NewActionForm";
 import { ACTION_STATUS, type Action } from "@/lib/actions-shared";
 import { APPL_LABEL, APPL_TONE, findCitations, KIND_LABEL, loadEntry, OPEN_STATUSES, STATUS_LABEL, TASK_LABEL } from "@/lib/watch";
+export const maxDuration = 60;
 import { analyse, draftFor, setEntryStatus, updateEntry } from "../actions";
 
 /* REG-01 · one entry: the text, S.A.M.'s reading (chapters citing it, applicability, suggested task), the decision, what was done. */
@@ -66,6 +67,33 @@ export default async function WatchEntry({ params }: { params: Promise<{ id: str
               {e.reference && isOpen && !citations.length && <p className="mini">No published chapter cites “{e.reference}”.</p>}
             </div>
           </section>
+
+          {(() => { const im = a?.impact; return (
+          <section className="card" id="impact">
+            <div className="ch"><span className="eyebrow">Impact on our manuals and certificates</span><span className="mini">{im ? `${frdt(im.at)}${im.model === "rules" ? " · without Claude's reading" : ""}` : "not analysed yet"}{may && isOpen && <form action={analyse} style={{ display: "inline", marginLeft: 8 }}><input type="hidden" name="id" value={e.id} /><button className="btn mini" type="submit">{im ? "Analyse again" : "Analyse the impact"}</button></form>}</span></div>
+            <div className="cb grid gap-3">
+              {!im ? <p className="mini">S.A.M. looks for the chapters of {e.entity}&apos;s published manuals and the certificates this text bears on, shows what changed (before / after) and which posts to warn. Suggestions only.</p> : <>
+                {im.analysis?.summary && <p>{im.analysis.summary}</p>}
+                {(im.analysis?.notify.length ?? 0) > 0 && <div className="mini">To warn: {im.analysis!.notify.map((p) => <span key={p} className="pill" style={{ marginRight: 4 }}>{p}</span>)}</div>}
+                <div><div className="eyebrow mb-1">Manuals, and the NP who owns each</div>
+                  {im.manuals.length ? <table className="tbl"><tbody>{im.manuals.map((m) => { const r = im.analysis?.manuals.filter((x) => x.code === m.code) ?? []; return (
+                    <tr key={m.id}><td><b className="mono">{m.code}</b> <span className="mini">{m.title}</span>{r.map((x, i) => <div key={i} className="mini"><b className="mono">{x.ref}</b> {x.why}{x.action && x.action !== "none" ? <span className="pill amber" style={{ marginLeft: 4 }}>{x.action}</span> : null}</div>)}
+                      <details className="mini"><summary>{m.sections.length} section{m.sections.length === 1 ? "" : "s"} citing it</summary>{m.sections.map((x, i) => <div key={i}><b className="mono">{x.ref}</b> {x.title} <i>{x.snippet}</i> <span className="mini">({x.via})</span></div>)}</details></td>
+                      <td style={{ textAlign: "right", whiteSpace: "nowrap" }}><span className="pill">{m.owner_role}</span></td></tr>); })}</tbody></table> : <p className="mini">No chapter of the published manuals cites it.</p>}</div>
+                <div><div className="eyebrow mb-1">Certificates and approvals</div>
+                  {im.certificates.length ? <table className="tbl"><tbody>{im.certificates.map((c) => { const r = im.analysis?.certificates.find((x) => x.title === c.title); return (
+                    <tr key={c.id}><td><Link href={c.folder ? `/docs/files?folder=${encodeURIComponent(c.folder)}` : "/docs/files"}><b>{c.title}</b></Link><div className="mini">{c.kind}{c.reference ? `, ${c.reference}` : ""}{c.registration ? `, ${c.registration}` : ""}{c.valid_until ? `, valid until ${frd(c.valid_until)}` : ""}, {r?.why ?? c.why}</div></td>
+                      <td style={{ textAlign: "right" }}>{r?.action && r.action !== "none" ? <span className="pill amber">{r.action}</span> : null}</td></tr>); })}</tbody></table> : <p className="mini">No certificate found that it bears on.</p>}</div>
+                {(im.changes.length > 0 || im.changes_note) && <div><div className="eyebrow mb-1">What changed, before / after</div>
+                  {im.changes_note && <p className="mini">{im.changes_note}</p>}
+                  {(im.analysis?.changes.length ?? 0) > 0 && <table className="tbl"><thead><tr><th>Article</th><th>Before</th><th>After</th><th>For us</th></tr></thead><tbody>{im.analysis!.changes.map((c, i) => <tr key={i}><td className="mono">{c.ref}</td><td className="mini">{c.before}</td><td className="mini">{c.after}</td><td className="mini">{c.impact}</td></tr>)}</tbody></table>}
+                  {im.changes.length > 0 && <details className="mini"><summary>{im.changes.length} article{im.changes.length === 1 ? "" : "s"} changed, full text{im.changes.filter((c) => c.cited_in.length).length ? `, ${im.changes.filter((c) => c.cited_in.length).length} cited in our manuals` : ""}</summary>
+                    <div className="grid gap-2 mt-1">{[...im.changes].sort((x, y) => y.cited_in.length - x.cited_in.length).slice(0, 60).map((c) => <div key={c.ref} className="baa"><b className="mono">{c.ref}</b> <span className="pill">{c.change}</span>{c.cited_in.length ? <span className="mini"> cited in {c.cited_in.join(", ")}</span> : null}
+                      <div className="grid grid-cols-2 gap-2"><div className="before">{c.before ?? "—"}</div><div className="after">{c.after ?? "removed"}</div></div></div>)}</div></details>}
+                </div>}
+              </>}
+            </div>
+          </section>); })()}
 
           <section className="card">
             <div className="ch"><span className="eyebrow">Decision, applicability, impact, who, when</span></div>

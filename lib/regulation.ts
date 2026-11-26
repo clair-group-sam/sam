@@ -104,27 +104,32 @@ export const KNOWN_TEXTS: { pattern: string; label: string; key?: string }[] = [
   { pattern: "1199/2011", label: "(EU) 1199/2011" },
   { pattern: "2021/1296", label: "Fuel / energy planning (EU) 2021/1296" },
 ];
-export type Cited = { pattern: string; label: string; key?: string; count: number; manuals: { entity: string; code: string; sections: number }[] };
+export type Cited = { pattern: string; label: string; key?: string; count: number; manuals: { entity: string; code: string; owner_role: string; sections: number }[]; certificates: { entity: string; title: string }[] };
 
+import { CERT_BY_KEY } from "@/lib/impact-keys";
 /** Texts cited in the current published revision of each manual (scope = entities). */
 export async function citedTexts(db: SupabaseClient, entities: string[]): Promise<Cited[]> {
-  const { data: mans } = await db.from("manuals").select("id,code,entity").in("entity", entities);
-  const ms = (mans ?? []) as { id: string; code: string; entity: string }[];
+  const { data: mans } = await db.from("manuals").select("id,code,entity,owner_role").in("entity", entities);
+  const ms = (mans ?? []) as { id: string; code: string; entity: string; owner_role: string }[];
   if (!ms.length) return [];
   const { data: revs } = await db.from("revisions").select("id,manual_id,published_at").in("manual_id", ms.map((m) => m.id)).in("step", ["published", "repository"]).order("published_at", { ascending: false, nullsFirst: false });
   const cur = new Map<string, string>();
   for (const r of (revs ?? []) as { id: string; manual_id: string }[]) if (!cur.has(r.manual_id)) cur.set(r.manual_id, r.id);
-  const byRev = new Map<string, { entity: string; code: string }>();
-  for (const m of ms) { const r = cur.get(m.id); if (r) byRev.set(r, { entity: m.entity, code: m.code }); }
+  const byRev = new Map<string, { entity: string; code: string; owner_role: string }>();
+  for (const m of ms) { const r = cur.get(m.id); if (r) byRev.set(r, { entity: m.entity, code: m.code, owner_role: m.owner_role }); }
+  const { data: cd } = await db.from("certificates").select("entity,title,kind,reference,folder,summary").in("entity", entities).is("archived_at", null).limit(2000);
+  const certs = (cd ?? []) as { entity: string; title: string; kind: string; reference: string | null; folder: string | null; summary: string | null }[];
   const revIds = [...byRev.keys()];
   if (!revIds.length) return [];
   const out: Cited[] = [];
   for (const k of KNOWN_TEXTS) {
     const { data } = await db.from("revision_sections").select("revision_id").in("revision_id", revIds).ilike("body_text", `%${k.pattern}%`).limit(1000);
     const rows = (data ?? []) as { revision_id: string }[];
-    const per = new Map<string, { entity: string; code: string; sections: number }>();
+    const per = new Map<string, { entity: string; code: string; owner_role: string; sections: number }>();
     for (const r of rows) { const m = byRev.get(r.revision_id); if (!m) continue; const x = per.get(r.revision_id) ?? { ...m, sections: 0 }; x.sections++; per.set(r.revision_id, x); }
-    out.push({ ...k, count: rows.length, manuals: [...per.values()].sort((a, b) => b.sections - a.sections) });
+    const re = k.key ? CERT_BY_KEY[k.key] : undefined;
+    const cs = certs.filter((c) => { const t = `${c.title} ${c.kind} ${c.reference ?? ""} ${c.folder ?? ""} ${c.summary ?? ""}`; return t.includes(k.pattern) || (!!re && re.test(t)); }).map((c) => ({ entity: c.entity, title: c.title }));
+    out.push({ ...k, count: rows.length, manuals: [...per.values()].sort((a, b) => b.sections - a.sections), certificates: cs });
   }
   return out;
 }
