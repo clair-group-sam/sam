@@ -9,6 +9,7 @@ import { ENT } from "@/lib/nav";
 import { DOMAINS, LIKELIHOODS, MSM_REF, RA_STATUS, SEVERITIES, mayEditRisk, riskIndex, riskLabel, schemeOf, tolerability, tolTone, type Ra } from "@/lib/risk";
 import { RiskTabs } from "@/components/RiskTabs";
 import { toMatchCount } from "@/lib/risk-count";
+import { EXPOSURE_MONTHS, topHazards } from "@/lib/risk-top";
 import { createAssessment } from "./actions";
 
 type H = { id: string; ref: string; title: string; consequence: string | null; status: string; entity: string; owner_role: string | null; needs_review: boolean; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; assessment_id: string; hazard_reports: { report_id: string }[] };
@@ -22,13 +23,15 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const scope = s.entity === "ALL" ? s.entities : [s.entity];
   const db = supabaseAdmin();
-  const [{ data: ra }, { data: hz }, { data: refs }, toMatch, { count: dup }] = await Promise.all([
+  const [{ data: ra }, { data: hz }, { data: refs }, toMatch, { count: dup }, tops] = await Promise.all([
     db.from("risk_assessments").select("*").in("entity", scope).eq("kind", "hazard_log").order("number"),
     db.from("hazards").select("id,ref,title,consequence,status,entity,owner_role,needs_review,lik_before,sev_before,lik_after,sev_after,assessment_id,risk_assessments!inner(kind),hazard_reports(report_id)").in("entity", scope).eq("proposed", false).eq("risk_assessments.kind", "hazard_log"),
     db.from("hazards").select("log_hazard_id").in("entity", scope).not("log_hazard_id", "is", null),
     toMatchCount(scope),
     db.from("risk_matches").select("subject_id", { count: "exact", head: true }).eq("subject_kind", "duplicate").in("entity", scope),
+    topHazards(db, scope),
   ]);
+  const top = new Map(tops.map((t) => [t.id, t]));
   const entries = new Map(((ra ?? []) as Ra[]).map((a) => [a.id, a]));
   const studies = new Map<string, number>(); for (const r of (refs ?? []) as { log_hazard_id: string }[]) studies.set(r.log_hazard_id, (studies.get(r.log_hazard_id) ?? 0) + 1);
   const archived = sp.st === "archived";
@@ -44,6 +47,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
   if (sp.flag === "review") base = base.filter((h) => h.needs_review);
   if (sp.flag === "overdue") base = base.filter((h) => (due(h) ?? "9999") < today);
   if (sp.flag === "unsigned") base = base.filter((h) => entries.get(h.assessment_id)?.status === "draft");
+  if (sp.flag === "top") base = base.filter((h) => top.has(h.id));
   let rows = base;
   if (sp.tol) rows = rows.filter((h) => tolOf(h) === sp.tol);
   if (sp.cell) rows = rows.filter((h) => riskIndex(lk(h), sv(h)) === sp.cell);
@@ -53,6 +57,8 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
   const score = (h: H) => { const t = tolOf(h); return (t === "intolerable" ? 3 : t === "tolerable" ? 2 : t ? 1 : 0) * 100 + (lk(h) ?? 0) * 10 + (6 - "ABCDE".indexOf(sv(h) ?? "E")); };
   const groups = new Map<string, H[]>(); for (const h of rows) { const d = entries.get(h.assessment_id)?.domain ?? "Other"; if (!groups.has(d)) groups.set(d, []); groups.get(d)!.push(h); }
   for (const g of groups.values()) g.sort((x, y) => score(y) - score(x));
+  // Top hazards: one list, the designated ones first, then the live ranking by exposure
+  if (sp.flag === "top") { const order = new Map(tops.map((t, i) => [t.id, i])); groups.clear(); groups.set("Top hazards", [...rows].sort((x, y) => (order.get(x.id) ?? 0) - (order.get(y.id) ?? 0))); }
   const live = all;
   const red = live.filter((h) => tolerability(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, schemeOf(h.entity)) === "intolerable").length;
   const edit = mayEditRisk(s);
@@ -61,8 +67,9 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
     <>
       <PageHeader eyebrow="Safety, Risk management" title="Hazard log" sub={`Each lasting hazard once, with its current rating, reviewed at the SRB, reassessed with each new occurrence, ${scope.map((e) => MSM_REF[e] ?? e).join(", ")}`} />
       <RiskTabs on="log" toMatch={toMatch} />
-      <div className="grid grid-cols-5 gap-4 mb-5">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mb-5">
         <Metric label="Hazards in the log" value={live.length} hint={`${new Set(live.map((h) => h.assessment_id)).size} entries`} />
+        <Metric label="Top hazards" value={tops.length} tone={tops.length ? "amber" : undefined} hint={`${tops.filter((t) => t.designated).length} designated, ${tops.filter((t) => !t.designated).length} live by exposure`} />
         <Metric label="Current risk red" value={red} tone={red ? "red" : undefined} hint="AM decision" />
         <Metric label="To reassess" value={live.filter((h) => h.needs_review).length} tone={live.some((h) => h.needs_review) ? "amber" : undefined} hint="occurrence or study linked" />
         <Metric label="Review overdue" value={live.filter((h) => (due(h) ?? "9999") < today).length} tone={live.some((h) => (due(h) ?? "9999") < today) ? "red" : undefined} />
@@ -72,6 +79,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
       <div className="withside grid gap-4 mb-4 items-start">
         <div>
           <div className="flex gap-2 mb-2 flex-wrap items-center">
+            {flag("top", "Top hazards", tops.length, "amber")}
             {flag("review", "To reassess", live.filter((h) => h.needs_review).length, "amber")}
             {flag("overdue", "Review overdue", live.filter((h) => (due(h) ?? "9999") < today).length, "red")}
             {flag("unsigned", "Not signed off", live.filter((h) => entries.get(h.assessment_id)?.status === "draft").length, "amber")}
@@ -83,6 +91,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
               <button className="btn">Filter</button>
             </form>
           </div>
+          {sp.flag === "top" && <p className="mini mb-2">Designated: the entries marked “Top risk” (set on the entry, by the safety desk). Live: the other hazards ranked by exposure, the occurrences linked over the last {EXPOSURE_MONTHS} months, then by current rating; without any occurrence a hazard enters only when its current risk is intolerable. The live list moves by itself.</p>}
           {(sp.cell || sp.tol || sp.domain || sp.q || sp.flag) && <p className="mini mb-2">{rows.length} hazards, <Link className="underline" href={qs({ m: sp.m }, {})}>clear filters</Link></p>}
       {[...groups.entries()].sort((x, y) => x[0].localeCompare(y[0])).map(([d, hs]) => (
         <section key={d} className="card mb-4">
@@ -94,7 +103,7 @@ export default async function HazardLog({ searchParams }: { searchParams: Promis
               const n = studies.get(h.id) ?? 0, r = h.hazard_reports.length; const dd = due(h);
               return (
                 <tr key={h.id}>
-                  <td className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.needs_review && <div className="mini red">to reassess</div>}</td>
+                  <td className="mono"><Link className="underline" href={`/safe/risk/${h.id}`}>{h.ref}</Link>{h.needs_review && <div className="mini red">to reassess</div>}{top.has(h.id) && <div><span className="pill amber" title={top.get(h.id)!.designated ? "Marked “Top risk” on its entry" : `Ranked by the occurrences linked over the last ${EXPOSURE_MONTHS} months, then by current rating`}>{top.get(h.id)!.designated ? "top, designated" : `top, live #${top.get(h.id)!.rank}`}</span>{top.get(h.id)!.exposure > 0 && <div className="mini">{top.get(h.id)!.exposure} occurrence{top.get(h.id)!.exposure === 1 ? "" : "s"} in {EXPOSURE_MONTHS} months</div>}</div>}</td>
                   <td className="entcol"><span className={"ent " + h.entity}>{h.entity}</span></td>
                   <td><Link href={`/safe/risk/${h.id}`}><b>{h.title}</b></Link>{h.consequence && <div className="mini">Consequence: {h.consequence}</div>}</td>
                   <td>{pre ? <span className={"pill " + tolTone(pre)}>{riskLabel(h.lik_before, h.sev_before, sc)}</span> : <span className="mini">—</span>} → {cur ? <span className={"pill " + tolTone(cur)}>{riskLabel(h.lik_after ?? h.lik_before, h.sev_after ?? h.sev_before, sc)}</span> : <span className="mini">—</span>}</td>

@@ -1,6 +1,7 @@
 // SAF-05 Committees: Safety Review Board (SRB) and Safety Action Group (SAG) — agenda from the MSM, attendees from the posts,
 // the figures presented (pack), notes and decisions per item, actions raised in the meeting, minutes.
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { topHazards } from "@/lib/risk-top";
 import { spiBoard, fmt, targetText, VERDICT } from "@/lib/spi";
 import { isSafetyDesk } from "@/lib/safety";
 import { riskLabel, schemeOf, tolerability } from "@/lib/risk-shared";
@@ -100,7 +101,7 @@ export type Pack = {
   since: string | null; until: string; year: number;
   spi: { code: string; label: string; target: string; ytd: string; verdict: string; off: boolean }[]; spiCounts: Record<string, number>;
   reports: { total: number; mor: number; significant: number; open: number; openOld: number; byType: Record<string, number>; list: { id: string; headline: string; erc: number | null; mor: boolean }[] };
-  hazards: { log: number; added: { ref: string; title: string }[]; red: { ref: string; title: string; score: string }[]; reviewDue: number; reassess: number };
+  hazards: { log: number; added: { ref: string; title: string }[]; red: { ref: string; title: string; score: string }[]; reviewDue: number; reassess: number; top?: { ref: string; title: string; score: string | null; designated: boolean; exposure: number }[] };
   changes: { number: string; name: string; status: string | null }[];
   actions: { open: number; late: number; doneSince: number; lateList: { number: string; title: string; due: string | null; owner: string | null }[] };
   findings: { open: number; late: number };
@@ -133,6 +134,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
   const logIds = ((ra ?? []) as { id: string; kind: string }[]).filter((x) => x.kind === "hazard_log").map((x) => x.id);
   const { data: hz } = logIds.length ? await db.from("hazards").select("ref,title,created_at,sev_after,lik_after,review_date,needs_review,status,proposed,source_ref").in("assessment_id", logIds).neq("status", "closed").limit(5000) : { data: [] };
   const H = ((hz ?? []) as { ref: string; title: string; created_at: string; sev_after: string | null; lik_after: number | null; review_date: string | null; needs_review: boolean; proposed: boolean; source_ref: string | null }[]).filter((h) => !h.proposed);
+  const tops = await topHazards(db, [e]).catch(() => []);
   const sch = schemeOf(e);
   const score = (s: string | null, l: number | null) => riskLabel(l, s, sch) ?? "";
   const isRed = (s: string | null, l: number | null) => tolerability(l, s, sch) === "intolerable";
@@ -151,7 +153,7 @@ export async function buildPack(c: Pick<Committee, "id" | "entity" | "kind" | "p
     spi: rows.map((r) => ({ code: r.code, label: r.label, target: targetText(r, r.t), ytd: fmt(r.ytd, r.basis), verdict: VERDICT[r.ytdVerdict][0], off: r.ytdVerdict === "improve" || r.ytdVerdict === "far" })), spiCounts,
     reports: { total: inP.length, mor: inP.filter((r) => r.a?.mor_status === "mandatory").length, significant: inP.filter((r) => (erc(r) ?? 0) >= 100).length, open: open.length, openOld: open.filter((r) => now - new Date(r.received_at).getTime() > 90 * 864e5).length, byType,
       list: inP.filter((r) => (erc(r) ?? 0) >= 100 || r.a?.mor_status === "mandatory").slice(0, 40).map((r) => ({ id: r.id, headline: r.headline, erc: erc(r), mor: r.a?.mor_status === "mandatory" })) },
-    hazards: { log: H.length, added: H.filter((h) => !h.source_ref && h.created_at >= since).map((h) => ({ ref: h.ref, title: h.title })).slice(0, 30), red: H.filter((h) => isRed(h.sev_after, h.lik_after)).map((h) => ({ ref: h.ref, title: h.title, score: score(h.sev_after, h.lik_after) })).slice(0, 30), reviewDue: H.filter((h) => h.review_date && h.review_date < today).length, reassess: H.filter((h) => h.needs_review).length },
+    hazards: { log: H.length, added: H.filter((h) => !h.source_ref && h.created_at >= since).map((h) => ({ ref: h.ref, title: h.title })).slice(0, 30), red: H.filter((h) => isRed(h.sev_after, h.lik_after)).map((h) => ({ ref: h.ref, title: h.title, score: score(h.sev_after, h.lik_after) })).slice(0, 30), reviewDue: H.filter((h) => h.review_date && h.review_date < today).length, reassess: H.filter((h) => h.needs_review).length, top: tops.map((t) => ({ ref: t.ref, title: t.title, score: t.label, designated: t.designated, exposure: t.exposure })) },
     changes: ((ra ?? []) as { kind: string; number: string; name: string; moc_status: string | null; created_at: string; start_date: string | null }[]).filter((x) => x.kind === "moc" && (x.start_date ?? x.created_at.slice(0, 10)) >= since.slice(0, 10)).map((x) => ({ number: x.number, name: x.name, status: x.moc_status })).slice(0, 40),
     actions: { open: openA.length, late: lateA.length, doneSince: A.filter((a) => (a.verified_at ?? a.done_at ?? "") >= since).length, lateList: lateA.slice(0, 30).map((a) => ({ number: a.number, title: a.title, due: a.due, owner: a.owner_role })) },
     findings: { open: openF.length, late: openF.filter((f) => f.due && f.due < today).length },
@@ -165,7 +167,7 @@ export function packFor(key: string, p: Pack | null): string[] {
   switch (key) {
     case "spi": return [`${p.spi.length} SPIs: ${p.spiCounts.ok ?? 0} on target, ${p.spiCounts.improve ?? 0} to improve, ${p.spiCounts.far ?? 0} far off, ${p.spiCounts.nodata ?? 0} without data / target`, ...p.spi.filter((s) => s.off).map((s) => `${s.code} ${s.label}: ${s.ytd} YTD against ${s.target} — ${s.verdict}`)];
     case "reports": case "events": return [`${p.reports.total} reports since ${p.since?.slice(0, 10)} — ${p.reports.mor} MOR, ${p.reports.significant} with ERC ≥ 100; ${p.reports.open} open (${p.reports.openOld} for more than 90 days)`, Object.entries(p.reports.byType).map(([k, v]) => `${k} ${v}`).join(", "), ...p.reports.list.map((r) => `${r.id} ${r.headline}${r.erc != null ? ` — ERC ${r.erc}` : ""}${r.mor ? " — MOR" : ""}`)].filter(Boolean);
-    case "hazards": return [`${p.hazards.log} hazards in the log; ${p.hazards.added.length} added since the last meeting; ${p.hazards.red.length} with an intolerable residual risk; ${p.hazards.reviewDue} reviews overdue; ${p.hazards.reassess} to reassess after a new occurrence`, ...p.hazards.red.map((h) => `${h.ref} ${h.title} — ${h.score}`), ...p.hazards.added.map((h) => `+ ${h.ref} ${h.title}`)];
+    case "hazards": return [`${p.hazards.log} hazards in the log; ${p.hazards.added.length} added since the last meeting; ${p.hazards.red.length} with an intolerable residual risk; ${p.hazards.reviewDue} reviews overdue; ${p.hazards.reassess} to reassess after a new occurrence`, ...(p.hazards.top?.length ? [`Top hazards: ${p.hazards.top.filter((t) => t.designated).length} designated, ${p.hazards.top.filter((t) => !t.designated).length} live by exposure`, ...p.hazards.top.map((t) => `★ ${t.ref} ${t.title}${t.score ? ` — ${t.score}` : ""} (${t.designated ? "designated" : `${t.exposure} occurrence${t.exposure === 1 ? "" : "s"} in 12 months`})`)] : []), ...p.hazards.red.map((h) => `${h.ref} ${h.title} — ${h.score}`), ...p.hazards.added.map((h) => `+ ${h.ref} ${h.title}`)];
     case "changes": return p.changes.length ? p.changes.map((c) => `${c.number} ${c.name} — ${c.status ?? ""}`) : ["No change file opened since the last meeting"];
     case "actions": case "open_actions": return [`${p.actions.open} safety actions open, ${p.actions.late} overdue; ${p.actions.doneSince} done since the last meeting`, ...p.actions.lateList.map((a) => `${a.number} ${a.title} — due ${a.due} (${a.owner ?? "—"})`)];
     case "compliance": case "findings": return [`${p.findings.open} findings open, ${p.findings.late} past their due date`];

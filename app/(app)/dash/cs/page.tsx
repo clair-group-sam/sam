@@ -120,11 +120,15 @@ function EntityColumn({ d, compact }: { d: EntityDash; compact: boolean }) {
         {p && <Area title={`Safety since the last SRB${p.since ? `, ${frd(p.since)}` : ""}`} link={{ href: "/safe/over", label: "Open the overview" }} figs={[
           { label: "reports", value: p.reports.total, href: "/safe/reports", hint: `${p.reports.mor} MOR, ${p.reports.significant} ERC ≥ 100, ${p.reports.open} open` },
           { label: "SPI on target", value: `${p.spiCounts.ok ?? 0} / ${p.spi.length}`, tone: (p.spiCounts.far ?? 0) ? "red" : (p.spiCounts.improve ?? 0) ? "amber" : "green", href: "/safe/over", hint: `${p.spiCounts.improve ?? 0} to improve, ${p.spiCounts.far ?? 0} far off` },
+          { label: "top hazards", value: p.hazards.top?.length ?? 0, href: "/safe/risk?flag=top", hint: `${(p.hazards.top ?? []).filter((t) => t.designated).length} designated, ${(p.hazards.top ?? []).filter((t) => !t.designated).length} live by exposure`, tone: p.hazards.top?.length ? "amber" : undefined },
           { label: "hazards", value: p.hazards.log, href: "/safe/risk", hint: `${p.hazards.red.length} intolerable in the log, ${p.hazards.reviewDue} reviews due`, tone: p.hazards.red.length ? "red" : p.hazards.reviewDue ? "amber" : undefined },
           { label: "safety actions", value: p.actions.open, href: "/safe/actions", hint: `${p.actions.late} overdue, ${p.actions.doneSince} done`, tone: p.actions.late ? "amber" : undefined },
           { label: "change files", value: p.changes.length, href: "/safe/moc" },
         ]} />}
       </section>
+      {p && (p.hazards.top?.length ?? 0) > 0 && <section className="card mb-4">
+        <div className="ch"><span className="eyebrow">Top hazards</span><Link className="mini" href="/safe/risk?flag=top">Open in the hazard log</Link></div>
+        <div className="cb" style={{ padding: 0 }}><table className="tbl"><tbody>{p.hazards.top!.map((t) => <tr key={t.ref}><td className="mono" style={{ width: 130 }}>{t.ref}</td><td>{t.title}</td><td style={{ width: 150 }}>{t.score ?? "not rated"}</td><td style={{ width: 240 }} className="mini">{t.designated ? "designated" : `live, ${t.exposure} occurrence${t.exposure === 1 ? "" : "s"} in 12 months`}</td></tr>)}</tbody></table></div></section>}
       <section className="card">
         <div className="ch"><span className="eyebrow">Overdue by post</span><Link className="mini" href="/dash/cs/overdue">Open the full table</Link></div>
         <div className="cb" style={{ padding: 0 }}>{d.overdue.groups.length ? <table className="tbl"><tbody>{d.overdue.groups.slice(0, 6).map((g) => <tr key={g.owner}><td>{g.owner}{g.isPerson ? "" : " (post)"}</td><td style={{ textAlign: "right" }}><span className={"pill " + (g.worst > 15 ? "red" : g.worst > 7 ? "amber" : "")}>{g.count} item{g.count === 1 ? "" : "s"}, worst {g.worst} d</span></td></tr>)}</tbody></table> : <p className="p-3 mini">Nothing overdue.</p>}</div>
