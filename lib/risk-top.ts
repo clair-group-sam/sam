@@ -12,8 +12,8 @@ export type TopHazard = { id: string; ref: string; title: string; entity: string
 
 export async function topHazards(db: SupabaseClient, entities: string[], n = TOP_LIVE): Promise<TopHazard[]> {
   if (!entities.length) return [];
-  const { data: ra } = await db.from("risk_assessments").select("id,entity,number,top_risk,status,owner_role").in("entity", entities).eq("kind", "hazard_log").limit(3000);
-  const entries = new Map(((ra ?? []) as { id: string; entity: string; number: string; top_risk: boolean | null; status: string; owner_role: string | null }[]).filter((a) => !["archived", "cancelled"].includes(a.status)).map((a) => [a.id, a]));
+  const { data: ra } = await db.from("risk_assessments").select("id,entity,number,status,owner_role").in("entity", entities).eq("kind", "hazard_log").limit(3000);
+  const entries = new Map(((ra ?? []) as { id: string; entity: string; number: string; status: string; owner_role: string | null }[]).filter((a) => !["archived", "cancelled"].includes(a.status)).map((a) => [a.id, a]));
   if (!entries.size) return [];
   const { data: hz } = await db.from("hazards").select("id,ref,title,entity,status,owner_role,top_risk,lik_before,sev_before,lik_after,sev_after,assessment_id,hazard_reports(report_id)").in("assessment_id", [...entries.keys()]).eq("proposed", false).neq("status", "closed").limit(5000);
   type H = { id: string; ref: string; title: string; entity: string; owner_role: string | null; top_risk: boolean | null; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; assessment_id: string; hazard_reports: { report_id: string }[] | null };
