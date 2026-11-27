@@ -174,7 +174,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
                 <label><span className="mini">Domain</span><select name="domain" className="inp" defaultValue={a.domain ?? ""} disabled={!edit}><option value="">—</option>{[...new Set([...DOMAINS, a.domain ?? ""])].filter(Boolean).map((d) => <option key={d}>{d}</option>)}</select></label>
                 <label><span className="mini">Owner (post)</span><input name="owner_role" className="inp mono" defaultValue={a.owner_role ?? ""} disabled={!edit} /></label>
                 {!moc && <label><span className="mini">Next review</span><input type="date" name="next_due" className="inp" defaultValue={a.next_due ?? ""} disabled={!edit} /></label>}
-                {!moc && <label><span className="mini">Top risk</span><select name="top_risk" className="inp" defaultValue={a.top_risk ? "1" : "0"} disabled={!edit}><option value="0">no</option><option value="1">yes</option></select></label>}
+                
               </div>
               <label><span className="mini">Participants, one per line: Name, role</span><textarea name="participants" className="inp" rows={3} defaultValue={(a.participants ?? []).map((p) => `${p.name}${p.role ? ", " + p.role : ""}`).join("\n")} disabled={!edit} /></label>
               {edit && <div className="flex justify-end"><button className="btn">Save</button></div>}

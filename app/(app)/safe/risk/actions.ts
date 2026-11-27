@@ -73,7 +73,6 @@ export async function updateAssessment(fd: FormData) {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const k of FIELDS) if (fd.has(k)) patch[k] = str(fd, k);
   if (fd.has("participants")) patch.participants = parseParticipants(str(fd, "participants"));
-  if (fd.has("top_risk")) patch.top_risk = fd.get("top_risk") === "1";
   if (!patch.name) delete patch.name;
   await db().from("risk_assessments").update(patch).eq("id", ra.id);
   await log({ assessment_id: ra.id, kind: "updated", actor: s.person?.id ?? null, note: "Details updated" });
