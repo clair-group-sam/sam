@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PageHeader } from "@/components/Page";
 import { HZ_STATUS, TOL_LABEL, KINDS, mayEditRisk, schemeOf, tolerability, tolTone } from "@/lib/risk";
 import { RiskMatrix, RiskPill } from "@/components/RiskMatrix";
-import { addMitigation, doneMitigation, keepHazard, discardHazard, reviewedNoChange, updateHazard } from "../actions";
+import { addMitigation, doneMitigation, keepHazard, discardHazard, reviewedNoChange, setTopHazard, updateHazard } from "../actions";
 
 type H = { id: string; entity: string; ref: string; title: string; description: string | null; consequence: string | null; main_impact: string | null; source: string; report_id: string | null; assessment_id: string | null; proposed: boolean; owner_role: string | null; status: string; lik_before: number | null; sev_before: string | null; lik_after: number | null; sev_after: string | null; review_date: string | null; needs_review: boolean; log_hazard_id: string | null; local_only: boolean };
 type M = { id: string; text: string; existing: boolean; owner_role: string | null; due: string | null; done_at: string | null; action_id: string | null };
@@ -48,6 +48,14 @@ export default async function HazardPage({ params }: { params: Promise<{ id: str
         tag={<span className="flex gap-2 items-center"><span className={"pill " + (HZ_STATUS[h.status]?.[1] ?? "")}>{HZ_STATUS[h.status]?.[0]}</span><RiskPill lik={h.lik_before} sev={h.sev_before} entity={h.entity} prefix="pre" /><RiskPill lik={h.lik_after} sev={h.sev_after} entity={h.entity} prefix="post" />{h.proposed && <span className="pill">proposed by SAM</span>}{h.needs_review && <span className="pill red">to reassess</span>}</span>}
         sub={`${h.entity}${a ? `, ${KINDS[a.kind]} ${a.number}, ${a.name}` : ""}`}
         right={<>{a && <Link className="btn" href={`/safe/risk/a/${a.id}`}>{a.number}</Link>}<Link className="btn" href="/safe/risk">Hazard log</Link></>} />
+      {a?.kind === "hazard_log" && h.status !== "closed" && !h.proposed && (() => { const t = h as unknown as { top_risk?: boolean; top_risk_at?: string | null; top_risk_note?: string | null }; return (
+        <form action={setTopHazard} className="card mb-4"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="on" value={t.top_risk ? "0" : "1"} />
+          <div className="cb flex flex-wrap gap-3 items-end">
+            {t.top_risk ? <><span className="pill amber">top hazard, designated{t.top_risk_at ? ` on ${frd(t.top_risk_at.slice(0, 10))}` : ""}</span>{t.top_risk_note && <span className="mini">{t.top_risk_note}</span>}{mayEditRisk(s) && <button className="btn" type="submit">No longer a top hazard</button>}</>
+              : mayEditRisk(s) ? <><label style={{ flex: 1, minWidth: 260 }}><span className="mini">Designate as a top hazard: why (shown in the hazard log and in the pack of the boards)</span><input name="note" className="inp" /></label><button className="btn" type="submit">Designate as a top hazard</button></>
+              : <span className="mini">Not designated as a top hazard.</span>}
+            <span className="mini" style={{ flexBasis: "100%" }}>Designated top hazards stay until unmarked. The other top hazards are ranked by themselves, by the occurrences linked over the last 12 months.</span>
+          </div></form>); })()}
       {signed && <p className="mini mb-3">The assessment {a!.number} is signed: to change this hazard, reopen a new version of the assessment.</p>}
       {h.proposed && edit && (
         <section className="card hz-proposed mb-4"><div className="cb flex gap-3 items-center"><span className="flex-1">SAM proposed this hazard. Keep it (its planned mitigations with an owner then reach their Inbox) or discard it.</span>

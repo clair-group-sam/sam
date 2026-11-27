@@ -18,6 +18,15 @@ async function who(entity?: string, check: (s: Session) => boolean = mayEditRisk
   return s;
 }
 const log = (x: { hazard_id?: string | null; assessment_id?: string | null; kind: string; actor: string | null; note: string }) => db().from("risk_events").insert(x);
+/** SAF · a hazard of the log designated as a top hazard, or no longer, by the safety desk; who, when and why are kept. */
+export async function setTopHazard(fd: FormData) {
+  const h = await hazardOf(String(fd.get("id"))); const s = await who(h.entity);
+  const on = fd.get("on") === "1"; const note = str(fd, "note");
+  const { error } = await db().from("hazards").update({ top_risk: on, top_risk_at: on ? new Date().toISOString() : null, top_risk_by: on ? s.person?.id ?? null : null, top_risk_note: on ? note : null }).eq("id", h.id);
+  if (error) fail(error.message);
+  await log({ hazard_id: h.id, assessment_id: h.assessment_id, kind: "local", actor: s.person?.id ?? null, note: on ? `Designated as a top hazard by ${s.name}${note ? `: ${note}` : ""}` : `No longer designated as a top hazard (${s.name})` });
+  revalidatePath(`/safe/risk/${h.id}`); revalidatePath("/safe/risk"); revalidatePath("/dash/cs");
+}
 type HRow = { id: string; entity: string; assessment_id: string | null; proposed: boolean; report_id: string | null; ref: string; title: string };
 async function hazardOf(id: string): Promise<HRow> {
   const { data } = await db().from("hazards").select("id,entity,assessment_id,proposed,report_id,ref,title").eq("id", id).maybeSingle();
